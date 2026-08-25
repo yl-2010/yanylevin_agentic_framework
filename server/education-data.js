@@ -28,7 +28,7 @@ const PROPERTY_JSON = new Set([
  * Dropped files hidden from dashboard tiles unless listed in `visibleFiles`.
  * Kept on disk for the model. Match is case-insensitive.
  */
-const DEFAULT_UI_HIDDEN_FILES = new Set(["context.md"]);
+const DEFAULT_UI_HIDDEN_FILES = new Set(["context.md", "deleted.md"]);
 
 /**
  * Safe basename for a context file (no path segments / traversal).
@@ -194,7 +194,7 @@ function pinContextFileOrder(files, topNames, bottomNames) {
  * List dropped context files in an object folder.
  * Default order is newest mtime first (same name, then A-Z). Optional `filesTop` /
  * `filesBottom` pin names above or below that. Skips property JSON, nested
- * object dirs, dotfiles, and UI-hidden names (`context.md` by default, plus
+ * object dirs, dotfiles, and UI-hidden names (`context.md` and `deleted.md` by default, plus
  * `hiddenFiles`, minus `visibleFiles`).
  * @param {string} dir
  * @param {{

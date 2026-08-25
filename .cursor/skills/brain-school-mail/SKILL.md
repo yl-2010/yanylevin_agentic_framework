@@ -44,7 +44,9 @@ admissions blasts, or mailing lists.
 Orgs (`brain/orgs/`) for EPS, PathIvy, and similar standing institutions when
 the mail adds a fact. Education Dates panel for orientation, conferences,
 picture day, field trips that are not already there
-(`.cursor/skills/personal-agent/education-dashboard.md`).
+(`.cursor/skills/personal-agent/education-dashboard.md`). Read
+`education/you@example.com/deleted.md` first. Skip a date that looks like
+something Yan already deleted (judgement, not exact clocks).
 
 Identity.md only for Yan map facts (current grade). A new email on
 identity-accounts.md means Yan's address. Other people's mail goes on their

@@ -32,6 +32,8 @@ describe("school-mail fill prompts", () => {
     assert.match(prompt, /Create a new person folder only for/);
     assert.match(prompt, /Never card Scoir/);
     assert.match(prompt, /Other people's mail goes on their card/);
+    assert.match(prompt, /deleted\.md/);
+    assert.match(prompt, /judgement, not exact clocks/);
   });
 
   it("compile pass does not reopen /tmp", () => {

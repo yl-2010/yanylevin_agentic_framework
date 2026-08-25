@@ -102,15 +102,19 @@ Timed events that are already confirmed and should go on Apple Calendar.
 One line per event: title, local date, start to end (or all-day), calendar hint,
 evidence (confirmation email / accepted invite / fromMe yes / school notice).
 "None" if none. Homework, Canvas, bells, and "maybe Friday" do not belong.
+If it looks like a `deleted.md` calendar row, omit it (judgement, not exact
+clocks). Do not list it as new.
 
 ## Big dates
 Life or school events that belong on the education Dates panel (orientation,
 conference, picnic, picture day, field trip, travel days, college visits).
 One line per date: name, YYYY-MM-DD, optional time, parent (user-level or
-class id), evidence. The prompt lists existing dates. If one already matches
-(same parent + date + similar name, including advisor/advisory and stripped
-year suffixes), write `update <path>` instead of a new name. A locked-in
-school event can appear here and in Locked-in calendar. "None" if none.
+class id), evidence. The prompt lists existing dates and `deleted.md`. If one
+already matches (same parent + date + similar name, including advisor/advisory
+and stripped year suffixes), write `update <path>` instead of a new name. If
+it looks like a manually deleted row, skip it. Do not write `update` for a
+path that is gone. A locked-in school event can appear here and in Locked-in
+calendar. "None" if none.
 Dentist visits and homework are not big dates. Travel days use the
 itinerary's fly day (flight number + local date), not `timezoneAfter` or
 Airbnb checkout. `mailSince` only covers new overnight mail; if identity or

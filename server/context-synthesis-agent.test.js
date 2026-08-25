@@ -92,6 +92,8 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /Locked-in calendar/);
     assert.match(prompt, /Big dates/);
     assert.match(prompt, /update <path>/);
+    assert.match(prompt, /manually deleted\.md row/);
+    assert.match(prompt, /Judgement, not exact date\/time/);
     assert.equal(SCHOOL_MAIL_PREFETCH_PATH, "/tmp/yanylevin-context-school-mail.json");
     assert.equal(SCREENTIME_PREFETCH_PATH, "/tmp/yanylevin-context-screentime.json");
     assert.equal(DIGEST_PATH, "/tmp/yanylevin-context-notable.md");
@@ -150,6 +152,31 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /Advisory conference/);
     assert.match(prompt, /dates\/advisory-conference/);
     assert.match(prompt, /update <path>/);
+    assert.match(prompt, /manually deleted\.md row/);
+  });
+
+  it("triage and actions carry a deleted.md block from the index", () => {
+    const existingIndex = [
+      "Existing education dates",
+      '- 2026-08-27 14:00 "Advisory conference" user-level dates/advisory-conference',
+      "Manually deleted objects (deleted.md). If a proposed date, todo, or calendar event looks like one of these, SKIP creating it. Judgement, not exact date/time. Do not write update <gone-path>. Next year's occurrence is allowed.",
+      "- deleted 2026-08-25 15:04 | date | First day of school (11th grade) | on 2026-09-02 08:15 | user-level | was dates/first-day-eps-2026-27",
+    ].join("\n");
+    const triage = buildTriagePrompt({
+      dateKey: "2026-08-16",
+      timezone: "America/Chicago",
+      existingIndex,
+    });
+    const actions = buildActionsPrompt({
+      dateKey: "2026-08-16",
+      timezone: "America/Chicago",
+      existingIndex,
+    });
+    for (const prompt of [triage, actions]) {
+      assert.match(prompt, /First day of school \(11th grade\)/);
+      assert.match(prompt, /manually deleted\.md row/);
+      assert.match(prompt, /Do not write update <gone-path>/);
+    }
   });
 
   it("actions executes calendar and big dates without a Yan add-this quote", () => {
@@ -169,6 +196,8 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /Advisory conference/);
     assert.match(prompt, /similar name/);
     assert.match(prompt, /Descriptions are markdown/);
+    assert.match(prompt, /manually deleted\.md row/);
+    assert.match(prompt, /Judgement, not exact date\/time/);
   });
 
   it("lint verifies cursors and the graph check", () => {

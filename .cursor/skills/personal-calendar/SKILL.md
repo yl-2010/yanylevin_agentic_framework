@@ -25,6 +25,12 @@ node server/calendar-cli.js update --id "<eventIdentifier>" --title "Dentist (mo
 node server/calendar-cli.js delete --id "<eventIdentifier>"
 ```
 
+Before `delete`, append a row to `education/you@example.com/deleted.md` (create the file from the education-dashboard header if it is missing):
+
+`- deleted YYYY-MM-DD HH:MM | calendar | Title | on YYYY-MM-DD HH:MM | Calendar Name | was <eventIdentifier>`
+
+Use the event's local start as `on`. Nightly actions must skip recreating an event that looks like a deleted row (judgement, not exact clocks). If Yan asks to add it back, create it and remove the matching row.
+
 First Studio run should prompt for Calendar access (`yl-calendar.app`). If JSON `ok` is false and the error mentions denied access, tell Yan to grant Calendar to **yl-calendar** (System Settings > Privacy & Security > Calendars). Cursor Full Disk Access does not cover Calendar.
 
 Output is JSON. Use `id` from create/list when updating or deleting. `--calendar` matches calendar title (or `--calendar-id`).
@@ -52,6 +58,6 @@ When adding a named person as a guest, use the address on their people card (or 
 
 Do not duplicate the EPS bell schedule (`schedule.json`) as Calendar events unless asked.
 
-Before creating, list overlapping events that day. Skip if a **similar title** already sits on that local day, not only a byte-identical string. Similar means the same event: lowercase, strip year tokens (`2026`, `2026-27`), treat advisor/advisory as one word, singular/plural on the last word. Nightly actions uses this same rule.
+Before creating, list overlapping events that day. Skip if a **similar title** already sits on that local day, not only a byte-identical string. Similar means the same event: lowercase, strip year tokens (`2026`, `2026-27`), treat advisor/advisory as one word, singular/plural on the last word. Also skip if it looks like a `deleted.md` calendar row. Nightly actions uses this same rule.
 
 Express live context already lists today + tomorrow. Open this skill when you need other days, or to create/change events.

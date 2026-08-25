@@ -16,6 +16,7 @@ import {
   zonedLocalToUtc,
 } from "./daily-briefing-agent.js";
 import { scheduleTodayKey } from "./education-data.js";
+import { formatDeletedBlock, loadDeletedMarkdown } from "./education-match.js";
 import { gitAddCommitPush } from "./git-publish.js";
 import {
   createLaterAuthRetry,
@@ -685,10 +686,14 @@ async function resolveModelSelection(apiKey, spec) {
   }
 }
 
-function buildCanvasSyncPrompt({ dateKey, timezone, force }) {
+export function buildCanvasSyncPrompt({ dateKey, timezone, force, deletedBlock }) {
   const rebuild = force
     ? "This is a forced/manual sync. Re-read the snapshot and apply the skill even if last-agent-sync.json is today."
     : "If last-agent-sync.json is already today and the snapshot has not grown new work, still apply any missing todos/dates from the snapshot.";
+  const deleted =
+    typeof deletedBlock === "string" && deletedBlock.trim()
+      ? deletedBlock.trim()
+      : "";
   return [
     `Follow ${SKILL_PATH}. Sync Canvas into Yan's education dashboard.`,
     "Yan only (you@example.com). Local only. Never spawn a Cursor cloud agent.",
@@ -700,8 +705,12 @@ function buildCanvasSyncPrompt({ dateKey, timezone, force }) {
     "Pull major syllabus / calendar-event dates onto date.json with canvasLink.",
     "NEVER write done or completedAt from Canvas. New todos start done false. Updates leave those keys untouched.",
     "Do not POST to Canvas. Do not delete education todos just because Canvas dropped a row.",
+    "Do not recreate a todo or date that looks like a manually deleted.md row. Judgement, not exact due clocks. canvasId is a strong hint.",
     rebuild,
-  ].join("\n");
+    deleted,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 async function acquireLock() {
@@ -817,7 +826,10 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
       `[canvas-sync] agent ${dateKey} tz=${timezone} model=${model.id} assignments=${fetched.assignments}`
     );
 
-    const prompt = buildCanvasSyncPrompt({ dateKey, timezone, force });
+    const deletedBlock = formatDeletedBlock(
+      await loadDeletedMarkdown(join(ROOT, "education", YAN_EMAIL))
+    );
+    const prompt = buildCanvasSyncPrompt({ dateKey, timezone, force, deletedBlock });
     const { result, authFailed, capacityFailed, transientFailed, usedFallback } =
       await promptWithAuthRetry({
       prefix: "canvas-sync",

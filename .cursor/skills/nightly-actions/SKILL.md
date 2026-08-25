@@ -57,10 +57,11 @@ Before `create`, list overlapping events with `node server/calendar-cli.js`
 (personal-calendar skill) and skip if a **similar title** already sits on
 that local day. Similar means the same event, not byte-identical strings:
 lowercase, strip year tokens (`2026`, `2026-27`), treat advisor/advisory as
-one word, singular/plural on the last word. Convert local times in the
-digest timezone to UTC for `--start` and `--end`. Pick the calendar from
-the personal-calendar skill. Do not ask; if the calendar is not obvious,
-use the personal / default iCloud calendar.
+one word, singular/plural on the last word. Also skip if the event looks
+like a `deleted.md` calendar row (judgement, not exact clocks). Convert
+local times in the digest timezone to UTC for `--start` and `--end`. Pick
+the calendar from the personal-calendar skill. Do not ask; if the calendar
+is not obvious, use the personal / default iCloud calendar.
 
 ## Big dates on the education dashboard (standing)
 
@@ -86,6 +87,11 @@ names share a real word (advisor, picnic), not dentist vs conference at
 14:00. Class-specific field trips go under that class. Everything else is
 user-level `education/you@example.com/dates/<slug>/`.
 
+The same prompt includes `deleted.md`. If a big date or locked-in calendar
+event looks like something Yan already deleted, **skip**. Judgement, not
+exact date/time. Do not write `update` for a path that is gone. Next year's
+occurrence is allowed.
+
 Write `description` as markdown per education-dashboard (bold lead-ins,
 bullets, links, blank lines). Never one run-on paragraph. Shape to copy:
 `dates/fall-orientation-day-1/date.json`.
@@ -97,7 +103,9 @@ Do not git commit; the Node wrapper does that.
 - **Education todos/projects**: per the education-dashboard file. If an
   open todo already has the same parent + dueDate + similar name, **update
   it**. Do not invent ` (2)` unless Yan asked for a second copy. Marking a
-  todo done requires evidence Yan actually did it or said to mark it.
+  todo done requires evidence Yan actually did it or said to mark it. If a
+  suggested todo looks like a `deleted.md` row, skip unless a Directive is
+  Yan explicitly asking to add it back (then create it and remove that row).
 - **Repo/file work**: only what Yan asked for in the scanned context. Small
   and reversible at night; anything large or destructive gets a journal note
   proposing it instead.
@@ -115,6 +123,8 @@ Do not git commit; the Node wrapper does that.
 - Retrying a failed send until it double-sends. One attempt, then report.
 - Duplicating an event, date, or todo that is already there. Exact `name`
   match is not enough; similar names on the same day are the same event.
+- Recreating something Yan already deleted. `deleted.md` is judgement, not
+  an exact clock match.
 
 ## Verify
 

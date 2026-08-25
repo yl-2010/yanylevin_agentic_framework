@@ -11,6 +11,7 @@ import {
   snapshotHasDashboardClass,
   selectDashboardCanvasCourses,
   filterCanvasSnapshotToDashboard,
+  buildCanvasSyncPrompt,
 } from "./canvas-sync.js";
 import {
   contextSynthesisHm,
@@ -263,5 +264,20 @@ describe("filterCanvasSnapshotToDashboard", () => {
       slim.events.map((e) => e.title),
       ["Test"]
     );
+  });
+});
+
+describe("buildCanvasSyncPrompt", () => {
+  it("tells the agent to skip deleted.md rows", () => {
+    const prompt = buildCanvasSyncPrompt({
+      dateKey: "2026-08-25",
+      timezone: "America/Chicago",
+      force: false,
+      deletedBlock:
+        "Manually deleted objects (deleted.md).\n- deleted 2026-08-25 15:04 | todo | Essay | on 2026-09-12 | class:lit | was classes/lit/todos/essay",
+    });
+    assert.match(prompt, /personal-canvas/);
+    assert.match(prompt, /Do not recreate a todo or date that looks like a manually deleted\.md row/);
+    assert.match(prompt, /classes\/lit\/todos\/essay/);
   });
 });

@@ -282,11 +282,45 @@ export async function loadEducationActionIndex(userRoot = defaultEducationRoot()
     .filter((t) => !t.done)
     .sort((a, b) => compareByDayThenPath(a, b, "dueDate"));
 
+  const deletedMarkdown = await loadDeletedMarkdown(userRoot);
+  const deletedBlock = formatDeletedBlock(deletedMarkdown);
+
   return {
     dates,
     todos: openTodos,
-    text: formatEducationActionIndex(dates, openTodos),
+    deletedMarkdown,
+    text: [formatEducationActionIndex(dates, openTodos), deletedBlock]
+      .filter(Boolean)
+      .join("\n\n"),
   };
+}
+
+/**
+ * Raw `deleted.md` at the user education root, or "" if missing/empty.
+ * @param {string} [userRoot]
+ */
+export async function loadDeletedMarkdown(userRoot = defaultEducationRoot()) {
+  try {
+    const text = await readFile(join(userRoot, "deleted.md"), "utf8");
+    return String(text || "").trim();
+  } catch (err) {
+    if (err?.code === "ENOENT") return "";
+    throw err;
+  }
+}
+
+/**
+ * Prompt block for nightly jobs. Empty string when there is no list.
+ * Matching is judgement, not a keyed date/time equality check.
+ * @param {string} [deletedMarkdown]
+ */
+export function formatDeletedBlock(deletedMarkdown) {
+  const body = String(deletedMarkdown || "").trim();
+  if (!body) return "";
+  return [
+    "Manually deleted objects (deleted.md). If a proposed date, todo, or calendar event looks like one of these, SKIP creating it. Judgement, not exact date/time. Do not write update <gone-path>. Next year's occurrence is allowed.",
+    body,
+  ].join("\n");
 }
 
 /**

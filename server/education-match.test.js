@@ -6,6 +6,7 @@ import { join } from "node:path";
 import {
   findMatchingDate,
   findMatchingTodo,
+  formatDeletedBlock,
   formatEducationActionIndex,
   isSameEducationDate,
   isSameEducationTodo,
@@ -268,6 +269,7 @@ describe("loadEducationActionIndex", () => {
       assert.match(index.text, /Call PathIvy/);
       assert.doesNotMatch(index.text, /College night/);
       assert.doesNotMatch(index.text, /Done already/);
+      assert.doesNotMatch(index.text, /Manually deleted objects/);
       assert.equal(
         findMatchingDate(
           {
@@ -288,5 +290,42 @@ describe("loadEducationActionIndex", () => {
     const text = formatEducationActionIndex([], []);
     assert.match(text, /never a new slug/);
     assert.match(text, /None/);
+  });
+
+  it("appends deleted.md with a judgement skip instruction", async () => {
+    const root = await mkdtemp(join(tmpdir(), "edu-match-del-"));
+    try {
+      await mkdir(join(root, "dates", "picnic"), { recursive: true });
+      await writeFile(
+        join(root, "dates", "picnic", "date.json"),
+        JSON.stringify({ name: "School picnic", date: "2026-09-12" })
+      );
+      await writeFile(
+        join(root, "deleted.md"),
+        [
+          "# Manually deleted",
+          "",
+          "## Items",
+          "",
+          "- deleted 2026-08-25 15:04 | date | First day of school (11th grade) | on 2026-09-02 08:15 | user-level | was dates/first-day-eps-2026-27",
+          "",
+        ].join("\n")
+      );
+
+      const index = await loadEducationActionIndex(root);
+      assert.match(index.text, /School picnic/);
+      assert.match(index.text, /Manually deleted objects \(deleted\.md\)/);
+      assert.match(index.text, /Judgement, not exact date\/time/);
+      assert.match(index.text, /First day of school \(11th grade\)/);
+      assert.match(index.text, /2026-09-02 08:15/);
+      assert.equal(index.deletedMarkdown.includes("first-day-eps-2026-27"), true);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("formatDeletedBlock is empty when there is no list", () => {
+    assert.equal(formatDeletedBlock(""), "");
+    assert.equal(formatDeletedBlock("   "), "");
   });
 });

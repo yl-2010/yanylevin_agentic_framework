@@ -125,6 +125,7 @@ export function buildSchoolMailFillPrompt({ outDir, file, batchIndex, batchCount
     "Create a new person folder only for a real EPS teacher, counselor, classmate, or family-school contact Yan clearly knows. Never card Scoir, GitHub, university marketing, or mailing lists.",
     "Timeline append-only: `- YYYY-MM-DD | fact [school-mail]`. Skip duplicates. Facts, not transcripts.",
     "Education dates that belong on the Dates panel (orientation, conferences, picture day, field trips) can be written under education/you@example.com/dates/ per the education-dashboard skill if they are not already there.",
+    "Read education/you@example.com/deleted.md. Skip dates that look like a row Yan already deleted (judgement, not exact clocks).",
     "Identity.md only for Yan map facts that are new (current grade). A new email on identity-accounts.md means Yan's address. Other people's mail goes on their card. School standing goes to identity-school.md. Dated school events go to the matching org timeline. Do not paste email bodies.",
     "Reply with one line: month, cards touched, dates added. Do not quote emails.",
   ].join("\n");

@@ -56,6 +56,7 @@ describe("listContextFiles hiddenNames", () => {
     await writeFile(join(dir, ".dotfile"), "d");
     await writeFile(join(dir, "todo.json"), "{}");
     await writeFile(join(dir, "CONTEXT.md"), "model notes");
+    await writeFile(join(dir, "deleted.md"), "# Manually deleted\n");
   });
 
   it("lists safe files and hides context.md by default", async () => {

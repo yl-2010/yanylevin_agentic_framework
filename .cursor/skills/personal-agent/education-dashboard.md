@@ -16,6 +16,7 @@ Canonical schedule files live in `.cursor/skills/class-schedule/SKILL.md` (weekl
 education/<email>/
   meta.json                 # gradeFolder, onedriveRoot, optional hiddenFiles / visibleFiles / filesTop / filesBottom for user-level dropped files
   schedule.json             # bells + weekdayPeriods + closedDates (from PDF)
+  deleted.md                # agent-only: objects this user deleted on purpose; nightly jobs skip recreating them
   .chat-history/            # Personal Agent transcripts (listed in the chat UI unless visibility: hidden)
   .chat-uploads/            # attachment staging (expires with session)
   # optional user-level dropped files sit here (not a context/ subfolder)
@@ -38,6 +39,7 @@ education/<email>/
 **Context file visibility:** dashboard file tiles omit some dropped files; bytes stay in the same folder. Do not delete the file or rename to a dotfile.
 
 - **`context.md` (any case, including `CONTEXT.md`)** is hidden by default on every class / project / todo / date / user-level folder. That file is for the model, not the app UI. Writing one does **not** need a JSON change.
+- **`deleted.md`** is hidden from tiles the same way. It lives at the user root (`education/<email>/deleted.md`). Do not put it in an object folder.
 - **`hiddenFiles`:** optional string array on `class.json`, `project.json`, `todo.json`, `date.json`, or `meta.json` (user-level). Each entry is a dropped-file basename (e.g. `"worksheet.pdf"`). Use when the user asks to hide a file that would otherwise show. Matching is case-insensitive.
 - **`visibleFiles`:** optional string array on the same JSON. Shows a file that would otherwise be hidden, including `CONTEXT.md` if the user asks to see it. Wins over `hiddenFiles` and over the context.md default. Unhide by adding the basename here; hide context.md again by removing it from `visibleFiles`.
 - **File tile order (web + iOS):** default is newest filesystem mtime first (same mtime, then A-Z). Override per folder with two optional string arrays on the same JSON. Array order is the pin order.
@@ -112,6 +114,31 @@ If it matches: **update that folder**. Never mint a new slug. `Advisory conferen
 
 Folder `dateId` stays unique within that parent `dates/` folder. Prefer a slug of the final `name`.
 
+### Manually deleted (`deleted.md`)
+
+When the user asks to **delete** a class, project, todo, or important date (not check off, not hide a file, not a move), append a row to `education/<email>/deleted.md` **before** removing the folder. Create the file if it is missing (copy the header from `education/you@example.com/deleted.md`). Alex writes only `education/you@example.com/deleted.md`.
+
+Do **not** record:
+
+- Moves (write the new folder, then delete the old one with no `deleted.md` row)
+- Checking `done` / setting `completedAt`
+- Daily briefing todos (`kind: "dailyBriefing"`)
+- Fixtures
+
+Row format (one line):
+
+`- deleted YYYY-MM-DD HH:MM | kind | Name | on YYYY-MM-DD HH:MM | parent | was path`
+
+- `deleted` timestamp is local now (date and time)
+- `kind` is `date` | `todo` | `class` | `project` (calendar rows use the personal-calendar skill)
+- After `on`, include the object's own date and time when those fields exist. Drop `on …` if there is no date
+- parent: `user-level`, `class:<id>`, `project:<id>`
+- `was` is the former folder path (helpful, not a unique key)
+
+If the user later asks to add that thing back, create it and **remove** the matching row from `deleted.md`. Nightly jobs skip by judgement, so a leftover row would keep blocking it.
+
+Nightly / Canvas / school-mail: if a proposed create looks like a row in `deleted.md`, skip it. Do not require the clock time or even the calendar day to match byte-for-byte. Same event in the same school year is enough. Next year's first day is a new event. Do not write `update <gone-path>`.
+
 ### Time phrases
 
 When the user says a due/start time in natural language, resolve it like this:
@@ -144,7 +171,7 @@ Text-only and attachment turns both run on **grok-4.6 high** (not fast). The two
 
 ## Actions
 
-- Parse natural language into class / project / todo / important date create/update/delete. When moving a todo or date into a class or project, write the new folder, then delete the old one. Do not leave empty `todos/<id>/` or `dates/<id>/` shells. Those make the brain education mirror warn about missing json. Nightly actions also creates `date.json` rows for big dates (school events, travel days, college visits) listed in the 02:30 digest. Skip or update duplicates (same parent + date + similar name, not only exact `name`). Do not create dates for routine appointments or homework.
+- Parse natural language into class / project / todo / important date create/update/delete. When moving a todo or date into a class or project, write the new folder, then delete the old one. Do not leave empty `todos/<id>/` or `dates/<id>/` shells. Those make the brain education mirror warn about missing json. An intentional delete must append a `deleted.md` row first; a move must not. Nightly actions also creates `date.json` rows for big dates (school events, travel days, college visits) listed in the 02:30 digest. Skip or update duplicates (same parent + date + similar name, not only exact `name`). Skip anything that looks like a `deleted.md` row (judgement, not exact clocks). Do not create dates for routine appointments or homework.
 - Daily Briefing feedback (Yan): when he comments on news selection (more local, less politics, skip a beat, etc.), append a dated note to `education/you@example.com/daily-briefing/preferences.md`. Capsule thumbs are 3-way: up = more of this, down = less of this, neither (`vote: null`) = **neutral** (a real rating, not skipped/ignored). Do not attach briefing todos to a class/project or give them CW/HW/QA/MA tags. Compiling the brief itself is the daily-news skill.
 - Set/clear `done`; set tags CW/HW/QA/MA when the user means school-tagged work. When setting `done` true, also set `completedAt` to an ISO timestamp (now); when setting `done` false, remove `completedAt`. On create, set `createdAt` to now.
 - Set/clear `showInDates` on todos when the user wants an item shown or hidden in Dates (MAs show there by default)

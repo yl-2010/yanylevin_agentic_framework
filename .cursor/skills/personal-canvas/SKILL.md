@@ -67,7 +67,7 @@ When at least one class maps, sync **only** those mapped classes and continue be
 For every snapshot assignment whose `courseId` is mapped:
 
 - Match an existing todo in that class by `canvasId`, then `canvasLink`, then same **name + parent + dueDate**.
-- **Create** if none. Folder id: kebab of the title, unique in that class `todos/`. Set `createdAt` now. `done: false` on create only.
+- **Create** if none, unless it looks like a row in `education/you@example.com/deleted.md`. Judgement, not exact due clocks. `canvasId` is a strong hint; similar name + class in the same year is enough. Skip those. Folder id: kebab of the title, unique in that class `todos/`. Set `createdAt` now. `done: false` on create only.
 - **Update** name, `dueDate`, `dueTime`, `tag`, `description`, `canvasLink`, `canvasId` when Canvas changed.
 - Prefer snapshot `dueDate` / `dueTime` (already in the briefing timezone). Undated Canvas rows may omit due fields.
 - **Always** set `canvasLink` to the assignment `htmlUrl`.
@@ -86,6 +86,7 @@ For every snapshot assignment whose `courseId` is mapped:
 Read each mapped course `syllabus` plus snapshot `events[]`. Create/update **important dates** (exams, concerts, trips, conferences, no-school mentioned in the syllabus, unit tests called out as calendar events). Skip routine class meetings.
 
 - Match by `canvasId` / `canvasLink` / same name+date in that class `dates/`. Also treat **similar names** on that date as the same event (advisor/advisory, stripped years). Update in place; never a second slug.
+- Skip create if the date looks like a `deleted.md` row (same judgement as todos).
 - Set `date`, optional `time`, markdown `description` when there are real facts, `canvasLink` (event url or course `syllabusUrl`), optional `canvasId`.
 - Do not turn syllabus fluff into dates.
 
@@ -94,6 +95,7 @@ Read each mapped course `syllabus` plus snapshot `events[]`. Create/update **imp
 - **Never** set or clear `done` or `completedAt` from Canvas. Yan checks work off in yanylevin. An update must leave those keys exactly as they are.
 - **Never** POST/PUT/DELETE to Canvas. Read-only.
 - **Never** delete an education todo/date because it disappeared from Canvas.
+- **Never** recreate a todo/date Yan already deleted (`deleted.md`). Judgement, not exact clocks.
 - **Never** touch fixtures (`"fixture": true` or ids starting `_example-`).
 - **Never** put Canvas rows on projects or user-level todos. Class folders only.
 - **Never** mix this with Fitness OS gym logs.
