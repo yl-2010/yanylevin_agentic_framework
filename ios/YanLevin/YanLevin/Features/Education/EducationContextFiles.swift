@@ -10,7 +10,7 @@ struct EducationFileOwner: Equatable {
     var projectId: String? = nil
 }
 
-/// Liquid-glass file tiles. Newest-first list from the API; tap opens Quick Look.
+/// Liquid-glass file tiles. API order (pinned top, then newest mtime, then pinned bottom); tap opens Quick Look.
 struct EducationContextFilesView: View {
     let files: [EducationContextFile]
     let owner: EducationFileOwner

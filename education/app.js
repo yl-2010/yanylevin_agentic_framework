@@ -1380,7 +1380,7 @@
   }
 
   /**
-   * Liquid-glass file tiles (newest first already from API).
+   * Liquid-glass file tiles (API order: filesTop, then newest mtime, then filesBottom).
    * @param {{ name: string }[]|null|undefined} files
    * @param {{ scope: string, id?: string, classId?: string, projectId?: string }} owner
    * @param {{ pair?: boolean, filterPrefix?: string }} [opts]

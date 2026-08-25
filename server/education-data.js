@@ -78,13 +78,41 @@ export function parseVisibleFileNames(props) {
 }
 
 /**
+ * Ordered basenames from `filesTop` / `filesBottom`. First occurrence wins.
+ * @param {unknown} raw
+ * @returns {string[]} lowercase safe basenames
+ */
+export function parseOrderedFileNames(raw) {
+  /** @type {string[]} */
+  const out = [];
+  const seen = new Set();
+  if (!Array.isArray(raw)) return out;
+  for (const entry of raw) {
+    const safe = isSafeContextFileName(entry);
+    if (!safe) continue;
+    const key = safe.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(key);
+  }
+  return out;
+}
+
+/**
  * @param {object|null|undefined} props
- * @returns {{ hiddenNames: Set<string>, visibleNames: Set<string> }}
+ * @returns {{
+ *   hiddenNames: Set<string>,
+ *   visibleNames: Set<string>,
+ *   topNames: string[],
+ *   bottomNames: string[],
+ * }}
  */
 export function contextFileListOpts(props) {
   return {
     hiddenNames: parseHiddenFileNames(props),
     visibleNames: parseVisibleFileNames(props),
+    topNames: parseOrderedFileNames(props?.filesTop),
+    bottomNames: parseOrderedFileNames(props?.filesBottom),
   };
 }
 
@@ -104,11 +132,77 @@ function toLowerNameSet(names) {
 }
 
 /**
- * List dropped context files in an object folder (newest first).
- * Skips property JSON, nested object dirs, dotfiles, and UI-hidden names
- * (`context.md` by default, plus `hiddenFiles`, minus `visibleFiles`).
+ * Stick named files to the top / bottom in the given order. Unpinned files
+ * keep their incoming order (mtime newest first). A name in both lists stays
+ * on top. Missing or hidden names are skipped.
+ * @param {{ name: string }[]} files
+ * @param {string[]|Set<string>|undefined} topNames
+ * @param {string[]|Set<string>|undefined} bottomNames
+ * @returns {{ name: string }[]}
+ */
+function pinContextFileOrder(files, topNames, bottomNames) {
+  const topList = Array.isArray(topNames)
+    ? topNames
+    : topNames instanceof Set
+      ? [...topNames]
+      : [];
+  const bottomList = Array.isArray(bottomNames)
+    ? bottomNames
+    : bottomNames instanceof Set
+      ? [...bottomNames]
+      : [];
+  if (!topList.length && !bottomList.length) return files;
+
+  /** @type {Map<string, { name: string }>} */
+  const byLower = new Map();
+  for (const f of files) {
+    const key = f.name.toLowerCase();
+    if (!byLower.has(key)) byLower.set(key, f);
+  }
+
+  const used = new Set();
+  /** @type {{ name: string }[]} */
+  const top = [];
+  for (const raw of topList) {
+    const key = String(raw).toLowerCase();
+    const f = byLower.get(key);
+    if (!f || used.has(key)) continue;
+    top.push(f);
+    used.add(key);
+  }
+
+  const bottomUsed = new Set();
+  /** @type {{ name: string }[]} */
+  const bottom = [];
+  for (const raw of bottomList) {
+    const key = String(raw).toLowerCase();
+    if (used.has(key) || bottomUsed.has(key)) continue;
+    const f = byLower.get(key);
+    if (!f) continue;
+    bottom.push(f);
+    bottomUsed.add(key);
+  }
+
+  const middle = files.filter((f) => {
+    const key = f.name.toLowerCase();
+    return !used.has(key) && !bottomUsed.has(key);
+  });
+  return [...top, ...middle, ...bottom];
+}
+
+/**
+ * List dropped context files in an object folder.
+ * Default order is newest mtime first (same name, then A-Z). Optional `filesTop` /
+ * `filesBottom` pin names above or below that. Skips property JSON, nested
+ * object dirs, dotfiles, and UI-hidden names (`context.md` by default, plus
+ * `hiddenFiles`, minus `visibleFiles`).
  * @param {string} dir
- * @param {{ hiddenNames?: Set<string>|string[], visibleNames?: Set<string>|string[] }} [opts]
+ * @param {{
+ *   hiddenNames?: Set<string>|string[],
+ *   visibleNames?: Set<string>|string[],
+ *   topNames?: string[]|Set<string>,
+ *   bottomNames?: string[]|Set<string>,
+ * }} [opts]
  * @returns {Promise<{ name: string, size: number, mtime: string }[]>}
  */
 export async function listContextFiles(dir, opts = {}) {
@@ -146,9 +240,10 @@ export async function listContextFiles(dir, opts = {}) {
     if (!visibleSet.has(n)) hiddenSet.add(n);
   }
   for (const n of visibleSet) hiddenSet.delete(n);
-  return out
+  const visible = out
     .filter((f) => !hiddenSet.has(f.name.toLowerCase()))
     .map(({ name, size, mtime }) => ({ name, size, mtime }));
+  return pinContextFileOrder(visible, opts?.topNames, opts?.bottomNames);
 }
 
 /**

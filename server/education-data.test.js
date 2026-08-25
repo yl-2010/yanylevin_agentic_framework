@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, utimes, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -8,6 +8,7 @@ import {
   isSafeContextFileName,
   listContextFiles,
   parseHiddenFileNames,
+  parseOrderedFileNames,
   parseVisibleFileNames,
 } from "./education-data.js";
 
@@ -109,6 +110,128 @@ describe("listContextFiles hiddenNames", () => {
     assert.deepEqual(
       files.map((f) => f.name).sort(),
       ["also-visible.txt", "hidden.pdf", "visible.pdf"]
+    );
+  });
+
+  it("cleanup", async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe("parseOrderedFileNames", () => {
+  it("keeps first-occurrence order and skips junk", () => {
+    assert.deepEqual(
+      parseOrderedFileNames(["Z.pdf", "a.txt", "Z.PDF", ".dot", "todo.json", "a.txt"]),
+      ["z.pdf", "a.txt"]
+    );
+  });
+
+  it("returns empty when absent", () => {
+    assert.deepEqual(parseOrderedFileNames(undefined), []);
+    assert.deepEqual(parseOrderedFileNames(null), []);
+  });
+});
+
+describe("listContextFiles pin order", () => {
+  /** @type {string} */
+  let dir;
+
+  it("setup temp folder with known mtimes", async () => {
+    dir = await mkdtemp(join(tmpdir(), "edu-pins-"));
+    await writeFile(join(dir, "old.pdf"), "a");
+    await writeFile(join(dir, "mid.pdf"), "b");
+    await writeFile(join(dir, "new.pdf"), "c");
+    await writeFile(join(dir, "hidden.pdf"), "d");
+    const t0 = new Date("2024-01-01T00:00:00Z");
+    const t1 = new Date("2024-06-01T00:00:00Z");
+    const t2 = new Date("2024-12-01T00:00:00Z");
+    const t3 = new Date("2025-01-01T00:00:00Z");
+    await utimes(join(dir, "old.pdf"), t0, t0);
+    await utimes(join(dir, "mid.pdf"), t1, t1);
+    await utimes(join(dir, "new.pdf"), t2, t2);
+    await utimes(join(dir, "hidden.pdf"), t3, t3);
+  });
+
+  it("defaults to newest mtime first", async () => {
+    const files = await listContextFiles(dir);
+    assert.deepEqual(
+      files.map((f) => f.name),
+      ["hidden.pdf", "new.pdf", "mid.pdf", "old.pdf"]
+    );
+  });
+
+  it("pins filesTop above mtime order", async () => {
+    const files = await listContextFiles(
+      dir,
+      contextFileListOpts({ filesTop: ["old.pdf", "new.pdf"] })
+    );
+    assert.deepEqual(
+      files.map((f) => f.name),
+      ["old.pdf", "new.pdf", "hidden.pdf", "mid.pdf"]
+    );
+  });
+
+  it("pins filesBottom below mtime order", async () => {
+    const files = await listContextFiles(
+      dir,
+      contextFileListOpts({ filesBottom: ["new.pdf", "old.pdf"] })
+    );
+    assert.deepEqual(
+      files.map((f) => f.name),
+      ["hidden.pdf", "mid.pdf", "new.pdf", "old.pdf"]
+    );
+  });
+
+  it("puts unpinned files between top and bottom", async () => {
+    const files = await listContextFiles(
+      dir,
+      contextFileListOpts({
+        filesTop: ["old.pdf"],
+        filesBottom: ["new.pdf"],
+      })
+    );
+    assert.deepEqual(
+      files.map((f) => f.name),
+      ["old.pdf", "hidden.pdf", "mid.pdf", "new.pdf"]
+    );
+  });
+
+  it("lets filesTop win when a name is in both lists", async () => {
+    const files = await listContextFiles(
+      dir,
+      contextFileListOpts({
+        filesTop: ["new.pdf"],
+        filesBottom: ["new.pdf"],
+      })
+    );
+    assert.deepEqual(
+      files.map((f) => f.name),
+      ["new.pdf", "hidden.pdf", "mid.pdf", "old.pdf"]
+    );
+  });
+
+  it("skips missing names and matches case-insensitively", async () => {
+    const files = await listContextFiles(
+      dir,
+      contextFileListOpts({ filesTop: ["missing.doc", "OLD.PDF"] })
+    );
+    assert.deepEqual(
+      files.map((f) => f.name),
+      ["old.pdf", "hidden.pdf", "new.pdf", "mid.pdf"]
+    );
+  });
+
+  it("does not show a hidden file just because it is pinned", async () => {
+    const files = await listContextFiles(
+      dir,
+      contextFileListOpts({
+        hiddenFiles: ["hidden.pdf"],
+        filesTop: ["hidden.pdf", "old.pdf"],
+      })
+    );
+    assert.deepEqual(
+      files.map((f) => f.name),
+      ["old.pdf", "new.pdf", "mid.pdf"]
     );
   });
 
