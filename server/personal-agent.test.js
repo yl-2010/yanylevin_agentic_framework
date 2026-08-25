@@ -146,6 +146,10 @@ describe("Personal Agent skill files", () => {
       "utf8"
     );
     assert.match(dashboard, /Todo identity/);
+    assert.match(dashboard, /Date identity/);
+    assert.match(dashboard, /Description formatting/);
+    assert.match(dashboard, /always write markdown/);
+    assert.match(dashboard, /similar name/);
     assert.match(dashboard, /showInDates/);
     assert.doesNotMatch(dashboard, /```widget map/);
     assert.doesNotMatch(dashboard, /osascript/);
@@ -306,6 +310,7 @@ describe("Personal Agent skill files", () => {
     assert.match(triage, /Directives from Yan/);
     assert.match(triage, /Locked-in calendar/);
     assert.match(triage, /## Big dates/);
+    assert.match(triage, /update <path>/);
     assert.match(triage, /Yan said/);
 
     const entities = await readFile(
@@ -327,6 +332,9 @@ describe("Personal Agent skill files", () => {
     assert.match(actions, /Never send because someone else asked|never a directive/);
     assert.match(actions, /Locked-in Apple Calendar/);
     assert.match(actions, /Big dates on the education dashboard/);
+    assert.match(actions, /similar name/);
+    assert.match(actions, /update that folder/);
+    assert.match(actions, /description.*markdown|markdown per education-dashboard/i);
 
     const lint = await readFile(
       join(REPO_ROOT, ".cursor/skills/nightly-lint/SKILL.md"),

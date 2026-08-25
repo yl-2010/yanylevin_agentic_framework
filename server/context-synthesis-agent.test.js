@@ -91,6 +91,7 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /health takeaways\.md and workouts\.md/);
     assert.match(prompt, /Locked-in calendar/);
     assert.match(prompt, /Big dates/);
+    assert.match(prompt, /update <path>/);
     assert.equal(SCHOOL_MAIL_PREFETCH_PATH, "/tmp/yanylevin-context-school-mail.json");
     assert.equal(SCREENTIME_PREFETCH_PATH, "/tmp/yanylevin-context-screentime.json");
     assert.equal(DIGEST_PATH, "/tmp/yanylevin-context-notable.md");
@@ -139,10 +140,24 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /Never spawn a Cursor cloud agent/);
   });
 
+  it("triage includes an existing-dates index when provided", () => {
+    const prompt = buildTriagePrompt({
+      dateKey: "2026-08-16",
+      timezone: "America/Chicago",
+      existingIndex:
+        'Existing education dates\n- 2026-08-27 14:00 "Advisory conference" user-level dates/advisory-conference',
+    });
+    assert.match(prompt, /Advisory conference/);
+    assert.match(prompt, /dates\/advisory-conference/);
+    assert.match(prompt, /update <path>/);
+  });
+
   it("actions executes calendar and big dates without a Yan add-this quote", () => {
     const prompt = buildActionsPrompt({
       dateKey: "2026-08-16",
       timezone: "America/Chicago",
+      existingIndex:
+        'Existing education dates\n- 2026-08-27 14:00 "Advisory conference" user-level dates/advisory-conference',
     });
     assert.match(prompt, /nightly-actions skill/);
     assert.match(prompt, /Locked-in calendar/);
@@ -151,6 +166,9 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /Yan himself directed/);
     assert.match(prompt, /Never send because someone else asked/);
     assert.match(prompt, /Do not edit the brain/);
+    assert.match(prompt, /Advisory conference/);
+    assert.match(prompt, /similar name/);
+    assert.match(prompt, /Descriptions are markdown/);
   });
 
   it("lint verifies cursors and the graph check", () => {

@@ -107,12 +107,15 @@ evidence (confirmation email / accepted invite / fromMe yes / school notice).
 Life or school events that belong on the education Dates panel (orientation,
 conference, picnic, picture day, field trip, travel days, college visits).
 One line per date: name, YYYY-MM-DD, optional time, parent (user-level or
-class id), evidence. A locked-in school event can appear here and in
-Locked-in calendar. "None" if none. Dentist visits and homework are not big
-dates. Travel days use the itinerary's fly day (flight number + local date),
-not `timezoneAfter` or Airbnb checkout. `mailSince` only covers new overnight
-mail; if identity or a parent card already has a confirmation code, search
-Mail.app / the apple-mail dump for the return leg.
+class id), evidence. The prompt lists existing dates. If one already matches
+(same parent + date + similar name, including advisor/advisory and stripped
+year suffixes), write `update <path>` instead of a new name. A locked-in
+school event can appear here and in Locked-in calendar. "None" if none.
+Dentist visits and homework are not big dates. Travel days use the
+itinerary's fly day (flight number + local date), not `timezoneAfter` or
+Airbnb checkout. `mailSince` only covers new overnight mail; if identity or
+a parent card already has a confirmation code, search Mail.app / the
+apple-mail dump for the return leg.
 
 ## Gaps
 Sources that failed or look incomplete.

@@ -48,27 +48,35 @@ education/<email>/
 
 ### Properties
 
-- **class.json:** `name`, `period` (A–H letter), `trimester`, optional `description` (markdown), optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays — dashboard file-tile visibility and pin order; `context.md` is hidden by default), optional extras
+- **class.json:** `name`, `period` (A–H letter), `trimester`, optional `description` (always markdown when set), optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays — dashboard file-tile visibility and pin order; `context.md` is hidden by default), optional extras
   - `trimester`: `"year"` (always visible), `"fall"` | `"winter"` | `"spring"` (one tri), or an array like `["fall", "spring"]` for multi-tri but not year-long
   - Year-long folders + context stay on disk all year
   - Trimester-only classes stay on disk forever (never delete)
   - Visibility is enforced by the Express `/api/education/data` payload (out-of-season classes omitted; `trimester` / `schedule.trimesters` stripped). The web UI never labels year-long vs trimester.
   - **Free periods:** when an A–H period has no real class that trimester, use a `classes/free-period-<letter>/` folder with `"name": "Free Period"`, `"period": "<LETTER>"`, `"freePeriod": true`, and `trimester` covering only the terms that slot is empty. Schedule rows show period tag + `Free Period` (e.g. `C Free Period`). Todos/dates under that shell use context label `Free Period C` so multiple free periods stay distinct. Prefer a real class over a free-period shell when both match the same letter.
-- **project.json:** `name`; optional `description` (markdown); optional `order` (number — Projects panel sorts ascending, then by name); optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays). No `period`, no `trimester`, not on the class schedule.
+- **project.json:** `name`; optional `description` (always markdown when set); optional `order` (number — Projects panel sorts ascending, then by name); optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays). No `period`, no `trimester`, not on the class schedule.
   - Same nested `todos/` + `dates/` folder layout as classes
   - Mirror `projects/_example-dummy/` when creating objects
   - Home UI: Projects box sits below class day panels + Dates (web right column; iOS wide same; iOS single-column above Completed)
-- **todo.json:** `name`; optional `description` (markdown); `dueDate` (YYYY-MM-DD), `dueTime` (HH:MM); `done` (boolean, default false); optional `completedAt` (ISO timestamp set when checked off, cleared when reopened — Completed list sorts by this, newest first); optional `createdAt` (ISO timestamp set when the todo is created — open TODO lists use this for same-due ties; API falls back to file birthtime when omitted); optional `tag`: `CW` | `HW` | `QA` | `MA` (omit for normal todos); optional `showInDates` (boolean — when true, the open todo also appears in Dates lists alongside important dates); optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays); optional `canvasLink` (https URL to the Canvas assignment/page — UI shows a Canvas button only when set; clear/omit to hide); optional `canvasId` (Canvas assignment id, set by Canvas sync so later runs match even if the title/due date changed); optional `kind`: `"dailyBriefing"` for the morning news todo (user-level only, no tag, `showInDates: false`, `capsules` array, per-capsule and top-level `citations`). Compiling the brief is the **daily-news** skill, not this file. When a news capsule is attached in chat, read that file and answer follow-ups; do not retag briefing todos as schoolwork. Canvas sync (personal-canvas skill) may create/update class todos from Canvas; it must **never** write `done` or `completedAt`.
+- **todo.json:** `name`; optional `description` (always markdown when set); `dueDate` (YYYY-MM-DD), `dueTime` (HH:MM); `done` (boolean, default false); optional `completedAt` (ISO timestamp set when checked off, cleared when reopened — Completed list sorts by this, newest first); optional `createdAt` (ISO timestamp set when the todo is created — open TODO lists use this for same-due ties; API falls back to file birthtime when omitted); optional `tag`: `CW` | `HW` | `QA` | `MA` (omit for normal todos); optional `showInDates` (boolean — when true, the open todo also appears in Dates lists alongside important dates); optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays); optional `canvasLink` (https URL to the Canvas assignment/page — UI shows a Canvas button only when set; clear/omit to hide); optional `canvasId` (Canvas assignment id, set by Canvas sync so later runs match even if the title/due date changed); optional `kind`: `"dailyBriefing"` for the morning news todo (user-level only, no tag, `showInDates: false`, `capsules` array, per-capsule and top-level `citations`). Compiling the brief is the **daily-news** skill, not this file. When a news capsule is attached in chat, read that file and answer follow-ups; do not retag briefing todos as schoolwork. Canvas sync (personal-canvas skill) may create/update class todos from Canvas; it must **never** write `done` or `completedAt`.
   - **Defaults:** `tag: "MA"` → `showInDates` defaults **on** (omit or `true`); any other todo → defaults **off**
   - Set `showInDates: false` when the user asks to hide a specific MA from Dates; set `showInDates: true` when they ask to show a non-MA todo in Dates
   - **Open TODO sort (web + iOS):** earliest `dueDate` first (overdue included); undated below all dated; same date → timed above date-only; exact same due (or both undated) → older `createdAt` above newer (most recently added at the bottom)
-- **date.json:** `name`; `date`; optional `time`, `description` (markdown); optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays); optional `canvasLink` / `canvasId` (same Canvas button as todos, used for syllabus or calendar-event dates)
+- **date.json:** `name`; `date`; optional `time`, `description` (always markdown when set); optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays); optional `canvasLink` / `canvasId` (same Canvas button as todos, used for syllabus or calendar-event dates)
   - Dates / showInDates todos under a **class** filter as the education-hat (`class`) category
   - Dates / showInDates todos under the **PathIvy** project filter as `pa` (PA circle)
   - Dates / showInDates todos under any other **project** (or user-level) filter as the dot (`loose`) category — never the hat
   - Home Dates filter order: MA · PA · class hat · dot
 
 Mirror the layout of `classes/_example-dummy/` (and `projects/_example-dummy/` for projects) when creating objects.
+
+### Description formatting
+
+`description` is markdown. Web and iOS render it on the detail screen. Names stay plain text (list rows do not parse markdown).
+
+When the field is set, **always write markdown**. Never a single run-on paragraph when there is more than one fact. Use `**lead-ins**`, bullets, links, and blank lines.
+
+Copy the shape of `education/you@example.com/dates/fall-orientation-day-1/date.json`.
 
 ### Todo identity (never collide)
 
@@ -79,14 +87,30 @@ Todos are distinct by the triple **`name` + parent + `dueDate`**:
 - Same name under different parents, or same name/parent with different due dates → **different todos** (create both as asked)
 - Folder `todoId` is only a path slug — still keep it unique **within that parent `todos/` folder** (never overwrite). Prefer a slug of the final `name`
 
-**Before creating a todo**, scan existing todos in that same class / project (or user-level). If another already has the **same `name` + same parent + same `dueDate` (including both none)**:
+**Before creating a todo**, scan existing todos in that same class / project (or user-level). If another already has the **same `name` + same parent + same `dueDate` (including both none)**, or a **similar name** on that same parent + dueDate (same rules as dates: lowercase, strip years, advisor/advisory, singular/plural):
 
-1. Do **not** overwrite or reuse that folder
-2. Append a numeric suffix to `name`: try ` (2)` first; **if `Name (2)` already exists with that same parent + dueDate, use ` (3)`**; if that exists too, ` (4)`, and so on — always the smallest unused ` (N)` so the triple is unique (e.g. `Essay` → `Essay (2)` → `Essay (3)`)
+1. **Update that folder** unless Yan asked for a second copy of the same work
+2. The ` (2)` / ` (3)` suffix is **only** when Yan asked for another copy with the same triple. Then: do **not** overwrite; append ` (2)` first; **if `Name (2)` already exists with that same parent + dueDate, use ` (3)`**; if that exists too, ` (4)`, and so on — always the smallest unused ` (N)` (e.g. `Essay` → `Essay (2)` → `Essay (3)`)
 3. Use a matching unique folder id (e.g. `essay-2`, `essay-3`)
 4. Brief reply may mention the rename (“Added Essay (3) due Fri”)
 
+Nightly actions never invents ` (2)`. It updates or skips.
+
 Updating / flipping `done` on an existing todo is fine — this rule is for **create** only.
+
+### Date identity (never duplicate)
+
+Same event if same **parent** + same **`date`** + **similar name**:
+
+- lowercase, strip year tokens (`2026`, `2026-27`, `2026–27`)
+- advisor = advisory
+- singular/plural on the last word (`conference` / `conferences`)
+- equal after that, or one name contains the other
+- same parent + same date + same `time` also matches when names share a real word (advisor, picnic), not dentist vs conference at 14:00
+
+If it matches: **update that folder**. Never mint a new slug. `Advisory conference` and `Advisor conferences 2026–27` on 2026-08-27 are one event. Last year's first day does not match this year's: the `date` field differs.
+
+Folder `dateId` stays unique within that parent `dates/` folder. Prefer a slug of the final `name`.
 
 ### Time phrases
 
@@ -120,7 +144,7 @@ Text-only and attachment turns both run on **grok-4.6 high** (not fast). The two
 
 ## Actions
 
-- Parse natural language into class / project / todo / important date create/update/delete. When moving a todo or date into a class or project, write the new folder, then delete the old one. Do not leave empty `todos/<id>/` or `dates/<id>/` shells. Those make the brain education mirror warn about missing json. Nightly actions also creates `date.json` rows for big dates (school events, travel days, college visits) listed in the 02:30 digest. Skip duplicates (`name` + parent + `date`). Do not create dates for routine appointments or homework.
+- Parse natural language into class / project / todo / important date create/update/delete. When moving a todo or date into a class or project, write the new folder, then delete the old one. Do not leave empty `todos/<id>/` or `dates/<id>/` shells. Those make the brain education mirror warn about missing json. Nightly actions also creates `date.json` rows for big dates (school events, travel days, college visits) listed in the 02:30 digest. Skip or update duplicates (same parent + date + similar name, not only exact `name`). Do not create dates for routine appointments or homework.
 - Daily Briefing feedback (Yan): when he comments on news selection (more local, less politics, skip a beat, etc.), append a dated note to `education/you@example.com/daily-briefing/preferences.md`. Capsule thumbs are 3-way: up = more of this, down = less of this, neither (`vote: null`) = **neutral** (a real rating, not skipped/ignored). Do not attach briefing todos to a class/project or give them CW/HW/QA/MA tags. Compiling the brief itself is the daily-news skill.
 - Set/clear `done`; set tags CW/HW/QA/MA when the user means school-tagged work. When setting `done` true, also set `completedAt` to an ISO timestamp (now); when setting `done` false, remove `completedAt`. On create, set `createdAt` to now.
 - Set/clear `showInDates` on todos when the user wants an item shown or hidden in Dates (MAs show there by default)
@@ -134,4 +158,4 @@ Text-only and attachment turns both run on **grok-4.6 high** (not fast). The two
 
 ## After edits
 
-The Mac Express watcher pushes SSE so `/education` refreshes. Prefer committing education data paths when finishing a batch of changes. School mutations in chat: 1–3 short lines. Object `description` fields may be markdown; the education UI renders them.
+The Mac Express watcher pushes SSE so `/education` refreshes. Prefer committing education data paths when finishing a batch of changes. School mutations in chat: 1–3 short lines. Object `description` fields are markdown when set; the education UI renders them. Always format them (Description formatting above).

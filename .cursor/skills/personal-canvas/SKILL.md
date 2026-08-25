@@ -79,14 +79,14 @@ For every snapshot assignment whose `courseId` is mapped:
   - Default take-home work → `HW`
   - High point values that look summative → `MA`
 - MA still defaults `showInDates` on; do not turn that off unless Yan asked.
-- Copy a short `description` from the snapshot when it helps; do not dump the whole syllabus into every todo.
+- Copy a short markdown `description` from the snapshot when it helps (education-dashboard Description formatting: bold lead-ins, bullets, links). Do not dump the whole syllabus into every todo.
 
 ## Syllabus and other dates → date.json
 
 Read each mapped course `syllabus` plus snapshot `events[]`. Create/update **important dates** (exams, concerts, trips, conferences, no-school mentioned in the syllabus, unit tests called out as calendar events). Skip routine class meetings.
 
-- Match by `canvasId` / `canvasLink` / same name+date in that class `dates/`.
-- Set `date`, optional `time`, `canvasLink` (event url or course `syllabusUrl`), optional `canvasId`.
+- Match by `canvasId` / `canvasLink` / same name+date in that class `dates/`. Also treat **similar names** on that date as the same event (advisor/advisory, stripped years). Update in place; never a second slug.
+- Set `date`, optional `time`, markdown `description` when there are real facts, `canvasLink` (event url or course `syllabusUrl`), optional `canvasId`.
 - Do not turn syllabus fluff into dates.
 
 ## Never

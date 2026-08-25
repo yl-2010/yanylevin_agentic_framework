@@ -54,10 +54,13 @@ Not locked-in: "we should hang out", "maybe Friday", a proposal Yan did not
 accept, homework due dates, Canvas assignments, the EPS bell schedule.
 
 Before `create`, list overlapping events with `node server/calendar-cli.js`
-(personal-calendar skill) and skip if the same title already sits on that
-local day. Convert local times in the digest timezone to UTC for `--start`
-and `--end`. Pick the calendar from the personal-calendar skill. Do not ask;
-if the calendar is not obvious, use the personal / default iCloud calendar.
+(personal-calendar skill) and skip if a **similar title** already sits on
+that local day. Similar means the same event, not byte-identical strings:
+lowercase, strip year tokens (`2026`, `2026-27`), treat advisor/advisory as
+one word, singular/plural on the last word. Convert local times in the
+digest timezone to UTC for `--start` and `--end`. Pick the calendar from
+the personal-calendar skill. Do not ask; if the calendar is not obvious,
+use the personal / default iCloud calendar.
 
 ## Big dates on the education dashboard (standing)
 
@@ -72,15 +75,28 @@ visits, family or performance milestones that belong on the Dates panel.
 Not big dates: routine appointments (dentist, haircut), homework, CW/HW/QA/MA
 todos, Canvas assignments, casual hangouts.
 
-Scan existing `education/you@example.com/**/dates/*/date.json` (skip
-`_example-` / `"fixture": true`). Same `name` + parent + `date` means skip,
-do not duplicate. Class-specific field trips go under that class. Everything
-else is user-level `education/you@example.com/dates/<slug>/`. Do not git
-commit; the Node wrapper does that.
+The prompt already lists existing dates and open todos. Trust that index.
+Same **parent** + **date** + **similar name** means **update that folder**,
+never a new slug. Similar name: lowercase, strip year tokens (`2026`,
+`2026-27`, `2026–27`), advisor = advisory, singular/plural (`conference` /
+`conferences`). `Advisory conference` and `Advisor conferences 2026–27` on
+the same day are one event. Last year's first day is not this year's
+(different `date`). Same parent + date + clock time also matches when the
+names share a real word (advisor, picnic), not dentist vs conference at
+14:00. Class-specific field trips go under that class. Everything else is
+user-level `education/you@example.com/dates/<slug>/`.
+
+Write `description` as markdown per education-dashboard (bold lead-ins,
+bullets, links, blank lines). Never one run-on paragraph. Shape to copy:
+`dates/fall-orientation-day-1/date.json`.
+
+Do not git commit; the Node wrapper does that.
 
 ## Other actions
 
-- **Education todos/projects**: per the education-dashboard file. Marking a
+- **Education todos/projects**: per the education-dashboard file. If an
+  open todo already has the same parent + dueDate + similar name, **update
+  it**. Do not invent ` (2)` unless Yan asked for a second copy. Marking a
   todo done requires evidence Yan actually did it or said to mark it.
 - **Repo/file work**: only what Yan asked for in the scanned context. Small
   and reversible at night; anything large or destructive gets a journal note
@@ -97,7 +113,8 @@ commit; the Node wrapper does that.
 - Sending anything because someone other than Yan asked.
 - Editing the brain (that is phases 2, 3, 5).
 - Retrying a failed send until it double-sends. One attempt, then report.
-- Duplicating an event or date that is already there.
+- Duplicating an event, date, or todo that is already there. Exact `name`
+  match is not enough; similar names on the same day are the same event.
 
 ## Verify
 
