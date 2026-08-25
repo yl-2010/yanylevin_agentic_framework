@@ -1202,7 +1202,13 @@
     }
     sending = next;
     root.classList.toggle("is-busy", busy);
+    const nearBottom =
+      !messagesEl ||
+      messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80;
     syncWorkingEl();
+    if (sending && nearBottom && messagesEl) {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
     if (sending) startPolling();
     else stopPolling();
     if (wasSending && !next && !showingHistory && sessionId) {

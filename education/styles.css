@@ -1722,6 +1722,7 @@ html[data-resolved-theme="dark"] .yan-chat-send { --lg-tint-opacity: 0.4; }
   --lg-filter: none; isolation: isolate;
   box-shadow: 0 10px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
   pointer-events: none; opacity: 0; transform: translateY(18%) scale(0.92); overflow: hidden;
+  display: flex; flex-direction: column;
   transition:
     opacity 0.45s var(--ease),
     transform 0.65s var(--chat-spring),
@@ -1780,17 +1781,26 @@ html.lg-chrome .yan-chat-close:hover {
   }
 }
 .yan-chat-messages {
-  position: relative; z-index: 3; height: 100%; overflow: auto;
-  padding: calc(var(--chat-panel-radius) + var(--chat-x-size) / 2 + 0.55rem) 1.2rem 1.2rem;
+  position: relative; z-index: 3; flex: 1 1 auto; min-height: 0; overflow: auto;
+  padding: calc(var(--chat-panel-radius) + var(--chat-x-size) / 2 + 0.55rem) 1.2rem 0;
   display: flex; flex-direction: column; gap: 0.55rem;
   -webkit-overflow-scrolling: touch;
 }
 .yan-chat-history {
   --chat-history-inset: 1.2rem;
-  position: relative; z-index: 3; height: 100%; overflow: auto;
-  padding: calc(var(--chat-panel-radius) + var(--chat-x-size) / 2 + 0.55rem) 0 1.2rem;
+  position: relative; z-index: 3; flex: 1 1 auto; min-height: 0; overflow: auto;
+  padding: calc(var(--chat-panel-radius) + var(--chat-x-size) / 2 + 0.55rem) 0 0;
   display: flex; flex-direction: column; gap: 1.05rem;
   -webkit-overflow-scrolling: touch;
+}
+/* Flex + overflow:auto drops padding-bottom from the scroll range. A real
+   flex item stays reachable, and the height clears the panel's corner clip. */
+.yan-chat-messages::after,
+.yan-chat-history::after {
+  content: "";
+  flex: 0 0 auto;
+  height: var(--chat-panel-radius);
+  pointer-events: none;
 }
 .yan-chat-history[hidden],
 .yan-chat-messages[hidden] { display: none !important; }
