@@ -1966,6 +1966,7 @@ html[data-resolved-theme="light"] .yan-chat-bubble {
 }
 .yan-chat-working {
   align-self: flex-start;
+  flex-shrink: 0;
   padding: 12px 14px;
   color: var(--muted);
 }
@@ -2004,6 +2005,7 @@ html[data-resolved-theme="light"] .yan-chat-bubble--user {
   align-items: flex-start;
   gap: 0.45rem;
   align-self: flex-start;
+  flex-shrink: 0;
   width: fit-content;
   max-width: calc(100% - 40px);
   min-width: 0;

@@ -1474,7 +1474,7 @@
   }
 
   /** New chat — leave the previous thread running in the background. */
-  async function clearChat() {
+  async function clearChat(opts = {}) {
     viewGen += 1;
     stopPolling();
     const hadThread = messages.length > 0 || sending;
@@ -1498,7 +1498,7 @@
     clearMessagesDom();
     clearLocal();
     hideHistory();
-    setState("closed");
+    setState(opts.open ? "open" : "closed");
     if (hadThread && window.YanMacApi) {
       try {
         const res = await window.YanMacApi.macFetch("/api/education/agent/start", {
@@ -1547,7 +1547,7 @@
         if (!event.shiftKey) return;
         event.preventDefault();
         event.stopImmediatePropagation();
-        toggleHistory();
+        clearChat({ open: true });
       },
       true
     );
