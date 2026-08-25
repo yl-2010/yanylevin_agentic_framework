@@ -103,7 +103,7 @@ Skeleton (keep the YL path exactly):
     </svg>
     <script src="/liquid-glass.js?v=chrome-perf9"></script>
     <script src="/theme-orb.js?v=chrome-perf6"></script>
-    <script src="/yl-home-link.js?v=2"></script>
+    <script src="/yl-home-link.js?v=3"></script>
   </body>
 </html>
 ```
