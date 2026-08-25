@@ -811,7 +811,10 @@ final class YLKeyboardAccessoryChrome: UIView {
         let guideRect = convert(keyboardLayoutGuide.layoutFrame, to: window)
         let guideCoverage = max(0, window.bounds.maxY - guideRect.minY)
         let coverage = max(guideCoverage, notificationCoverage)
-        guard lift > 20 || coverage > 20 else { return nil }
+        // Lift subtracts the rest/home-indicator baseline. Coverage alone is
+        // already ~34pt with the keys down, which used to start a history
+        // swipe scrub and slide the composer.
+        guard lift > 20 else { return nil }
         var frame = lastKeyboardScreenFrame
         if frame.height < 1 {
             frame = convert(keyboardLayoutGuide.layoutFrame, to: nil)

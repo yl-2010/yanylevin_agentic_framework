@@ -630,7 +630,7 @@ struct ChatView: View {
             historyHapticGate.handle(historyDragOrigin)
             if opening {
                 loadHistoryIfNeeded()
-                if composerFocused || YLKeyboardScrub.canBegin {
+                if composerFocused {
                     historyScrubbingKeyboard = true
                     YLKeyboardScrub.begin()
                     YLKeyboardScrub.setProgress(min(max(historyDragOrigin, 0), 1))
