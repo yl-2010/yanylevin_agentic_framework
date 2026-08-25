@@ -4,7 +4,6 @@
  */
 (() => {
   const el = document.querySelector("a.c-tl");
-  if (!el) return;
 
   fetch("/api/auth/session", {
     credentials: "same-origin",
@@ -12,7 +11,7 @@
   })
     .then((res) => res.json().catch(() => ({})))
     .then((data) => {
-      if (data && data.authenticated && data.access === "full") {
+      if (el && data && data.authenticated && data.access === "full") {
         el.setAttribute("href", "/education/");
       }
     })

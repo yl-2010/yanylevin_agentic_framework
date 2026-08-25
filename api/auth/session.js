@@ -32,13 +32,14 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    res.status(200).json({
+    const payload = {
       ok: true,
       authenticated: true,
       email: session.email,
       name: session.name || session.email,
       access: session.access,
-    });
+    };
+    res.status(200).json(payload);
   } catch (err) {
     console.error("[auth/session]", err);
     res.status(500).json({

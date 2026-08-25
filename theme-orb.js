@@ -18,6 +18,10 @@
   function resolveTheme(preference) {
     if (preference === "dark") return "dark";
     if (preference === "light") return "light";
+    if (typeof window.__resolveSystemTheme === "function") {
+      const resolved = window.__resolveSystemTheme();
+      if (resolved === "dark" || resolved === "light") return resolved;
+    }
     return window.matchMedia("(prefers-color-scheme: dark)").matches
       ? "dark"
       : "light";
@@ -42,6 +46,8 @@
     const current = resolveTheme(themePreference);
     applyTheme(current === "dark" ? "light" : "dark");
   }
+
+  window.__refreshSiteTheme = () => applyTheme(themePreference);
 
   // Keep in sync with the head bootstrap (system).
   applyTheme("system");

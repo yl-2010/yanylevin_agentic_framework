@@ -45,6 +45,10 @@
   function resolveTheme(preference) {
     if (preference === "dark") return "dark";
     if (preference === "light") return "light";
+    if (typeof window.__resolveSystemTheme === "function") {
+      const resolved = window.__resolveSystemTheme();
+      if (resolved === "dark" || resolved === "light") return resolved;
+    }
     return window.matchMedia("(prefers-color-scheme: dark)").matches
       ? "dark"
       : "light";
@@ -68,6 +72,11 @@
       window.reinitLiquidGlass();
     }
   }
+
+  window.__refreshSiteTheme = () => {
+    applyTheme(themePreference);
+    refreshGlass();
+  };
 
   // Bootstrap already set system; keep JS state in sync.
   applyTheme("system");

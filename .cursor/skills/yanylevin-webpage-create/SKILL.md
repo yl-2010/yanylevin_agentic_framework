@@ -102,8 +102,8 @@ Skeleton (keep the YL path exactly):
       <defs id="liquid-glass-defs"></defs>
     </svg>
     <script src="/liquid-glass.js?v=chrome-perf9"></script>
-    <script src="/theme-orb.js?v=chrome-perf5"></script>
-    <script src="/yl-home-link.js"></script>
+    <script src="/theme-orb.js?v=chrome-perf6"></script>
+    <script src="/yl-home-link.js?v=2"></script>
   </body>
 </html>
 ```
