@@ -527,9 +527,14 @@
     return preview || "Chat";
   }
 
+  function syncHistoryFrost() {
+    root.classList.toggle("is-history", showingHistory);
+  }
+
   function hideHistory(opts = {}) {
     const wasShowing = showingHistory;
     showingHistory = false;
+    syncHistoryFrost();
     historyStructureKey = "";
     historyPointerSid = null;
     if (messagesEl) messagesEl.hidden = false;
@@ -545,6 +550,7 @@
 
   async function showHistory() {
     showingHistory = true;
+    syncHistoryFrost();
     setState("panel", { skipFocus: true });
     if (messagesEl) messagesEl.hidden = true;
     if (historyEl) {
