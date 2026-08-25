@@ -1,0 +1,16 @@
+# Personal agent API: Cloudflare Tunnel → local Express (port 3004)
+#
+# 1. Copy to ~/.cloudflared/config-personalagent.yml
+# 2. Replace TUNNEL_UUID and the hostname with yours
+# 3. DNS CNAME api → TUNNEL_UUID.cfargotunnel.com
+# 4. cloudflared tunnel --config ~/.cloudflared/config-personalagent.yml run
+#
+# Never tunnel LM Studio (:1234).
+
+tunnel: TUNNEL_UUID
+credentials-file: /Users/you/.cloudflared/TUNNEL_UUID.json
+
+ingress:
+  - hostname: api.example.com
+    service: http://127.0.0.1:3004
+  - service: http_status:404

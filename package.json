@@ -1,0 +1,32 @@
+{
+  "name": "yanylevin_agentic_framework",
+  "private": false,
+  "version": "1.0.0",
+  "description": "Single-operator personal agent framework (Mac Express + Cursor + education/fitness UI)",
+  "scripts": {
+    "server": "npm run start --prefix server",
+    "server:dev": "npm run dev --prefix server",
+    "deploy:web": "npx vercel deploy --prod --yes",
+    "daily-briefing": "npm run daily-briefing --prefix server",
+    "location-history": "npm run location-history --prefix server",
+    "location-enrichment": "npm run location-enrichment --prefix server",
+    "canvas-sync": "npm run canvas-sync --prefix server",
+    "school-mail": "npm run school-mail --prefix server",
+    "school-mail-fill": "npm run school-mail-fill --prefix server",
+    "apple-mail": "npm run apple-mail --prefix server",
+    "apple-mail-fill": "npm run apple-mail-fill --prefix server",
+    "health-takeaways": "npm run health-takeaways --prefix server",
+    "health-shortcut": "npm run health-shortcut --prefix server",
+    "context-synthesis": "npm run context-synthesis --prefix server",
+    "chat-title-refresh": "npm run chat-title-refresh --prefix server",
+    "brain-person-imessage": "npm run brain-person-imessage --prefix server",
+    "test:server": "npm test --prefix server",
+    "oss:export": "node scripts/export-oss.mjs",
+    "oss:scan": "node scripts/oss-scan.mjs",
+    "oss:mirror": "node scripts/export-oss.mjs && node scripts/oss-scan.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

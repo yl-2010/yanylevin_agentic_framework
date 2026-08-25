@@ -1,0 +1,33 @@
+---
+description: On Mac Studio, restart the Express API after applicable server changes
+alwaysApply: true
+---
+
+# Mac Studio API restart
+
+Restarting the live Express API is **the agent’s job** when this Cursor instance is on **Yan’s Mac Studio** and the change set affects that process. Do not skip it or leave it for the user. Follow [`AGENTS.md`](../../AGENTS.md).
+
+## Gate (must pass)
+
+Confirm Mac Studio before any restart:
+
+```bash
+hostname | grep -qi 'Mac-Studio' || scutil --get ComputerName | grep -qi 'Mac Studio'
+```
+
+Skip restart on MacBook, Cursor Cloud, or any other host.
+
+## Applicable changes
+
+Restart when edits affect the running Node process, e.g. `server/**`, `server/package.json`, or `deploy/launchagents/com.personalagent.server.plist` / root `npm run server` plumbing.
+
+Skip for static HTML/CSS/JS, iOS, Vercel-only, docs-only, or education/fitness data-folder sync.
+
+## Restart command
+
+```bash
+launchctl kickstart -k "gui/$(id -u)/com.personalagent.server"
+curl -sS -f http://127.0.0.1:3004/health
+```
+
+That LaunchAgent is the production equivalent of `npm run server`. If it is not loaded and a manual `npm run server` is running, stop it and start `npm run server` from the repo root instead, then verify `/health`.

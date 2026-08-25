@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleExecutable</key>
+	<string>yl-calendar</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.yanylevin.yl-calendar</string>
+	<key>CFBundleName</key>
+	<string>yl-calendar</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Yan Levin’s Personal Agent reads and writes Apple Calendar on this Mac.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Yan Levin’s Personal Agent reads and writes Apple Calendar on this Mac so web and iOS chat can create events.</string>
+</dict>
+</plist>

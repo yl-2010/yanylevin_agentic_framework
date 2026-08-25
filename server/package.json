@@ -1,0 +1,40 @@
+{
+  "name": "personalagent-server",
+  "private": false,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Mac Express API for the personal agent framework",
+  "scripts": {
+    "start": "node --env-file=.env index.js",
+    "dev": "node --env-file=.env --watch index.js",
+    "daily-briefing": "node --env-file=.env daily-briefing-agent.js",
+    "location-history": "node --env-file=.env location-history-agent.js",
+    "location-enrichment": "node --env-file=.env location-enrichment-agent.js",
+    "canvas-sync": "node --env-file=.env canvas-sync.js",
+    "school-mail": "node school-mail.js",
+    "school-mail-fill": "node --env-file=.env school-mail-fill.js",
+    "apple-mail": "node apple-mail.js dump",
+    "apple-mail-fill": "node --env-file=.env apple-mail-fill.js",
+    "health-takeaways": "node --env-file=.env health-takeaways-agent.js",
+    "location-brain": "node --env-file=.env location-brain-agent.js",
+    "health-brain": "node --env-file=.env health-brain-agent.js",
+    "health-history": "node --env-file=.env health-history-agent.js",
+    "brain-person-imessage": "node --env-file=.env brain-person-imessage-fill.js",
+    "health-shortcut": "node --env-file=.env health-shortcut-build.js",
+    "health-apple-export": "node --env-file=.env health-apple-export.js",
+    "context-synthesis": "node --env-file=.env context-synthesis-agent.js",
+    "chat-title-refresh": "node --env-file=.env chat-title-refresh-agent.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@cursor/sdk": "^1.0.26",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "jose": "^6.1.0",
+    "playwright-core": "^1.62.1"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,10 @@
+{
+  "compileLocalTime": "06:00",
+  "dueLocalTime": "07:00",
+  "nightlyAgentsLocalTime": "01:00",
+  "chatTitleRefreshLocalTime": "01:30",
+  "contextSynthesisLocalTime": "02:30",
+  "brainProjectionLocalTime": "03:00",
+  "factCheckLocalTime": "03:30",
+  "timezone": "America/Los_Angeles"
+}

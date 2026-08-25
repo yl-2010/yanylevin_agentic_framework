@@ -1,0 +1,10 @@
+{
+  "name": "Todo #7",
+  "tag": "MA",
+  "dueDate": "2026-10-01",
+  "dueTime": "08:00",
+  "description": "Fixture sample: MA tag with far due date (showInDates defaults on for MA)",
+  "showInDates": true,
+  "done": false,
+  "fixture": true
+}

@@ -1,0 +1,558 @@
+/* Dashboard — ultra-minimal horizontal rails */
+
+.stage-dashboard {
+  --dash-fade: min(16vw, 110px);
+  /* First card sits past the left edge with a clear gap */
+  --dash-inset: calc(var(--dash-fade) + clamp(1.5rem, 3.5vw, 2.25rem));
+  /* Room for chip/card shadows inside the scrollport (overflow clips otherwise) */
+  --dash-shadow-pad: calc(8px + var(--lg-outer-shadow-blur, 24px));
+  --dash-blur-bleed: var(--dash-shadow-pad);
+  display: block;
+  place-items: unset;
+  padding: calc(var(--corner-pad) + 132px) 0 clamp(2.5rem, 6vw, 4rem);
+  width: 100%;
+  min-height: 100vh;
+}
+
+@media (max-width: 900px) {
+  .stage-dashboard {
+    padding-top: calc(var(--corner-pad) + 112px);
+  }
+}
+
+@media (max-width: 560px) {
+  .stage-dashboard {
+    padding-top: calc(var(--corner-pad) + 96px);
+    --dash-fade: min(18vw, 88px);
+  }
+}
+
+.dash {
+  width: 100%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1.75rem, 4vw, 2.75rem);
+}
+
+.dash-section {
+  min-width: 0;
+}
+
+.dash-section-title {
+  margin: 0 0 0.85rem;
+  padding-inline: var(--dash-inset);
+  font-family: var(--display);
+  font-size: var(--text-title2);
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.dash-rail-wrap {
+  position: relative;
+  width: 100%;
+  overflow: visible;
+}
+
+.dash-rail {
+  list-style: none;
+  margin: 0;
+  /* Vertical padding keeps box-shadows inside the scrollport instead of clipping */
+  padding: var(--dash-shadow-pad) var(--dash-inset);
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0.85rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: var(--dash-inset);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* Opacity fade first — cards dissolve into the real page background */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 calc(var(--dash-fade) * 0.85),
+    #000 calc(100% - var(--dash-fade) * 0.85),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 calc(var(--dash-fade) * 0.85),
+    #000 calc(100% - var(--dash-fade) * 0.85),
+    transparent 100%
+  );
+}
+
+.dash-rail::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * Progressive blur on top of the opacity fade.
+ * Vertical bleed matches shadow padding so the blur covers chip shadows too.
+ */
+.dash-rail-blur {
+  pointer-events: none;
+  position: absolute;
+  top: calc(-1 * var(--dash-blur-bleed));
+  bottom: calc(-1 * var(--dash-blur-bleed));
+  width: var(--dash-fade);
+  z-index: 2;
+}
+
+.dash-rail-blur-left {
+  left: 0;
+}
+
+.dash-rail-blur-right {
+  right: 0;
+}
+
+html.lg-chrome .dash-rail-blur {
+  contain: layout style;
+  transform: translateZ(0);
+}
+
+.dash-rail-blur > span {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+}
+
+.dash-rail-blur-left > span {
+  -webkit-mask-image:
+    linear-gradient(
+      to right,
+      rgba(0, 0, 0, var(--alpha)) 0%,
+      transparent var(--stop)
+    ),
+    linear-gradient(
+      to bottom,
+      transparent 0%,
+      #000 12%,
+      #000 88%,
+      transparent 100%
+    );
+  mask-image:
+    linear-gradient(
+      to right,
+      rgba(0, 0, 0, var(--alpha)) 0%,
+      transparent var(--stop)
+    ),
+    linear-gradient(
+      to bottom,
+      transparent 0%,
+      #000 12%,
+      #000 88%,
+      transparent 100%
+    );
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+.dash-rail-blur-right > span {
+  -webkit-mask-image:
+    linear-gradient(
+      to left,
+      rgba(0, 0, 0, var(--alpha)) 0%,
+      transparent var(--stop)
+    ),
+    linear-gradient(
+      to bottom,
+      transparent 0%,
+      #000 12%,
+      #000 88%,
+      transparent 100%
+    );
+  mask-image:
+    linear-gradient(
+      to left,
+      rgba(0, 0, 0, var(--alpha)) 0%,
+      transparent var(--stop)
+    ),
+    linear-gradient(
+      to bottom,
+      transparent 0%,
+      #000 12%,
+      #000 88%,
+      transparent 100%
+    );
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+.dash-rail-blur > span:nth-child(1) {
+  --stop: 100%;
+  --alpha: 0.4;
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+.dash-rail-blur > span:nth-child(2) {
+  --stop: 62%;
+  --alpha: 0.5;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.dash-rail-blur > span:nth-child(3) {
+  --stop: 32%;
+  --alpha: 0.6;
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+/* Hide unused stack slots if present */
+.dash-rail-blur > span:nth-child(n + 4) {
+  display: none;
+}
+
+html[data-resolved-theme="dark"] .dash-rail-blur > span:nth-child(1) {
+  -webkit-backdrop-filter: blur(3px) brightness(0.78);
+  backdrop-filter: blur(3px) brightness(0.78);
+}
+
+html[data-resolved-theme="dark"] .dash-rail-blur > span:nth-child(2) {
+  -webkit-backdrop-filter: blur(8px) brightness(0.72);
+  backdrop-filter: blur(8px) brightness(0.72);
+}
+
+html[data-resolved-theme="dark"] .dash-rail-blur > span:nth-child(3) {
+  -webkit-backdrop-filter: blur(16px) brightness(0.68);
+  backdrop-filter: blur(16px) brightness(0.68);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-resolved-theme="light"]) .dash-rail-blur > span:nth-child(1) {
+    -webkit-backdrop-filter: blur(3px) brightness(0.78);
+    backdrop-filter: blur(3px) brightness(0.78);
+  }
+
+  :root:not([data-resolved-theme="light"]) .dash-rail-blur > span:nth-child(2) {
+    -webkit-backdrop-filter: blur(8px) brightness(0.72);
+    backdrop-filter: blur(8px) brightness(0.72);
+  }
+
+  :root:not([data-resolved-theme="light"]) .dash-rail-blur > span:nth-child(3) {
+    -webkit-backdrop-filter: blur(16px) brightness(0.68);
+    backdrop-filter: blur(16px) brightness(0.68);
+  }
+}
+
+.dash-section-lede {
+  margin: -0.35rem 0 1rem;
+  padding-inline: var(--dash-inset);
+  max-width: 42rem;
+  font-size: var(--text-subhead);
+  font-weight: 400;
+  line-height: 1.333;
+  color: var(--muted);
+}
+
+/* Shared fake glass (nothing behind these boxes) */
+.dash-login,
+.dash-entry,
+.dash-agent {
+  position: relative;
+  isolation: isolate;
+  --lg-filter: none;
+  color: var(--fg);
+  box-shadow: 0 6px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
+  background-color: color-mix(in srgb, var(--panel-bg) 88%, var(--fg) 4%);
+  border: 1px solid var(--panel-brd);
+  backdrop-filter: blur(14px) saturate(1.55);
+  -webkit-backdrop-filter: blur(14px) saturate(1.55);
+}
+
+.dash-login::before,
+.dash-entry::before,
+.dash-agent::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  box-shadow: inset 0 0 var(--lg-shadow-blur) var(--lg-shadow-spread)
+    var(--lg-shadow-color);
+  background-color: rgba(var(--lg-tint-rgb), var(--lg-tint-opacity));
+  pointer-events: none;
+}
+
+.dash-login.lg-refraction,
+.dash-entry.lg-refraction,
+.dash-agent.lg-refraction {
+  background-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.dash-login.lg-refraction::after,
+.dash-entry.lg-refraction::after,
+.dash-agent.lg-refraction::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  backdrop-filter: var(--lg-filter);
+  -webkit-backdrop-filter: var(--lg-filter);
+  isolation: isolate;
+  pointer-events: none;
+}
+
+html.lg-chrome .dash-login.lg-static,
+html.lg-chrome .dash-entry.lg-static,
+html.lg-chrome .dash-agent.lg-static {
+  transition: transform 0.3s var(--ease);
+}
+
+html.lg-chrome .dash-login.lg-static:hover,
+html.lg-chrome .dash-entry.lg-static:hover,
+html.lg-chrome .dash-agent.lg-static:hover {
+  will-change: transform;
+}
+
+html.lg-chrome .dash-login.lg-static.lg-refraction::after,
+html.lg-chrome .dash-entry.lg-static.lg-refraction::after,
+html.lg-chrome .dash-agent.lg-static.lg-refraction::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  isolation: auto;
+  background: var(--lg-spec) center / 100% 100% no-repeat;
+  mix-blend-mode: screen;
+  opacity: var(--lg-spec-opacity, 0.5);
+}
+
+/* ---- Login chips (liquid glass) ---- */
+
+.dash-rail-logins {
+  align-items: center;
+  min-height: calc(3.25rem + 2 * var(--dash-shadow-pad));
+}
+
+.dash-login {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  display: grid;
+  place-items: center;
+  padding: 0.9rem 1.4rem;
+  border-radius: 22px;
+  font-family: var(--display);
+  font-size: var(--text-headline);
+  font-weight: 600;
+  white-space: nowrap;
+  animation: dash-in 0.4s var(--ease) backwards;
+}
+
+.dash-login > span {
+  position: relative;
+  z-index: 2;
+  color: var(--fg);
+  opacity: 1;
+}
+
+/* ---- Chat cards ---- */
+
+.dash-entry {
+  flex: 0 0 min(320px, 72vw);
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  animation: dash-fade 0.45s var(--ease) backwards;
+  min-height: 0;
+}
+
+.dash-entry-in {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1rem 1.05rem 1.1rem;
+  min-height: 0;
+  max-height: min(48vh, 380px);
+  overflow: hidden;
+}
+
+@keyframes dash-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dash-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-entry,
+  .dash-login,
+  .dash-agent {
+    animation: none;
+  }
+
+  .dash-rail-blur > span {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+.dash-when {
+  margin: 0;
+  flex: 0 0 auto;
+  font-family: var(--display);
+  font-size: var(--text-caption);
+  font-weight: 400;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  color: var(--fg);
+  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  scrollbar-width: thin;
+}
+
+.dash-text.is-assistant {
+  color: var(--muted);
+  border-top: 1px solid var(--hairline);
+  padding-top: 0.7rem;
+  flex: 1 1 auto;
+}
+
+/* ---- Scheduled agents ---- */
+
+.dash-section-agents {
+  padding-bottom: 0.5rem;
+}
+
+.dash-agent-graph {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding-inline: var(--dash-inset);
+  padding-bottom: var(--dash-shadow-pad);
+}
+
+.dash-agent-band {
+  display: grid;
+  grid-template-columns: 4.75rem minmax(0, 1fr);
+  gap: 0.75rem 0.9rem;
+  align-items: center;
+}
+
+.dash-agent-time {
+  margin: 0;
+  font-family: var(--display);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.dash-agent-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.dash-agent-gap {
+  flex: 0 0 0.85rem;
+}
+
+.dash-agent-edge {
+  flex: 0 0 1.15rem;
+  height: 2px;
+  border: 0;
+  background: color-mix(in srgb, var(--fg) 28%, transparent);
+  border-radius: 99px;
+}
+
+.dash-agent-edge.is-wait {
+  height: 0;
+  background: none;
+  border-top: 2px dotted color-mix(in srgb, var(--fg) 32%, transparent);
+}
+
+.dash-agent {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 0.2rem;
+  font-family: var(--display);
+  animation: dash-fade 0.45s var(--ease) backwards;
+}
+
+.dash-agent--clock {
+  width: 9.1rem;
+  height: 9.1rem;
+  padding: 0.85rem 0.7rem;
+  border-radius: 50%;
+}
+
+.dash-agent--after {
+  width: 11.25rem;
+  min-height: 4.65rem;
+  padding: 0.8rem 0.95rem;
+  border-radius: 22px;
+}
+
+.dash-agent.is-optional {
+  border-style: dashed;
+}
+
+.dash-agent-name,
+.dash-agent-model {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  max-width: 100%;
+}
+
+.dash-agent-name {
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.dash-agent-model {
+  font-size: var(--text-caption2);
+  font-weight: 500;
+  color: var(--muted);
+  line-height: 1.25;
+}
+
+@media (max-width: 560px) {
+  .dash-agent-band {
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+  }
+}

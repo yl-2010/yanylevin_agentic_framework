@@ -1,0 +1,26 @@
+---
+description: Do not rely on git auto-deploy; production-deploy Vercel when the live website or education/fitness/dashboard UI changed
+alwaysApply: true
+---
+
+# Vercel manual deploy
+
+Git push does **not** update yanylevin.com. Auto-deploy is off on purpose (Hobby 100 deploys/day; skipped education-sync commits still counted). Follow [`AGENTS.md`](../../AGENTS.md).
+
+## Do not reconnect Git
+
+Do **not** run `vercel git connect`. `vercel.json` has `git.deploymentEnabled: false`. Keep it that way.
+
+## When to deploy
+
+After commit + push, run `npm run deploy:web` if Vercel serves the file. Education / fitness / dashboard **UI** counts (`education/app.js`, `education/styles.css`, `education/index.html`, `education/chatbot.js`, same under `fitness/` and `dashboard/`). Homepage and other pages too. `api/**` and `vercel.json` routing too.
+
+Skip only `education/<email>/`, `fitness/<email>/`, chat/login logs, `server/**`, `ios/`, docs, skills, and LaunchAgents. User data is not the UI.
+
+## Command
+
+```bash
+npx vercel whoami && npm run deploy:web
+```
+
+Needs Vercel CLI login (Mac Studio is `yl-2010`). If whoami fails, skip and say so. Then confirm the live URL.

@@ -1,0 +1,45 @@
+---
+description: Auto and first-party parents stay first-party; never upgrade subagents to Fable/Opus
+alwaysApply: true
+---
+
+# Subagent models (Cursor Desktop)
+
+`cursor-grok-4.5-high` is retired. Cursor still lists it on Task; treat that slug as invalid.
+
+## Hard ceiling
+
+A subagent must never run on a model tier **above** the parent.
+
+- **Auto** (`default`) and **Cursor first-party** parents (Composer, Grok 4.6, etc.): subagents stay first-party. Never pass Fable, Opus, Sonnet thinking, or any other third-party slug.
+- **Third-party** parent (Fable, Opus): `inherit` or the same family only. Do not upgrade (e.g. Fable parent → Opus subagent).
+
+## Auto mode
+
+When the parent chat is Auto (`default` / `catalogModelId=default`):
+
+- Prefer `inherit` on Task types that support it.
+- On **explore**, pass `cursor-grok-4.6-high` explicitly. Omitting `model` on explore still bills retired 4.5 even under Auto.
+- Allowed explicit slugs: `cursor-grok-4.6-high`, `composer-2.5-fast`, `composer-2.5`, and other Cursor first-party IDs. Not `claude-fable-5-thinking-high` or other Claude slugs.
+
+## Named first-party parent (Grok 4.6, Composer, …)
+
+- Prefer `inherit`.
+- On **explore**, pass the parent's family if you must be explicit (`cursor-grok-4.6-high`, `composer-2.5-fast`, etc.).
+- Do not steer Grok 4.6 toward Composer unless the user asked. Do not pass third-party Claude slugs.
+
+## Named third-party parent (Fable, Opus, …)
+
+- Prefer `inherit` (Fable → Fable, Opus → Opus).
+- On **explore**, pass the parent's family slug (e.g. `claude-fable-5-thinking-high`).
+- Do not upgrade to a higher third-party tier.
+
+## Grok 4.5
+
+- Never pass `cursor-grok-4.5-high`. Use `cursor-grok-4.6-high` instead.
+
+## Other
+
+- Do **not** pin every Task to Grok 4.6 when the parent is already third-party or Composer.
+- This wins over Cursor's Task list that still includes 4.5.
+- Exception: a **direct user prompt** names a listed model (other than 4.5).

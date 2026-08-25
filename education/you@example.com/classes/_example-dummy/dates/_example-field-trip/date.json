@@ -1,0 +1,7 @@
+{
+  "name": "Date #3",
+  "date": "2026-10-15",
+  "time": "09:30",
+  "description": "Fixture sample: class-level important date with time",
+  "fixture": true
+}

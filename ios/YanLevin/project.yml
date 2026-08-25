@@ -1,0 +1,146 @@
+name: YanLevin
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "18.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # Personal Team (Yan Levin) — swap for paid team when enabling Sign In with Apple
+    DEVELOPMENT_TEAM: "YOUR_TEAM_ID"
+    CODE_SIGN_STYLE: Automatic
+targets:
+  YanLevin:
+    type: application
+    platform: iOS
+    sources:
+      - path: YanLevin
+        excludes:
+          - "**/.DS_Store"
+          - "My Logo.icon"
+          - "My Logo.icon/**"
+          - "Resources/Logo/**"
+    resources:
+      - path: YanLevin/Assets.xcassets
+      - path: "YanLevin/My Logo.icon"
+      - path: YanLevin/Resources/Logo
+        buildPhase: resources
+    info:
+      path: YanLevin/Info.plist
+      properties:
+        CFBundleDisplayName: Yan Levin
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        UILaunchStoryboardName: LaunchScreen
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        "UISupportedInterfaceOrientations~ipad":
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIRequiresFullScreen: false
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+        GIDClientID: "$(GOOGLE_IOS_CLIENT_ID)"
+        CFBundleURLTypes:
+          - CFBundleURLSchemes:
+              - "$(GOOGLE_URL_SCHEME)"
+              - personalagent
+        YanSiteBaseURL: https://yanylevin.com
+        YanApiBaseURL: https://api.yanylevin.com
+        ITSAppUsesNonExemptEncryption: false
+        UIBackgroundModes:
+          - location
+        NSLocationWhenInUseUsageDescription: "This app uses your location on chat maps. On iPhone it may also send location to the Personal Agent so it knows where you are, including when you chat from the website or iPad."
+        NSLocationAlwaysAndWhenInUseUsageDescription: "This app uses your iPhone location in the background so the Personal Agent can see where you are when you chat from the web or a computer. On iPhone it also sends a location update about every 15 minutes, plus when you move a significant distance."
+    entitlements:
+      path: YanLevin/YanLevin.entitlements
+      properties:
+        # Sign In with Apple — re-enable with paid Apple Developer team (not Personal Team):
+        # com.apple.developer.applesignin:
+        #   - Default
+        # Also set AccountView.signInWithAppleEnabled = true
+        com.apple.security.application-groups:
+          - group.com.example.personalagent
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.personalagent
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.education
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GOOGLE_IOS_CLIENT_ID: ""
+        GOOGLE_URL_SCHEME: com.googleusercontent.apps.PLACEHOLDER
+    dependencies:
+      - package: GoogleSignIn
+        product: GoogleSignIn
+      - target: YanLevinWidgets
+        embed: true
+  YanLevinWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: YanLevinWidgets
+        excludes:
+          - "**/.DS_Store"
+          - "Assets.xcassets"
+          - "Assets.xcassets/**"
+      - path: YanLevin/Networking/APIClient.swift
+      - path: YanLevin/Networking/APIClient+URL.swift
+      - path: YanLevin/Networking/AppGroupStore.swift
+      - path: YanLevin/Networking/EducationModels.swift
+      - path: YanLevin/Networking/EducationSchedule.swift
+      - path: YanLevin/Design/NaturalWhen.swift
+      - path: YanLevin/App/OpenChatIntent.swift
+      - path: YanLevin/App/OpenTodoIntent.swift
+      - path: YanLevin/App/CompleteTodoIntent.swift
+      - path: YanLevinWidgets/Assets.xcassets
+        type: folder.assetcatalog
+        buildPhase: resources
+    info:
+      path: YanLevinWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Yan Levin
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        YanSiteBaseURL: https://yanylevin.com
+        YanApiBaseURL: https://api.yanylevin.com
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: YanLevinWidgets/YanLevinWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.example.personalagent
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.personalagent.widgets
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) WIDGET_EXTENSION"
+        LD_RUNPATH_SEARCH_PATHS:
+          - "$(inherited)"
+          - "@executable_path/Frameworks"
+          - "@executable_path/../../Frameworks"
+        SKIP_INSTALL: true
+packages:
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: "8.0.0"
+schemes:
+  YanLevin:
+    build:
+      targets:
+        YanLevin: all
+        YanLevinWidgets: all
+    run:
+      config: Debug
+    archive:
+      config: Release

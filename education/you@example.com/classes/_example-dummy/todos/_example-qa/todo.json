@@ -1,0 +1,8 @@
+{
+  "name": "Todo #6",
+  "tag": "QA",
+  "dueDate": "2026-09-12",
+  "description": "Fixture sample: QA tag",
+  "done": false,
+  "fixture": true
+}

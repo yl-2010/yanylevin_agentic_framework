@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      (function () {
+        try {
+          var dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          var r = document.documentElement;
+          r.dataset.theme = "system";
+          r.dataset.resolvedTheme = dark ? "dark" : "light";
+          r.style.colorScheme = dark ? "dark" : "light";
+        } catch (e) {}
+      })();
+    </script>
+    <title>Privacy Policy · personal agent</title>
+    <meta
+      name="description"
+      content="Privacy policy for this personal-agent fork. Operator-run, not a commercial product."
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" media="(prefers-color-scheme: light)" />
+    <link rel="icon" href="/favicon-dark.svg" type="image/svg+xml" media="(prefers-color-scheme: dark)" />
+    <link rel="stylesheet" href="/education/styles.css?v=send-flight-1" />
+    <style>
+      .privacy {
+        width: min(40rem, calc(100% - 2rem));
+        margin: 0 auto;
+        padding: clamp(7.5rem, 14vh, 9rem) 0 4.5rem;
+      }
+      .privacy-hero { margin-bottom: 1.75rem; }
+      .privacy-hero h1 {
+        font-family: var(--display);
+        font-size: var(--text-large-title);
+        font-weight: 700;
+        line-height: 1.21;
+        margin: 0 0 0.45rem;
+      }
+      .privacy-meta { margin: 0; color: var(--muted); font-size: var(--text-subhead); }
+      .privacy-lead {
+        margin: 0 0 0.35rem;
+        color: var(--fg);
+        font-size: var(--text-body);
+        line-height: var(--lh-body);
+      }
+      .privacy section { margin-top: 1.85rem; }
+      .privacy h2 {
+        font-family: var(--display);
+        font-size: var(--text-title2);
+        font-weight: 700;
+        margin: 0 0 0.55rem;
+        color: var(--fg);
+      }
+      .privacy p, .privacy li {
+        color: var(--muted);
+        font-size: var(--text-body);
+        line-height: var(--lh-body);
+      }
+      .privacy p { margin: 0 0 0.75rem; }
+      .privacy ul { margin: 0 0 0.75rem; padding-left: 1.15rem; }
+      .privacy li { margin: 0.35rem 0; }
+      .privacy li strong { color: var(--fg); font-weight: 600; }
+      .privacy a { color: var(--accent); }
+      .privacy-foot {
+        margin-top: 2.5rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid var(--hairline);
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <a class="corner c-tl squircle" data-liquid-glass="squircle" data-filter-id="lg-tl" href="/" aria-label="Home">
+      <svg viewBox="0 0 252 252" aria-hidden="true"><path fill="currentColor" d="M229.4,214.58c0,11.34-9.21,20.52-20.55,20.51l-117.33-.11c-2.66-.02-5.21-.49-7.64-1.48-9.37-3.58-14.91-14.5-12.23-24.2.17-.64.37-1.29.61-1.92,0,0,22.86-63.64,22.86-63.64L26.54,49.57c-6.68-9.17-4.66-22.01,4.51-28.69,9.17-6.67,22.01-4.65,28.68,4.51l52.17,71.64,23.93-66.63c3.8-10.58,15.47-16.08,26.05-12.28,10.59,3.81,16.09,15.47,12.28,26.05l-53.8,149.78,88.53.08c11.34.01,20.53,9.21,20.51,20.55Z"/></svg>
+    </a>
+    <button type="button" class="corner c-tr circle" data-liquid-glass="circle" data-filter-id="lg-tr" aria-label="Toggle theme" draggable="false"></button>
+    <main class="privacy" aria-label="Privacy policy">
+      <header class="privacy-hero">
+        <h1>Privacy Policy</h1>
+        <p class="privacy-meta">Template for forks. Last updated: August 25, 2026</p>
+      </header>
+      <p class="privacy-lead">
+        This is an operator-run personal project, not a commercial advertising product.
+        You (the operator) host it. Replace this page with your own policy before you
+        put a fork on the public internet.
+      </p>
+      <section>
+        <h2>What this covers</h2>
+        <p>The static site, optional public chatbot, signed-in Education / Fitness / Dashboard tools, and the companion iOS app if you ship one.</p>
+      </section>
+      <section>
+        <h2>Information you may collect</h2>
+        <ul>
+          <li><strong>Public chat.</strong> Visitor messages plus limited technical signals for abuse resistance. Processed by a local language model on the operator's Mac if that path is enabled.</li>
+          <li><strong>Sign-in.</strong> Google OAuth (optional). Email decides whether the account is the allowlisted operator.</li>
+          <li><strong>Operator data.</strong> School dashboard, fitness logs, Health dumps, location, mail, and Messages stay on the operator's Mac under <code>education/&lt;email&gt;/</code>. They are not a public API.</li>
+        </ul>
+      </section>
+      <section>
+        <h2>Apple integrations</h2>
+        <p>Mail, Calendar, Contacts, Messages, Screen Time, Health, and location run locally with Full Disk Access / TCC. They are not sent to a third-party SaaS by this repo.</p>
+      </section>
+      <p class="privacy-foot">Operator: set your own name and contact here. This template ships with the MIT-licensed framework.</p>
+    </main>
+    <script src="/theme-orb.js"></script>
+    <script src="/liquid-glass.js"></script>
+  </body>
+</html>

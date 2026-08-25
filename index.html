@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      (function () {
+        try {
+          var dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          var r = document.documentElement;
+          r.dataset.theme = "system";
+          r.dataset.resolvedTheme = dark ? "dark" : "light";
+          r.style.colorScheme = dark ? "dark" : "light";
+        } catch (e) {}
+      })();
+    </script>
+    <title>(PLACEHOLDER) Yan Levin · personal agent framework</title>
+    <meta
+      name="description"
+      content="Open-source personal agent framework. Mac-local Cursor agent, education/fitness dashboards, Apple integrations. Yan Levin is a placeholder name for the reference implementation."
+    />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" media="(prefers-color-scheme: light)" />
+    <link rel="icon" href="favicon-dark.svg" type="image/svg+xml" media="(prefers-color-scheme: dark)" />
+    <style>
+      :root {
+        /* Color theme from site #1 */
+        --bg-0: #e8edf2;
+        --bg-1: #dde5ec;
+        --fg: #14181d;
+        --muted: #5a6470;
+        --accent: #1b7d8a;
+        --hairline: rgba(20, 24, 29, 0.12);
+        --panel-bg: rgba(255, 255, 255, 0.5);
+        --panel-brd: rgba(255, 255, 255, 0.6);
+        --rim: rgba(255, 255, 255, 0.75);
+        --glow: rgba(255, 255, 255, 0.14);
+        --bloom-a: rgba(24, 125, 145, 0.22);
+        --bloom-b: rgba(206, 176, 122, 0.16);
+        --bloom-c: rgba(70, 120, 200, 0.18);
+        --lg-tint-rgb: 255, 255, 255;
+        --lg-tint-opacity: 0.06;
+        --lg-shadow-blur: 20px;
+        --lg-shadow-spread: -5px;
+        --lg-shadow-color: rgba(255, 255, 255, 0.45);
+        --lg-outer-shadow-blur: 24px;
+        --lg-outer-shadow: rgba(0, 0, 0, 0.18);
+        --lg-fallback-tint: 0.2;
+        --lg-fallback-shine: rgba(255, 255, 255, 0.5);
+        --apple: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
+        --display: var(--apple);
+        --body: var(--apple);
+        --ease: cubic-bezier(0.22, 1, 0.36, 1);
+        --pointer-x: 50%;
+        --pointer-y: 30%;
+        --pointer-glow-strength: 0.75;
+      }
+      @property --lg-read-blur {
+        syntax: "<length>";
+        inherits: true;
+        initial-value: 0px;
+      }
+      /* Dark tokens: OS preference (unless forced light) or explicit resolved dark */
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-resolved-theme="light"]) {
+          --bg-0: #0b0e11;
+          --bg-1: #0f141a;
+          --fg: #e9eef2;
+          --muted: #98a2ad;
+          --accent: #71c4c2;
+          --hairline: rgba(233, 238, 242, 0.12);
+          --panel-bg: rgba(26, 31, 37, 0.45);
+          --panel-brd: rgba(255, 255, 255, 0.1);
+          --rim: rgba(255, 255, 255, 0.16);
+          --glow: rgba(200, 214, 224, 0.05);
+          --bloom-a: rgba(58, 150, 152, 0.2);
+          --bloom-b: rgba(150, 120, 70, 0.15);
+          --bloom-c: rgba(66, 104, 168, 0.17);
+          --lg-tint-rgb: 18, 24, 22;
+          --lg-tint-opacity: 0.28;
+          --lg-shadow-blur: 22px;
+          --lg-shadow-spread: -4px;
+          --lg-shadow-color: rgba(255, 255, 255, 0.28);
+          --lg-outer-shadow-blur: 28px;
+          --lg-outer-shadow: rgba(0, 0, 0, 0.5);
+          --lg-fallback-tint: 0.14;
+          --lg-fallback-shine: rgba(255, 255, 255, 0.3);
+        }
+      }
+      html[data-resolved-theme="dark"] {
+        --bg-0: #0b0e11;
+        --bg-1: #0f141a;
+        --fg: #e9eef2;
+        --muted: #98a2ad;
+        --accent: #71c4c2;
+        --hairline: rgba(233, 238, 242, 0.12);
+        --panel-bg: rgba(26, 31, 37, 0.45);
+        --panel-brd: rgba(255, 255, 255, 0.1);
+        --rim: rgba(255, 255, 255, 0.16);
+        --glow: rgba(200, 214, 224, 0.05);
+        --bloom-a: rgba(58, 150, 152, 0.2);
+        --bloom-b: rgba(150, 120, 70, 0.15);
+        --bloom-c: rgba(66, 104, 168, 0.17);
+        --lg-tint-rgb: 18, 24, 22;
+        --lg-tint-opacity: 0.28;
+        --lg-shadow-blur: 22px;
+        --lg-shadow-spread: -4px;
+        --lg-shadow-color: rgba(255, 255, 255, 0.28);
+        --lg-outer-shadow-blur: 28px;
+        --lg-outer-shadow: rgba(0, 0, 0, 0.5);
+        --lg-fallback-tint: 0.14;
+        --lg-fallback-shine: rgba(255, 255, 255, 0.3);
+      }
+      html[data-resolved-theme="light"] {
+        --bg-0: #e8edf2;
+        --bg-1: #dde5ec;
+        --fg: #14181d;
+        --muted: #5a6470;
+        --accent: #1b7d8a;
+        --hairline: rgba(20, 24, 29, 0.12);
+        --panel-bg: rgba(255, 255, 255, 0.5);
+        --panel-brd: rgba(255, 255, 255, 0.6);
+        --rim: rgba(255, 255, 255, 0.75);
+        --glow: rgba(255, 255, 255, 0.14);
+        --bloom-a: rgba(24, 125, 145, 0.22);
+        --bloom-b: rgba(206, 176, 122, 0.16);
+        --bloom-c: rgba(70, 120, 200, 0.18);
+        --lg-tint-rgb: 255, 255, 255;
+        --lg-tint-opacity: 0.06;
+        --lg-shadow-blur: 20px;
+        --lg-shadow-spread: -5px;
+        --lg-shadow-color: rgba(255, 255, 255, 0.45);
+        --lg-outer-shadow-blur: 24px;
+        --lg-outer-shadow: rgba(0, 0, 0, 0.18);
+        --lg-fallback-tint: 0.2;
+        --lg-fallback-shine: rgba(255, 255, 255, 0.5);
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0; color: var(--fg);
+        font-family: var(--body); font-size: 17px; line-height: 1.294;
+        -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; min-height: 100vh;
+        background: linear-gradient(180deg, var(--bg-0), var(--bg-1));
+      }
+      /* Calm background for the glass to refract (from site #1) */
+      body::before {
+        content: ""; position: fixed; inset: 0; z-index: -2; pointer-events: none;
+        background:
+          radial-gradient(42rem 42rem at 8% 4%, var(--bloom-a), transparent 60%),
+          radial-gradient(38rem 38rem at 96% 30%, var(--bloom-b), transparent 62%),
+          radial-gradient(46rem 46rem at 60% 100%, var(--bloom-c), transparent 60%);
+      }
+      body::after {
+        content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+        opacity: var(--pointer-glow-strength);
+        background: radial-gradient(24rem 24rem at var(--pointer-x) var(--pointer-y), var(--glow), transparent 60%);
+        transition: opacity 0.4s var(--ease);
+      }
+      html.lg-chrome {
+        --pointer-x: 50vw;
+        --pointer-y: 30vh;
+      }
+      html.lg-chrome body::after {
+        inset: auto; width: 48rem; height: 48rem; left: 0; top: 0;
+        margin-left: -24rem; margin-top: -24rem;
+        background: radial-gradient(24rem 24rem at 50% 50%, var(--glow), transparent 60%);
+        transform: translate3d(var(--pointer-x), var(--pointer-y), 0);
+        will-change: transform;
+      }
+      html.lg-chrome .corner { will-change: auto; }
+      html.lg-chrome .corner:hover, html.lg-chrome .corner.is-dragging { will-change: transform; }
+      img { max-width: 100%; display: block; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; text-underline-offset: 0.2em; }
+      .wrap { width: min(50rem, calc(100% - 2.5rem)); margin: 0 auto; }
+
+      /* ---- Liquid Glass corner shapes (main-site engine) ---- */
+      .corner {
+        position: fixed; z-index: 80; --lg-filter: none; isolation: isolate;
+        display: grid; place-items: center; color: var(--fg);
+        box-shadow: 0 6px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
+        transition: transform 0.3s var(--ease), box-shadow 0.4s var(--ease);
+        will-change: transform;
+      }
+      .corner::before, .stat-tile::before, .portrait-glass::before,
+      .yan-chat-close::before, .yan-chat-send::before, .app-tile::before,
+      .yan-chat-bubble::before {
+        content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit;
+        box-shadow: inset 0 0 var(--lg-shadow-blur) var(--lg-shadow-spread) var(--lg-shadow-color);
+        background-color: rgba(var(--lg-tint-rgb), var(--lg-tint-opacity)); pointer-events: none;
+      }
+      .corner.lg-refraction::after, .stat-tile.lg-refraction::after, .portrait-glass.lg-refraction::after,
+      .yan-chat-close.lg-refraction::after, .yan-chat-send.lg-refraction::after, .app-tile.lg-refraction::after,
+      .yan-chat-bubble.lg-refraction::after {
+        content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
+        backdrop-filter: var(--lg-filter); -webkit-backdrop-filter: var(--lg-filter);
+        isolation: isolate; pointer-events: none;
+      }
+      .corner.lg-fallback, .stat-tile.lg-fallback, .portrait-glass.lg-fallback,
+      .yan-chat-close.lg-fallback, .yan-chat-send.lg-fallback, .app-tile.lg-fallback,
+      .yan-chat-bubble.lg-fallback {
+        background-color: rgba(var(--lg-tint-rgb), var(--lg-fallback-tint));
+        backdrop-filter: blur(10px) saturate(1.5); -webkit-backdrop-filter: blur(10px) saturate(1.5);
+      }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-resolved-theme="light"]) .corner.lg-refraction::after,
+        html:not([data-resolved-theme="light"]) .stat-tile.lg-refraction::after,
+        html:not([data-resolved-theme="light"]) .portrait-glass.lg-refraction::after,
+        html:not([data-resolved-theme="light"]) .yan-chat-close.lg-refraction::after,
+        html:not([data-resolved-theme="light"]) .yan-chat-send.lg-refraction::after,
+        html:not([data-resolved-theme="light"]) .app-tile.lg-refraction::after,
+        html:not([data-resolved-theme="light"]) .yan-chat-bubble.lg-refraction::after {
+          backdrop-filter: var(--lg-filter) brightness(0.92) saturate(1.15);
+          -webkit-backdrop-filter: var(--lg-filter) brightness(0.92) saturate(1.15);
+        }
+      }
+      html[data-resolved-theme="dark"] .corner.lg-refraction::after,
+      html[data-resolved-theme="dark"] .stat-tile.lg-refraction::after,
+      html[data-resolved-theme="dark"] .portrait-glass.lg-refraction::after,
+      html[data-resolved-theme="dark"] .yan-chat-close.lg-refraction::after,
+      html[data-resolved-theme="dark"] .yan-chat-send.lg-refraction::after,
+      html[data-resolved-theme="dark"] .app-tile.lg-refraction::after,
+      html[data-resolved-theme="dark"] .yan-chat-bubble.lg-refraction::after {
+        backdrop-filter: var(--lg-filter) brightness(0.92) saturate(1.15);
+        -webkit-backdrop-filter: var(--lg-filter) brightness(0.92) saturate(1.15);
+      }
+      html.lg-chrome .yan-chat-bubble.lg-static {
+        transition: transform 0.3s var(--ease);
+      }
+      html.lg-chrome .yan-chat-bubble.lg-static:hover {
+        will-change: transform;
+      }
+      html.lg-chrome .yan-chat-bubble.lg-static.lg-refraction::after {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        isolation: auto;
+        background: rgba(255, 255, 255, 0.72);
+        mix-blend-mode: normal;
+        opacity: 1;
+        -webkit-mask-image: var(--lg-spec);
+        mask-image: var(--lg-spec);
+        -webkit-mask-size: 100% 100%;
+        mask-size: 100% 100%;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+      }
+      .corner svg, .yan-chat-close svg, .yan-chat-send svg {
+        position: relative; z-index: 2; width: 52%; height: 52%;
+      }
+      .corner.squircle { border-radius: var(--lg-radius, 21px); }
+      .corner.circle { border-radius: 50%; }
+
+      /* Social dock (top-right 2×2): GitHub half of prior size; LI left, mail below */
+      :root {
+        --corner-pad: clamp(1rem, 2.5vw, 1.6rem);
+        --social-size: 50px;
+        --social-gap: 0.55rem;
+      }
+      .c-tl { top: var(--corner-pad); left: var(--corner-pad); width: 120px; height: 120px; }
+      .social-orb {
+        width: var(--social-size); height: var(--social-size);
+      }
+      .social-orb svg { width: 50%; height: 50%; }
+      .c-gh {
+        top: var(--corner-pad); right: var(--corner-pad);
+      }
+      .c-li {
+        top: var(--corner-pad);
+        right: calc(var(--corner-pad) + var(--social-size) + var(--social-gap));
+      }
+      .c-mail {
+        top: calc(var(--corner-pad) + var(--social-size) + var(--social-gap));
+        right: var(--corner-pad);
+      }
+      .c-bl {
+        /* Above logo/socials/content; below chat pill (90) + panel (89) */
+        z-index: 88;
+        bottom: var(--corner-pad); left: var(--corner-pad);
+        width: 120px; height: 120px; cursor: grab; touch-action: none;
+        user-select: none; -webkit-user-drag: none;
+        transition:
+          transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1),
+          width 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+          height 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+          border-radius 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+          box-shadow 0.4s var(--ease);
+      }
+      .c-bl.is-dragging { transition: none; cursor: grabbing; }
+      .c-bl:active { cursor: grabbing; }
+      .c-bl.is-docked {
+        width: var(--social-size); height: var(--social-size);
+        cursor: grab;
+      }
+      .c-bl.is-docked svg { width: 50%; height: 50%; }
+      @media (max-width: 900px) {
+        :root { --social-size: 40px; }
+        .c-tl, .c-bl:not(.is-docked), .c-br { width: 96px; height: 96px; }
+      }
+      @media (max-width: 560px) {
+        :root { --social-size: 33px; }
+        .c-tl, .c-bl:not(.is-docked), .c-br { width: 80px; height: 80px; }
+      }
+
+      .hero { padding: clamp(9.5rem, 17vh, 11rem) 0 clamp(2rem, 6vh, 3.5rem); }
+      .hero-grid { display: grid; gap: 2rem; align-items: center; }
+      @media (min-width: 720px) { .hero-grid { grid-template-columns: 1fr auto; } }
+      .eyebrow { font-size: 17px; font-weight: 700; text-transform: none; color: var(--accent); margin: 0 0 0.9rem; }
+      h1 { font-family: var(--apple); font-weight: 700; font-size: 34px; line-height: 1.21; margin: 0 0 1rem; max-width: 16ch; }
+      .lede { color: var(--muted); font-size: 17px; margin: 0; max-width: 42ch; }
+      @media (min-width: 720px) {
+        h1 { font-size: 44px; }
+        .lede { font-size: 20px; }
+      }
+
+      /* Portrait held inside an orange-tinted Liquid Glass squircle */
+      /* Frosted glass frame (CSS), saturated orange tint */
+      .portrait-glass {
+        position: relative; isolation: isolate;
+        --lg-tint-rgb: 253, 88, 2; --lg-tint-opacity: 0.34;
+        width: max-content; padding: clamp(0.85rem, 2.2vw, 1.25rem);
+        margin: 0; border-radius: 40px; display: block;
+        backdrop-filter: blur(16px) saturate(1.7); -webkit-backdrop-filter: blur(16px) saturate(1.7);
+        box-shadow: 0 14px 36px var(--lg-outer-shadow);
+        transition: transform 0.4s var(--ease); will-change: transform;
+      }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-resolved-theme="light"]) .portrait-glass {
+          --lg-tint-rgb: 244, 104, 16; --lg-tint-opacity: 0.36;
+        }
+      }
+      html[data-resolved-theme="dark"] .portrait-glass {
+        --lg-tint-rgb: 244, 104, 16; --lg-tint-opacity: 0.36;
+      }
+      html[data-resolved-theme="light"] .portrait-glass {
+        --lg-tint-rgb: 253, 88, 2; --lg-tint-opacity: 0.34;
+      }
+      .portrait-glass > * { position: relative; z-index: 2; }
+      /* Photo: exact same size and corner radius as before, square */
+      .portrait {
+        width: clamp(150px, 32vw, 200px); height: clamp(150px, 32vw, 200px);
+        border-radius: 26px; object-fit: cover; object-position: 42% 16%; display: block;
+      }
+
+      section { padding: clamp(1.75rem, 5vh, 2.75rem) 0; }
+      h2 { font-family: var(--display); font-weight: 700; font-size: 22px; color: var(--fg); margin: 0 0 1.5rem; }
+      .about p { margin: 0; max-width: 60ch; }
+
+      /* About + Academics share one row */
+      .about-row { display: grid; gap: 1.75rem; align-items: stretch; }
+      @media (min-width: 760px) { .about-row { grid-template-columns: 1fr 1fr; gap: 2.25rem; } }
+      .about-col { align-self: center; }
+
+      .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+      .stat-tile {
+        position: relative; isolation: isolate; --lg-filter: none;
+        border-radius: var(--lg-radius, 26px); min-height: clamp(104px, 15vw, 132px);
+        display: grid; place-items: center; padding: 1rem; text-align: center;
+        box-shadow: 0 6px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
+        transition: transform 0.3s var(--ease), box-shadow 0.4s var(--ease);
+        will-change: transform;
+      }
+      .stat-tile > * { position: relative; z-index: 2; }
+      .stat-in { display: flex; flex-direction: column; gap: 0.3rem; }
+      .stat-tile .v { font-family: var(--display); font-size: 28px; font-weight: 700; line-height: 1; }
+      .stat-tile .k { color: var(--muted); font-size: 12px; }
+
+      .timeline { list-style: none; margin: 0; padding: 0; position: relative; }
+      .timeline::before { content: ""; position: absolute; left: 0.42rem; top: 0.5rem; bottom: 0.5rem; width: 2px; background: linear-gradient(var(--accent), transparent); opacity: 0.5; }
+      .timeline li { position: relative; padding: 0 0 1.4rem 1.9rem; }
+      .timeline li:last-child { padding-bottom: 0; }
+      .timeline li::before { content: ""; position: absolute; left: 0; top: 0.35rem; width: 0.9rem; height: 0.9rem; border-radius: 50%; background: var(--bg-0); border: 2px solid var(--accent); transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease); }
+      .timeline li:hover::before { transform: scale(1.25); box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 22%, transparent); }
+      .timeline .year { font-family: var(--display); font-weight: 700; color: var(--accent); font-size: 12px; }
+      .timeline h3 { font-family: var(--display); font-weight: 600; font-size: 17px; margin: 0.1rem 0 0.15rem; }
+      .timeline p { margin: 0; color: var(--muted); font-size: 15px; }
+      .timeline p a { color: var(--accent); font-weight: 600; }
+      .row p a { color: var(--accent); font-weight: 600; }
+
+      .rows { display: grid; gap: 0.4rem; }
+      .rows .row { padding: 0.85rem 0; transition: padding-left 0.3s var(--ease); }
+      .rows .row:hover { padding-left: 0.5rem; }
+      .row h3 { font-family: var(--display); font-weight: 600; font-size: 17px; margin: 0 0 0.15rem; }
+      .row .when { color: var(--accent); font-size: 12px; margin: 0 0 0.45rem; }
+      .row p { margin: 0; color: var(--muted); font-size: 15px; }
+      .row p a { color: var(--accent); font-weight: 600; }
+
+      .awards { list-style: none; margin: 0; padding: 0; }
+      .awards li { padding: 0.55rem 0; color: var(--muted); font-size: 15px; }
+      .awards li + li { border-top: 1px solid var(--hairline); }
+
+      /* Hidden Apps unlock (authorized Google session only) */
+      .apps-section[hidden] { display: none !important; }
+      .apps-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+        gap: 1rem;
+      }
+      .app-tile {
+        position: relative;
+        isolation: isolate;
+        --lg-filter: none;
+        display: grid;
+        place-items: center;
+        min-height: clamp(88px, 14vw, 112px);
+        padding: 1.1rem 1.25rem;
+        border-radius: 22px;
+        color: var(--fg);
+        text-decoration: none;
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: 17px;
+        text-align: center;
+        box-shadow: 0 6px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
+        transition: transform 0.3s var(--ease), box-shadow 0.4s var(--ease);
+        will-change: transform;
+      }
+      .app-tile > span {
+        position: relative;
+        z-index: 2;
+      }
+      .app-tile:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 28px var(--lg-outer-shadow);
+        text-decoration: none;
+      }
+
+      footer { padding: 2.5rem 0 3.5rem; color: var(--muted); font-size: 12px; }
+      footer a { color: var(--accent); font-size: 15px; font-weight: 500; }
+      footer .fl { display: flex; gap: 1.25rem; margin: 0.75rem 0; }
+
+      .reveal { opacity: 0; transform: translateY(0.9rem); transition: opacity 0.7s var(--ease), transform 0.7s var(--ease); }
+      .reveal.vis { opacity: 1; transform: none; }
+      @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; } html { scroll-behavior: auto; } body::after { display: none; } }
+
+      .visually-hidden {
+        position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+        overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+      }
+
+      /* ── Chatbot: circle → centered pill → response panel ── */
+      .yan-chat {
+        --lg-read-blur: 0px;
+        --chat-pad: clamp(1rem, 2.5vw, 1.6rem);
+        --chat-circle: 120px;
+        /* Match .c-tl size so the panel clears the top liquid-glass orbs */
+        --chat-top-orb: 120px;
+        --chat-top-gap: 0.75rem;
+        --chat-panel-top: calc(var(--chat-pad) + var(--chat-top-orb) + var(--chat-top-gap));
+        --pill-h: var(--chat-circle);
+        --chat-panel-bottom: calc(var(--pill-h) + var(--chat-pad) + 0.75rem);
+        --chat-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+        --chat-orange: #fd5802;
+        --chat-orange-rgb: 253, 88, 2;
+        --pill-w: var(--chat-circle);
+        --pill-left: calc(100vw - var(--chat-pad) - var(--chat-circle));
+        position: fixed; inset: 0; z-index: 90; pointer-events: none;
+      }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-resolved-theme="light"]) .yan-chat {
+          --chat-orange: #f87a28; --chat-orange-rgb: 248, 122, 40;
+        }
+      }
+      html[data-resolved-theme="dark"] .yan-chat {
+        --chat-orange: #f87a28; --chat-orange-rgb: 248, 122, 40;
+      }
+      html[data-resolved-theme="light"] .yan-chat {
+        --chat-orange: #fd5802; --chat-orange-rgb: 253, 88, 2;
+      }
+      @media (max-width: 900px) {
+        .yan-chat { --chat-circle: 96px; --chat-top-orb: 96px; }
+      }
+      @media (max-width: 560px) {
+        .yan-chat { --chat-circle: 80px; --chat-top-orb: 80px; }
+      }
+      .yan-chat.is-open {
+        --pill-w: min(calc(var(--chat-circle) * 6), calc(100vw - (var(--chat-pad) * 2)));
+        --pill-left: calc(50vw - (var(--pill-w) / 2));
+      }
+      .yan-chat.has-input-text {
+        --lg-read-blur: 20px;
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .yan-chat {
+          transition: --lg-read-blur 0.4s var(--ease);
+        }
+      }
+
+      .yan-chat-pill.corner,
+      .yan-chat-pill.corner.circle {
+        top: auto; bottom: var(--chat-pad);
+        left: var(--pill-left); right: auto;
+        width: var(--pill-w); height: var(--pill-h);
+        /* Beat .corner.circle { border-radius: 50% } so a tall composer stays a rounded rect. */
+        border-radius: calc(var(--chat-circle) / 2);
+        pointer-events: auto; cursor: pointer; overflow: visible;
+        transition:
+          left 0.7s var(--chat-spring), width 0.7s var(--chat-spring),
+          height 0.22s var(--ease), box-shadow 0.35s var(--ease),
+          transform 0.3s var(--ease);
+      }
+      .yan-chat.is-open .yan-chat-pill.corner {
+        cursor: text;
+      }
+      .yan-chat-pill.corner.lg-refraction::after {
+        backdrop-filter: blur(var(--lg-read-blur)) var(--lg-filter);
+        -webkit-backdrop-filter: blur(var(--lg-read-blur)) var(--lg-filter);
+      }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-resolved-theme="light"]) .yan-chat-pill.corner.lg-refraction::after {
+          backdrop-filter: blur(var(--lg-read-blur)) var(--lg-filter) brightness(0.92) saturate(1.15);
+          -webkit-backdrop-filter: blur(var(--lg-read-blur)) var(--lg-filter) brightness(0.92) saturate(1.15);
+        }
+      }
+      html[data-resolved-theme="dark"] .yan-chat-pill.corner.lg-refraction::after {
+        backdrop-filter: blur(var(--lg-read-blur)) var(--lg-filter) brightness(0.92) saturate(1.15);
+        -webkit-backdrop-filter: blur(var(--lg-read-blur)) var(--lg-filter) brightness(0.92) saturate(1.15);
+      }
+      .yan-chat-pill.lg-fallback {
+        backdrop-filter: blur(10px) saturate(1.5);
+        -webkit-backdrop-filter: blur(10px) saturate(1.5);
+        transition: backdrop-filter 0.4s var(--ease), -webkit-backdrop-filter 0.4s var(--ease);
+      }
+      .yan-chat.has-input-text .yan-chat-pill.lg-fallback {
+        backdrop-filter: blur(20px) saturate(1.5);
+        -webkit-backdrop-filter: blur(20px) saturate(1.5);
+      }
+
+      .yan-chat-launcher {
+        position: absolute; inset: 0; z-index: 3; margin: 0; padding: 0; border: 0;
+        display: grid; place-items: center; background: transparent; color: var(--fg);
+        cursor: pointer; opacity: 1;
+        transition: opacity 0.25s var(--ease), transform 0.35s var(--chat-spring);
+      }
+      .yan-chat-launcher svg { width: 52%; height: 52%; }
+      .yan-chat.is-open .yan-chat-launcher {
+        opacity: 0; pointer-events: none; transform: scale(0.4) rotate(90deg);
+      }
+
+      .yan-chat-close {
+        --lg-filter: none;
+        --chat-x-size: 1.7rem;
+        position: absolute; z-index: 5; display: grid; place-items: center;
+        width: var(--chat-x-size); height: var(--chat-x-size); margin: 0; padding: 0; border: 0; border-radius: 50%;
+        color: var(--fg); background: transparent; isolation: isolate;
+        box-shadow: 0 3px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
+        cursor: pointer; opacity: 0; pointer-events: none;
+        transition: opacity 0.28s var(--ease), transform 0.3s var(--ease), box-shadow 0.3s var(--ease);
+      }
+      .yan-chat-close svg { width: 48%; height: 48%; display: block; }
+      .yan-chat-close:focus-visible { outline: 2px solid var(--chat-orange); outline-offset: 2px; }
+      .yan-chat-close--pill { top: 0.38rem; left: 0.38rem; }
+      .yan-chat-close--panel {
+        top: calc(var(--chat-panel-radius) - var(--chat-x-size) / 2);
+        left: calc(var(--chat-panel-radius) - var(--chat-x-size) / 2);
+      }
+      .yan-chat.is-open:not(.has-panel) .yan-chat-close--pill {
+        opacity: 1; pointer-events: auto; transition-delay: 0.18s;
+      }
+      .yan-chat.has-panel .yan-chat-close--panel {
+        opacity: 1; pointer-events: auto;
+      }
+      .yan-chat.has-panel .yan-chat-close--pill {
+        opacity: 0; pointer-events: none; transition-delay: 0s;
+      }
+
+      .yan-chat-form {
+        position: absolute; inset: 0; z-index: 4; display: flex; align-items: center; gap: 0.45rem;
+        padding: 0 0.7rem 0 2.45rem; opacity: 0; pointer-events: none;
+        transition: opacity 0.28s var(--ease);
+      }
+      .yan-chat.is-open .yan-chat-form { opacity: 1; pointer-events: auto; transition-delay: 0.2s; }
+      .yan-chat.is-composer-tall .yan-chat-form {
+        align-items: flex-end;
+        padding-top: 0.55rem;
+        padding-bottom: 0.55rem;
+      }
+      .yan-chat-input {
+        flex: 1; min-width: 0; min-height: 0; height: 1.35em; margin: 0; padding: 0 0.25rem; border: 0;
+        background: transparent; color: var(--fg); font-family: var(--body);
+        font-size: 17px; font-weight: 400; outline: none;
+        line-height: 1.294; resize: none; overflow-x: hidden; overflow-y: hidden;
+        white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;
+        appearance: none; -webkit-appearance: none; field-sizing: fixed; align-self: center;
+      }
+      .yan-chat.is-composer-tall .yan-chat-input { align-self: stretch; height: auto; }
+      .yan-chat-input::placeholder { color: var(--muted); opacity: 0.8; }
+      .yan-chat-send {
+        --lg-filter: none;
+        --lg-tint-rgb: var(--chat-orange-rgb);
+        --lg-tint-opacity: 0.42;
+        /* position:relative so ::before/::after glass layers size to this button,
+           not the positioned .yan-chat-pill ancestor (was painting a pill-wide oval) */
+        position: relative;
+        flex: 0 0 2.45rem;
+        width: 2.45rem; min-width: 2.45rem; max-width: 2.45rem;
+        height: 2.45rem; min-height: 2.45rem; max-height: 2.45rem;
+        margin: 0; padding: 0; border: 0; overflow: hidden;
+        border-radius: 50%; display: grid; place-items: center; background: transparent;
+        color: var(--fg); isolation: isolate; cursor: pointer;
+        box-shadow: 0 4px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
+        transition: opacity 0.2s, box-shadow 0.3s var(--ease), filter 0.25s var(--ease);
+      }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-resolved-theme="light"]) .yan-chat-send { --lg-tint-opacity: 0.4; }
+      }
+      html[data-resolved-theme="dark"] .yan-chat-send { --lg-tint-opacity: 0.4; }
+      .yan-chat-send svg {
+        width: 42%; height: 42%; display: block;
+        transition: transform 0.25s var(--chat-spring);
+      }
+      .yan-chat-send:hover {
+        filter: brightness(1.08);
+        box-shadow: 0 6px calc(var(--lg-outer-shadow-blur) + 4px) var(--lg-outer-shadow);
+      }
+      .yan-chat-send:hover svg { transform: translateY(-1px) scale(1.06); }
+      .yan-chat-send:disabled { opacity: 0.45; cursor: wait; filter: none; }
+      .yan-chat-send:disabled svg { transform: none; }
+      .yan-chat-send:focus-visible { outline: 2px solid var(--chat-orange); outline-offset: 2px; }
+
+      @keyframes yan-chat-panel-in {
+        from { opacity: 0; transform: translateY(18%) scale(0.92); }
+        to { opacity: 1; transform: none; }
+      }
+      .yan-chat-panel {
+        --chat-panel-radius: clamp(1.5rem, 4vw, 2.4rem);
+        --chat-x-size: 1.7rem;
+        position: fixed; z-index: 89;
+        left: var(--pill-left); right: auto;
+        /* Always clear top-left / top-right glass with a visible gap */
+        top: var(--chat-panel-top);
+        bottom: var(--chat-panel-bottom);
+        width: var(--pill-w); height: auto;
+        border-radius: var(--chat-panel-radius);
+        --lg-filter: none; isolation: isolate;
+        box-shadow: 0 10px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
+        pointer-events: none; opacity: 0; transform: translateY(18%) scale(0.92); overflow: hidden;
+        transition:
+          opacity 0.45s var(--ease),
+          transform 0.65s var(--chat-spring),
+          left 0.7s var(--chat-spring),
+          width 0.7s var(--chat-spring);
+      }
+      .yan-chat-panel::before {
+        content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit;
+        box-shadow: inset 0 0 var(--lg-shadow-blur) var(--lg-shadow-spread) var(--lg-shadow-color);
+        background-color: rgba(var(--lg-tint-rgb), var(--lg-tint-opacity)); pointer-events: none;
+      }
+      .yan-chat-panel.lg-refraction::after {
+        content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
+        backdrop-filter: var(--lg-filter); -webkit-backdrop-filter: var(--lg-filter);
+        isolation: isolate; pointer-events: none;
+      }
+      .yan-chat-panel.lg-fallback {
+        background-color: rgba(var(--lg-tint-rgb), var(--lg-fallback-tint));
+        backdrop-filter: blur(14px) saturate(1.5); -webkit-backdrop-filter: blur(14px) saturate(1.5);
+      }
+      .yan-chat.has-panel .yan-chat-panel {
+        pointer-events: auto; opacity: 1; transform: none;
+        animation: yan-chat-panel-in 0.65s var(--chat-spring) backwards;
+      }
+      .yan-chat.has-panel.is-send-flight .yan-chat-panel {
+        animation: none;
+      }
+      html.lg-chrome .yan-chat.has-panel .yan-chat-panel {
+        transition:
+          transform 0.3s var(--ease),
+          opacity 0.45s var(--ease),
+          left 0.7s var(--chat-spring),
+          width 0.7s var(--chat-spring);
+      }
+      html.lg-chrome .yan-chat.has-panel .yan-chat-panel:hover,
+      html.lg-chrome .yan-chat.is-open .yan-chat-pill.corner:hover,
+      html.lg-chrome .yan-chat-close:hover {
+        will-change: transform;
+      }
+      @media (min-width: 901px) {
+        .yan-chat-panel {
+          /* ~2/3 viewport, but never climb into the top orb band */
+          top: auto;
+          bottom: var(--chat-panel-bottom);
+          height: min(
+            66.666vh,
+            calc(100vh - var(--chat-panel-top) - var(--chat-panel-bottom))
+          );
+          max-height: calc(100vh - var(--chat-panel-top) - var(--chat-panel-bottom));
+        }
+      }
+      .yan-chat-messages {
+        position: relative; z-index: 3; height: 100%; overflow: auto;
+        padding: calc(var(--chat-panel-radius) + var(--chat-x-size) / 2 + 0.55rem) 1.2rem 1.2rem;
+        display: flex; flex-direction: column; gap: 0.85rem;
+        -webkit-overflow-scrolling: touch;
+      }
+      .yan-chat-bubble {
+        position: relative;
+        isolation: isolate;
+        --lg-filter: none;
+        --lg-tint-opacity: 0.28;
+        box-sizing: border-box;
+        width: fit-content;
+        max-width: calc(100% - 40px);
+        padding: 12px;
+        border-radius: 22px;
+        font-family: var(--body);
+        font-size: 17px;
+        line-height: 1.294;
+        font-weight: 400;
+        color: var(--fg);
+        text-align: left;
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow: hidden;
+        background: transparent;
+        box-shadow: 0 4px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
+        backdrop-filter: blur(22px) saturate(1.4);
+        -webkit-backdrop-filter: blur(22px) saturate(1.4);
+      }
+      .yan-chat-bubble.lg-fallback {
+        backdrop-filter: blur(22px) saturate(1.5);
+        -webkit-backdrop-filter: blur(22px) saturate(1.5);
+      }
+      html[data-resolved-theme="dark"] .yan-chat-bubble {
+        --lg-tint-opacity: 0.5;
+      }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-resolved-theme="light"]) .yan-chat-bubble {
+          --lg-tint-opacity: 0.5;
+        }
+      }
+      html[data-resolved-theme="light"] .yan-chat-bubble {
+        --lg-tint-opacity: 0.28;
+      }
+      .yan-chat-bubble > *,
+      .yan-chat-bubble-in {
+        position: relative;
+        z-index: 2;
+      }
+      .yan-chat-bubble-in { display: block; }
+      .yan-chat-bubble--user {
+        --chat-bubble-tint: color-mix(in srgb, var(--chat-orange) 16%, transparent);
+        align-self: flex-end;
+        background-image: linear-gradient(var(--chat-bubble-tint), var(--chat-bubble-tint));
+      }
+      .yan-chat-bubble--assistant {
+        align-self: flex-start;
+      }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-resolved-theme="light"]) .yan-chat-bubble--user {
+          --chat-bubble-tint: color-mix(in srgb, var(--chat-orange) 26%, transparent);
+        }
+      }
+      html[data-resolved-theme="dark"] .yan-chat-bubble--user {
+        --chat-bubble-tint: color-mix(in srgb, var(--chat-orange) 26%, transparent);
+      }
+      html[data-resolved-theme="light"] .yan-chat-bubble--user {
+        --chat-bubble-tint: color-mix(in srgb, var(--chat-orange) 16%, transparent);
+      }
+      @media (min-width: 901px) {
+        .yan-chat-bubble {
+          max-width: calc(100% - 120px);
+        }
+      }
+      .yan-chat-bubble.is-flying {
+        opacity: 0 !important;
+      }
+      .yan-chat-flight {
+        position: absolute;
+        inset: 0;
+        z-index: 96;
+        pointer-events: none;
+        overflow: visible;
+      }
+      .yan-chat-bubble--flight {
+        max-width: none;
+      }
+      .yan-chat.is-busy .yan-chat-pill {
+        animation: yan-chat-pulse 1.2s ease-in-out infinite;
+      }
+      @keyframes yan-chat-pulse {
+        0%, 100% { box-shadow: 0 6px var(--lg-outer-shadow-blur) var(--lg-outer-shadow); }
+        50% {
+          box-shadow:
+            0 6px var(--lg-outer-shadow-blur) var(--lg-outer-shadow),
+            0 0 0 4px rgba(var(--chat-orange-rgb), 0.22);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .yan-chat-pill.corner, .yan-chat-panel, .yan-chat-launcher, .yan-chat-close, .yan-chat-form, .yan-chat-send {
+          transition-duration: 0.01ms !important; animation: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Top-left: Liquid Glass squircle logo, returns to top -->
+    <a class="corner c-tl squircle" data-liquid-glass="squircle" data-filter-id="lg-tl" href="#top" aria-label="Back to top">
+      <svg viewBox="0 0 252 252" aria-hidden="true"><path fill="currentColor" d="M229.4,214.58c0,11.34-9.21,20.52-20.55,20.51l-117.33-.11c-2.66-.02-5.21-.49-7.64-1.48-9.37-3.58-14.91-14.5-12.23-24.2.17-.64.37-1.29.61-1.92,0,0,22.86-63.64,22.86-63.64L26.54,49.57c-6.68-9.17-4.66-22.01,4.51-28.69,9.17-6.67,22.01-4.65,28.68,4.51l52.17,71.64,23.93-66.63c3.8-10.58,15.47-16.08,26.05-12.28,10.59,3.81,16.09,15.47,12.28,26.05l-53.8,149.78,88.53.08c11.34.01,20.53,9.21,20.51,20.55Z"/></svg>
+    </a>
+    <!-- Top-right social dock: LinkedIn · GitHub / (YouTube easter egg) · Mail -->
+    <a class="corner social-orb c-li squircle" data-liquid-glass="squircle" data-filter-id="lg-li" href="https://github.com/yl-2010/yanylevin_agentic_framework" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.61 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z"/></svg>
+    </a>
+    <a class="corner social-orb c-gh squircle" data-liquid-glass="squircle" data-filter-id="lg-tr" href="https://github.com/yl-2010/yanylevin_agentic_framework" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.21.09 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.39 1.24-3.23-.13-.3-.54-1.52.11-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 3-.4c1.02 0 2.05.14 3 .4 2.29-1.55 3.3-1.23 3.3-1.23.65 1.66.24 2.88.12 3.18.77.84 1.23 1.92 1.23 3.23 0 4.62-2.81 5.64-5.49 5.94.43.37.82 1.1.82 2.22 0 1.6-.02 2.9-.02 3.29 0 .32.22.7.83.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"/></svg>
+    </a>
+    <a class="corner social-orb c-mail squircle" data-liquid-glass="squircle" data-filter-id="lg-mail" href="mailto:you@example.com" aria-label="Email">
+      <!-- https://www.svgrepo.com/show/502648/email.svg -->
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M4 7.00005L10.2 11.65C11.2667 12.45 12.7333 12.45 13.8 11.65L20 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </a>
+    <!-- Bottom-left: draggable Liquid Glass circle (YouTube easter egg when docked) -->
+    <a class="corner c-bl circle" data-liquid-glass="circle" data-filter-id="lg-bl" target="_blank" rel="noopener noreferrer" aria-label="Drag me" draggable="false" tabindex="0"></a>
+
+    <!-- Bottom-right chatbot: closed circle → centered pill → response panel -->
+    <div id="yan-chat" class="yan-chat" data-state="closed">
+      <div
+        class="yan-chat-panel"
+        data-liquid-glass="rounded"
+        data-filter-id="lg-chat-panel"
+        hidden
+        aria-hidden="true"
+        role="region"
+        aria-label="Chat with the visitor chatbot"
+      >
+        <button
+          type="button"
+          class="yan-chat-close yan-chat-close--panel circle"
+          data-liquid-glass="circle"
+          data-filter-id="lg-chat-x-panel"
+          data-yan-chat-close
+          aria-label="Close chat"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" style="transform: rotate(45deg)"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
+        </button>
+        <div class="yan-chat-messages" aria-live="polite"></div>
+      </div>
+
+      <div
+        class="yan-chat-pill corner circle c-br"
+        data-liquid-glass="circle"
+        data-filter-id="lg-chat-pill"
+      >
+        <button
+          type="button"
+          class="yan-chat-close yan-chat-close--pill circle"
+          data-liquid-glass="circle"
+          data-filter-id="lg-chat-x-pill"
+          data-yan-chat-close
+          aria-label="Close chat"
+          tabindex="-1"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" style="transform: rotate(45deg)"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
+        </button>
+
+        <button
+          type="button"
+          class="yan-chat-launcher"
+          aria-label="Ask about this framework"
+          aria-expanded="false"
+          aria-controls="yan-chat-input"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
+        </button>
+
+        <form class="yan-chat-form" action="#" autocomplete="off">
+          <label class="visually-hidden" for="yan-chat-input">Ask a question</label>
+          <textarea
+            id="yan-chat-input"
+            class="yan-chat-input"
+            name="q"
+            rows="1"
+            inputmode="text"
+            enterkeyhint="enter"
+            placeholder="Ask about this repo…"
+            maxlength="2000"
+            tabindex="-1"
+            autocomplete="off"
+            wrap="soft"
+            aria-multiline="true"
+          ></textarea>
+          <button
+            type="submit"
+            class="yan-chat-send circle"
+            data-liquid-glass="circle"
+            data-filter-id="lg-chat-send"
+            aria-label="Send question"
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <g stroke="currentColor" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 18.2V6.4"/>
+                <path d="M6.9 11.3L12 6.2L17.1 11.3"/>
+              </g>
+            </svg>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <main class="wrap" id="top">
+      <section class="hero">
+        <div class="hero-grid">
+          <div>
+            <p class="eyebrow">(PLACEHOLDER) Yan Levin</p>
+            <h1>A personal agent that lives on your Mac.</h1>
+            <p class="lede">Open-source framework for a single-operator life OS: Cursor agent, file-tree brain, school dashboard, fitness, nightly jobs, optional Apple Mail / Messages / Health / location. The live reference is <a href="https://yanylevin.com">yanylevin.com</a>.</p>
+          </div>
+          <figure class="portrait-glass" id="tilt">
+            <img class="portrait" src="favicon.svg" alt="" width="640" height="640" />
+          </figure>
+        </div>
+      </section>
+
+      <section id="about" class="about reveal">
+        <h2>What this is</h2>
+        <div class="about-row">
+          <div class="about-col">
+            <p>A Mac-hosted personal agent. Express on localhost, Cursor SDK for the signed-in operator, optional local gpt-oss for visitors. Education, fitness, and dashboard UIs read a per-email folder tree. Apple integrations talk to the OS over a local Unix socket, not the public internet.</p>
+            <p>Yan Levin in this repo is a placeholder for the person who built the reference implementation. Fork it, set OWNER_EMAIL, rename the iOS target before you sign it.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="run" class="reveal">
+        <h2>Run it</h2>
+        <div class="rows">
+          <div class="row"><h3>Mac Express API</h3><p class="when">port 3004</p><p>Copy server/.env.example, set OWNER_EMAIL and CURSOR_API_KEY, then npm run server. Optional: LM Studio on :1234 for the public chatbot.</p></div>
+          <div class="row"><h3>Dashboards</h3><p class="when">/education /fitness /dashboard</p><p>Static UI on Vercel or python3 -m http.server. Google OAuth is optional on localhost.</p></div>
+          <div class="row"><h3>iOS</h3><p class="when">SwiftUI</p><p>Ship as a reference. Change the bundle ID, team, and display name before signing. See docs/IOS_APP.md.</p></div>
+        </div>
+      </section>
+
+      <section id="apps" class="reveal apps-section">
+        <h2>Apps</h2>
+        <div class="apps-grid">
+          <a
+            class="app-tile"
+            data-liquid-glass="rounded"
+            data-filter-id="lg-app-dash"
+            href="/dashboard/"
+          ><span>Dashboard</span></a>
+          <a
+            class="app-tile"
+            data-liquid-glass="rounded"
+            data-filter-id="lg-app-edu"
+            href="/education/"
+          ><span>Education</span></a>
+          <a
+            class="app-tile"
+            data-liquid-glass="rounded"
+            data-filter-id="lg-app-fit"
+            href="/fitness/"
+          ><span>Fitness</span></a>
+        </div>
+      </section>
+    </main>
+
+    <footer id="contact">
+      <div class="wrap">
+        <p><a href="mailto:you@example.com">you@example.com</a></p>
+        <p class="fl">
+          <a href="https://github.com/yl-2010" target="_blank" rel="noopener noreferrer">GitHub</a>
+          
+        </p>
+        <p>© 2026 (PLACEHOLDER) Yan Levin. MIT licensed framework.</p>
+      </div>
+    </footer>
+
+    <svg class="liquid-glass-svg" xmlns="http://www.w3.org/2000/svg" width="0" height="0" aria-hidden="true" focusable="false" color-interpolation-filters="sRGB" style="position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;">
+      <defs id="liquid-glass-defs"></defs>
+    </svg>
+
+    <script src="liquid-glass.js?v=chrome-perf13"></script>
+    <script src="/yl-home-link.js"></script>
+    <script>
+      const ease = (t) => 1 - Math.pow(1 - t, 3);
+      const rm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      const io = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (!e.isIntersecting) return; e.target.classList.add("vis");
+          e.target.querySelectorAll?.("[data-count]").forEach(countUp); io.unobserve(e.target); });
+      }, { threshold: 0.14 });
+      document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+
+      function countUp(el) {
+        if (el.dataset.done) return; el.dataset.done = "1";
+        const raw = el.textContent.trim(); const dec = raw.includes("."); const target = Number(raw);
+        if (!isFinite(target) || rm) { el.textContent = raw; return; }
+        const dur = 1000, t0 = performance.now();
+        const tick = (now) => { const t = Math.min(1, (now - t0) / dur); const v = target * ease(t);
+          el.textContent = dec ? v.toFixed(2) : Math.round(v); if (t < 1) requestAnimationFrame(tick); else el.textContent = raw; };
+        el.textContent = dec ? "0.00" : "0"; requestAnimationFrame(tick);
+      }
+
+      // Combined base (drag) + magnetic (hover) transform.
+      // Magnetic listeners live in liquid-glass.js; drag still uses applyT.
+      function applyT(el) {
+        if (typeof window.__lgApplyTransform === "function") {
+          window.__lgApplyTransform(el);
+          return;
+        }
+        const bx = el._bx || 0, by = el._by || 0, mx = el._mx || 0, my = el._my || 0;
+        el.style.transform = `translate(${bx + mx}px, ${by + my}px)`;
+      }
+
+      const YT_HREF = "https://github.com/yl-2010/yanylevin_agentic_framework";
+      const YT_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M23.5 6.2a3.05 3.05 0 0 0-2.14-2.16C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.36.54A3.05 3.05 0 0 0 .5 6.2 32.1 32.1 0 0 0 0 12a32.1 32.1 0 0 0 .5 5.8 3.05 3.05 0 0 0 2.14 2.16C4.5 20.5 12 20.5 12 20.5s7.5 0 9.36-.54A3.05 3.05 0 0 0 23.5 17.8 32.1 32.1 0 0 0 24 12a32.1 32.1 0 0 0-.5-5.8zM9.75 15.57V8.43L15.84 12l-6.09 3.57z"/></svg>`;
+      const DOCK_SNAP = 72;
+      const HOME_SNAP = 90;
+
+      function withNoTransition(el, fn) {
+        const prev = el.style.transition;
+        el.style.transition = "none";
+        const result = fn();
+        // Flush so later transition:"" animates from the committed styles
+        void el.offsetWidth;
+        el.style.transition = prev;
+        return result;
+      }
+      function getHomeRect(el) {
+        return withNoTransition(el, () => {
+          const prev = el.style.transform;
+          el.style.transform = "none";
+          void el.offsetWidth;
+          const r = el.getBoundingClientRect();
+          el.style.transform = prev;
+          return r;
+        });
+      }
+      // Missing 2×2 cell: left-aligned with LinkedIn, top-aligned with Mail
+      function getYtSlotRect() {
+        const li = document.querySelector(".c-li");
+        const mail = document.querySelector(".c-mail");
+        const gh = document.querySelector(".c-gh");
+        if (!li || !mail || !gh) return { left: 0, top: 0, width: 50, height: 50 };
+        const liR = li.getBoundingClientRect();
+        const mailR = mail.getBoundingClientRect();
+        const size = gh.getBoundingClientRect().width;
+        return { left: liR.left, top: mailR.top, width: size, height: size };
+      }
+      function offsetToRect(el, target) {
+        const home = getHomeRect(el);
+        return { x: target.left - home.left, y: target.top - home.top };
+      }
+      function distCenters(a, b) {
+        return Math.hypot(
+          a.left + a.width / 2 - (b.left + b.width / 2),
+          a.top + a.height / 2 - (b.top + b.height / 2)
+        );
+      }
+      function preserveCenterOffset(el) {
+        const visual = el.getBoundingClientRect();
+        const cx = visual.left + visual.width / 2;
+        const cy = visual.top + visual.height / 2;
+        const home = getHomeRect(el);
+        el._bx = cx - home.width / 2 - home.left;
+        el._by = cy - home.height / 2 - home.top;
+        el._mx = 0; el._my = 0;
+        applyT(el);
+      }
+      function snapToSlot(el) {
+        const off = offsetToRect(el, getYtSlotRect());
+        el._bx = off.x; el._by = off.y; el._mx = 0; el._my = 0;
+        applyT(el);
+      }
+      function dockOrb(el) {
+        const wasDocked = el._docked;
+        el._docked = true;
+        // Morph to social size at the current center, then spring into the slot
+        withNoTransition(el, () => {
+          el.classList.add("is-docked", "squircle");
+          el.classList.remove("circle");
+          el.setAttribute("data-liquid-glass", "squircle");
+          el.setAttribute("aria-label", "YouTube");
+          el.setAttribute("href", YT_HREF);
+          if (!wasDocked) el.innerHTML = YT_SVG;
+          preserveCenterOffset(el);
+        });
+        snapToSlot(el);
+        if (!wasDocked) window.reinitLiquidGlass?.();
+      }
+      function undockOrb(el) {
+        if (!el._docked) return;
+        el._docked = false;
+        withNoTransition(el, () => {
+          el.classList.remove("is-docked", "squircle");
+          el.classList.add("circle");
+          el.setAttribute("data-liquid-glass", "circle");
+          el.setAttribute("aria-label", "Drag me");
+          el.removeAttribute("href");
+          el.innerHTML = "";
+          preserveCenterOffset(el);
+        });
+        window.reinitLiquidGlass?.();
+      }
+      function snapOrbHome(el) {
+        undockOrb(el);
+        el._bx = 0; el._by = 0; el._mx = 0; el._my = 0;
+        applyT(el);
+      }
+
+      function draggableOrb(el) {
+        if (!el) return;
+        el._docked = false;
+        el.removeAttribute("href");
+        // Link only navigates when docked and the gesture was a click (not a drag)
+        el.addEventListener("click", (e) => {
+          if (!el._docked || el._moved) { e.preventDefault(); e.stopPropagation(); }
+        });
+        el.addEventListener("dragstart", (e) => e.preventDefault());
+        el.addEventListener("pointerdown", (e) => {
+          if (e.button != null && e.button !== 0) return;
+          e.preventDefault();
+          el._drag = true; el._moved = false;
+          el.classList.add("is-dragging");
+          try { el.setPointerCapture(e.pointerId); } catch (_) {}
+          el._sx = e.clientX - (el._bx || 0); el._sy = e.clientY - (el._by || 0);
+          el._mx = 0; el._my = 0;
+        });
+        el.addEventListener("pointermove", (e) => {
+          if (!el._drag) return;
+          const nx = e.clientX - el._sx, ny = e.clientY - el._sy;
+          if (Math.hypot(nx - (el._bx || 0), ny - (el._by || 0)) > 4) el._moved = true;
+          el._bx = nx; el._by = ny; applyT(el);
+          // Leave the corner while dragging → empty circle again
+          if (el._docked && distCenters(el.getBoundingClientRect(), getYtSlotRect()) > DOCK_SNAP) {
+            undockOrb(el);
+            el._sx = e.clientX - (el._bx || 0);
+            el._sy = e.clientY - (el._by || 0);
+          }
+        });
+        const end = () => {
+          if (!el._drag) return;
+          el._drag = false;
+          el.classList.remove("is-dragging");
+          const visual = el.getBoundingClientRect();
+          const slot = getYtSlotRect();
+          // Home snap uses drag offsets (same as original orb) — robust to size morphs
+          if (distCenters(visual, slot) < DOCK_SNAP) {
+            dockOrb(el);
+          } else if (Math.hypot(el._bx || 0, el._by || 0) < HOME_SNAP) {
+            snapOrbHome(el);
+          } else if (el._docked) {
+            undockOrb(el);
+          }
+        };
+        el.addEventListener("pointerup", end);
+        el.addEventListener("pointercancel", end);
+        el.addEventListener("lostpointercapture", end);
+        addEventListener("resize", () => {
+          if (!el._docked || el._drag) return;
+          snapToSlot(el);
+        });
+
+        // Fast double-click / double-tap while undocked → Google unlock for Apps
+        const DBL_MS = 380;
+        let lastTapAt = 0;
+        let unlocking = false;
+        function startMainSiteUnlock() {
+          if (unlocking || el._docked || el._moved) return;
+          unlocking = true;
+          location.href = "/api/auth/google?next=/";
+        }
+        el.addEventListener("pointerup", (e) => {
+          // `end` runs first and clears _drag; ignore drags / YouTube-docked mode.
+          if (el._docked || el._moved) return;
+          if (e.button != null && e.button !== 0) return;
+          const now = performance.now();
+          if (now - lastTapAt <= DBL_MS) {
+            lastTapAt = 0;
+            e.preventDefault();
+            e.stopPropagation();
+            startMainSiteUnlock();
+            return;
+          }
+          lastTapAt = now;
+        });
+      }
+
+      // Magnetic hover is bound in liquid-glass.js for all .corner orbs
+      draggableOrb(document.querySelector(".c-bl"));
+
+      // Apps section: shown only for the operator Google sessions
+      const appsSection = document.getElementById("apps");
+      function revealAppsSection({ scroll } = {}) {
+        if (!appsSection || !appsSection.hidden) {
+          if (scroll && appsSection && !appsSection.hidden) {
+            appsSection.scrollIntoView({ behavior: rm ? "auto" : "smooth", block: "start" });
+          }
+          if (!appsSection?.hidden) queueMicrotask(() => window.reinitLiquidGlass?.());
+          return;
+        }
+        appsSection.hidden = false;
+        // Re-run reveal observer so the section animates in
+        const ioApps = new IntersectionObserver((es) => {
+          es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("vis"); ioApps.unobserve(e.target); } });
+        }, { threshold: 0.14 });
+        ioApps.observe(appsSection);
+        queueMicrotask(() => window.reinitLiquidGlass?.());
+        if (scroll || location.hash === "#apps") {
+          requestAnimationFrame(() => {
+            appsSection.scrollIntoView({ behavior: rm ? "auto" : "smooth", block: "start" });
+          });
+        }
+      }
+
+      fetch("/api/auth/session", {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      })
+        .then((res) => res.json().catch(() => ({})))
+        .then((data) => {
+          if (data && data.authenticated && data.access === "full") {
+            revealAppsSection({ scroll: location.hash === "#apps" });
+          }
+        })
+        .catch(() => {});
+
+      if (!rm) {
+        const tilt = document.getElementById("tilt");
+        if (tilt) { tilt.addEventListener("pointermove", (e) => { const r = tilt.getBoundingClientRect();
+            const x = (e.clientX-r.left)/r.width-0.5, y = (e.clientY-r.top)/r.height-0.5;
+            tilt.style.transform = `perspective(700px) rotateX(${-y*8}deg) rotateY(${x*8}deg) translateY(-2px)`; });
+          tilt.addEventListener("pointerleave", () => tilt.style.transform = ""); }
+      }
+    </script>
+    <script src="js/chat-send-flight.js?v=1"></script>
+    <script src="chatbot.js?v=read-blur-1"></script>
+  </body>
+</html>

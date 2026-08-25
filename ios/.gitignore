@@ -1,0 +1,7 @@
+# Xcode / SPM
+ios/YanLevin/**/xcuserdata/
+ios/YanLevin/**/DerivedData/
+ios/YanLevin/*.xcworkspace/xcuserdata/
+ios/YanLevin/YanLevin.xcodeproj/project.xcworkspace/xcuserdata/
+ios/YanLevin/YanLevin.xcodeproj/xcuserdata/
+*.xcuserstate

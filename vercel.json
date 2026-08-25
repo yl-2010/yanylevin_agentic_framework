@@ -1,0 +1,74 @@
+{
+  "git": {
+    "deploymentEnabled": false
+  },
+  "ignoreCommand": "bash scripts/vercel-ignore.sh",
+  "redirects": [
+    {
+      "source": "/privacy",
+      "destination": "/privacy/",
+      "permanent": true
+    },
+    {
+      "source": "/education",
+      "destination": "/education/",
+      "permanent": true
+    },
+    {
+      "source": "/fitness",
+      "destination": "/fitness/",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard",
+      "destination": "/dashboard/",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/education/class/:classId",
+      "destination": "/education/index.html"
+    },
+    {
+      "source": "/education/project/:projectId",
+      "destination": "/education/index.html"
+    },
+    {
+      "source": "/education/todo/:todoId/capsule/:capsuleId",
+      "destination": "/education/index.html"
+    },
+    {
+      "source": "/education/todo/:todoId",
+      "destination": "/education/index.html"
+    },
+    {
+      "source": "/education/date/:dateId",
+      "destination": "/education/index.html"
+    },
+    {
+      "source": "/api/education/:path*",
+      "destination": "/api/education-api?p=:path*"
+    },
+    {
+      "source": "/api/fitness/:path*",
+      "destination": "/api/fitness-api?p=:path*"
+    },
+    {
+      "source": "/api/dashboard/:path*",
+      "destination": "/api/dashboard-api?p=:path*"
+    },
+    {
+      "source": "/api/mac-user-token",
+      "destination": "/api/mac-token?kind=user"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/runtime-config.json",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=60" }
+      ]
+    }
+  ]
+}

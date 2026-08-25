@@ -1,0 +1,792 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		016EA89B8F227C0DDEED8851 /* ChatSendFlight.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA73E841EE806831FD0F0861 /* ChatSendFlight.swift */; };
+		0176F9C055AC87C95524E633 /* ChatWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0293C4406F9D69D94DEF0AF /* ChatWidgets.swift */; };
+		02E4B0AB334E7E786B92BAFF /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D468F5B66C3D9BB130D39AAA /* AuthStore.swift */; };
+		032BFEAC925AFA4D167E6C32 /* WidgetTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = DECFCA8CF45C78AC9199902F /* WidgetTheme.swift */; };
+		034756E6C4184A83EB15F7F2 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A056C44E530D5338DB54978D /* ChatView.swift */; };
+		093950D06486BD77A0BB4EA4 /* YLHostedFocus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13E6C6E576FBB4F67B006FB4 /* YLHostedFocus.swift */; };
+		196EEE341ED3D3FA75A91793 /* AccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38D22C729456850565C23AF9 /* AccountView.swift */; };
+		1A9B6E82F6D2D31EC8BA1C4D /* ChatHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BBD84778BC1EBA0B291C926 /* ChatHistory.swift */; };
+		1B7A56181DDF09EE216EDC33 /* CompleteTodoIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC2230637E10DE30D253A23 /* CompleteTodoIntent.swift */; };
+		1BA9231BCC4B579878103580 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 51A6DDC91012A844AA890035 /* LaunchScreen.storyboard */; };
+		1D0BBCD7B923BB7B323938D2 /* YanLevinWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 057315720E940707A886B356 /* YanLevinWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		1D54D63591106F2E66FD43BC /* YLMarkdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = F851AE2250BE4269E53498EE /* YLMarkdown.swift */; };
+		1DF40969B828B2CB2F30888B /* FitnessBrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 922B61894A2A07D7CCD9C045 /* FitnessBrowseView.swift */; };
+		21E339E62F3791B824D65363 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3696B966768BE75F409A9700 /* APIClient.swift */; };
+		2B05B5988A1714A285B68747 /* NaturalWhen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C591473A552F86C4D658DD74 /* NaturalWhen.swift */; };
+		2BE3CC08BF6BD93E85A4BB4D /* EducationSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = F05C0EC38920C98140B2615D /* EducationSchedule.swift */; };
+		3279B73FA38FB7C0DD4A194A /* APIClient+URL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2723AF7679B0DE1C331A02F3 /* APIClient+URL.swift */; };
+		32B21003D97E555F1A6F5D88 /* ChatModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEF42D98892009798E7AA8FB /* ChatModels.swift */; };
+		378B2508AF4CC7A49975AD47 /* TodoWidgetConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B63568A4441B0FF78A31482 /* TodoWidgetConfiguration.swift */; };
+		37DD00EC16A32006CC2AEFB7 /* OpenTodoIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499CB5F2593A83941A69B5D4 /* OpenTodoIntent.swift */; };
+		388B229B71EC77D5B676128B /* EducationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94CCFD3097868B59A3491ED /* EducationStore.swift */; };
+		3B957FF9EC905A753653E97F /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DEC95CF8756916C4C1611A6 /* KeychainStore.swift */; };
+		44F57A5672664B02EBD73904 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B1AE411FFEEF931F47A4C9E /* HomeView.swift */; };
+		47486BD29572D791F436479F /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20592DA9B5602E124F949B98 /* Theme.swift */; };
+		5172BD9CA2C8FCCBCB09D120 /* EducationSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = F05C0EC38920C98140B2615D /* EducationSchedule.swift */; };
+		536ABAA7AA545DDD9015486B /* OpenTodoIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499CB5F2593A83941A69B5D4 /* OpenTodoIntent.swift */; };
+		55E8EB83D402053CEB351A61 /* YLKeyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E41EB89491918E6F0C2E4F19 /* YLKeyboard.swift */; };
+		64221A3AEDE4E019A8BC837F /* OpenChatIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82915689A31137AC9DA6206D /* OpenChatIntent.swift */; };
+		6530B1B04F6935154D6B0C6F /* MacSSEClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FABE02122636C2A1A016FBC /* MacSSEClient.swift */; };
+		6979410754B0AFC1FEC0CE72 /* OpenChatIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82915689A31137AC9DA6206D /* OpenChatIntent.swift */; };
+		6B89D4F726F3E02F409A3328 /* YLKeyboardScrub.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEA3E5AC8DBB39B3548312C6 /* YLKeyboardScrub.swift */; };
+		6C1FD5253AE396A06C06B7B6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3BFC5D2A192A99E4F618F79B /* Assets.xcassets */; };
+		759BFDA13D21B1C13ED6D8B5 /* FitnessStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 584356DE1F7514C323536418 /* FitnessStore.swift */; };
+		7851F71BDF6DF7BFF0D7E8B2 /* NaturalWhen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C591473A552F86C4D658DD74 /* NaturalWhen.swift */; };
+		824D6E2F1C587C1EFEBBF1E5 /* EducationContextFiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23283A3D071E6F63E623FD38 /* EducationContextFiles.swift */; };
+		826F6BD0C6720A6D4550B518 /* GlassChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4533B0C052E08A466A1A195A /* GlassChrome.swift */; };
+		92B5F17CAFBFD2DE8AA97AEB /* YLMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A015C81FA07EC99A09C44AE /* YLMotion.swift */; };
+		93BADEA5A4C4F56FEFFFF5A4 /* APIClient+URL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2723AF7679B0DE1C331A02F3 /* APIClient+URL.swift */; };
+		9449091BE5AF456E7D7EAAF6 /* TodoWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56E5089678AC6FD751ABBA54 /* TodoWidget.swift */; };
+		958BCCA3A8A3810849928DDB /* AppLoadingScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F59C1B7CC61E1680271B65 /* AppLoadingScreen.swift */; };
+		9BEC1717E9F8F9A601A23781 /* ChatControlWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B019B6E0B0488314D38BD9 /* ChatControlWidget.swift */; };
+		A0F684FF13DDC6E02923E9CD /* YLMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 080B5543DFC0877FE81D2D84 /* YLMark.swift */; };
+		A3F8D551C2EE0A3BE4752D3A /* AppGroupStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E7DDEA1EF28086A8752029D /* AppGroupStore.swift */; };
+		A6296BB53F8F6B2A3F71EA80 /* PhoneLocationReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7742B1FA93A28AF4A3108EB /* PhoneLocationReporter.swift */; };
+		AB903E8C34C41CEC4181D2C4 /* AdaptiveLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80FC48973417CD8112FE819E /* AdaptiveLayout.swift */; };
+		AFEE5D756883EFA48D330F94 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3696B966768BE75F409A9700 /* APIClient.swift */; };
+		B1D99F7011A4A4F668A1CFB2 /* AppGroupStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E7DDEA1EF28086A8752029D /* AppGroupStore.swift */; };
+		B40C25FBC305B1121634EE49 /* EducationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29892B1F97CCD28845DB2EEF /* EducationModels.swift */; };
+		B6F580E7F659994D82092817 /* YanLevinApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD7AE7215F57F3740AB87531 /* YanLevinApp.swift */; };
+		BE062D44E3319A3659ABBE58 /* PortfolioContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C388677B1F2846B058FF887 /* PortfolioContent.swift */; };
+		C26C2C6C35B5E1DBD0FE36EF /* YanLevinWidgetsBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE69351E7F5EA54D38D8FA97 /* YanLevinWidgetsBundle.swift */; };
+		C4C827265C7EB2B6010D2E8D /* ScheduleWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67483E28EDDF1CD3D9F6A453 /* ScheduleWidget.swift */; };
+		C52595D82A1AB8D1201B44B3 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B414370293577E90FDB3BC95 /* RootTabView.swift */; };
+		C9DF62AF737C33204914CB98 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 9D32EB49F8063F208E32F95D /* GoogleSignIn */; };
+		CB114A65D5AFEEEA56C84CCC /* EducationTabScroll.swift in Sources */ = {isa = PBXBuildFile; fileRef = D52A64A697EC5F95C4A2B684 /* EducationTabScroll.swift */; };
+		CB52F3FD1D3893E8E4A63472 /* CompleteTodoIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC2230637E10DE30D253A23 /* CompleteTodoIntent.swift */; };
+		D283F05FAC1FF2FF6D883046 /* YLHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB1CE3B3DB78550077E7BECD /* YLHaptics.swift */; };
+		D87E37BADE68F781859B1452 /* FitnessModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FFCFCEECE10E079F84FFF3A /* FitnessModels.swift */; };
+		DFF9B7522C2CBE25D1F65B58 /* WidgetEducationLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D74026100E777A198580A59 /* WidgetEducationLoader.swift */; };
+		E0DACB5DB2DB4BB7947801BD /* TabReselectObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB6D32A34C8B1C29DF15F180 /* TabReselectObserver.swift */; };
+		E384A7935DC0BB912E24813B /* EducationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29892B1F97CCD28845DB2EEF /* EducationModels.swift */; };
+		EDBCEE776FEEB42A93437629 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8651995A2DE1EC4290CBBDCC /* Assets.xcassets */; };
+		F4D7D1D5846E78005F4C7208 /* GymView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832A6558D9C48C7524ACB200 /* GymView.swift */; };
+		F9E81A6B0E896B79B4F154F8 /* EducationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F29B1D9327A0BC8892A063 /* EducationView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		23CDDDEE1C3222CC521A1E84 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 22701243CA336BA565088C91 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 258E3907C6B36740B61E8D73;
+			remoteInfo = YanLevinWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		22D274311CEDEF3F04A8B21C /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				1D0BBCD7B923BB7B323938D2 /* YanLevinWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		03B019B6E0B0488314D38BD9 /* ChatControlWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatControlWidget.swift; sourceTree = "<group>"; };
+		057315720E940707A886B356 /* YanLevinWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = YanLevinWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		080B5543DFC0877FE81D2D84 /* YLMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLMark.swift; sourceTree = "<group>"; };
+		0FABE02122636C2A1A016FBC /* MacSSEClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSSEClient.swift; sourceTree = "<group>"; };
+		13E6C6E576FBB4F67B006FB4 /* YLHostedFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLHostedFocus.swift; sourceTree = "<group>"; };
+		1D74026100E777A198580A59 /* WidgetEducationLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetEducationLoader.swift; sourceTree = "<group>"; };
+		1FFCFCEECE10E079F84FFF3A /* FitnessModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitnessModels.swift; sourceTree = "<group>"; };
+		20592DA9B5602E124F949B98 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		23283A3D071E6F63E623FD38 /* EducationContextFiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EducationContextFiles.swift; sourceTree = "<group>"; };
+		2723AF7679B0DE1C331A02F3 /* APIClient+URL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "APIClient+URL.swift"; sourceTree = "<group>"; };
+		29892B1F97CCD28845DB2EEF /* EducationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EducationModels.swift; sourceTree = "<group>"; };
+		2B1AE411FFEEF931F47A4C9E /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		2C0DC0034B12289190CFCF03 /* YanLevin.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = YanLevin.entitlements; sourceTree = "<group>"; };
+		2DEC95CF8756916C4C1611A6 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		311ADB15534A57F1748F1E96 /* YanLevin.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = YanLevin.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3696B966768BE75F409A9700 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		38D22C729456850565C23AF9 /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
+		3BFC5D2A192A99E4F618F79B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		3E7DDEA1EF28086A8752029D /* AppGroupStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppGroupStore.swift; sourceTree = "<group>"; };
+		4533B0C052E08A466A1A195A /* GlassChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassChrome.swift; sourceTree = "<group>"; };
+		499CB5F2593A83941A69B5D4 /* OpenTodoIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenTodoIntent.swift; sourceTree = "<group>"; };
+		4C388677B1F2846B058FF887 /* PortfolioContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortfolioContent.swift; sourceTree = "<group>"; };
+		4C7C415F217E8A243F65406D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		51A6DDC91012A844AA890035 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		56E5089678AC6FD751ABBA54 /* TodoWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoWidget.swift; sourceTree = "<group>"; };
+		584356DE1F7514C323536418 /* FitnessStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitnessStore.swift; sourceTree = "<group>"; };
+		593E309C735275989CBC1866 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
+		5999526ED018A9822D26520F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		67483E28EDDF1CD3D9F6A453 /* ScheduleWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleWidget.swift; sourceTree = "<group>"; };
+		80FC48973417CD8112FE819E /* AdaptiveLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdaptiveLayout.swift; sourceTree = "<group>"; };
+		82915689A31137AC9DA6206D /* OpenChatIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenChatIntent.swift; sourceTree = "<group>"; };
+		832A6558D9C48C7524ACB200 /* GymView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GymView.swift; sourceTree = "<group>"; };
+		8651995A2DE1EC4290CBBDCC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		8B63568A4441B0FF78A31482 /* TodoWidgetConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoWidgetConfiguration.swift; sourceTree = "<group>"; };
+		922B61894A2A07D7CCD9C045 /* FitnessBrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitnessBrowseView.swift; sourceTree = "<group>"; };
+		9A015C81FA07EC99A09C44AE /* YLMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLMotion.swift; sourceTree = "<group>"; };
+		9BBD84778BC1EBA0B291C926 /* ChatHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHistory.swift; sourceTree = "<group>"; };
+		A056C44E530D5338DB54978D /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
+		A94CCFD3097868B59A3491ED /* EducationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EducationStore.swift; sourceTree = "<group>"; };
+		AB6D32A34C8B1C29DF15F180 /* TabReselectObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabReselectObserver.swift; sourceTree = "<group>"; };
+		B3F59C1B7CC61E1680271B65 /* AppLoadingScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLoadingScreen.swift; sourceTree = "<group>"; };
+		B414370293577E90FDB3BC95 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
+		BD7AE7215F57F3740AB87531 /* YanLevinApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YanLevinApp.swift; sourceTree = "<group>"; };
+		BE69351E7F5EA54D38D8FA97 /* YanLevinWidgetsBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YanLevinWidgetsBundle.swift; sourceTree = "<group>"; };
+		C591473A552F86C4D658DD74 /* NaturalWhen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NaturalWhen.swift; sourceTree = "<group>"; };
+		CA73E841EE806831FD0F0861 /* ChatSendFlight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSendFlight.swift; sourceTree = "<group>"; };
+		D468F5B66C3D9BB130D39AAA /* AuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthStore.swift; sourceTree = "<group>"; };
+		D52A64A697EC5F95C4A2B684 /* EducationTabScroll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EducationTabScroll.swift; sourceTree = "<group>"; };
+		DB1CE3B3DB78550077E7BECD /* YLHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLHaptics.swift; sourceTree = "<group>"; };
+		DEC2230637E10DE30D253A23 /* CompleteTodoIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompleteTodoIntent.swift; sourceTree = "<group>"; };
+		DECFCA8CF45C78AC9199902F /* WidgetTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetTheme.swift; sourceTree = "<group>"; };
+		E0293C4406F9D69D94DEF0AF /* ChatWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatWidgets.swift; sourceTree = "<group>"; };
+		E41EB89491918E6F0C2E4F19 /* YLKeyboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLKeyboard.swift; sourceTree = "<group>"; };
+		EEA3E5AC8DBB39B3548312C6 /* YLKeyboardScrub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLKeyboardScrub.swift; sourceTree = "<group>"; };
+		F05C0EC38920C98140B2615D /* EducationSchedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EducationSchedule.swift; sourceTree = "<group>"; };
+		F0F29B1D9327A0BC8892A063 /* EducationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EducationView.swift; sourceTree = "<group>"; };
+		F1ADA724BC1A214D2CAE4EBF /* YanLevinWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = YanLevinWidgets.entitlements; sourceTree = "<group>"; };
+		F7742B1FA93A28AF4A3108EB /* PhoneLocationReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneLocationReporter.swift; sourceTree = "<group>"; };
+		F851AE2250BE4269E53498EE /* YLMarkdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLMarkdown.swift; sourceTree = "<group>"; };
+		FEF42D98892009798E7AA8FB /* ChatModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatModels.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		D7ED04E1834772E9A920971D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C9DF62AF737C33204914CB98 /* GoogleSignIn in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		133769D51F42958DE1DCF5D0 /* Gym */ = {
+			isa = PBXGroup;
+			children = (
+				922B61894A2A07D7CCD9C045 /* FitnessBrowseView.swift */,
+				832A6558D9C48C7524ACB200 /* GymView.swift */,
+			);
+			path = Gym;
+			sourceTree = "<group>";
+		};
+		2AED63293462F505A5363A79 /* Account */ = {
+			isa = PBXGroup;
+			children = (
+				38D22C729456850565C23AF9 /* AccountView.swift */,
+			);
+			path = Account;
+			sourceTree = "<group>";
+		};
+		3F50753D4245BBD862D23235 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				DEC2230637E10DE30D253A23 /* CompleteTodoIntent.swift */,
+				82915689A31137AC9DA6206D /* OpenChatIntent.swift */,
+				499CB5F2593A83941A69B5D4 /* OpenTodoIntent.swift */,
+				B414370293577E90FDB3BC95 /* RootTabView.swift */,
+				AB6D32A34C8B1C29DF15F180 /* TabReselectObserver.swift */,
+				BD7AE7215F57F3740AB87531 /* YanLevinApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		40A2D816426D38376D2A48CE /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				311ADB15534A57F1748F1E96 /* YanLevin.app */,
+				057315720E940707A886B356 /* YanLevinWidgets.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		5CF4537A92D43EACE282A5D0 /* YanLevin */ = {
+			isa = PBXGroup;
+			children = (
+				3BFC5D2A192A99E4F618F79B /* Assets.xcassets */,
+				4C7C415F217E8A243F65406D /* Info.plist */,
+				51A6DDC91012A844AA890035 /* LaunchScreen.storyboard */,
+				2C0DC0034B12289190CFCF03 /* YanLevin.entitlements */,
+				3F50753D4245BBD862D23235 /* App */,
+				C318C6F201DED83075BE025C /* Design */,
+				FB2839EDAD78A6E22CC7836D /* Features */,
+				6238D86E227DBAB98EDEF8E5 /* Networking */,
+				75415CB453FB8977E91EF810 /* Resources */,
+			);
+			path = YanLevin;
+			sourceTree = "<group>";
+		};
+		6238D86E227DBAB98EDEF8E5 /* Networking */ = {
+			isa = PBXGroup;
+			children = (
+				3696B966768BE75F409A9700 /* APIClient.swift */,
+				2723AF7679B0DE1C331A02F3 /* APIClient+URL.swift */,
+				3E7DDEA1EF28086A8752029D /* AppGroupStore.swift */,
+				D468F5B66C3D9BB130D39AAA /* AuthStore.swift */,
+				FEF42D98892009798E7AA8FB /* ChatModels.swift */,
+				29892B1F97CCD28845DB2EEF /* EducationModels.swift */,
+				F05C0EC38920C98140B2615D /* EducationSchedule.swift */,
+				A94CCFD3097868B59A3491ED /* EducationStore.swift */,
+				1FFCFCEECE10E079F84FFF3A /* FitnessModels.swift */,
+				584356DE1F7514C323536418 /* FitnessStore.swift */,
+				2DEC95CF8756916C4C1611A6 /* KeychainStore.swift */,
+				0FABE02122636C2A1A016FBC /* MacSSEClient.swift */,
+				F7742B1FA93A28AF4A3108EB /* PhoneLocationReporter.swift */,
+			);
+			path = Networking;
+			sourceTree = "<group>";
+		};
+		6D6F1C173653D5A6EFDF06EE /* Chat */ = {
+			isa = PBXGroup;
+			children = (
+				9BBD84778BC1EBA0B291C926 /* ChatHistory.swift */,
+				CA73E841EE806831FD0F0861 /* ChatSendFlight.swift */,
+				A056C44E530D5338DB54978D /* ChatView.swift */,
+				E0293C4406F9D69D94DEF0AF /* ChatWidgets.swift */,
+			);
+			path = Chat;
+			sourceTree = "<group>";
+		};
+		75415CB453FB8977E91EF810 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				593E309C735275989CBC1866 /* .gitkeep */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		9677241926DC32DAC5B7F9AE /* Education */ = {
+			isa = PBXGroup;
+			children = (
+				23283A3D071E6F63E623FD38 /* EducationContextFiles.swift */,
+				D52A64A697EC5F95C4A2B684 /* EducationTabScroll.swift */,
+				F0F29B1D9327A0BC8892A063 /* EducationView.swift */,
+			);
+			path = Education;
+			sourceTree = "<group>";
+		};
+		C318C6F201DED83075BE025C /* Design */ = {
+			isa = PBXGroup;
+			children = (
+				80FC48973417CD8112FE819E /* AdaptiveLayout.swift */,
+				B3F59C1B7CC61E1680271B65 /* AppLoadingScreen.swift */,
+				4533B0C052E08A466A1A195A /* GlassChrome.swift */,
+				C591473A552F86C4D658DD74 /* NaturalWhen.swift */,
+				20592DA9B5602E124F949B98 /* Theme.swift */,
+				DB1CE3B3DB78550077E7BECD /* YLHaptics.swift */,
+				13E6C6E576FBB4F67B006FB4 /* YLHostedFocus.swift */,
+				E41EB89491918E6F0C2E4F19 /* YLKeyboard.swift */,
+				EEA3E5AC8DBB39B3548312C6 /* YLKeyboardScrub.swift */,
+				080B5543DFC0877FE81D2D84 /* YLMark.swift */,
+				F851AE2250BE4269E53498EE /* YLMarkdown.swift */,
+				9A015C81FA07EC99A09C44AE /* YLMotion.swift */,
+			);
+			path = Design;
+			sourceTree = "<group>";
+		};
+		CDCBB76352E8F1EDBA6E65B3 /* YanLevinWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				8651995A2DE1EC4290CBBDCC /* Assets.xcassets */,
+				03B019B6E0B0488314D38BD9 /* ChatControlWidget.swift */,
+				5999526ED018A9822D26520F /* Info.plist */,
+				67483E28EDDF1CD3D9F6A453 /* ScheduleWidget.swift */,
+				56E5089678AC6FD751ABBA54 /* TodoWidget.swift */,
+				8B63568A4441B0FF78A31482 /* TodoWidgetConfiguration.swift */,
+				1D74026100E777A198580A59 /* WidgetEducationLoader.swift */,
+				DECFCA8CF45C78AC9199902F /* WidgetTheme.swift */,
+				F1ADA724BC1A214D2CAE4EBF /* YanLevinWidgets.entitlements */,
+				BE69351E7F5EA54D38D8FA97 /* YanLevinWidgetsBundle.swift */,
+			);
+			path = YanLevinWidgets;
+			sourceTree = "<group>";
+		};
+		DE7722D88202B484853ABED7 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				2B1AE411FFEEF931F47A4C9E /* HomeView.swift */,
+				4C388677B1F2846B058FF887 /* PortfolioContent.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		E549457A206976E40E3B165D = {
+			isa = PBXGroup;
+			children = (
+				5CF4537A92D43EACE282A5D0 /* YanLevin */,
+				CDCBB76352E8F1EDBA6E65B3 /* YanLevinWidgets */,
+				40A2D816426D38376D2A48CE /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		FB2839EDAD78A6E22CC7836D /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				2AED63293462F505A5363A79 /* Account */,
+				6D6F1C173653D5A6EFDF06EE /* Chat */,
+				9677241926DC32DAC5B7F9AE /* Education */,
+				133769D51F42958DE1DCF5D0 /* Gym */,
+				DE7722D88202B484853ABED7 /* Home */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		258E3907C6B36740B61E8D73 /* YanLevinWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C6386F5C867997CF816A4657 /* Build configuration list for PBXNativeTarget "YanLevinWidgets" */;
+			buildPhases = (
+				EF3AB38F6D754E37D6AAA52A /* Sources */,
+				EAD8C9DB30364CFC9C623720 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = YanLevinWidgets;
+			packageProductDependencies = (
+			);
+			productName = YanLevinWidgets;
+			productReference = 057315720E940707A886B356 /* YanLevinWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		EC58E0DD739B869051D8D28B /* YanLevin */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CF14197059B75822975570E2 /* Build configuration list for PBXNativeTarget "YanLevin" */;
+			buildPhases = (
+				C61E44766411836BF3817E7B /* Sources */,
+				BD774E77A1B95772A38BF988 /* Resources */,
+				D7ED04E1834772E9A920971D /* Frameworks */,
+				22D274311CEDEF3F04A8B21C /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				9FDCAB9E8CD85641004EE428 /* PBXTargetDependency */,
+			);
+			name = YanLevin;
+			packageProductDependencies = (
+				9D32EB49F8063F208E32F95D /* GoogleSignIn */,
+			);
+			productName = YanLevin;
+			productReference = 311ADB15534A57F1748F1E96 /* YanLevin.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		22701243CA336BA565088C91 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					258E3907C6B36740B61E8D73 = {
+						DevelopmentTeam = YOUR_TEAM_ID;
+						ProvisioningStyle = Automatic;
+					};
+					EC58E0DD739B869051D8D28B = {
+						DevelopmentTeam = YOUR_TEAM_ID;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = AE28DED9DA20A342F9FF93AC /* Build configuration list for PBXProject "YanLevin" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = E549457A206976E40E3B165D;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				18C178DA3D94F5ED2C35D329 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 40A2D816426D38376D2A48CE /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				EC58E0DD739B869051D8D28B /* YanLevin */,
+				258E3907C6B36740B61E8D73 /* YanLevinWidgets */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		BD774E77A1B95772A38BF988 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6C1FD5253AE396A06C06B7B6 /* Assets.xcassets in Resources */,
+				1BA9231BCC4B579878103580 /* LaunchScreen.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EAD8C9DB30364CFC9C623720 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EDBCEE776FEEB42A93437629 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C61E44766411836BF3817E7B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				93BADEA5A4C4F56FEFFFF5A4 /* APIClient+URL.swift in Sources */,
+				AFEE5D756883EFA48D330F94 /* APIClient.swift in Sources */,
+				196EEE341ED3D3FA75A91793 /* AccountView.swift in Sources */,
+				AB903E8C34C41CEC4181D2C4 /* AdaptiveLayout.swift in Sources */,
+				B1D99F7011A4A4F668A1CFB2 /* AppGroupStore.swift in Sources */,
+				958BCCA3A8A3810849928DDB /* AppLoadingScreen.swift in Sources */,
+				02E4B0AB334E7E786B92BAFF /* AuthStore.swift in Sources */,
+				1A9B6E82F6D2D31EC8BA1C4D /* ChatHistory.swift in Sources */,
+				32B21003D97E555F1A6F5D88 /* ChatModels.swift in Sources */,
+				016EA89B8F227C0DDEED8851 /* ChatSendFlight.swift in Sources */,
+				034756E6C4184A83EB15F7F2 /* ChatView.swift in Sources */,
+				0176F9C055AC87C95524E633 /* ChatWidgets.swift in Sources */,
+				CB52F3FD1D3893E8E4A63472 /* CompleteTodoIntent.swift in Sources */,
+				824D6E2F1C587C1EFEBBF1E5 /* EducationContextFiles.swift in Sources */,
+				E384A7935DC0BB912E24813B /* EducationModels.swift in Sources */,
+				5172BD9CA2C8FCCBCB09D120 /* EducationSchedule.swift in Sources */,
+				388B229B71EC77D5B676128B /* EducationStore.swift in Sources */,
+				CB114A65D5AFEEEA56C84CCC /* EducationTabScroll.swift in Sources */,
+				F9E81A6B0E896B79B4F154F8 /* EducationView.swift in Sources */,
+				1DF40969B828B2CB2F30888B /* FitnessBrowseView.swift in Sources */,
+				D87E37BADE68F781859B1452 /* FitnessModels.swift in Sources */,
+				759BFDA13D21B1C13ED6D8B5 /* FitnessStore.swift in Sources */,
+				826F6BD0C6720A6D4550B518 /* GlassChrome.swift in Sources */,
+				F4D7D1D5846E78005F4C7208 /* GymView.swift in Sources */,
+				44F57A5672664B02EBD73904 /* HomeView.swift in Sources */,
+				3B957FF9EC905A753653E97F /* KeychainStore.swift in Sources */,
+				6530B1B04F6935154D6B0C6F /* MacSSEClient.swift in Sources */,
+				7851F71BDF6DF7BFF0D7E8B2 /* NaturalWhen.swift in Sources */,
+				6979410754B0AFC1FEC0CE72 /* OpenChatIntent.swift in Sources */,
+				536ABAA7AA545DDD9015486B /* OpenTodoIntent.swift in Sources */,
+				A6296BB53F8F6B2A3F71EA80 /* PhoneLocationReporter.swift in Sources */,
+				BE062D44E3319A3659ABBE58 /* PortfolioContent.swift in Sources */,
+				C52595D82A1AB8D1201B44B3 /* RootTabView.swift in Sources */,
+				E0DACB5DB2DB4BB7947801BD /* TabReselectObserver.swift in Sources */,
+				47486BD29572D791F436479F /* Theme.swift in Sources */,
+				D283F05FAC1FF2FF6D883046 /* YLHaptics.swift in Sources */,
+				093950D06486BD77A0BB4EA4 /* YLHostedFocus.swift in Sources */,
+				55E8EB83D402053CEB351A61 /* YLKeyboard.swift in Sources */,
+				6B89D4F726F3E02F409A3328 /* YLKeyboardScrub.swift in Sources */,
+				A0F684FF13DDC6E02923E9CD /* YLMark.swift in Sources */,
+				1D54D63591106F2E66FD43BC /* YLMarkdown.swift in Sources */,
+				92B5F17CAFBFD2DE8AA97AEB /* YLMotion.swift in Sources */,
+				B6F580E7F659994D82092817 /* YanLevinApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EF3AB38F6D754E37D6AAA52A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3279B73FA38FB7C0DD4A194A /* APIClient+URL.swift in Sources */,
+				21E339E62F3791B824D65363 /* APIClient.swift in Sources */,
+				A3F8D551C2EE0A3BE4752D3A /* AppGroupStore.swift in Sources */,
+				9BEC1717E9F8F9A601A23781 /* ChatControlWidget.swift in Sources */,
+				1B7A56181DDF09EE216EDC33 /* CompleteTodoIntent.swift in Sources */,
+				B40C25FBC305B1121634EE49 /* EducationModels.swift in Sources */,
+				2BE3CC08BF6BD93E85A4BB4D /* EducationSchedule.swift in Sources */,
+				2B05B5988A1714A285B68747 /* NaturalWhen.swift in Sources */,
+				64221A3AEDE4E019A8BC837F /* OpenChatIntent.swift in Sources */,
+				37DD00EC16A32006CC2AEFB7 /* OpenTodoIntent.swift in Sources */,
+				C4C827265C7EB2B6010D2E8D /* ScheduleWidget.swift in Sources */,
+				9449091BE5AF456E7D7EAAF6 /* TodoWidget.swift in Sources */,
+				378B2508AF4CC7A49975AD47 /* TodoWidgetConfiguration.swift in Sources */,
+				DFF9B7522C2CBE25D1F65B58 /* WidgetEducationLoader.swift in Sources */,
+				032BFEAC925AFA4D167E6C32 /* WidgetTheme.swift in Sources */,
+				C26C2C6C35B5E1DBD0FE36EF /* YanLevinWidgetsBundle.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		9FDCAB9E8CD85641004EE428 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 258E3907C6B36740B61E8D73 /* YanLevinWidgets */;
+			targetProxy = 23CDDDEE1C3222CC521A1E84 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0959D50D5A918B23674C126B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = YanLevinWidgets/YanLevinWidgets.entitlements;
+				INFOPLIST_FILE = YanLevinWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.personalagent.widgets;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) WIDGET_EXTENSION";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		3DC864DE87B4C52B6B184109 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = YanLevinWidgets/YanLevinWidgets.entitlements;
+				INFOPLIST_FILE = YanLevinWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.personalagent.widgets;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) WIDGET_EXTENSION";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		9E027842E869EEC9CFCC98CA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = YOUR_TEAM_ID;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B941A47F7A7CBC8CEF4078EF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = YanLevin/YanLevin.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GOOGLE_IOS_CLIENT_ID = "";
+				GOOGLE_URL_SCHEME = com.googleusercontent.apps.PLACEHOLDER;
+				INFOPLIST_FILE = YanLevin/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.personalagent;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		DC606A73D43932AF07FAC3D7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = YOUR_TEAM_ID;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		F8BA73F80E2B622EAB0DB2BE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = YanLevin/YanLevin.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GOOGLE_IOS_CLIENT_ID = "";
+				GOOGLE_URL_SCHEME = com.googleusercontent.apps.PLACEHOLDER;
+				INFOPLIST_FILE = YanLevin/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.personalagent;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AE28DED9DA20A342F9FF93AC /* Build configuration list for PBXProject "YanLevin" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9E027842E869EEC9CFCC98CA /* Debug */,
+				DC606A73D43932AF07FAC3D7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C6386F5C867997CF816A4657 /* Build configuration list for PBXNativeTarget "YanLevinWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0959D50D5A918B23674C126B /* Debug */,
+				3DC864DE87B4C52B6B184109 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		CF14197059B75822975570E2 /* Build configuration list for PBXNativeTarget "YanLevin" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B941A47F7A7CBC8CEF4078EF /* Debug */,
+				F8BA73F80E2B622EAB0DB2BE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		18C178DA3D94F5ED2C35D329 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		9D32EB49F8063F208E32F95D /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 18C178DA3D94F5ED2C35D329 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 22701243CA336BA565088C91 /* Project object */;
+}

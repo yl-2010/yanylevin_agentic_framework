@@ -1,0 +1,9 @@
+{
+  "name": "Todo #2",
+  "tag": "CW",
+  "dueDate": "2026-08-20",
+  "dueTime": "15:00",
+  "description": "Fixture sample: CW tag with past due date",
+  "done": true,
+  "fixture": true
+}

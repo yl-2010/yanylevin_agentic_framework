@@ -1,0 +1,33 @@
+.DS_Store
+*.log
+.vscode/
+.idea/
+.vercel
+.env
+.env.local
+.env.*.local
+server/.env
+server/.auth-secret
+server/node_modules/
+node_modules/
+macos/YLCalendar/yl-calendar
+macos/YLCalendar/yl-calendar.app/
+macos/YLCalendar/.build/
+ios/shortcuts/**/*.signed.shortcut
+ios/shortcuts/yan-health-sync/Yan Health Sync.shortcut
+ios/shortcuts/yan-health-sync/workflow.filled.json
+ios/shortcuts/yan-health-sync/workflow.filled.plist
+ios/shortcuts/yan-health-sync/workflow.filled.shortcut
+ios/shortcuts/yan-health-sync/workflow.json
+
+# Operator data that must never be committed from a fork
+education/*/health/
+education/*/.chat-history/
+education/*/.location.json
+education/*/.location-history/
+education/*/.canvas/
+education/*/brain/people/
+education/*/brain/journal/
+education/*/brain/threads/
+data/chat-log.md
+data/login-log.md
