@@ -60,7 +60,17 @@ const META_PATH = join(
   "daily-briefing",
   "meta.json"
 );
-const LOCK_STALE_MS = 90 * 60 * 1000;
+export const SYNTHESIS_LOCK_STALE_MS = 90 * 60 * 1000;
+const LOCK_STALE_MS = SYNTHESIS_LOCK_STALE_MS;
+
+export const PIPELINE_PHASES = [
+  "triage",
+  "entities",
+  "synthesis",
+  "actions",
+  "lint",
+  "finished",
+];
 
 export const CONTEXT_SYNTHESIS_MODEL_SPEC = {
   id: process.env.CURSOR_CONTEXT_SYNTHESIS_MODEL || "grok-4.6",
@@ -122,7 +132,7 @@ let timer = null;
 
 const laterAuthRetry = createLaterAuthRetry({
   prefix: "context-synthesis",
-  run: ({ dateKey }) => runContextSynthesis({ dateKey, force: true }),
+  run: ({ dateKey }) => runContextSynthesis({ dateKey }),
 });
 
 /**
@@ -199,11 +209,48 @@ async function readState(dir = brainDir()) {
   }
 }
 
+/**
+ * @param {string} dir
+ * @param {string} dateKey
+ * @param {string} phase
+ */
+async function writePipelineProgress(dir, dateKey, phase) {
+  const prev = await readState(dir);
+  const finished = phase === "finished";
+  await writeFile(
+    statePath(dir),
+    `${JSON.stringify(
+      {
+        ...prev,
+        lastPipelineAt: new Date().toISOString(),
+        lastPipelinePhase: phase,
+        lastPipelineDateKey: finished ? dateKey : prev.lastPipelineDateKey,
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+}
+
+/**
+ * @param {number} mtimeMs
+ * @param {number} [nowMs]
+ * @param {number} [staleMs]
+ */
+export function lockMtimeIsFresh(
+  mtimeMs,
+  nowMs = Date.now(),
+  staleMs = SYNTHESIS_LOCK_STALE_MS
+) {
+  return nowMs - mtimeMs <= staleMs;
+}
+
 export async function isContextSynthesisBusy() {
   if (inFlight) return true;
   try {
-    await stat(LOCK_PATH);
-    return true;
+    const st = await stat(LOCK_PATH);
+    return lockMtimeIsFresh(st.mtimeMs);
   } catch {
     return false;
   }
@@ -212,6 +259,49 @@ export async function isContextSynthesisBusy() {
 export async function synthesisRanOn(dateKey, dir = brainDir()) {
   const state = await readState(dir);
   return String(state?.lastSynthesisDateKey || "") === String(dateKey);
+}
+
+/**
+ * Runner-written. Synthesis writing lastSynthesisDateKey is not enough.
+ * @param {string} dateKey
+ * @param {string} [dir]
+ */
+export async function pipelineFinishedOn(dateKey, dir = brainDir()) {
+  const state = await readState(dir);
+  return pipelineFinishedOnFromState(state, dateKey);
+}
+
+/**
+ * @param {object} state
+ * @param {string} dateKey
+ */
+export function pipelineFinishedOnFromState(state, dateKey) {
+  return String(state?.lastPipelineDateKey || "") === String(dateKey);
+}
+
+/**
+ * Next phase to run. `resumeFrom` is an explicit CLI/start phase.
+ * @param {object} state
+ * @param {string} dateKey
+ * @param {string} [resumeFrom]
+ * @param {boolean} [force]
+ */
+export function resumePhaseFromState(state, dateKey, resumeFrom, force = false) {
+  if (force) return "triage";
+  const explicit = String(resumeFrom || "").trim();
+  if (explicit && PIPELINE_PHASES.includes(explicit) && explicit !== "finished") {
+    return explicit;
+  }
+  if (pipelineFinishedOnFromState(state, dateKey)) return "finished";
+  const phase = String(state?.lastPipelinePhase || "");
+  const idx = PIPELINE_PHASES.indexOf(phase);
+  if (idx >= 0 && phase !== "finished") {
+    return PIPELINE_PHASES[idx + 1] || "finished";
+  }
+  if (String(state?.lastSynthesisDateKey || "") === String(dateKey)) {
+    return "actions";
+  }
+  return "triage";
 }
 
 export function contextSynthesisModelSpec() {
@@ -944,13 +1034,14 @@ export async function runContextSynthesis(opts = {}) {
 }
 
 /**
- * @param {{ force?: boolean, dateKey?: string, bootstrapPeople?: boolean, enrichPeople?: boolean }} [opts]
+ * @param {{ force?: boolean, dateKey?: string, bootstrapPeople?: boolean, enrichPeople?: boolean, resumeFrom?: string }} [opts]
  */
 async function runContextSynthesisOnce({
   force = false,
   dateKey: dateKeyOpt,
   bootstrapPeople = false,
   enrichPeople = false,
+  resumeFrom = "",
 } = {}) {
   const meta = await readMeta();
   const now = briefingNow(meta);
@@ -960,8 +1051,8 @@ async function runContextSynthesisOnce({
   await mkdir(dir, { recursive: true });
   await mkdir(join(dir, "people"), { recursive: true });
 
-  const skipAlreadyRan = !bootstrapPeople && !enrichPeople && !force;
-  if (skipAlreadyRan && (await synthesisRanOn(dateKey, dir))) {
+  const skipAlreadyRan = !bootstrapPeople && !enrichPeople && !force && !resumeFrom;
+  if (skipAlreadyRan && (await pipelineFinishedOn(dateKey, dir))) {
     console.log(`[context-synthesis] skip ${dateKey}: already ran`);
     laterAuthRetry.clear();
     return { ok: true, skipped: true, reason: "already-ran", dateKey };
@@ -974,7 +1065,7 @@ async function runContextSynthesisOnce({
   }
 
   try {
-    if (skipAlreadyRan && (await synthesisRanOn(dateKey, dir))) {
+    if (skipAlreadyRan && (await pipelineFinishedOn(dateKey, dir))) {
       laterAuthRetry.clear();
       return { ok: true, skipped: true, reason: "already-ran", dateKey };
     }
@@ -1097,6 +1188,16 @@ async function runContextSynthesisOnce({
     }
 
     // Five-phase nightly pipeline.
+    const latest = await readState(dir);
+    const startPhase = resumePhaseFromState(latest, dateKey, resumeFrom, force);
+    if (startPhase === "finished") {
+      laterAuthRetry.clear();
+      return { ok: true, skipped: true, reason: "already-ran", dateKey };
+    }
+    const phaseAtLeast = (name) =>
+      PIPELINE_PHASES.indexOf(startPhase) <= PIPELINE_PHASES.indexOf(name);
+    console.log(`[context-synthesis] start phase=${startPhase}`);
+
     const composer = await resolveModelSelection(apiKey, PEOPLE_ENRICH_MODEL_SPEC);
     const grokHigh = await resolveModelSelection(apiKey, NIGHTLY_ACTIONS_MODEL_SPEC);
 
@@ -1149,58 +1250,98 @@ async function runContextSynthesisOnce({
       };
     };
 
-    let outcome = await runPhase(
-      "triage",
-      buildTriagePrompt({ dateKey, timezone, existingIndex }),
-      composer
-    );
-    if (outcome.transientFailed) return phaseFailed("triage", outcome);
-    let digest = "";
-    try {
-      digest = await readFile(DIGEST_PATH, "utf8");
-    } catch {
-      /* missing digest handled below */
+    /** @type {{ result?: { status?: string }, transientFailed?: boolean, authFailed?: boolean, capacityFailed?: boolean }} */
+    let outcome = { result: { status: "finished" } };
+    /** @type {string[]} */
+    let generatorNotes = [];
+
+    const loadDigest = async () => {
+      try {
+        return (await readFile(DIGEST_PATH, "utf8")).trim();
+      } catch {
+        return "";
+      }
+    };
+
+    if (phaseAtLeast("triage")) {
+      outcome = await runPhase(
+        "triage",
+        buildTriagePrompt({ dateKey, timezone, existingIndex }),
+        composer
+      );
+      if (outcome.transientFailed) return phaseFailed("triage", outcome);
+      await writePipelineProgress(dir, dateKey, "triage");
     }
-    if (!digest.trim()) {
+
+    let digest = await loadDigest();
+    if (!digest && startPhase !== "triage" && startPhase !== "lint") {
+      console.log("[nightly-triage] digest missing on resume; re-running triage");
+      outcome = await runPhase(
+        "triage",
+        buildTriagePrompt({ dateKey, timezone, existingIndex }),
+        composer
+      );
+      if (outcome.transientFailed) return phaseFailed("triage", outcome);
+      digest = await loadDigest();
+    }
+    if (!digest && startPhase !== "lint") {
       console.error("[nightly-triage] digest missing after triage phase");
       laterAuthRetry.schedule(dateKey);
       return { ok: false, dateKey, phase: "triage", status: "error", reason: "no-digest" };
     }
 
-    outcome = await runPhase("entities", buildEntitiesPrompt({ dateKey, timezone }), composer);
-    if (outcome.transientFailed) return phaseFailed("entities", outcome);
-    const generatorNotes = await runGeneratorScripts("nightly-entities");
-
-    outcome = await runPhase(
-      "synthesis",
-      buildContextSynthesisPrompt({ dateKey, timezone, force }),
-      model
-    );
-    if (outcome.transientFailed) return phaseFailed("synthesis", outcome);
-
-    const actionsNeeded = digestHasActionWork(digest);
-    if (!actionsNeeded) {
-      console.log(
-        "[nightly-actions] skipped: digest has no directives, suggested actions, calendar, or big dates"
-      );
-    } else {
+    if (phaseAtLeast("entities")) {
       outcome = await runPhase(
-        "actions",
-        buildActionsPrompt({ dateKey, timezone, existingIndex }),
-        grokHigh
+        "entities",
+        buildEntitiesPrompt({ dateKey, timezone }),
+        composer
       );
-      if (outcome.transientFailed) return phaseFailed("actions", outcome);
+      if (outcome.transientFailed) return phaseFailed("entities", outcome);
+      generatorNotes = await runGeneratorScripts("nightly-entities");
+      await writePipelineProgress(dir, dateKey, "entities");
     }
 
-    outcome = await runPhase(
-      "lint",
-      buildLintPrompt({ dateKey, timezone, generatorNotes }),
-      composer
-    );
-    if (outcome.transientFailed) return phaseFailed("lint", outcome);
-    await runGeneratorScripts("nightly-lint");
+    if (phaseAtLeast("synthesis")) {
+      outcome = await runPhase(
+        "synthesis",
+        buildContextSynthesisPrompt({ dateKey, timezone, force }),
+        model
+      );
+      if (outcome.transientFailed) return phaseFailed("synthesis", outcome);
+      await writePipelineProgress(dir, dateKey, "synthesis");
+    }
+
+    let actionsNeeded = false;
+    if (phaseAtLeast("actions")) {
+      actionsNeeded = digestHasActionWork(digest);
+      if (!actionsNeeded) {
+        console.log(
+          "[nightly-actions] skipped: digest has no directives, suggested actions, calendar, or big dates"
+        );
+      } else {
+        outcome = await runPhase(
+          "actions",
+          buildActionsPrompt({ dateKey, timezone, existingIndex }),
+          grokHigh
+        );
+        if (outcome.transientFailed) return phaseFailed("actions", outcome);
+      }
+      await writePipelineProgress(dir, dateKey, "actions");
+    }
+
+    if (phaseAtLeast("lint")) {
+      outcome = await runPhase(
+        "lint",
+        buildLintPrompt({ dateKey, timezone, generatorNotes }),
+        composer
+      );
+      if (outcome.transientFailed) return phaseFailed("lint", outcome);
+      await runGeneratorScripts("nightly-lint");
+      await writePipelineProgress(dir, dateKey, "lint");
+    }
 
     laterAuthRetry.clear();
+    await writePipelineProgress(dir, dateKey, "finished");
     await gitAddCommitPush({
       paths: [
         BRAIN_REL,
@@ -1219,6 +1360,7 @@ async function runContextSynthesisOnce({
       dateKey,
       status: "finished",
       actionsRan: actionsNeeded,
+      resumedFrom: startPhase === "triage" ? undefined : startPhase,
     };
   } finally {
     await releaseLock(handle);
@@ -1230,7 +1372,7 @@ async function maybeRunMissed() {
     const meta = await readMeta();
     const now = briefingNow(meta);
     if (now.minutes < hmToMinutes(contextSynthesisHm(meta))) return;
-    if (await synthesisRanOn(now.dateKey)) return;
+    if (await pipelineFinishedOn(now.dateKey)) return;
     console.log(`[context-synthesis] missed-job recovery for ${now.dateKey}`);
     await runContextSynthesis();
   } catch (err) {
@@ -1294,10 +1436,13 @@ if (isMain) {
   const force = process.argv.includes("--force");
   const bootstrapPeople = process.argv.includes("--bootstrap-people");
   const enrichPeople = process.argv.includes("--enrich-people");
+  const resumeArg = process.argv.find((a) => a.startsWith("--resume-from="));
+  const resumeFrom = resumeArg ? resumeArg.slice("--resume-from=".length) : "";
   runContextSynthesis({
     force: force || bootstrapPeople || enrichPeople,
     bootstrapPeople,
     enrichPeople,
+    resumeFrom,
   })
     .then((result) => {
       console.log("[context-synthesis]", result);

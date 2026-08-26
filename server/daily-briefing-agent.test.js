@@ -2,7 +2,6 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import {
-  AGENT_RECAP_DRAFT_PATH,
   AGENT_RECAP_MODEL_SPEC,
   BRIEFING_NEWS_MODEL_SPEC,
   BRIEFING_UNSLOP_MODEL_SPEC,
@@ -10,11 +9,13 @@ import {
   NEWS_DRAFT_PATH,
   NIGHTLY_STATUS_PATH,
   addDaysToDateKey,
+  agentRecapDraftPath,
   buildAgentRecapPrompt,
   buildNewsPrompt,
   buildUnslopPrompt,
   dueHm,
   isoOnDateKey,
+  newsDraftPath,
   nextCompileAt,
   prefetchNightlyStatus,
   zonedLocalToUtc,
@@ -80,8 +81,22 @@ describe("briefing model specs", () => {
   });
 });
 
+describe("briefing draft paths", () => {
+  it("date-keys news and recap drafts", () => {
+    assert.equal(
+      newsDraftPath("2026-08-26"),
+      "/tmp/yanylevin-daily-briefing-news-draft-2026-08-26.json"
+    );
+    assert.equal(
+      agentRecapDraftPath("2026-08-26"),
+      "/tmp/yanylevin-daily-briefing-agent-recap-2026-08-26.json"
+    );
+    assert.equal(newsDraftPath(""), NEWS_DRAFT_PATH);
+  });
+});
+
 describe("briefing phase prompts", () => {
-  it("news phase writes draft only", () => {
+  it("news phase writes today's dated draft only", () => {
     const prompt = buildNewsPrompt({
       dateKey: "2026-08-22",
       timezone: "America/Chicago",
@@ -90,24 +105,27 @@ describe("briefing phase prompts", () => {
     });
     assert.match(prompt, /daily-news skill/);
     assert.match(prompt, /Phase 1/);
-    assert.match(prompt, new RegExp(NEWS_DRAFT_PATH.replace(/\//g, "\\/")));
+    assert.match(prompt, /news-draft-2026-08-22\.json/);
+    assert.match(prompt, /stale/);
+    assert.match(prompt, /not a template/);
     assert.match(prompt, /Do not write todo\.json/);
     assert.match(prompt, /Do not unslop/);
   });
 
-  it("agent recap phase references status prefetch and recap draft", () => {
+  it("agent recap phase references status prefetch and dated recap draft", () => {
     const prompt = buildAgentRecapPrompt({
       dateKey: "2026-08-22",
       timezone: "America/Chicago",
     });
     assert.match(prompt, /agent-recap skill/);
     assert.match(prompt, new RegExp(NIGHTLY_STATUS_PATH.replace(/\//g, "\\/")));
-    assert.match(prompt, new RegExp(AGENT_RECAP_DRAFT_PATH.replace(/\//g, "\\/")));
+    assert.match(prompt, /agent-recap-2026-08-22\.json/);
+    assert.match(prompt, /pipelineFinished/);
     assert.match(prompt, /URGENT/);
     assert.match(prompt, /noVote/);
   });
 
-  it("unslop phase merges drafts into todo", () => {
+  it("unslop phase merges today's drafts into todo", () => {
     const prompt = buildUnslopPrompt({
       dateKey: "2026-08-22",
       timezone: "America/Chicago",
@@ -115,9 +133,11 @@ describe("briefing phase prompts", () => {
       dueTime: "07:00",
     });
     assert.match(prompt, /unslop skill/);
-    assert.match(prompt, new RegExp(NEWS_DRAFT_PATH.replace(/\//g, "\\/")));
-    assert.match(prompt, new RegExp(AGENT_RECAP_DRAFT_PATH.replace(/\//g, "\\/")));
+    assert.match(prompt, /news-draft-2026-08-22\.json/);
+    assert.match(prompt, /agent-recap-2026-08-22\.json/);
     assert.match(prompt, /agent-recap first/);
+    assert.match(prompt, /done false/);
+    assert.match(prompt, /not a copy of yesterday/);
     assert.match(prompt, /taste\.md/);
   });
 });
@@ -139,6 +159,8 @@ describe("prefetchNightlyStatus", () => {
     assert.ok(parsed.agents.some((a) => a.name === "context-synthesis"));
     assert.ok(parsed.agents.some((a) => a.name === "canvas-sync"));
     assert.ok(parsed.agents.some((a) => a.name === "fact-check"));
+    assert.equal(typeof parsed.pipelineFinished, "boolean");
+    assert.ok("pipelinePhase" in parsed);
     assert.ok(parsed.brainNotes && typeof parsed.brainNotes === "object");
     assert.equal(payload.dateKey, dateKey);
   });

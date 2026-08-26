@@ -23,6 +23,9 @@ import {
   runWithModelFallback,
   evictLocalCursorExecutor,
   onLocalCursorExecutorEvict,
+  beginScheduledCursorWork,
+  endScheduledCursorWork,
+  scheduledCursorWorkCount,
 } from "./cursor-sdk-auth.js";
 
 describe("isCursorAuthFailure", () => {
@@ -353,6 +356,23 @@ describe("evictLocalCursorExecutor", () => {
       await evictLocalCursorExecutor();
       assert.equal(n, 1);
     } finally {
+      stop();
+    }
+  });
+
+  it("skips a full evict while a scheduled job holds the lease", async () => {
+    let n = 0;
+    const stop = onLocalCursorExecutorEvict(() => {
+      n += 1;
+    });
+    beginScheduledCursorWork();
+    try {
+      assert.equal(scheduledCursorWorkCount(), 1);
+      const out = await evictLocalCursorExecutor({ skipIfScheduledAtLeast: 1 });
+      assert.equal(out.skipped, true);
+      assert.equal(n, 0);
+    } finally {
+      endScheduledCursorWork();
       stop();
     }
   });

@@ -3,9 +3,10 @@
  *
  * Auth / stale executor: the SDK caches one local executor per cwd+apiKey.
  * Recreating the Agent handle is not enough while any other session still
- * holds a lease. Interactive retries dispose every live Agent so the
- * executor refcount hits 0, then create a new one and replay the UI
- * transcript into the prompt.
+ * holds a lease. Interactive retries dispose Personal Agent handles so the
+ * executor refcount can hit 0, then create a new one and replay the UI
+ * transcript. They skip a full evict while a scheduled Agent.prompt job
+ * holds the lease, so a 3am chat retry does not kill nightly actions.
  *
  * App/web: first Grok send, then reconnect Grok twice (executor evict),
  * then Auto twice (assume Grok high demand). If Auto also fails, surface
@@ -626,6 +627,7 @@ export async function promptWithAuthRetry({
       });
   }
 
+  beginScheduledCursorWork();
   return runWithModelFallback({
     prefix,
     preferredModel: preferred,
@@ -634,10 +636,14 @@ export async function promptWithAuthRetry({
     fallbackDelaysMs: fbDelays,
     laterDelaysMs: laterDelaysMs ?? CAPACITY_LATER_RETRY_MS,
     onBeforeAttempt: async ({ recreate }) => {
-      if (recreate) await evictLocalCursorExecutor();
+      if (recreate) {
+        await evictLocalCursorExecutor({ skipIfScheduledAtLeast: 2 });
+      }
     },
     run: async (currentModel) =>
       runPrompt(requireCursorApiKey(), currentModel),
+  }).finally(() => {
+    endScheduledCursorWork();
   });
 }
 
@@ -786,8 +792,23 @@ const liveLocalAgents = new Set();
 /** @type {Set<() => void>} */
 const executorEvictListeners = new Set();
 
+/** Nightly / scheduled Agent.prompt jobs currently holding the shared executor. */
+let scheduledCursorWork = 0;
+
 /** Serialize overlapping evicts so refcount teardown stays ordered. */
 let evictChain = Promise.resolve();
+
+export function beginScheduledCursorWork() {
+  scheduledCursorWork += 1;
+}
+
+export function endScheduledCursorWork() {
+  scheduledCursorWork = Math.max(0, scheduledCursorWork - 1);
+}
+
+export function scheduledCursorWorkCount() {
+  return scheduledCursorWork;
+}
 
 /**
  * Owners register so they can drop disposed Agent handles (session.agent = null).
@@ -832,11 +853,26 @@ async function evictLocalCursorExecutorUnlocked() {
 /**
  * Drop every live Agent so the SDK executor cache refcount hits 0 and the
  * stale gRPC client is actually torn down. Next create()+send() is a cache miss.
+ *
+ * Personal Agent retries pass skipIfScheduledAtLeast: 1 so a nightly job keeps
+ * the shared executor. Nightly self-retries pass 2 so a sibling scheduled job
+ * is not killed.
+ *
+ * @param {{ skipIfScheduledAtLeast?: number }} [opts]
+ * @returns {Promise<{ skipped: boolean, scheduled?: number }>}
  */
-export async function evictLocalCursorExecutor() {
+export async function evictLocalCursorExecutor(opts = {}) {
+  const min = Number(opts.skipIfScheduledAtLeast);
+  if (Number.isFinite(min) && min > 0 && scheduledCursorWork >= min) {
+    console.warn(
+      `[cursor-sdk] skip executor evict; ${scheduledCursorWork} scheduled job(s) hold the lease`
+    );
+    return { skipped: true, scheduled: scheduledCursorWork };
+  }
   const run = evictChain.then(() => evictLocalCursorExecutorUnlocked());
   evictChain = run.catch(() => {});
   await run;
+  return { skipped: false, scheduled: scheduledCursorWork };
 }
 
 /**
@@ -875,7 +911,13 @@ export async function createLocalCursorAgent({ model, cwd }) {
  */
 export async function recreateLocalCursorAgent({ model, cwd, attach }) {
   const run = evictChain.then(async () => {
-    await evictLocalCursorExecutorUnlocked();
+    if (scheduledCursorWork >= 1) {
+      console.warn(
+        "[cursor-sdk] recreate without full evict; scheduled job in flight"
+      );
+    } else {
+      await evictLocalCursorExecutorUnlocked();
+    }
     const agent = await createLocalCursorAgent({ model, cwd });
     if (typeof attach === "function") attach(agent);
     return agent;

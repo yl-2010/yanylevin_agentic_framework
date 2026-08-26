@@ -103,6 +103,7 @@ node --env-file=server/.env server/health-takeaways-agent.js --force
 node --env-file=server/.env server/chat-title-refresh-agent.js --force
 node --env-file=server/.env server/chat-title-refresh-agent.js --backfill
 node --env-file=server/.env server/context-synthesis-agent.js --force   # 5-phase nightly pipeline
+node --env-file=server/.env server/context-synthesis-agent.js --resume-from=lint
 node --env-file=server/.env server/location-brain-agent.js --force
 node --env-file=server/.env server/health-brain-agent.js --force
 node --env-file=server/.env server/fact-check-agent.js --force

@@ -36,10 +36,31 @@ const META_PATH = join(
   "meta.json"
 );
 
+/** Undated leftover from before date-keyed drafts. Ignore it. */
 export const NEWS_DRAFT_PATH = "/tmp/yanylevin-daily-briefing-news-draft.json";
 export const AGENT_RECAP_DRAFT_PATH =
   "/tmp/yanylevin-daily-briefing-agent-recap.json";
 export const NIGHTLY_STATUS_PATH = "/tmp/yanylevin-nightly-status.json";
+
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * @param {string} dateKey
+ */
+export function newsDraftPath(dateKey) {
+  const key = String(dateKey || "").trim();
+  if (!DATE_KEY_RE.test(key)) return NEWS_DRAFT_PATH;
+  return `/tmp/yanylevin-daily-briefing-news-draft-${key}.json`;
+}
+
+/**
+ * @param {string} dateKey
+ */
+export function agentRecapDraftPath(dateKey) {
+  const key = String(dateKey || "").trim();
+  if (!DATE_KEY_RE.test(key)) return AGENT_RECAP_DRAFT_PATH;
+  return `/tmp/yanylevin-daily-briefing-agent-recap-${key}.json`;
+}
 
 export const BRIEFING_NEWS_MODEL_SPEC = {
   id:
@@ -392,7 +413,9 @@ async function recentEducationCommits(dateKey) {
  * @param {string} timezone
  */
 export async function prefetchNightlyStatus(dateKey, timezone) {
-  const { synthesisRanOn } = await import("./context-synthesis-agent.js");
+  const { pipelineFinishedOn, synthesisRanOn } = await import(
+    "./context-synthesis-agent.js"
+  );
   const { enrichmentRanOn } = await import("./location-enrichment-agent.js");
   const { refreshRanOn } = await import("./chat-title-refresh-agent.js");
   const { healthBrainRanOn } = await import("./health-brain-agent.js");
@@ -447,6 +470,7 @@ export async function prefetchNightlyStatus(dateKey, timezone) {
   const canvasRan = await canvasSyncRanOn(dateKey);
   const chatRefreshRan = await refreshRanOn(dateKey);
   const synthesisRan = await synthesisRanOn(dateKey);
+  const pipelineFinished = await pipelineFinishedOn(dateKey);
   const locationBrainRan = await locationBrainRanOn(dateKey);
   const healthBrainRan = await healthBrainRanOn(dateKey);
   const factCheckRan = await factCheckRanOn(dateKey);
@@ -493,9 +517,11 @@ export async function prefetchNightlyStatus(dateKey, timezone) {
       name: "context-synthesis",
       expected: true,
       ran: synthesisRan,
-      detail: brainState?.lastSynthesisAt
-        ? `lastSynthesisAt ${brainState.lastSynthesisAt}`
-        : "no synthesis timestamp",
+      detail: pipelineFinished
+        ? `pipeline finished ${brainState?.lastPipelineAt || ""}`.trim()
+        : brainState?.lastSynthesisAt
+          ? `synthesis ${brainState.lastSynthesisAt} phase=${brainState?.lastPipelinePhase || "unknown"} (pipeline not finished)`
+          : "no synthesis timestamp",
     },
     {
       name: "location-brain",
@@ -530,6 +556,8 @@ export async function prefetchNightlyStatus(dateKey, timezone) {
     journalKey,
     journalPath,
     journalExists,
+    pipelineFinished,
+    pipelinePhase: brainState?.lastPipelinePhase || null,
     agents,
     brainNotes: brainState?.notes || {},
     brainCursors: brainState?.cursors || {},
@@ -579,9 +607,10 @@ function requireKey() {
 }
 
 export function buildNewsPrompt({ dateKey, timezone, force, dueTime }) {
+  const draft = newsDraftPath(dateKey);
   const rebuild = force
-    ? "Rebuild: overwrite the news draft even if it already exists."
-    : "If the news draft file already exists and this is not a rebuild, stop.";
+    ? `Rebuild: overwrite ${draft} even if it already exists.`
+    : `If ${draft} already exists and this is not a rebuild, stop. An undated ${NEWS_DRAFT_PATH} or a draft for a different date is stale. Ignore it and write today's file.`;
   return [
     "Follow the daily-news skill (.cursor/skills/daily-news/SKILL.md). Phase 1 (news draft) only.",
     "You are phase 1 of Yan's morning Daily Briefing pipeline. Yan only (you@example.com).",
@@ -590,20 +619,23 @@ export function buildNewsPrompt({ dateKey, timezone, force, dueTime }) {
     "Read profile.md, preferences.md, taste.md, and last 7 days of dailyBriefing todos (titles, bodies, votes).",
     "Pick about 10 good stories. Interest areas in the skill are guidelines, not a quota.",
     "Sources: credible left-leaning and independent outlets only. WSJ is the rightmost allowed. Never Fox or anything right of WSJ.",
+    "Yesterday's briefing is for de-dupe, not a template. Do not copy its capsules. Repeat a topic only when there is a real new development, labeled New:.",
     "Do not write todo.json. Do not rewrite taste.md. Do not unslop yet.",
-    `Write only ${NEWS_DRAFT_PATH} as JSON: { "capsules": [...], "citations": [...] }. News capsules only (no agent recap). Each capsule needs id, category, title, body, vote null, citations.`,
+    `Write only ${draft} as JSON: { "capsules": [...], "citations": [...] }. News capsules only (no agent recap). Each capsule needs id, category, title, body, vote null, citations.`,
     rebuild,
   ].join("\n");
 }
 
 export function buildAgentRecapPrompt({ dateKey, timezone }) {
+  const recap = agentRecapDraftPath(dateKey);
   return [
     "Follow the agent-recap skill (.cursor/skills/agent-recap/SKILL.md).",
     "You are phase 2 (agent recap) of Yan's morning Daily Briefing pipeline. Yan only (you@example.com).",
     "Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} (timezone ${timezone}).`,
     `Read ${NIGHTLY_STATUS_PATH} first, then dig as the skill says (brain/state.json notes, journal, git log, server log tail).`,
-    `Write only ${AGENT_RECAP_DRAFT_PATH} as JSON:`,
+    `pipelineFinished false or lastPipelinePhase not finished means actions/lint did not complete. Put that under URGENT.`,
+    `Write only ${recap} as JSON:`,
     '{ "id": "agent-recap", "title": "Agent Recap", "category": "other", "noVote": true, "vote": null, "body": "..." }',
     "Body: URGENT section (omit if none), Actions section (omit if none), then general recap prose. No citations.",
     "Cover every scheduled overnight agent except the daily briefing itself.",
@@ -611,6 +643,8 @@ export function buildAgentRecapPrompt({ dateKey, timezone }) {
 }
 
 export function buildUnslopPrompt({ dateKey, timezone, force, dueTime }) {
+  const draft = newsDraftPath(dateKey);
+  const recap = agentRecapDraftPath(dateKey);
   const rebuild = force
     ? "Rebuild/overwrite today's Daily Briefing even if that todo already exists. Preserve capsule votes when reusing the same capsule ids."
     : "If today's briefing todo already exists, stop. Do not create a (2).";
@@ -619,9 +653,10 @@ export function buildUnslopPrompt({ dateKey, timezone, force, dueTime }) {
     "Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} (timezone ${timezone}).`,
     `Read and apply the unslop skill (${UNSLOP_SKILL_PATH}). Do not inline the whole skill.`,
-    `Read ${NEWS_DRAFT_PATH} and ${AGENT_RECAP_DRAFT_PATH}. Unslop news capsule titles and bodies plus the agent recap body.`,
+    `Read ${draft} and ${recap}. Unslop news capsule titles and bodies plus the agent recap body.`,
+    `If ${draft} is missing, do not copy yesterday's todo news. Stop and say the news draft is missing.`,
     `Write education/${BRIEFING_EMAIL}/todos/${dateKey}-daily-briefing/todo.json:`,
-    `Title like "August 12th Daily Briefing". kind dailyBriefing. dueDate ${dateKey}, dueTime ${dueTime}. showInDates false.`,
+    `Title like "August 12th Daily Briefing". kind dailyBriefing. dueDate ${dateKey}, dueTime ${dueTime}. showInDates false. done false. createdAt is now, not a copy of yesterday.`,
     "capsules: agent-recap first (from agent recap draft, keep noVote true), then ~10 news capsules. Top-level citations from news draft only, alphabetical by name.",
     "Capsule thumbs are 3-way: up, down, null (neutral). Agent recap has noVote and no citations.",
     "Then rewrite education/you@example.com/daily-briefing/taste.md from last week's news thumbs only (not agent recap).",

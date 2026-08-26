@@ -1,10 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  HEALTH_TAKEAWAYS_CATCHUP_MS,
   HEALTH_TAKEAWAYS_MODEL_SPEC,
   buildHealthTakeawaysPrompt,
   healthTakeawaysModelSpec,
   nextHealthTakeawaysAt,
+  nextHealthTakeawaysSlot,
 } from "./health-takeaways-agent.js";
 import { nextLocalHmAt } from "./location-history-agent.js";
 
@@ -51,5 +53,15 @@ describe("health takeaways schedule", () => {
     const next = nextHealthTakeawaysAt(META, now);
     assert.equal(next.toISOString(), close.toISOString());
     assert.equal(close.toISOString(), "2026-08-17T06:00:00.000Z");
+  });
+
+  it("catches up every 4 hours before the next 01:00", () => {
+    const now = new Date("2026-08-17T12:00:00.000Z");
+    const slot = nextHealthTakeawaysSlot(META, now);
+    assert.equal(slot.nightly, false);
+    assert.equal(
+      slot.when.getTime(),
+      now.getTime() + HEALTH_TAKEAWAYS_CATCHUP_MS
+    );
   });
 });

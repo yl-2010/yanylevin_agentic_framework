@@ -14,7 +14,7 @@ Phase 2 of the morning pipeline (`server/daily-briefing-agent.js`), after the ne
 
 ## Output
 
-Write `/tmp/yanylevin-daily-briefing-agent-recap.json`:
+Write `/tmp/yanylevin-daily-briefing-agent-recap-<today's dateKey>.json`:
 
 ```json
 {
@@ -36,7 +36,7 @@ Use this order. **Omit a section entirely** when it does not apply that day (do 
 1. **`URGENT:`** (only when something needs Yan's attention)
    - Bullet list.
    - Agent that was supposed to run but did not (check `agents[]` in the nightly status prefetch).
-   - Nightly pipeline phase failure (triage, entities, synthesis, actions, lint).
+   - Nightly pipeline phase failure (triage, entities, synthesis, actions, lint). `pipelineFinished` false after synthesis ran means actions/lint did not complete.
    - Context source with `ok=false` or missing when it is normally populated (`brain/state.json` `notes`, digest gaps).
    - Stale cursors that mean a source is stuck.
    - Anything else from logs or notes that Yan must fix before things work again.
@@ -52,7 +52,7 @@ Use this order. **Omit a section entirely** when it does not apply that day (do 
 
 ## Read first
 
-1. `/tmp/yanylevin-nightly-status.json` (runner prefetch: per-agent `ran`, `brainNotes`, `brainCursors`, `journalExists`, `serverLogTail`, `gitCommits`).
+1. `/tmp/yanylevin-nightly-status.json` (runner prefetch: per-agent `ran`, `pipelineFinished`, `pipelinePhase`, `brainNotes`, `brainCursors`, `journalExists`, `serverLogTail`, `gitCommits`).
 2. `education/you@example.com/brain/state.json` (especially `notes`, `notes.factCheck`, and `lastSynthesisDateKey`).
 3. Yesterday's journal: `brain/journal/<dateKey minus 1>.md` when it exists.
 4. `location/state.json`, `health/state.json`, `daily-briefing/chat-title-refresh-state.json` if prefetch is thin.

@@ -560,6 +560,9 @@ function requireKey() {
  * @param {ModelSelection} model
  */
 async function replaceSessionAgent(session, model) {
+  const prev = session.agent;
+  session.agent = null;
+  if (prev) await disposeCursorAgent(prev);
   await recreateLocalCursorAgent({
     model,
     cwd: REPO_ROOT,

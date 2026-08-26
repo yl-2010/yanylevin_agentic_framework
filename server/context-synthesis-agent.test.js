@@ -30,9 +30,13 @@ import {
   digestSectionIsNone,
   extractUserQueriesFromTranscript,
   listThinPeopleSlugs,
+  lockMtimeIsFresh,
   nextContextSynthesisAt,
   peopleEnrichModelSpec,
+  pipelineFinishedOnFromState,
   prefetchRecentChats,
+  resumePhaseFromState,
+  SYNTHESIS_LOCK_STALE_MS,
 } from "./context-synthesis-agent.js";
 
 const META = {
@@ -452,5 +456,69 @@ describe("context synthesis schedule", () => {
       new Date("2026-08-16T20:00:00-05:00")
     );
     assert.equal(when.toISOString(), "2026-08-17T07:30:00.000Z");
+  });
+});
+
+describe("pipeline resume", () => {
+  const dateKey = "2026-08-26";
+
+  it("treats lastSynthesisDateKey without lastPipelineDateKey as resume-at-actions", () => {
+    assert.equal(
+      resumePhaseFromState({ lastSynthesisDateKey: dateKey }, dateKey),
+      "actions"
+    );
+    assert.equal(pipelineFinishedOnFromState({ lastSynthesisDateKey: dateKey }, dateKey), false);
+  });
+
+  it("resumes at the phase after lastPipelinePhase", () => {
+    assert.equal(
+      resumePhaseFromState({ lastPipelinePhase: "synthesis" }, dateKey),
+      "actions"
+    );
+    assert.equal(
+      resumePhaseFromState({ lastPipelinePhase: "actions" }, dateKey),
+      "lint"
+    );
+  });
+
+  it("skips when lastPipelineDateKey is today", () => {
+    assert.equal(
+      resumePhaseFromState({ lastPipelineDateKey: dateKey, lastPipelinePhase: "finished" }, dateKey),
+      "finished"
+    );
+    assert.equal(
+      pipelineFinishedOnFromState({ lastPipelineDateKey: dateKey }, dateKey),
+      true
+    );
+  });
+
+  it("force starts at triage even if synthesis already ran", () => {
+    assert.equal(
+      resumePhaseFromState(
+        { lastSynthesisDateKey: dateKey, lastPipelineDateKey: dateKey },
+        dateKey,
+        "",
+        true
+      ),
+      "triage"
+    );
+  });
+
+  it("honors --resume-from", () => {
+    assert.equal(
+      resumePhaseFromState({ lastPipelineDateKey: dateKey }, dateKey, "lint"),
+      "lint"
+    );
+  });
+});
+
+describe("stale synthesis lock", () => {
+  it("treats a lock older than 90 minutes as idle", () => {
+    const now = 1_000_000;
+    assert.equal(lockMtimeIsFresh(now, now, SYNTHESIS_LOCK_STALE_MS), true);
+    assert.equal(
+      lockMtimeIsFresh(now - SYNTHESIS_LOCK_STALE_MS - 1, now, SYNTHESIS_LOCK_STALE_MS),
+      false
+    );
   });
 });

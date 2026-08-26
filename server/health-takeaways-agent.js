@@ -109,12 +109,29 @@ async function readMeta() {
   return meta;
 }
 
+export const HEALTH_TAKEAWAYS_CATCHUP_MS = 4 * 60 * 60 * 1000;
+
 export function healthTakeawaysModelSpec() {
   return modelSelection(HEALTH_TAKEAWAYS_MODEL_SPEC);
 }
 
 export function nextHealthTakeawaysAt(meta, now = new Date()) {
   return nextLocalHmAt(meta, nightlyAgentsHm(meta), now);
+}
+
+/**
+ * Next 01:00 slot, or a 4-hour catch-up if dumps can still land tonight.
+ * @param {object} meta
+ * @param {Date} [now]
+ */
+export function nextHealthTakeawaysSlot(meta, now = new Date()) {
+  const nightlyAt = nextLocalHmAt(meta, nightlyAgentsHm(meta), now);
+  const plus = new Date(now.getTime() + HEALTH_TAKEAWAYS_CATCHUP_MS);
+  const when = plus.getTime() < nightlyAt.getTime() ? plus : nightlyAt;
+  return {
+    when,
+    nightly: when.getTime() === nightlyAt.getTime(),
+  };
 }
 
 export function buildHealthTakeawaysPrompt({ dateKey, timezone, force }) {
@@ -271,11 +288,11 @@ async function maybeRunMissed() {
 
 function armTimer(meta) {
   if (timer) clearTimeout(timer);
-  const when = nextHealthTakeawaysAt(meta);
+  const { when, nightly } = nextHealthTakeawaysSlot(meta);
   const delay = Math.max(1000, when.getTime() - Date.now());
-  const capped = Math.min(delay, 24 * 60 * 60 * 1000);
+  const capped = Math.min(delay, HEALTH_TAKEAWAYS_CATCHUP_MS);
   console.log(
-    `[health-takeaways] next run ${when.toISOString()} (in ${Math.round(capped / 60000)} min)`
+    `[health-takeaways] next run ${when.toISOString()} (in ${Math.round(capped / 60000)} min)${nightly ? " nightly" : " catch-up"}`
   );
   timer = setTimeout(() => {
     runHealthTakeaways()

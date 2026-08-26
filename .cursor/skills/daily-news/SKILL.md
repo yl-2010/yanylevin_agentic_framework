@@ -18,8 +18,8 @@ Yan-only (`education/you@example.com/`). Local Cursor agents, never cloud.
 
 | Phase | Model | Skill | Output |
 |-------|-------|-------|--------|
-| 1 news | grok-4.6 xhigh | this file (news sections only) | `/tmp/yanylevin-daily-briefing-news-draft.json` |
-| 2 agent-recap | grok-4.6 high | agent-recap | `/tmp/yanylevin-daily-briefing-agent-recap.json` |
+| 1 news | grok-4.6 xhigh | this file (news sections only) | `/tmp/yanylevin-daily-briefing-news-draft-<dateKey>.json` |
+| 2 agent-recap | grok-4.6 high | agent-recap | `/tmp/yanylevin-daily-briefing-agent-recap-<dateKey>.json` |
 | 3 unslop | composer-2.5 | unslop + assemble | `todo.json`, `taste.md` |
 
 Phase 1 stops after the news draft. Phase 3 reads unslop, merges agent recap (first capsule) with news, writes the todo, rewrites taste.
@@ -45,7 +45,7 @@ education/you@example.com/
 1. Resolve **today** from `meta.json` (the scheduler passes the date key; otherwise use the active timezone's current date).
 2. Read `profile.md`, `preferences.md`, `taste.md`, and every user-level todo with `"kind": "dailyBriefing"` whose `dueDate` is in the last **7 days** (titles, bodies, votes).
 3. Pick about 10 good stories. The beats below are interest guidelines, not a must-cover list. Do not invent news. Draft capsule titles and bodies.
-4. Write `/tmp/yanylevin-daily-briefing-news-draft.json` with `{ "capsules": [...], "citations": [...] }`. News only. Do not write `todo.json`, `taste.md`, or agent recap.
+4. Write `/tmp/yanylevin-daily-briefing-news-draft-<today's dateKey>.json` with `{ "capsules": [...], "citations": [...] }`. News only. Do not write `todo.json`, `taste.md`, or agent recap. An undated `news-draft.json` or a file for another day is stale. Ignore it. Do not copy yesterday's capsules.
 
 ## Phase 3: final todo (after agent recap + unslop)
 
@@ -87,7 +87,7 @@ Phase 3 assembles the final todo. Schema:
 }
 ```
 
-- User-level only (no class/project). No `tag`. `showInDates: false`.
+- User-level only (no class/project). No `tag`. `showInDates: false`. `done: false` on create.
 - **Agent recap** is always the first capsule: `id` `agent-recap`, `noVote: true`, no citations, no thumbs. See agent-recap skill for body sections (URGENT, Actions, general recap).
 - Aim for about **10 news capsules** (roughly 9–12), plus agent recap. Quality over coverage. `id` unique within the day, kebab-case.
 - `category`: `global` | `us` | `politics` | `wa` | `local` | `pop` | `tech` | `markets` | `other`
