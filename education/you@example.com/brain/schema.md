@@ -136,6 +136,7 @@ created the first time there is real content. Never create an empty file.
 | relationship.md | How the operator knows them, origin arc, assessment. The only home for "how we met." |
 | beliefs.md | What they believe, what motivates them, communication style, hobby horses. Not spelling or aliases. |
 | threads.md | Open threads with them; resolved items move to the timeline |
+| schedule.md | Recurring calendar. School blocks, advisory, sports or club cadence, other repeating commitments. A single date (a game, a concert, a trip) stays on the timeline, a thread, or education dates. |
 | notes.md | Typed misc context (recurring text topics, one-off facts that fit nowhere else) |
 
 Standing is current facts about this person. No "how we met" novel (that is relationship.md), no other people's nicknames or deaths (those live on their cards), no agent ACL (that is personal-agent / SOUL.md). Family tree is edges, not a restated sibling list on every relative. Group Standing is who the group is now and the open plan; dated history stays in that group's timeline.

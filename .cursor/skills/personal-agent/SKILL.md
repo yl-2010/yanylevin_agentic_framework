@@ -44,7 +44,7 @@ If this turn names a person (given name, last name, nickname, or alias), look th
 1. Read `.cursor/skills/personal-people/SKILL.md`
 2. Pull the card: `node server/brain-entity-card.js "<name or slug>"` (fields, edges, typed files, recent timeline in one call)
 3. Ambiguous name: check `education/you@example.com/brain/people/index.md` aliases; several rows match means pull every matching card before choosing
-4. Open a typed file (`relationship.md`, `beliefs.md`, `threads.md`, `notes.md`) only when the question needs it
+4. Open a typed file (`relationship.md`, `beliefs.md`, `threads.md`, `schedule.md`, `notes.md`) only when the question needs it. `schedule.md` for their classes, free periods, or other recurring commitments
 5. If nothing matches, say so. Do not invent a second person
 
 Aliases live on the card and in `people/index.md`. Pull the card. Do not treat two strings as two people until the index says so.
@@ -76,6 +76,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | iMessage read and send | `.cursor/skills/personal-imessage/SKILL.md` |
 | Apple Screen Time / app usage (Yan only) | `.cursor/skills/personal-screentime/SKILL.md` |
 | Contacts lookup (sqlite, no Contacts.app) | `.cursor/skills/personal-contacts/SKILL.md` |
+| Their classes, free periods, recurring sports or clubs | that person's `people/<slug>/schedule.md` (Yan only; not `schedule.json`) |
 | Standing memories / brain (Yan only) | `education/you@example.com/brain/` — `identity.md` (map), `identity-school.md`, `identity-accounts.md`, `identity-logistics.md`, `patterns.md`, `health.md`, `threads/`, `journal/`, `places/`; contract in `brain/schema.md` (life facts; agent behavior is `SOUL.md` + the matching skill, not here) |
 | Nightly context synthesis (manual run) | `.cursor/skills/context-synthesis/SKILL.md` |
 | Nightly fact-check (manual run) | `.cursor/skills/nightly-fact-check/SKILL.md` |

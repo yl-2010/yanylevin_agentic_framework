@@ -34,8 +34,9 @@ Not optional. Not "only if the question is about them."
 3. Several people can share a first name. Pull every matching card before
    answering; do not pick the first hit.
 4. Open a typed file (`relationship.md`, `beliefs.md`, `threads.md`,
-   `notes.md`) only when the task needs that context. The card is usually
-   enough.
+   `schedule.md`, `notes.md`) only when the task needs that context. The
+   card is usually enough. Open `schedule.md` for their classes, free
+   periods, advisory, or other recurring commitments.
 5. Not in the index: say so. Optionally search Contacts or iMessage. Do not
    invent a second person; do not create a card unless Yan asks.
 6. Graph questions ("who is in JYPE", "who connects to Milos") read the
@@ -52,6 +53,7 @@ full contract):
 | `relationship.md` | How Yan knows them, Yan's assessment. |
 | `beliefs.md` | Beliefs, motivations, communication style, hobby horses. |
 | `threads.md` | Open items between Yan and them. |
+| `schedule.md` | Recurring calendar (school blocks, sports/club cadence). Not one-off dates. |
 | `notes.md` | Typed misc. |
 
 Only person.md always exists; the others appear when there is real content.

@@ -36,8 +36,9 @@ for people; you are where person facts land.
   current. Label uncertainty (likely / looks like / as of DATE).
 - Typed files per schema: relationship.md (how Yan knows them, assessment),
   beliefs.md (beliefs, motivations, communication style, hobby horses),
-  threads.md (open items between Yan and them), notes.md (typed misc). Create
-  a file the first time there is real content; never create empty files.
+  threads.md (open items between Yan and them), schedule.md (recurring
+  calendar only, not one-off dates), notes.md (typed misc). Create a file
+  the first time there is real content; never create empty files.
 - Update `last_touched` and any changed frontmatter fields.
 
 ## New entities

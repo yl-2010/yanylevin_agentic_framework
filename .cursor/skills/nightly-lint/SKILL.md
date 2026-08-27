@@ -31,7 +31,8 @@ duplicated, and the cursors moved. You fix structure, not content.
   edges, delete the duplicate).
 - Promote: a Standing section that has grown past ~25 lines gets its stable
   facts split into the typed files (relationship.md / beliefs.md / threads.md
-  / notes.md). Never create empty files.
+  / schedule.md / notes.md). Recurring calendar goes to schedule.md, not
+  Standing. Never create empty files.
 - Identity pages: any bullet over ~220 characters, or `identity.md` over
   ~80 lines / ~1,200 words, gets rewritten down per schema. Mail-noise
   (Libby holds, sign-in alerts, iCloud-full) does not belong there.

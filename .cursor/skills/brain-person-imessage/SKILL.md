@@ -49,6 +49,7 @@ Primary folder: `education/you@example.com/brain/people/<slug>/`
 | `relationship.md` | How Yan knows them, Yan's assessment |
 | `beliefs.md` | Beliefs, motivations, communication style, hobby horses |
 | `threads.md` | Open items between Yan and them |
+| `schedule.md` | Recurring calendar (school blocks, sports/club cadence). Not one-off dates |
 | `notes.md` | Typed misc |
 
 Also: `people/index.md` for name/alias lookup. If this month states a fact
