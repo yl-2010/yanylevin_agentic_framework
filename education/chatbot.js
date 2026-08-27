@@ -974,7 +974,7 @@
       submit.title = full && !sending
         ? `Queue full (max ${MAX_QUEUED}). Wait for a reply.`
         : sending
-          ? "Hold 2 seconds to interrupt instead of queueing"
+          ? "Hold send or Enter 2 seconds to interrupt instead of queueing"
           : "";
     }
   }
@@ -1565,6 +1565,7 @@
   let sendHoldTimer = null;
   let sendHoldArmed = false;
   let sendHoldConsumed = false;
+  let enterHoldActive = false;
 
   form?.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -1587,23 +1588,21 @@
     sendBtn?.classList.remove("is-interrupt-armed");
   }
 
-  sendBtn?.addEventListener("pointerdown", (event) => {
-    if (event.button && event.button !== 0) return;
-    if (event.shiftKey) return;
+  function startSendHold() {
     sendHoldConsumed = false;
     clearSendHold();
     sendHoldTimer = window.setTimeout(() => {
       sendHoldTimer = null;
       if (!sending) return;
       sendHoldArmed = true;
-      sendBtn.classList.add("is-interrupt-armed");
+      sendBtn?.classList.add("is-interrupt-armed");
     }, HOLD_MS);
-  });
+  }
 
-  sendBtn?.addEventListener("pointerup", (event) => {
+  function finishInterruptHold(event) {
     const armed = sendHoldArmed && sending;
     clearSendHold();
-    if (!armed) return;
+    if (!armed) return false;
     event.preventDefault();
     event.stopPropagation();
     sendHoldConsumed = true;
@@ -1611,6 +1610,17 @@
       navigator.vibrate([40, 35, 90]);
     }
     sendMessage(input?.value, { interrupt: true });
+    return true;
+  }
+
+  sendBtn?.addEventListener("pointerdown", (event) => {
+    if (event.button && event.button !== 0) return;
+    if (event.shiftKey) return;
+    startSendHold();
+  });
+
+  sendBtn?.addEventListener("pointerup", (event) => {
+    finishInterruptHold(event);
   });
 
   sendBtn?.addEventListener("pointercancel", () => {
@@ -1660,7 +1670,8 @@
 
   input?.addEventListener("input", syncComposerSize);
 
-  // Desktop: Enter sends, Shift+Enter inserts a newline.
+  // Desktop: Enter sends on keyup, Shift+Enter inserts a newline.
+  // Hold Enter 2s while working to interrupt instead of queueing.
   // Touch / iOS: Return inserts a newline; send is the UI button.
   input?.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" || event.shiftKey || event.isComposing || event.keyCode === 229) {
@@ -1668,7 +1679,27 @@
     }
     if (!desktopEnterSends()) return;
     event.preventDefault();
-    sendMessage(input.value);
+    if (event.repeat) return;
+    enterHoldActive = true;
+    startSendHold();
+  });
+
+  function onEnterKeyup(event) {
+    if (event.key !== "Enter" || !enterHoldActive) return;
+    enterHoldActive = false;
+    event.preventDefault();
+    if (finishInterruptHold(event)) return;
+    sendMessage(input?.value);
+  }
+
+  input?.addEventListener("keyup", onEnterKeyup);
+  window.addEventListener("keyup", onEnterKeyup);
+
+  input?.addEventListener("blur", () => {
+    if (!enterHoldActive) return;
+    enterHoldActive = false;
+    sendHoldConsumed = false;
+    clearSendHold();
   });
 
   // Drag-and-drop attachments onto the chat input / form.
