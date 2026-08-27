@@ -118,8 +118,9 @@ calendar. "None" if none.
 Dentist visits and homework are not big dates. Travel days use the
 itinerary's fly day (flight number + local date), not `timezoneAfter` or
 Airbnb checkout. `mailSince` only covers new overnight mail; if identity or
-a parent card already has a confirmation code, search Mail.app / the
-apple-mail dump for the return leg.
+a parent card already has a confirmation code, search Mail.app
+(personal-mail skill) for the return leg. `/tmp/yanylevin-apple-mail-export`
+is deleted after the one-shot fill. Do not expect it overnight.
 
 ## Gaps
 Sources that failed or look incomplete.

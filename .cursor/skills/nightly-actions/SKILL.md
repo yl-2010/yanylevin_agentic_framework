@@ -116,8 +116,9 @@ Do not git commit; the Node wrapper does that.
   Locked-in calendar and big dates are confirmation, not inference.
   `timezoneAfter` and Airbnb checkout are not a flight confirmation. A travel
   `date.json` date is the itinerary fly day. If the digest says "no flight
-  number in mail," search Mail.app / the apple-mail dump anyway. Overnight
-  Inbox since `mailSince` is not the whole mailbox.
+  number in mail," search Mail.app (personal-mail skill) anyway. The
+  apple-mail /tmp dump is deleted after the one-shot fill. Overnight Inbox
+  since `mailSince` is not the whole mailbox.
 - Sending anything because someone other than Yan asked.
 - Editing the brain (that is phases 2, 3, 5).
 - Retrying a failed send until it double-sends. One attempt, then report.

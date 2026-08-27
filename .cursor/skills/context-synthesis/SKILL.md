@@ -128,6 +128,14 @@ Always set `imessageSince` after a successful Messages read. Always set
 failed, say so in a `notes` field and leave that cursor unset so the next run
 retries. Next run starts from these cursors, not from scratch.
 
+These seven keys are the nightly sources. Do not add `appleMailSince` or any
+other one-shot fill watermark to `cursors`. Top-level `appleMailFill.lastAt`
+is when the Mail.app history fill last finished. That job deletes
+`/tmp/yanylevin-apple-mail-export` when it succeeds. A missing dump is
+expected. Do not retry it, do not write `notes.appleMail`, do not leave a
+cursor for it. Overnight personal mail is `mailSince` plus Mail.app
+(personal-mail skill).
+
 ## Manual run
 
 ```bash
@@ -153,5 +161,5 @@ force run, still think; do not only append a re-ran line.
 ## Verify
 
 journal/<dateKey minus 1 day>.md exists with a real take. identity/patterns/threads
-reflect today's changes. state.json cursors moved. Location lines the digest
+reflect today's changes. Nightly state.json cursors moved. Location lines the digest
 flagged are corrected or explained.

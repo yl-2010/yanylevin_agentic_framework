@@ -35,6 +35,30 @@ function hasFlag(flag) {
   return process.argv.includes(flag);
 }
 
+/**
+ * One-shot fill finished. Stamp appleMailFill.lastAt (not a nightly cursor).
+ * Drop leftover appleMailSince / notes.appleMail so overnight jobs do not retry.
+ *
+ * @param {Record<string, unknown>} state
+ * @param {string} [at]
+ */
+export function recordAppleMailFillComplete(state, at = new Date().toISOString()) {
+  const next = state && typeof state === "object" ? { ...state } : {};
+  const cursors =
+    next.cursors && typeof next.cursors === "object"
+      ? { .../** @type {Record<string, unknown>} */ (next.cursors) }
+      : {};
+  delete cursors.appleMailSince;
+  next.cursors = cursors;
+  next.appleMailFill = { lastAt: String(at) };
+  if (next.notes && typeof next.notes === "object") {
+    const notes = { .../** @type {Record<string, unknown>} */ (next.notes) };
+    delete notes.appleMail;
+    next.notes = notes;
+  }
+  return next;
+}
+
 function modelSelection(spec) {
   return {
     id: String(spec.id),
@@ -231,12 +255,11 @@ export async function runAppleMailFill(opts = {}) {
     try {
       const stateFile = join(REPO_ROOT, BRAIN_REL, "state.json");
       const state = JSON.parse(await readFile(stateFile, "utf8"));
-      state.cursors = state.cursors && typeof state.cursors === "object" ? state.cursors : {};
-      state.cursors.appleMailSince = new Date().toISOString();
-      await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);
+      const next = recordAppleMailFillComplete(state);
+      await writeFile(stateFile, `${JSON.stringify(next, null, 2)}\n`);
     } catch (err) {
       console.warn(
-        "[apple-mail-fill] could not bump appleMailSince",
+        "[apple-mail-fill] could not stamp appleMailFill.lastAt",
         err instanceof Error ? err.message : err
       );
     }

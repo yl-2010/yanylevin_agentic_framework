@@ -38,7 +38,12 @@ Use this order. **Omit a section entirely** when it does not apply that day (do 
    - Agent that was supposed to run but did not (check `agents[]` in the nightly status prefetch).
    - Nightly pipeline phase failure (triage, entities, synthesis, actions, lint). `pipelineFinished` false after synthesis ran means actions/lint did not complete.
    - Context source with `ok=false` or missing when it is normally populated (`brain/state.json` `notes`, digest gaps).
-   - Stale cursors that mean a source is stuck.
+   - Stale **nightly** cursors that mean a source is stuck (`mailSince`,
+     `schoolMailSince`, `imessageSince`, `chatHistorySince`, `screenTimeAt`,
+     `locationEnrichmentAt`, `healthAt`). Do not flag `appleMailFill.lastAt`
+     or a missing `/tmp/yanylevin-apple-mail-export`. That fill is one-shot
+     and not on the overnight schedule. The dump is deleted when it finishes.
+     Overnight mail is `mailSince`.
    - Anything else from logs or notes that Yan must fix before things work again.
 
 2. **`Actions:`** (only when the nightly-actions phase did something)

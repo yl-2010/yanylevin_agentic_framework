@@ -56,7 +56,12 @@ A fact on `people/<slug>/` with no "Yan said" reads as something they said. If `
 
 Overnight triage only scans Inbox since `mailSince`. Standing logistics live in older mail. You still have to check them.
 
-Re-open Mail.app (personal-mail skill) or `/tmp/yanylevin-apple-mail-export` when tonight's writes mention mail, a flight, a refund, a booking, an itinerary, or say something is "not in mail" / "no flight number." A quiet overnight Inbox is not proof the confirmation does not exist.
+Re-open Mail.app (personal-mail skill) when tonight's writes mention mail, a
+flight, a refund, a booking, an itinerary, or say something is "not in mail"
+/ "no flight number." `/tmp/yanylevin-apple-mail-export` only exists while a
+one-shot fill is running. After that job it is deleted. A missing dump is
+expected, not a failed ingest. A quiet overnight Inbox is not proof the
+confirmation does not exist.
 
 Round-trip confirmations: read every leg, not the subject-line outbound. A Tesla subject that says "processing" can still post a refund line in the same body. Search Exchange first, then Google, then iCloud. Do not stop at the since-cursor window.
 

@@ -203,7 +203,7 @@ export function buildFactCheckPrompt({ dateKey, timezone, journalKey, force }) {
     "Do not compile news or the Daily Briefing. Those run at 06:00 on the context you leave clean.",
     `Read git-visible overnight writes under ${brain}/, ${loc}/, ${health}/, and education dates/classes/projects/todos if phase 4 or Canvas touched them.`,
     "Re-read iMessage with who/fromMe (never handle as speaker in a 1:1). JSON at is UTC with no Z.",
-    "Mail claims (flights, refunds, bookings, 'not in mail') need Mail.app or /tmp/yanylevin-apple-mail-export. mailSince is new overnight mail only; search history. Round-trips: every leg. timezoneAfter is not a boarding pass.",
+    "Mail claims (flights, refunds, bookings, 'not in mail') need Mail.app (personal-mail skill). /tmp/yanylevin-apple-mail-export only exists during a one-shot fill and is deleted after; a missing dump is expected. mailSince is new overnight mail only; search history in Mail.app. Round-trips: every leg. timezoneAfter is not a boarding pass.",
     "Health clocks: standing America/Los_Angeles; Austin workouts after 2026-08-12 through 2026-08-26 use America/Chicago.",
     `Write corrections in place per brain/schema.md. Set ${brain}/state.json notes.factCheck (what you fixed, or that nothing was wrong). Keep lastSynthesis* and cursors.`,
     "Git commit is the Node wrapper. After frontmatter changes, node server/brain-graph.js (wrapper also runs it).",

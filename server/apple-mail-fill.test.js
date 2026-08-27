@@ -4,6 +4,7 @@ import {
   APPLE_MAIL_FILL_MODEL_SPEC,
   buildAppleMailCompilePrompt,
   buildAppleMailFillPrompt,
+  recordAppleMailFillComplete,
 } from "./apple-mail-fill.js";
 import { filesFromMonth, chunkDumpText } from "./school-mail-fill.js";
 
@@ -51,6 +52,27 @@ describe("apple-mail fill prompts", () => {
     ];
     assert.equal(filesFromMonth(files, "", "2024-07").length, 1);
     assert.equal(filesFromMonth(files, "2020-01", "").length, 1);
+  });
+
+  it("stamps appleMailFill.lastAt outside nightly cursors", () => {
+    const next = recordAppleMailFillComplete(
+      {
+        cursors: {
+          mailSince: "2026-08-27T09:30:08.531Z",
+          appleMailSince: "2026-08-25T03:24:00.683Z",
+        },
+        notes: {
+          mail: "mail-people ok",
+          appleMail: "Left appleMailSince so the next run retries.",
+        },
+      },
+      "2026-08-27T17:00:00.000Z"
+    );
+    assert.equal(next.appleMailFill.lastAt, "2026-08-27T17:00:00.000Z");
+    assert.equal(next.cursors.mailSince, "2026-08-27T09:30:08.531Z");
+    assert.equal(next.cursors.appleMailSince, undefined);
+    assert.equal(next.notes.appleMail, undefined);
+    assert.equal(next.notes.mail, "mail-people ok");
   });
 
   it("splits a fat month on message boundaries", () => {

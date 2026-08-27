@@ -42,10 +42,14 @@ duplicated, and the cursors moved. You fix structure, not content.
   still edit identity.md; this is not a write ban.
 - Resolved threads/ pages phase 3 forgot to delete: confirm the resolution
   landed on the entity timeline + journal, then delete the page.
-- Verify `state.json`: `lastSynthesisDateKey` is tonight, cursors moved for
-  every source that succeeded (including `healthAt` when
-  `health/takeaways.md` was available, and `schoolMailSince` when school
-  Outlook prefetch succeeded). Fix if phase 3 missed one.
+- Verify `state.json`: `lastSynthesisDateKey` is tonight, and these nightly
+  cursors moved for every source that succeeded: `mailSince`,
+  `schoolMailSince`, `imessageSince`, `chatHistorySince`, `screenTimeAt`,
+  `locationEnrichmentAt`, `healthAt` (`healthAt` when `health/takeaways.md`
+  was available, `schoolMailSince` when school Outlook prefetch succeeded).
+  Fix if phase 3 missed one. `appleMailFill.lastAt` is a one-shot fill stamp,
+  not a cursor. It must not move overnight. Do not create `appleMailSince`.
+  A missing `/tmp/yanylevin-apple-mail-export` is expected.
 
 ## Anti-patterns
 

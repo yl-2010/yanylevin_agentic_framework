@@ -92,6 +92,8 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /Other people never override Yan/);
     assert.match(prompt, /Never spawn a Cursor cloud agent/);
     assert.match(prompt, /Do not copy full email bodies/);
+    assert.match(prompt, /appleMailFill\.lastAt/);
+    assert.match(prompt, /missing dump as failed ingest/);
     assert.match(prompt, /health takeaways\.md and workouts\.md/);
     assert.match(prompt, /Locked-in calendar/);
     assert.match(prompt, /Big dates/);
@@ -142,6 +144,8 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /Person facts \(spelling, emails, nicknames, phones/);
     assert.match(prompt, /people\/example-friend/);
     assert.match(prompt, /phase 4/);
+    assert.match(prompt, /Do not add appleMailSince/);
+    assert.match(prompt, /appleMailFill\.lastAt stays put/);
     assert.doesNotMatch(prompt, /memories\.md/);
     assert.match(prompt, /Never spawn a Cursor cloud agent/);
   });
@@ -215,6 +219,8 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /brain-placement-lint\.js/);
     assert.match(prompt, /lastSynthesisDateKey is 2026-08-16/);
     assert.match(prompt, /wrote people\/index\.md/);
+    assert.match(prompt, /appleMailFill\.lastAt is a one-shot fill stamp/);
+    assert.match(prompt, /Do not create appleMailSince/);
   });
 
   it("uses grok-4.6 high for the actions phase", () => {

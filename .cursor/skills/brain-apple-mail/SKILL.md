@@ -13,8 +13,10 @@ disable-model-invocation: true
 
 You are a one-shot local Cursor agent. Read a /tmp dump of Mail.app personal
 mail, write facts into brain cards, stop. Keep files that already exist. The
-Node wrapper deletes the dump after you finish. Do not copy dump files into
-the repo.
+Node wrapper deletes the dump after you finish and stamps
+`appleMailFill.lastAt` on `state.json` (top-level, not under `cursors`). Do
+not write `appleMailSince` into cursors. Do not copy dump files into the
+repo.
 
 Model: **composer-2.5** (fast=false). One Composer pass per month. Do not skim.
 
