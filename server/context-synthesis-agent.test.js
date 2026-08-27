@@ -470,24 +470,58 @@ describe("pipeline resume", () => {
     assert.equal(pipelineFinishedOnFromState({ lastSynthesisDateKey: dateKey }, dateKey), false);
   });
 
-  it("resumes at the phase after lastPipelinePhase", () => {
+  it("resumes at the phase after lastPipelinePhase on the same night", () => {
     assert.equal(
-      resumePhaseFromState({ lastPipelinePhase: "synthesis" }, dateKey),
+      resumePhaseFromState(
+        { lastPipelinePhase: "synthesis", lastPipelineDateKey: dateKey },
+        dateKey
+      ),
       "actions"
     );
     assert.equal(
-      resumePhaseFromState({ lastPipelinePhase: "actions" }, dateKey),
+      resumePhaseFromState(
+        { lastPipelinePhase: "actions", lastPipelineDateKey: dateKey },
+        dateKey
+      ),
       "lint"
+    );
+    assert.equal(
+      pipelineFinishedOnFromState(
+        { lastPipelineDateKey: dateKey, lastPipelinePhase: "synthesis" },
+        dateKey
+      ),
+      false
     );
   });
 
-  it("skips when lastPipelineDateKey is today", () => {
+  it("does not resume a prior night leftover phase", () => {
+    assert.equal(
+      resumePhaseFromState(
+        {
+          lastPipelinePhase: "synthesis",
+          lastPipelineDateKey: "2026-08-25",
+          lastSynthesisDateKey: "2026-08-25",
+        },
+        dateKey
+      ),
+      "triage"
+    );
+  });
+
+  it("skips when lastPipelineDateKey is today and the phase is finished", () => {
     assert.equal(
       resumePhaseFromState({ lastPipelineDateKey: dateKey, lastPipelinePhase: "finished" }, dateKey),
       "finished"
     );
     assert.equal(
       pipelineFinishedOnFromState({ lastPipelineDateKey: dateKey }, dateKey),
+      true
+    );
+    assert.equal(
+      pipelineFinishedOnFromState(
+        { lastPipelineDateKey: dateKey, lastPipelinePhase: "finished" },
+        dateKey
+      ),
       true
     );
   });

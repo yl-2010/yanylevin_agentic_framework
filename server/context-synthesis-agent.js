@@ -216,7 +216,6 @@ async function readState(dir = brainDir()) {
  */
 async function writePipelineProgress(dir, dateKey, phase) {
   const prev = await readState(dir);
-  const finished = phase === "finished";
   await writeFile(
     statePath(dir),
     `${JSON.stringify(
@@ -224,7 +223,7 @@ async function writePipelineProgress(dir, dateKey, phase) {
         ...prev,
         lastPipelineAt: new Date().toISOString(),
         lastPipelinePhase: phase,
-        lastPipelineDateKey: finished ? dateKey : prev.lastPipelineDateKey,
+        lastPipelineDateKey: dateKey,
       },
       null,
       2
@@ -276,7 +275,10 @@ export async function pipelineFinishedOn(dateKey, dir = brainDir()) {
  * @param {string} dateKey
  */
 export function pipelineFinishedOnFromState(state, dateKey) {
-  return String(state?.lastPipelineDateKey || "") === String(dateKey);
+  if (String(state?.lastPipelineDateKey || "") !== String(dateKey)) return false;
+  const phase = String(state?.lastPipelinePhase || "");
+  // Empty phase: nights that only stamped the date after a full success.
+  return !phase || phase === "finished";
 }
 
 /**
@@ -295,10 +297,15 @@ export function resumePhaseFromState(state, dateKey, resumeFrom, force = false) 
   if (pipelineFinishedOnFromState(state, dateKey)) return "finished";
   const phase = String(state?.lastPipelinePhase || "");
   const idx = PIPELINE_PHASES.indexOf(phase);
-  if (idx >= 0 && phase !== "finished") {
+  const progressOnTonight =
+    String(state?.lastPipelineDateKey || "") === String(dateKey);
+  const synthesisOnTonight =
+    String(state?.lastSynthesisDateKey || "") === String(dateKey);
+  // lastPipelinePhase from a killed prior night must not skip tonight's triage.
+  if (idx >= 0 && phase !== "finished" && (progressOnTonight || synthesisOnTonight)) {
     return PIPELINE_PHASES[idx + 1] || "finished";
   }
-  if (String(state?.lastSynthesisDateKey || "") === String(dateKey)) {
+  if (synthesisOnTonight) {
     return "actions";
   }
   return "triage";
