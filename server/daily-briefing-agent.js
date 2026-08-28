@@ -634,6 +634,7 @@ export function buildAgentRecapPrompt({ dateKey, timezone }) {
     "Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} (timezone ${timezone}).`,
     `Read ${NIGHTLY_STATUS_PATH} first, then dig as the skill says (brain/state.json notes, journal, git log, server log tail).`,
+    "notes.calendar is written by synthesis before actions. It is not a record of calendar creates. List Apple Calendar before saying an event stayed off.",
     `pipelineFinished false or lastPipelinePhase not finished means actions/lint did not complete. Put that under URGENT.`,
     `Write only ${recap} as JSON:`,
     '{ "id": "agent-recap", "title": "Agent Recap", "category": "other", "noVote": true, "vote": null, "body": "..." }',

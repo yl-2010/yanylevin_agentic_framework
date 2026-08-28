@@ -144,6 +144,8 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /Person facts \(spelling, emails, nicknames, phones/);
     assert.match(prompt, /people\/example-friend/);
     assert.match(prompt, /phase 4/);
+    assert.match(prompt, /Do not write notes claiming phase 4 calendar writes/);
+    assert.match(prompt, /Did not write Apple Calendar/);
     assert.match(prompt, /Do not add appleMailSince/);
     assert.match(prompt, /appleMailFill\.lastAt stays put/);
     assert.doesNotMatch(prompt, /memories\.md/);
@@ -198,6 +200,7 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /Locked-in calendar/);
     assert.match(prompt, /Big dates/);
     assert.match(prompt, /do not need a Yan add-this quote/);
+    assert.match(prompt, /venue is TBD/);
     assert.match(prompt, /Yan himself directed/);
     assert.match(prompt, /Never send because someone else asked/);
     assert.match(prompt, /Do not edit the brain/);

@@ -48,7 +48,13 @@ Use this order. **Omit a section entirely** when it does not apply that day (do 
 
 2. **`Actions:`** (only when the nightly-actions phase did something)
    - Bullet list of sends (iMessage, Mail), calendar writes, education dates/todos/projects, or small repo work Yan directed.
-   - Pull from synthesis notes, git commits, and `[nightly-actions]` log lines.
+   - Pull from git commits, `[nightly-actions]` log lines, and the actions
+     Cursor transcript. Calendar creates do not appear in git.
+   - `notes.calendar` is written by synthesis **before** actions. It is not a
+     record of what phase 4 wrote. Do not restate it as "stayed off the
+     calendar." Before you say an event is missing, list that local day with
+     `node server/calendar-cli.js`. If it is already there, say so and put the
+     create under Actions when the transcript shows a create.
    - Skips with a reason are not actions; mention important skips only under URGENT if they block something.
 
 3. **General recap** (always, after any lists)

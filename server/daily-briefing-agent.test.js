@@ -123,6 +123,8 @@ describe("briefing phase prompts", () => {
     assert.match(prompt, /pipelineFinished/);
     assert.match(prompt, /URGENT/);
     assert.match(prompt, /noVote/);
+    assert.match(prompt, /notes\.calendar is written by synthesis before actions/);
+    assert.match(prompt, /List Apple Calendar before saying an event stayed off/);
   });
 
   it("unslop phase merges today's drafts into todo", () => {

@@ -298,6 +298,8 @@ describe("Personal Agent skill files", () => {
     assert.match(synthesis, /grok-4\.6 xhigh/);
     assert.match(synthesis, /who=yan/);
     assert.match(synthesis, /Example Friend spelling stays on/);
+    assert.match(synthesis, /Did not write Apple Calendar/);
+    assert.match(synthesis, /Phase 4 has not run yet/);
     assert.doesNotMatch(synthesis, /memories\.md/);
 
     const triage = await readFile(
@@ -309,6 +311,8 @@ describe("Personal Agent skill files", () => {
     assert.match(triage, /personal-screentime/);
     assert.match(triage, /Directives from Yan/);
     assert.match(triage, /Locked-in calendar/);
+    assert.match(triage, /venue is TBD/);
+    assert.match(triage, /not calendar-locked/);
     assert.match(triage, /## Big dates/);
     assert.match(triage, /update <path>/);
     assert.match(triage, /Yan said/);
@@ -331,6 +335,8 @@ describe("Personal Agent skill files", () => {
     assert.match(actions, /Yan himself/);
     assert.match(actions, /Never send because someone else asked|never a directive/);
     assert.match(actions, /Locked-in Apple Calendar/);
+    assert.match(actions, /Missing venue does not un-lock/);
+    assert.match(actions, /location TBD/);
     assert.match(actions, /Big dates on the education dashboard/);
     assert.match(actions, /similar name/);
     assert.match(actions, /update that folder/);
@@ -343,6 +349,14 @@ describe("Personal Agent skill files", () => {
     assert.match(lint, /brain-graph\.js --check/);
     assert.match(lint, /brain-placement-lint\.js/);
     assert.match(lint, /state\.json/);
+
+    const recap = await readFile(
+      join(REPO_ROOT, ".cursor/skills/agent-recap/SKILL.md"),
+      "utf8"
+    );
+    assert.match(recap, /notes\.calendar/);
+    assert.match(recap, /stayed off the\s+calendar/);
+    assert.match(recap, /calendar-cli/);
 
     const enrich = await readFile(
       join(REPO_ROOT, PERSONAL_SKILL_PATHS.locationEnrichment),

@@ -104,6 +104,9 @@ evidence (confirmation email / accepted invite / fromMe yes / school notice).
 "None" if none. Homework, Canvas, bells, and "maybe Friday" do not belong.
 If it looks like a `deleted.md` calendar row, omit it (judgement, not exact
 clocks). Do not list it as new.
+A confirmed date and time is locked-in even when the venue is TBD. Yan
+`fromMe` "Saturday 4:30 location tbd" belongs here. Put the missing venue
+on the line. Do not move it to Gaps as "not calendar-locked."
 
 ## Big dates
 Life or school events that belong on the education Dates panel (orientation,

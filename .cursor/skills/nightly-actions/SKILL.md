@@ -50,6 +50,10 @@ Locked-in means a specific date (and usually a time) plus one of:
 - Yan `fromMe` agreeing to a specific slot ("yes Saturday 7 works")
 - Official school notice of a scheduled event (orientation, conference, picnic)
 
+Missing venue does not un-lock that. "Saturday 4:30, location TBD" is still a
+create. Put the TBD in the event location or notes. Triage may have parked it
+in Gaps; re-verify against the iMessage, not the Gaps line.
+
 Not locked-in: "we should hang out", "maybe Friday", a proposal Yan did not
 accept, homework due dates, Canvas assignments, the EPS bell schedule.
 

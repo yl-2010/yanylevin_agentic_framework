@@ -128,6 +128,11 @@ Always set `imessageSince` after a successful Messages read. Always set
 failed, say so in a `notes` field and leave that cursor unset so the next run
 retries. Next run starts from these cursors, not from scratch.
 
+Do not write notes that claim what phase 4 did. Phase 4 has not run yet. Never
+write "Did not write Apple Calendar (phase 4)." If you mention calendar in
+`notes`, say what is already on Apple Calendar or listed as locked-in in the
+digest.
+
 These seven keys are the nightly sources. Do not add `appleMailSince` or any
 other one-shot fill watermark to `cursors`. Top-level `appleMailFill.lastAt`
 is when the Mail.app history fill last finished. That job deletes
