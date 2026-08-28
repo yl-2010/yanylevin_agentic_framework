@@ -6,6 +6,23 @@ enum RootTab: Hashable {
     case chat
     case education
     case account
+
+    static func defaultTab(fullAccess: Bool) -> RootTab {
+        fullAccess ? .chat : .home
+    }
+
+    /// iOS 27 TabView crashes if selection points at a tab that is not in the
+    /// current set (Apple 164516837). Signed-in chrome has no Home; guests have
+    /// no Fitness / Education.
+    static func clamped(_ tab: RootTab, fullAccess: Bool) -> RootTab {
+        if fullAccess {
+            return tab == .home ? .chat : tab
+        }
+        switch tab {
+        case .fitness, .education: return .home
+        default: return tab
+        }
+    }
 }
 
 /// App entry behavior:
@@ -21,7 +38,25 @@ enum RootTab: Hashable {
 final class AppNavigationStore: ObservableObject {
     static let shared = AppNavigationStore()
 
-    @Published var selectedTab: RootTab = .home
+    @Published var selectedTab: RootTab
+
+    private init() {
+        selectedTab = RootTab.defaultTab(fullAccess: AppGroupStore.hasFullAccess)
+    }
+
+    /// Keep `selectedTab` inside the tabs the current auth state actually shows.
+    /// Call this in the same turn as `AuthStore.session` changes; `onChange` is
+    /// too late (the TabView has already laid out).
+    func adoptAccess(fullAccess: Bool) {
+        if fullAccess {
+            if selectedTab == .home {
+                selectedTab = .chat
+            }
+            return
+        }
+        selectedTab = .home
+    }
+
     @Published var chatHandoffID = UUID()
     @Published var chatHandoffAttachments: [PendingChatAttachment] = []
     @Published var chatHandoffPreferPersonalAgent = false
@@ -134,19 +169,27 @@ struct RootTabView: View {
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .onAppear { applyAuthorizedDefaultIfNeeded() }
         .onChange(of: auth.hasFullAccess) { _, full in
+            nav.adoptAccess(fullAccess: full)
             if full {
                 applyAuthorizedDefaultIfNeeded()
             } else {
                 didApplyAuthorizedDefault = false
-                nav.selectedTab = .home
             }
         }
+    }
+
+    /// Never hand TabView a tag that is missing from this auth state's tabs.
+    private var tabSelection: Binding<RootTab> {
+        Binding(
+            get: { RootTab.clamped(nav.selectedTab, fullAccess: auth.hasFullAccess) },
+            set: { nav.selectedTab = $0 }
+        )
     }
 
     /// Same tabs as before. Chat is the iOS 27 prominent slot so it sits in
     /// its own circle on the trailing edge.
     private var phoneTabView: some View {
-        TabView(selection: $nav.selectedTab) {
+        TabView(selection: tabSelection) {
             if auth.hasFullAccess {
                 Tab("Account", systemImage: "person.crop.circle", value: RootTab.account) {
                     AccountView()
@@ -187,7 +230,7 @@ struct RootTabView: View {
     }
 
     private var padTabView: some View {
-        TabView(selection: $nav.selectedTab) {
+        TabView(selection: tabSelection) {
             if auth.hasFullAccess {
                 AccountView()
                     .tabItem { Label("Account", systemImage: "person.crop.circle") }
@@ -225,9 +268,8 @@ struct RootTabView: View {
         guard auth.hasFullAccess, !didApplyAuthorizedDefault else { return }
         didApplyAuthorizedDefault = true
         nav.consumePendingOpenTodoIfNeeded()
-        // Cold start / restore still has the guest default (.home). Keep Account/Chat
-        // if the user is mid sign-in or already browsing (including lock-screen Chat
-        // or a widget todo tap).
+        // Keep Account/Chat if the user is mid sign-in or already browsing
+        // (lock-screen Chat or a widget todo tap). Only rewrite leftover Home.
         if nav.selectedTab == .home {
             nav.selectedTab = .chat
         }

@@ -42,17 +42,26 @@ final class AuthStore: ObservableObject {
         }
     }
 
+    private func applySession(_ session: AuthSession?, syncNav: Bool = true) {
+        self.session = session
+        guard syncNav else { return }
+        AppNavigationStore.shared.adoptAccess(fullAccess: session?.isFull == true)
+    }
+
     /// Last signed-in full-access session, without waiting on Keychain or `/session`.
     private func hydrateFromAppGroupIfNeeded() {
         guard session == nil else { return }
         guard AppGroupStore.hasFullAccess, let token = AppGroupStore.token else { return }
         let email = AppGroupStore.email ?? ""
         guard !email.isEmpty else { return }
-        session = AuthSession(
-            email: email,
-            name: AppGroupStore.name ?? email,
-            access: "full",
-            token: token
+        applySession(
+            AuthSession(
+                email: email,
+                name: AppGroupStore.name ?? email,
+                access: "full",
+                token: token
+            ),
+            syncNav: false
         )
         attachPersonalSensors(email: email, token: token, fullAccess: true)
     }
@@ -73,11 +82,13 @@ final class AuthStore: ObservableObject {
                 bearer: token
             )
             if res.authenticated, let email = res.email, let access = res.access {
-        session = AuthSession(
-                    email: email,
-                    name: res.name ?? email,
-                    access: access,
-                    token: token
+                applySession(
+                    AuthSession(
+                        email: email,
+                        name: res.name ?? email,
+                        access: access,
+                        token: token
+                    )
                 )
                 KeychainStore.saveToken(token)
                 AppGroupStore.saveSession(
@@ -206,7 +217,7 @@ final class AuthStore: ObservableObject {
             return
         }
         let name = dict["name"] ?? email
-        session = AuthSession(email: email, name: name, access: access, token: token)
+        applySession(AuthSession(email: email, name: name, access: access, token: token))
         KeychainStore.saveToken(token)
         AppGroupStore.saveSession(token: token, email: email, name: name, access: access)
         attachPersonalSensors(
@@ -244,7 +255,7 @@ final class AuthStore: ObservableObject {
                 access: access,
                 token: token
             )
-            self.session = session
+            applySession(session)
             KeychainStore.saveToken(token)
             AppGroupStore.saveSession(
                 token: token,
@@ -298,7 +309,7 @@ final class AuthStore: ObservableObject {
 
     private func signOutLocal() {
         attachPersonalSensors(email: nil, token: nil, fullAccess: false)
-        session = nil
+        applySession(nil)
         KeychainStore.clearToken()
         AppGroupStore.clearSession()
     }
