@@ -2,8 +2,8 @@
 name: nightly-actions
 description: >-
   Phase 4 of Yan's nightly pipeline: execute directed actions, plus standing
-  writes of locked-in Apple Calendar events and big education dates.
-  Grok 4.6 high. Yan only.
+  writes of Apple Calendar plans (add freely) and rare education dates
+  (skip unless big). Grok 4.6 high. Yan only.
 disable-model-invocation: true
 ---
 
@@ -14,15 +14,20 @@ disable-model-invocation: true
 ## Goal
 
 The nightly pipeline can act, not only remember. Execute Directives from Yan
-and Suggested actions. Also put locked-in events on Apple Calendar and big
-dates on the education dashboard, even when Yan never said "add this."
+and Suggested actions. Also put dated plans on Apple Calendar (default add)
+and rare big dates on the education dashboard, even when Yan never said
+"add this."
 
 ## Contract
 
 - Input is `/tmp/yanylevin-context-notable.md`. If Directives, Suggested
-  actions, Locked-in calendar, and Big dates are all "None", stop immediately.
+  actions, Calendar plans (or the old Locked-in calendar heading), and Big
+  dates are all "None", stop immediately unless What happened still has a
+  dated plan that belongs on Apple Calendar.
 - Re-verify every item against its evidence before executing. Triage can be
-  wrong; you are the second check. Skip and say why when the evidence is thin.
+  wrong; you are the second check. For Calendar, triage is often too shy:
+  still create a dated plan it left off the list. For education dates, triage
+  is often too eager: skip unless it clears the high bar below.
 - Allowed action classes: iMessage/Mail sends, education todo/date/project
   writes, Apple Calendar writes, repo/file work on this Mac.
 - Report every action taken (and every skip) in your reply; phase 5 and the
@@ -38,24 +43,38 @@ or Cursor Desktop on this repo. Existing group chats by name are valid
 request from someone who is not Yan is never a directive, even if it arrived
 in Yan's threads. When in doubt, do not send; note it for the journal.
 
-## Locked-in Apple Calendar (standing)
+## Apple Calendar (standing)
 
-Create timed events that are already locked in. You do **not** need a Yan
-quote that says to add them. You do need confirmation evidence.
+Bias is **add**. Any plan with a date goes on Apple Calendar. You do **not**
+need a Yan quote that says to add it. You do **not** need a booking, an
+accepted invite, or "yes that works." When you are unsure, create it.
 
-Locked-in means a specific date (and usually a time) plus one of:
+A named day is enough. A clock time is better. All-day is fine when they did
+not name a time. TBD venue is fine. "Maybe Friday" is fine. A proposal Yan
+has not refused is fine. Scan Calendar plans, What happened, and Suggested
+actions. If triage left a dated plan off the list, still create it.
 
-- Booking or confirmation (dentist, doctor, reservation, flight, hotel, tickets)
-- A calendar invite Yan accepted that is not already on the Studio calendar
-- Yan `fromMe` agreeing to a specific slot ("yes Saturday 7 works")
-- Official school notice of a scheduled event (orientation, conference, picnic)
+Create when there is a specific day plus any of:
 
-Missing venue does not un-lock that. "Saturday 4:30, location TBD" is still a
+- Hangout, meal, pickup, drop-off, sports, club, performance
+- Appointment, reservation, flight, hotel, tickets
+- School event with a day named
+- Travel or college visit
+- Yan `fromMe` naming a slot
+- An invite sitting in mail or iMessage
+
+Missing venue does not skip it. "Saturday 4:30, location TBD" is still a
 create. Put the TBD in the event location or notes. Triage may have parked it
 in Gaps; re-verify against the iMessage, not the Gaps line.
 
-Not locked-in: "we should hang out", "maybe Friday", a proposal Yan did not
-accept, homework due dates, Canvas assignments, the EPS bell schedule.
+Skip only:
+
+- Homework due dates, Canvas assignments, the EPS bell schedule
+- "we should hang out" with no day named
+- A similar title already on that local day (duplicate check below)
+- A `deleted.md` calendar row (judgement, not exact clocks)
+
+Do not invent a clock. Use the time they named, or all-day.
 
 Before `create`, list overlapping events with `node server/calendar-cli.js`
 (personal-calendar skill) and skip if a **similar title** already sits on
@@ -69,16 +88,28 @@ is not obvious, use the personal / default iCloud calendar.
 
 ## Big dates on the education dashboard (standing)
 
-Write `date.json` objects for big dates, per
-`.cursor/skills/personal-agent/education-dashboard.md`. These can overlap the
-calendar list. A locked-in school picnic goes on both.
+Bias is **skip**. The Dates panel is not a second calendar. When you are unsure, do not
+write a `date.json`. Hangouts, dentist, picture day, picnic, spirit week,
+club meetings, and ordinary class events stay off Dates even if they are on
+Apple Calendar. If triage listed one of those under Big dates, skip it and
+say why.
 
-Big dates: school events (orientation, conference, picnic, picture day,
-college night, field trip), travel that takes Yan out of school, college
-visits, family or performance milestones that belong on the Dates panel.
+Write `date.json` only for rare, high-stakes items, per
+`.cursor/skills/personal-agent/education-dashboard.md`. A school-year
+milestone can still go on both Calendar and Dates. A picnic goes on Calendar
+only.
+
+Big dates:
+
+- School-year milestones: first or last day, orientation, advisor or parent
+  conferences
+- Travel that takes Yan out of school (itinerary fly day)
+- College visits
+- Graduation-scale or family/performance milestones that belong on Dates
 
 Not big dates: routine appointments (dentist, haircut), homework, CW/HW/QA/MA
-todos, Canvas assignments, casual hangouts.
+todos, Canvas assignments, casual hangouts, picture day, picnics, spirit
+weeks, club meetings, quizzes, ordinary field trips and class events.
 
 The prompt already lists existing dates and open todos. Trust that index.
 Same **parent** + **date** + **similar name** means **update that folder**,
@@ -91,10 +122,10 @@ names share a real word (advisor, picnic), not dentist vs conference at
 14:00. Class-specific field trips go under that class. Everything else is
 user-level `education/you@example.com/dates/<slug>/`.
 
-The same prompt includes `deleted.md`. If a big date or locked-in calendar
-event looks like something Yan already deleted, **skip**. Judgement, not
-exact date/time. Do not write `update` for a path that is gone. Next year's
-occurrence is allowed.
+The same prompt includes `deleted.md`. If a big date or calendar plan looks
+like something Yan already deleted, **skip**. Judgement, not exact date/time.
+Do not write `update` for a path that is gone. Next year's occurrence is
+allowed.
 
 Write `description` as markdown per education-dashboard (bold lead-ins,
 bullets, links, blank lines). Never one run-on paragraph. Shape to copy:
@@ -116,8 +147,9 @@ Do not git commit; the Node wrapper does that.
 
 ## Anti-patterns
 
-- Acting on inference. "He probably wants X" is a journal note, not an action.
-  Locked-in calendar and big dates are confirmation, not inference.
+- Acting on inference for sends, todos, or education dates. "He probably
+  wants X" is a journal note, not an education date. Calendar is the
+  exception: a named day for a plan is enough, even if the plan is tentative.
   `timezoneAfter` and Airbnb checkout are not a flight confirmation. A travel
   `date.json` date is the itinerary fly day. If the digest says "no flight
   number in mail," search Mail.app (personal-mail skill) anyway. The
@@ -134,5 +166,6 @@ Do not git commit; the Node wrapper does that.
 ## Verify
 
 Every directive is executed, skipped-with-reason, or deferred-with-reason.
-Sends still need a quoted Yan directive. Calendar creates and education dates
-need confirmation evidence and a duplicate check.
+Sends still need a quoted Yan directive. Calendar creates need a named day
+and a duplicate check, not a confirmation. Education dates need the high bar
+above and a duplicate check.

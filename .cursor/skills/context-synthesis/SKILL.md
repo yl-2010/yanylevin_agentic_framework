@@ -130,8 +130,8 @@ retries. Next run starts from these cursors, not from scratch.
 
 Do not write notes that claim what phase 4 did. Phase 4 has not run yet. Never
 write "Did not write Apple Calendar (phase 4)." If you mention calendar in
-`notes`, say what is already on Apple Calendar or listed as locked-in in the
-digest.
+`notes`, say what is already on Apple Calendar or listed as Calendar plans in
+the digest.
 
 These seven keys are the nightly sources. Do not add `appleMailSince` or any
 other one-shot fill watermark to `cursors`. Top-level `appleMailFill.lastAt`

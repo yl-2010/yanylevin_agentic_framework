@@ -44,9 +44,9 @@ Infer from the title, people, and time:
 - Otherwise the personal / default iCloud calendar
 
 If it is not obvious, **ask** before creating. Nightly actions is the
-exception: it creates locked-in confirmed events without asking, and uses the
-personal / default iCloud calendar when the target is unclear. Never invent
-events that were not requested or confirmed.
+exception: it creates any plan with a date without asking (tentative and TBD
+venue included), and uses the personal / default iCloud calendar when the
+target is unclear. Do not invent a day that nobody named.
 
 When adding a named person as a guest, use the address on their people card (or Contacts). Do not keep a second address table here.
 

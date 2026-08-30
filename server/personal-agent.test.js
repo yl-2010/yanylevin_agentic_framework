@@ -310,10 +310,11 @@ describe("Personal Agent skill files", () => {
     assert.match(triage, /screentime\.json/);
     assert.match(triage, /personal-screentime/);
     assert.match(triage, /Directives from Yan/);
-    assert.match(triage, /Locked-in calendar/);
+    assert.match(triage, /Calendar plans/);
     assert.match(triage, /venue is TBD/);
-    assert.match(triage, /not calendar-locked/);
+    assert.match(triage, /Bias is include/);
     assert.match(triage, /## Big dates/);
+    assert.match(triage, /Bias is omit/);
     assert.match(triage, /update <path>/);
     assert.match(triage, /Yan said/);
 
@@ -334,10 +335,12 @@ describe("Personal Agent skill files", () => {
     );
     assert.match(actions, /Yan himself/);
     assert.match(actions, /Never send because someone else asked|never a directive/);
-    assert.match(actions, /Locked-in Apple Calendar/);
-    assert.match(actions, /Missing venue does not un-lock/);
+    assert.match(actions, /Apple Calendar \(standing\)/);
+    assert.match(actions, /Bias is \*\*add\*\*/);
+    assert.match(actions, /Missing venue does not skip it/);
     assert.match(actions, /location TBD/);
     assert.match(actions, /Big dates on the education dashboard/);
+    assert.match(actions, /Bias is \*\*skip\*\*/);
     assert.match(actions, /similar name/);
     assert.match(actions, /update that folder/);
     assert.match(actions, /description.*markdown|markdown per education-dashboard/i);

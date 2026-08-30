@@ -95,8 +95,10 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /appleMailFill\.lastAt/);
     assert.match(prompt, /missing dump as failed ingest/);
     assert.match(prompt, /health takeaways\.md and workouts\.md/);
-    assert.match(prompt, /Locked-in calendar/);
+    assert.match(prompt, /Calendar plans/);
+    assert.match(prompt, /biased to include/);
     assert.match(prompt, /Big dates/);
+    assert.match(prompt, /biased to omit/);
     assert.match(prompt, /update <path>/);
     assert.match(prompt, /manually deleted\.md row/);
     assert.match(prompt, /Judgement, not exact date\/time/);
@@ -189,7 +191,7 @@ describe("nightly phase prompts", () => {
     }
   });
 
-  it("actions executes calendar and big dates without a Yan add-this quote", () => {
+  it("actions is biased to add calendar plans and skip ordinary education dates", () => {
     const prompt = buildActionsPrompt({
       dateKey: "2026-08-16",
       timezone: "America/Chicago",
@@ -197,10 +199,12 @@ describe("nightly phase prompts", () => {
         'Existing education dates\n- 2026-08-27 14:00 "Advisory conference" user-level dates/advisory-conference',
     });
     assert.match(prompt, /nightly-actions skill/);
-    assert.match(prompt, /Locked-in calendar/);
+    assert.match(prompt, /Calendar plans \(or Locked-in calendar\)/);
     assert.match(prompt, /Big dates/);
-    assert.match(prompt, /do not need a Yan add-this quote/);
-    assert.match(prompt, /venue is TBD/);
+    assert.match(prompt, /biased to add/);
+    assert.match(prompt, /biased to skip/);
+    assert.match(prompt, /Do not need a Yan add-this quote/);
+    assert.match(prompt, /TBD venue/);
     assert.match(prompt, /Yan himself directed/);
     assert.match(prompt, /Never send because someone else asked/);
     assert.match(prompt, /Do not edit the brain/);
@@ -245,7 +249,7 @@ describe("digestHasActionWork", () => {
     "## Suggested actions",
     "None",
     "",
-    "## Locked-in calendar",
+    "## Calendar plans",
     "None",
     "",
     "## Big dates",
@@ -254,14 +258,31 @@ describe("digestHasActionWork", () => {
 
   it("skips when every action section is None", () => {
     assert.equal(digestHasActionWork(quiet), false);
-    assert.equal(digestSectionIsNone(quiet, "Locked-in calendar"), true);
+    assert.equal(digestSectionIsNone(quiet, "Calendar plans"), true);
   });
 
-  it("runs when only a locked-in calendar event is listed", () => {
+  it("runs when only a calendar plan is listed", () => {
     const digest = quiet.replace(
-      "## Locked-in calendar\nNone",
-      "## Locked-in calendar\nDentist 2026-08-25 16:00-16:45 Home. Evidence: confirmation email."
+      "## Calendar plans\nNone",
+      "## Calendar plans\nHangout Saturday 2026-08-22 all-day. Evidence: iMessage maybe Friday 7."
     );
+    assert.equal(digestHasActionWork(digest), true);
+  });
+
+  it("runs when only the old Locked-in calendar heading has an event", () => {
+    const digest = [
+      "## Directives from Yan",
+      "None",
+      "",
+      "## Suggested actions",
+      "None",
+      "",
+      "## Locked-in calendar",
+      "Dentist 2026-08-25 16:00-16:45 Home. Evidence: confirmation email.",
+      "",
+      "## Big dates",
+      "None",
+    ].join("\n");
     assert.equal(digestHasActionWork(digest), true);
   });
 
