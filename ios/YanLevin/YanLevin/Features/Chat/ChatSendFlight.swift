@@ -60,10 +60,12 @@ struct ChatSendFlightOverlay: View {
             let destHeight = flight.dest?.height ?? max(flight.origin.height, 1)
             let startScale = min(0.92, flight.origin.height / destHeight)
             let scale = flight.dest == nil ? startScale : startScale + (1 - startScale) * t
-            let width = flight.dest?.width ?? (bubbleSize.width > 1 ? bubbleSize.width : 80)
+            let wrapWidth = flight.dest?.width ?? max(flight.origin.width, 1)
+            let width = flight.dest?.width ?? (bubbleSize.width > 1 ? bubbleSize.width : wrapWidth)
             let height = flight.dest?.height ?? (bubbleSize.height > 1 ? bubbleSize.height : destHeight)
             ChatSendFlightBubble(text: flight.text, colorScheme: colorScheme)
-                .fixedSize()
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: wrapWidth, alignment: .trailing)
                 .onGeometryChange(for: CGSize.self) { proxy in
                     proxy.size
                 } action: { size in
