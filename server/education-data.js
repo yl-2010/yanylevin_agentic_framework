@@ -241,6 +241,28 @@ function projectOpenedMs(project, openedAt) {
 }
 
 /**
+ * Treat a new project (no leftover `order`, not yet in the opened map) as
+ * opened at project.json birthtime, same as a user opening it.
+ * @param {Record<string, string>} openedAt
+ * @param {{ id: string, order?: unknown, _birthMs?: number }[]} projects
+ * @returns {Record<string, string>}
+ */
+export function mergeCreateOpenedAt(openedAt, projects) {
+  /** @type {Record<string, string>} */
+  const out = { ...openedAt };
+  if (!Array.isArray(projects)) return out;
+  for (const p of projects) {
+    const id = String(p?.id || "").trim();
+    if (!id || out[id]) continue;
+    if (Number.isFinite(Number(p.order))) continue;
+    const birth = Number(p._birthMs);
+    if (!Number.isFinite(birth) || birth <= 0) continue;
+    out[id] = new Date(birth).toISOString();
+  }
+  return out;
+}
+
+/**
  * @param {object} project
  */
 function projectOrderNum(project) {
@@ -249,9 +271,10 @@ function projectOrderNum(project) {
 }
 
 /**
- * Projects panel order: pinned top, then newest last-opened, then pinned bottom.
- * Never-opened projects keep leftover `order` (then A-Z). A pin in both lists
- * stays on top. Missing names are skipped. Pins match folder id or display name.
+ * Projects panel order: pinned top, then newest last-opened (user open or
+ * agent create), then pinned bottom. Never-opened leftover-`order` projects
+ * stay below those, then A-Z. A pin in both lists stays on top. Missing
+ * names are skipped. Pins match folder id or display name.
  * @param {object[]} projects
  * @param {{
  *   projectsTop?: unknown,
@@ -1247,10 +1270,19 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
   const projects = [];
   for (const projectId of projectIds) {
     const projectDir = join(root, "projects", projectId);
-    const props = await readJsonFile(join(projectDir, "project.json"));
+    const projectJson = join(projectDir, "project.json");
+    const props = await readJsonFile(projectJson);
     if (!props || typeof props !== "object") continue;
     const project = { id: projectId, ...props };
     if (!includeFixtures && isFixture(project)) continue;
+
+    let birthMs = 0;
+    try {
+      const st = await stat(projectJson);
+      birthMs = Number(st.birthtimeMs) || Number(st.ctimeMs) || 0;
+    } catch {
+      /* skip */
+    }
 
     const projectTodos = await loadObjectFolder(
       join(projectDir, "todos"),
@@ -1268,17 +1300,21 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
     );
     projects.push({
       ...project,
+      _birthMs: birthMs,
       files: projectFiles,
       todos: projectTodos,
       dates: projectDates,
     });
   }
-  const openedAt = await readProjectsOpened(root);
-  const sortedProjects = sortEducationProjects(projects, {
-    projectsTop: meta.projectsTop,
-    projectsBottom: meta.projectsBottom,
-    openedAt,
-  });
+  const openedAt = mergeCreateOpenedAt(await readProjectsOpened(root), projects);
+  const sortedProjects = sortEducationProjects(
+    projects.map(({ _birthMs, ...rest }) => rest),
+    {
+      projectsTop: meta.projectsTop,
+      projectsBottom: meta.projectsBottom,
+      openedAt,
+    }
+  );
 
   let nowContext = null;
   if (!includeFixtures) {
@@ -1424,7 +1460,8 @@ export async function setTodoDone(
 }
 
 /**
- * Record that the signed-in user opened a project (web or iOS). Does not git commit.
+ * Record that a project was opened (web/iOS click) or created (agent).
+ * Does not git commit.
  * @param {string} email
  * @param {string} projectId
  */

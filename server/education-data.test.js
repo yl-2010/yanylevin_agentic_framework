@@ -11,6 +11,7 @@ import {
   parseOrderedFileNames,
   parseVisibleFileNames,
   parseOrderedProjectPins,
+  mergeCreateOpenedAt,
   sortEducationProjects,
 } from "./education-data.js";
 
@@ -355,5 +356,39 @@ describe("sortEducationProjects", () => {
       sorted.map((p) => p.id),
       ["a"]
     );
+  });
+
+  it("puts a create timestamp above leftover order, below projectsTop", () => {
+    const sorted = sortEducationProjects(
+      [
+        { id: "old", name: "Old", order: 1 },
+        { id: "fresh", name: "Fresh" },
+        { id: "pinned", name: "Pinned" },
+      ],
+      {
+        projectsTop: ["pinned"],
+        openedAt: { fresh: "2026-08-30T00:00:00.000Z" },
+      }
+    );
+    assert.deepEqual(
+      sorted.map((p) => p.id),
+      ["pinned", "fresh", "old"]
+    );
+  });
+});
+
+describe("mergeCreateOpenedAt", () => {
+  it("fills birthtime for new projects that have no leftover order", () => {
+    const merged = mergeCreateOpenedAt(
+      { clicked: "2026-08-01T00:00:00.000Z" },
+      [
+        { id: "clicked", _birthMs: 1 },
+        { id: "fresh", _birthMs: Date.parse("2026-08-30T12:00:00.000Z") },
+        { id: "legacy", order: 2, _birthMs: Date.parse("2026-08-30T12:00:00.000Z") },
+      ]
+    );
+    assert.equal(merged.clicked, "2026-08-01T00:00:00.000Z");
+    assert.equal(merged.fresh, "2026-08-30T12:00:00.000Z");
+    assert.equal(merged.legacy, undefined);
   });
 });

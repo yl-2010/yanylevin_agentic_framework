@@ -15,7 +15,7 @@ Canonical schedule files live in `.cursor/skills/class-schedule/SKILL.md` (weekl
 ```
 education/<email>/
   meta.json                 # gradeFolder, onedriveRoot, optional hiddenFiles / visibleFiles / filesTop / filesBottom for user-level dropped files; optional projectsTop / projectsBottom for the Projects panel
-  .projects-opened.json     # runtime last-opened map (web + iOS clicks). Gitignored. Do not edit.
+  .projects-opened.json     # last-opened map (user clicks + agent creates). Gitignored. Write on project create; do not git add.
   schedule.json             # bells + weekdayPeriods + closedDates (from PDF)
   deleted.md                # agent-only: objects this user deleted on purpose; nightly jobs skip recreating them
   .chat-history/            # Personal Agent transcripts (listed in the chat UI unless visibility: hidden)
@@ -48,12 +48,12 @@ education/<email>/
   - **`filesBottom`:** stuck to the bottom, in this order
   - Everything not listed stays in the middle, still newest-mtime first
   - Matching is case-insensitive. Missing names are skipped. A name in both lists stays on top. Hidden files stay hidden even if pinned. Omit the key when the list is empty (do not leave `[]`).
-- **Project list order (web + iOS):** default is newest clicked-open first (web and iOS record this when the project detail screen opens). Never-opened projects stay below those, using leftover `order` on `project.json` if present, then A-Z. Override with two optional string arrays on **`meta.json`**. Array order is the pin order. Pins match folder id or display name, case-insensitive.
+- **Project list order (web + iOS):** default is newest last-opened first. Opening the project screen (web or iOS) records that. Creating a project counts the same: write the folder id and now (ISO) into `.projects-opened.json` after `project.json`. Never-opened leftover-`order` projects stay below those, then A-Z. Override with two optional string arrays on **`meta.json`**. Array order is the pin order. Pins match folder id or display name, case-insensitive.
   - **`projectsTop`:** stuck to the top of the Projects box, in this order
   - **`projectsBottom`:** stuck to the bottom, in this order
   - Everything not listed stays in the middle, still newest-opened first
   - Missing names are skipped. A name in both lists stays on top. Omit the key when the list is empty (do not leave `[]`).
-  - Do not write `.projects-opened.json`. That file is click tracking only.
+  - On create, merge that project id into `.projects-opened.json` (now ISO). Create the file if missing. Keep other keys. Do not git add it. Do not set leftover `order` on a new project.
 
 ### Properties
 
@@ -65,7 +65,7 @@ education/<email>/
   - **Free periods:** when an A–H period has no real class that trimester, use a `classes/free-period-<letter>/` folder with `"name": "Free Period"`, `"period": "<LETTER>"`, `"freePeriod": true`, and `trimester` covering only the terms that slot is empty. Schedule rows show period tag + `Free Period` (e.g. `C Free Period`). Todos/dates under that shell use context label `Free Period C` so multiple free periods stay distinct. Prefer a real class over a free-period shell when both match the same letter.
 - **project.json:** `name`; optional `description` (always markdown when set); optional leftover `order` (number, used only among never-opened unpinned projects); optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays). No `period`, no `trimester`, not on the class schedule. Do not set `order` to pin a project; use `meta.json` `projectsTop` / `projectsBottom`.
   - Same nested `todos/` + `dates/` folder layout as classes
-  - Mirror `projects/_example-dummy/` when creating objects
+  - Mirror `projects/_example-dummy/` when creating objects (skip `fixture` and `order` on a real project). After create, record the folder id in `.projects-opened.json` as opened now so it shows at the top of the unpinned list.
   - Home UI: Projects box sits below class day panels + Dates (web right column; iOS wide same; iOS single-column above Completed)
 - **todo.json:** `name`; optional `description` (always markdown when set); `dueDate` (YYYY-MM-DD), `dueTime` (HH:MM); `done` (boolean, default false); optional `completedAt` (ISO timestamp set when checked off, cleared when reopened — Completed list sorts by this, newest first); optional `createdAt` (ISO timestamp set when the todo is created — open TODO lists use this for same-due ties; API falls back to file birthtime when omitted); optional `tag`: `CW` | `HW` | `QA` | `MA` (omit for normal todos); optional `showInDates` (boolean — when true, the open todo also appears in Dates lists alongside important dates); optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays); optional `canvasLink` (https URL to the Canvas assignment/page — UI shows a Canvas button only when set; clear/omit to hide); optional `canvasId` (Canvas assignment id, set by Canvas sync so later runs match even if the title/due date changed); optional `kind`: `"dailyBriefing"` for the morning news todo (user-level only, no tag, `showInDates: false`, `capsules` array, per-capsule and top-level `citations`). Compiling the brief is the **daily-news** skill, not this file. When a news capsule is attached in chat, read that file and answer follow-ups; do not retag briefing todos as schoolwork. Canvas sync (personal-canvas skill) may create/update class todos from Canvas; it must **never** write `done` or `completedAt`.
   - **Defaults:** `tag: "MA"` → `showInDates` defaults **on** (omit or `true`); any other todo → defaults **off**
@@ -185,7 +185,8 @@ Text-only and attachment turns both run on **grok-4.6 high** (not fast). The two
 - Set/clear `showInDates` on todos when the user wants an item shown or hidden in Dates (MAs show there by default)
 - Hide or unhide dropped context files. Do not delete the file. `context.md` / `CONTEXT.md` is already hidden from tiles; writing it needs no JSON. To hide any other file, append the basename to `hiddenFiles`. To show a hidden file (including context.md), add the basename to `visibleFiles` on that object's properties JSON (`todo.json`, `date.json`, `class.json`, `project.json`, or `meta.json` for user-level files). To hide context.md again, remove it from `visibleFiles`.
 - Pin dropped-file tile order when the user asks. Write `filesTop` / `filesBottom` on that object's properties JSON (same files as hidden/visible). Array order is the stuck order. Add or reorder names as asked; remove a name to unstick it (it goes back to mtime order in the middle). A name should not sit in both lists: top wins if they conflict, but prefer deleting it from the other list. Drop the key if the array would be empty. Do not invent an order they did not ask for.
-- Pin Projects-box order when the user asks. Write `projectsTop` / `projectsBottom` on `meta.json`. Array order is the stuck order. Entries are folder ids or display names (case-insensitive). Add or reorder as asked; remove a name to unstick it (it goes back to last-opened order in the middle). A name should not sit in both lists: top wins if they conflict, but prefer deleting it from the other list. Drop the key if the array would be empty. Do not invent an order they did not ask for. Do not write `.projects-opened.json`.
+- Pin Projects-box order when the user asks. Write `projectsTop` / `projectsBottom` on `meta.json`. Array order is the stuck order. Entries are folder ids or display names (case-insensitive). Add or reorder as asked; remove a name to unstick it (it goes back to last-opened order in the middle). A name should not sit in both lists: top wins if they conflict, but prefer deleting it from the other list. Drop the key if the array would be empty. Do not invent an order they did not ask for.
+- When creating a project, also merge its folder id and now (ISO) into `education/<email>/.projects-opened.json` so it sorts like a just-opened project (below `projectsTop`, above older unpinned). Create the file if missing. Keep other keys. Remove that id if the project is deleted. Do not git add this file.
 - Set/clear `canvasLink` (and `canvasId`) on todos/dates when the user provides a Canvas URL, or when following the personal-canvas sync skill for mapped classes. Yan checks off `done` himself; Canvas sync must not copy completion.
 - Store chat attachments into object folders when they are useful context (identical file bytes)
 - Maintain `schedule.json` when the PDF or calendar changes
