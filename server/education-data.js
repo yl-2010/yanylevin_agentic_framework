@@ -190,6 +190,143 @@ function pinContextFileOrder(files, topNames, bottomNames) {
   return [...top, ...middle, ...bottom];
 }
 
+/** Runtime last-opened map. Gitignored; not an object-folder properties JSON. */
+const PROJECTS_OPENED_FILE = ".projects-opened.json";
+
+/**
+ * Ordered project pins from `projectsTop` / `projectsBottom` on meta.json.
+ * Entries are folder ids or display names. First occurrence wins.
+ * @param {unknown} raw
+ * @returns {string[]} lowercase pins
+ */
+export function parseOrderedProjectPins(raw) {
+  /** @type {string[]} */
+  const out = [];
+  const seen = new Set();
+  if (!Array.isArray(raw)) return out;
+  for (const entry of raw) {
+    const s = String(entry || "").trim();
+    if (!s || s === "." || s === "..") continue;
+    if (s.includes("/") || s.includes("\\") || s.includes("\0")) continue;
+    const key = s.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(key);
+  }
+  return out;
+}
+
+/**
+ * @param {object} project
+ * @param {string} pin lowercase
+ */
+function projectMatchesPin(project, pin) {
+  const id = String(project?.id || "")
+    .trim()
+    .toLowerCase();
+  const name = String(project?.name || "")
+    .trim()
+    .toLowerCase();
+  return Boolean(pin) && (id === pin || name === pin);
+}
+
+/**
+ * @param {object} project
+ * @param {Record<string, string|number>|undefined} openedAt
+ */
+function projectOpenedMs(project, openedAt) {
+  const raw = openedAt?.[project?.id];
+  const t = typeof raw === "number" ? raw : Date.parse(String(raw || ""));
+  return Number.isFinite(t) ? t : 0;
+}
+
+/**
+ * @param {object} project
+ */
+function projectOrderNum(project) {
+  const n = Number(project?.order);
+  return Number.isFinite(n) ? n : 9999;
+}
+
+/**
+ * Projects panel order: pinned top, then newest last-opened, then pinned bottom.
+ * Never-opened projects keep leftover `order` (then A-Z). A pin in both lists
+ * stays on top. Missing names are skipped. Pins match folder id or display name.
+ * @param {object[]} projects
+ * @param {{
+ *   projectsTop?: unknown,
+ *   projectsBottom?: unknown,
+ *   topNames?: unknown,
+ *   bottomNames?: unknown,
+ *   openedAt?: Record<string, string|number>,
+ * }} [opts]
+ * @returns {object[]}
+ */
+export function sortEducationProjects(projects, opts = {}) {
+  const list = Array.isArray(projects) ? [...projects] : [];
+  const openedAt =
+    opts.openedAt && typeof opts.openedAt === "object" && !Array.isArray(opts.openedAt)
+      ? opts.openedAt
+      : {};
+  list.sort((a, b) => {
+    const ao = projectOpenedMs(a, openedAt);
+    const bo = projectOpenedMs(b, openedAt);
+    if (ao !== bo) return bo - ao;
+    const aOrd = projectOrderNum(a);
+    const bOrd = projectOrderNum(b);
+    if (aOrd !== bOrd) return aOrd - bOrd;
+    return String(a.name || a.id).localeCompare(String(b.name || b.id));
+  });
+
+  const topList = parseOrderedProjectPins(opts.topNames ?? opts.projectsTop);
+  const bottomList = parseOrderedProjectPins(opts.bottomNames ?? opts.projectsBottom);
+  if (!topList.length && !bottomList.length) return list;
+
+  const used = new Set();
+  const findUnused = (pin) =>
+    list.find((p) => !used.has(p.id) && projectMatchesPin(p, pin));
+
+  /** @type {object[]} */
+  const top = [];
+  for (const pin of topList) {
+    const p = findUnused(pin);
+    if (!p) continue;
+    top.push(p);
+    used.add(p.id);
+  }
+
+  /** @type {object[]} */
+  const bottom = [];
+  for (const pin of bottomList) {
+    const p = findUnused(pin);
+    if (!p) continue;
+    bottom.push(p);
+    used.add(p.id);
+  }
+
+  const middle = list.filter((p) => !used.has(p.id));
+  return [...top, ...middle, ...bottom];
+}
+
+/**
+ * @param {string} root
+ * @returns {Promise<Record<string, string>>}
+ */
+async function readProjectsOpened(root) {
+  const data = await readJsonFile(join(root, PROJECTS_OPENED_FILE));
+  if (!data || typeof data !== "object" || Array.isArray(data)) return {};
+  /** @type {Record<string, string>} */
+  const out = {};
+  for (const [id, iso] of Object.entries(data)) {
+    const safe = isSafeObjectId(id);
+    if (!safe) continue;
+    const t = Date.parse(String(iso || ""));
+    if (!Number.isFinite(t)) continue;
+    out[safe] = new Date(t).toISOString();
+  }
+  return out;
+}
+
 /**
  * List dropped context files in an object folder.
  * Default order is newest mtime first (same name, then A-Z). Optional `filesTop` /
@@ -1136,11 +1273,11 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
       dates: projectDates,
     });
   }
-  projects.sort((a, b) => {
-    const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : 9999;
-    const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : 9999;
-    if (ao !== bo) return ao - bo;
-    return String(a.name || a.id).localeCompare(String(b.name || b.id));
+  const openedAt = await readProjectsOpened(root);
+  const sortedProjects = sortEducationProjects(projects, {
+    projectsTop: meta.projectsTop,
+    projectsBottom: meta.projectsBottom,
+    openedAt,
   });
 
   let nowContext = null;
@@ -1159,7 +1296,7 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
     todos,
     dates,
     classes,
-    projects,
+    projects: sortedProjects,
     ...(includeFixtures
       ? {}
       : { activeClassIdsByDate, todayKey, ...(nowContext ? { nowContext } : {}) }),
@@ -1284,6 +1421,41 @@ export async function setTodoDone(
   }).catch((err) => console.error("[education-data] git publish", err));
 
   return next;
+}
+
+/**
+ * Record that the signed-in user opened a project (web or iOS). Does not git commit.
+ * @param {string} email
+ * @param {string} projectId
+ */
+export async function markProjectOpened(email, projectId) {
+  const root = userEducationRoot(email);
+  const id = isSafeObjectId(projectId);
+  if (!id) {
+    const err = new Error("invalid project id");
+    err.status = 400;
+    throw err;
+  }
+  const props = await readJsonFile(join(root, "projects", id, "project.json"));
+  if (!props || typeof props !== "object") {
+    const err = new Error("project not found");
+    err.status = 404;
+    throw err;
+  }
+  if (isFixture({ id, ...props })) {
+    const err = new Error("fixture projects are read-only");
+    err.status = 403;
+    throw err;
+  }
+  const opened = await readProjectsOpened(root);
+  const lastOpenedAt = new Date().toISOString();
+  opened[id] = lastOpenedAt;
+  await writeFile(
+    join(root, PROJECTS_OPENED_FILE),
+    JSON.stringify(opened, null, 2) + "\n",
+    "utf8"
+  );
+  return { id, lastOpenedAt };
 }
 
 /**

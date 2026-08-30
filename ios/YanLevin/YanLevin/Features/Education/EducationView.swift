@@ -49,6 +49,11 @@ struct EducationView: View {
             .navigationTitle("Education")
             .navigationBarTitleDisplayMode(.large)
             .refreshable { await reloadAndRestartLiveSession() }
+            .onChange(of: educationFocus.path) { _, path in
+                if case .projectDetail(let project) = path.last {
+                    Task { await store.markProjectOpened(id: project.id, token: auth.session?.token) }
+                }
+            }
             .navigationDestination(for: EducationRoute.self) { route in
                 switch route {
                 case .classDetail(let cls):
@@ -788,6 +793,9 @@ struct ProjectDetailView: View {
         .refreshable {
             guard let token = auth.session?.token else { return }
             await store.load(token: token)
+        }
+        .onAppear {
+            Task { await store.markProjectOpened(id: project.id, token: auth.session?.token) }
         }
     }
 

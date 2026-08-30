@@ -193,6 +193,22 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    const projectOpened = /^project\/([^/]+)\/opened$/.exec(route);
+    if (projectOpened) {
+      if (method !== "POST" && method !== "PATCH") {
+        res.setHeader("Allow", "POST, PATCH");
+        res.status(405).json({ ok: false, error: "method not allowed" });
+        return;
+      }
+      await forwardEducation(req, res, {
+        method: "POST",
+        path: `/api/education/project/${encodeURIComponent(projectOpened[1])}/opened`,
+        body: {},
+        timeoutMs: 15_000,
+      });
+      return;
+    }
+
     if (route === "todo/done") {
       if (method !== "PATCH" && method !== "POST") {
         res.setHeader("Allow", "PATCH, POST");

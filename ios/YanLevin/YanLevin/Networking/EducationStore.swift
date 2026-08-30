@@ -420,6 +420,8 @@ final class EducationStore: ObservableObject {
     /// Last `/api/education/data` payload. Identical bytes skip `@Published tree`
     /// so Chat map cards are not rebuilt on every agent-file SSE tick.
     private var lastEducationData: Data?
+    private var lastOpenedProjectId: String?
+    private var lastOpenedAt = Date.distantPast
     /// Bumped when the visible thread changes so in-flight polls/resumes cannot
     /// paint an older chat.
     private var agentViewGen = 0
@@ -707,6 +709,22 @@ final class EducationStore: ObservableObject {
         } catch {
             errorText = error.localizedDescription
         }
+    }
+
+    func markProjectOpened(id: String, token: String?) async {
+        guard let token, !id.isEmpty else { return }
+        let now = Date()
+        if id == lastOpenedProjectId, now.timeIntervalSince(lastOpenedAt) < 2 {
+            return
+        }
+        lastOpenedProjectId = id
+        lastOpenedAt = now
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        _ = try? await APIClient.shared.requestRaw(
+            "api/education/project/\(encoded)/opened",
+            method: "POST",
+            bearer: token
+        )
     }
 
     func setCapsuleVote(

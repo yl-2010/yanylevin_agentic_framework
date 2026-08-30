@@ -284,6 +284,30 @@
     else history.pushState({}, "", url);
     route = parseRoute();
     render({ scroll });
+    maybeTouchProjectOpened();
+  }
+
+  /** @type {string|null} */
+  let lastOpenedProjectId = null;
+  /** @type {number} */
+  let lastOpenedAtMs = 0;
+
+  function maybeTouchProjectOpened() {
+    const id = route.view === "project" ? String(route.projectId || "").trim() : "";
+    if (!id) return;
+    const now = Date.now();
+    if (id === lastOpenedProjectId && now - lastOpenedAtMs < 2000) return;
+    lastOpenedProjectId = id;
+    lastOpenedAtMs = now;
+    const mac = window.YanMacApi;
+    if (!mac?.macFetch) return;
+    mac
+      .macFetch(`/api/education/project/${encodeURIComponent(id)}/opened`, {
+        method: "POST",
+        json: {},
+        timeoutMs: 15_000,
+      })
+      .catch((err) => console.warn("[edu project opened]", err));
   }
 
   function pad2(n) {
@@ -2348,6 +2372,7 @@
     captureScroll();
     route = parseRoute();
     render({ scroll: "restore" });
+    maybeTouchProjectOpened();
   });
 
   appEl?.addEventListener("keydown", (event) => {
@@ -2382,6 +2407,7 @@
       show("full");
       bindAppClicks();
       await fetchData();
+      maybeTouchProjectOpened();
       subscribeEvents();
       // Normalize /education → /education/
       if (window.location.pathname === "/education") {

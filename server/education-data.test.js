@@ -10,6 +10,8 @@ import {
   parseHiddenFileNames,
   parseOrderedFileNames,
   parseVisibleFileNames,
+  parseOrderedProjectPins,
+  sortEducationProjects,
 } from "./education-data.js";
 
 describe("parseHiddenFileNames", () => {
@@ -244,5 +246,114 @@ describe("listContextFiles pin order", () => {
 describe("isSafeContextFileName", () => {
   it("rejects dotfiles", () => {
     assert.equal(isSafeContextFileName(".notes.pdf"), null);
+  });
+});
+
+describe("sortEducationProjects", () => {
+  it("parses projectsTop names lowercase and skips paths", () => {
+    assert.deepEqual(
+      parseOrderedProjectPins(["PathIvy", "pathivy", "../x", "ϵStore"]),
+      ["pathivy", "ϵstore"]
+    );
+  });
+
+  it("puts newest lastOpened first", () => {
+    const sorted = sortEducationProjects(
+      [
+        { id: "a", name: "Alpha" },
+        { id: "b", name: "Beta" },
+        { id: "c", name: "Gamma" },
+      ],
+      {
+        openedAt: {
+          a: "2026-08-01T00:00:00.000Z",
+          c: "2026-08-20T00:00:00.000Z",
+        },
+      }
+    );
+    assert.deepEqual(
+      sorted.map((p) => p.id),
+      ["c", "a", "b"]
+    );
+  });
+
+  it("keeps leftover order among never-opened projects", () => {
+    const sorted = sortEducationProjects([
+      { id: "debate", name: "Debate", order: 4 },
+      { id: "yanylevin", name: "YanYLevin", order: 1 },
+      { id: "estore", name: "ϵStore", order: 3 },
+    ]);
+    assert.deepEqual(
+      sorted.map((p) => p.id),
+      ["yanylevin", "estore", "debate"]
+    );
+  });
+
+  it("pins projectsTop above recency, projectsBottom below", () => {
+    const sorted = sortEducationProjects(
+      [
+        { id: "pathivy", name: "PathIvy" },
+        { id: "estore", name: "ϵStore" },
+        { id: "debate", name: "Debate" },
+        { id: "sockethr", name: "ExampleCo" },
+      ],
+      {
+        projectsTop: ["PathIvy"],
+        projectsBottom: ["debate"],
+        openedAt: {
+          estore: "2026-08-29T00:00:00.000Z",
+          sockethr: "2026-08-20T00:00:00.000Z",
+        },
+      }
+    );
+    assert.deepEqual(
+      sorted.map((p) => p.id),
+      ["pathivy", "estore", "sockethr", "debate"]
+    );
+  });
+
+  it("matches pins by folder id or name, case-insensitive", () => {
+    const sorted = sortEducationProjects(
+      [
+        { id: "estore", name: "ϵStore" },
+        { id: "jype-frontier-cascadia", name: "JYPE - Frontier Cascadia" },
+      ],
+      {
+        projectsTop: ["ESTORE"],
+        projectsBottom: ["JYPE - Frontier Cascadia"],
+      }
+    );
+    assert.deepEqual(
+      sorted.map((p) => p.id),
+      ["estore", "jype-frontier-cascadia"]
+    );
+  });
+
+  it("lets projectsTop win when a name is in both lists", () => {
+    const sorted = sortEducationProjects(
+      [
+        { id: "a", name: "Alpha" },
+        { id: "b", name: "Beta" },
+      ],
+      {
+        projectsTop: ["b"],
+        projectsBottom: ["b", "a"],
+      }
+    );
+    assert.deepEqual(
+      sorted.map((p) => p.id),
+      ["b", "a"]
+    );
+  });
+
+  it("skips missing pin names", () => {
+    const sorted = sortEducationProjects(
+      [{ id: "a", name: "Alpha", order: 2 }],
+      { projectsTop: ["gone", "Alpha"], projectsBottom: ["also-gone"] }
+    );
+    assert.deepEqual(
+      sorted.map((p) => p.id),
+      ["a"]
+    );
   });
 });

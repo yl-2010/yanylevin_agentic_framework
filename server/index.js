@@ -25,6 +25,7 @@ import {
   readEducationTree,
   setTodoDone,
   setCapsuleVote,
+  markProjectOpened,
   resolveContextFile,
   sendContextFile,
 } from "./education-data.js";
@@ -549,6 +550,24 @@ app.patch(
       res.status(err.status || 500).json({
         ok: false,
         error: err.message || "todo update failed",
+      });
+    }
+  }
+);
+
+app.post(
+  "/api/education/project/:id/opened",
+  requireEducationUser,
+  async (req, res) => {
+    try {
+      const result = await markProjectOpened(req.user.email, req.params.id);
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      console.error("[/api/education/project/opened]", err);
+      res.status(err.status || 500).json({
+        ok: false,
+        error: err.message || "project open failed",
       });
     }
   }
