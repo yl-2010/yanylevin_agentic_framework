@@ -19,7 +19,7 @@
     <title>Education</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" media="(prefers-color-scheme: light)" />
     <link rel="icon" href="/favicon-dark.svg" type="image/svg+xml" media="(prefers-color-scheme: dark)" />
-    <link rel="stylesheet" href="/education/styles.css?v=working-scroll-2" />
+    <link rel="stylesheet" href="/education/styles.css?v=attach-later-1" />
   </head>
   <body>
     <a
@@ -132,6 +132,30 @@
 
           <form class="yan-chat-form" action="#" autocomplete="off">
             <label class="visually-hidden" for="edu-chat-input">Ask your personal agent</label>
+            <input
+              id="edu-chat-files"
+              class="yan-chat-file visually-hidden"
+              type="file"
+              multiple
+              tabindex="-1"
+            />
+            <button
+              type="button"
+              class="yan-chat-attach"
+              data-edu-chat-attach
+              aria-label="Attach files"
+              tabindex="-1"
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M16.5 6.5v9.2a4.5 4.5 0 0 1-9 0V7.2a3.2 3.2 0 0 1 6.4 0v8.1a1.9 1.9 0 1 1-3.8 0V8.5"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
             <textarea
               id="edu-chat-input"
               class="yan-chat-input"
@@ -185,6 +209,6 @@
     <script src="/education/markdown.js?v=md-2"></script>
     <script src="/education/app.js?v=md-1"></script>
     <script src="/js/chat-send-flight.js?v=1"></script>
-    <script src="/education/chatbot.js?v=enter-hold-interrupt-1"></script>
+    <script src="/education/chatbot.js?v=attach-later-1"></script>
   </body>
 </html>

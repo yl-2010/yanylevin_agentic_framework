@@ -1517,6 +1517,8 @@ html[data-resolved-theme="light"] .yan-chat {
   width: var(--pill-w); height: var(--pill-h);
   /* Beat .corner.circle { border-radius: 50% } so a tall composer stays a rounded rect. */
   border-radius: calc(var(--chat-circle) / 2);
+  /* Above the transcript so attach chips are not covered in an open thread. */
+  z-index: 91;
   pointer-events: auto; cursor: pointer; overflow: visible;
   transition:
     left 0.7s var(--chat-spring), width 0.7s var(--chat-spring),
@@ -1611,8 +1613,30 @@ html[data-resolved-theme="dark"] .yan-chat-pill.corner.lg-refraction::after {
 }
 .yan-chat.is-composer-tall .yan-chat-input { align-self: stretch; height: auto; }
 .yan-chat-input::placeholder { color: var(--muted); opacity: 0.8; }
+.yan-chat-attach {
+  flex: 0 0 1.65rem;
+  width: 1.65rem;
+  min-width: 1.65rem;
+  height: 1.65rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  opacity: 0.72;
+}
+.yan-chat-attach svg { width: 72%; height: 72%; display: block; }
+.yan-chat-attach:hover { opacity: 1; }
+.yan-chat-attach:focus-visible { outline: 2px solid var(--chat-orange); outline-offset: 2px; }
 .yan-chat.is-dragover .yan-chat-pill.corner {
   box-shadow: 0 0 0 2px var(--chat-orange), 0 4px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
+}
+.yan-chat.is-dragover.has-panel .yan-chat-panel {
+  box-shadow: 0 0 0 2px var(--chat-orange), 0 10px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
 }
 .yan-chat-attach-chips {
   position: absolute;
@@ -1626,6 +1650,9 @@ html[data-resolved-theme="dark"] .yan-chat-pill.corner.lg-refraction::after {
   overflow: auto;
   pointer-events: auto;
   z-index: 5;
+}
+.yan-chat.has-panel.has-attachments .yan-chat-messages::after {
+  height: calc(var(--chat-panel-radius) + 3.2rem);
 }
 .yan-chat-attach-chips[hidden] { display: none !important; }
 .yan-chat-attach-chip {
@@ -1641,6 +1668,17 @@ html[data-resolved-theme="dark"] .yan-chat-pill.corner.lg-refraction::after {
   font-weight: 600;
   line-height: 1.2;
   box-shadow: 0 2px 8px var(--lg-outer-shadow);
+}
+.yan-chat-attach-chip-thumb {
+  flex: 0 0 auto;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 4px;
+  object-fit: cover;
+  background: color-mix(in srgb, var(--fg) 12%, transparent);
+}
+.yan-chat-attach-chip:has(.yan-chat-attach-chip-thumb) {
+  padding-left: 0.28rem;
 }
 .yan-chat-attach-chip-name {
   overflow: hidden;

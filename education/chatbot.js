@@ -4,7 +4,8 @@
  * Runs continue on the Mac after tab close or a new chat; resume via
  * /agent/active, /agent/state, or past-chats. New chat does not stop the
  * previous thread (queued turns still drain in the background).
- * Drag-and-drop files onto the input to attach them.
+ * Drag-and-drop files onto the composer or an open thread. Paperclip also
+ * opens a file picker. Attachments work on later turns, not only the first.
  */
 (() => {
   const root = document.getElementById("edu-chat");
@@ -16,6 +17,8 @@
   const historyEl = root.querySelector(".yan-chat-history");
   const form = root.querySelector(".yan-chat-form");
   const input = root.querySelector(".yan-chat-input");
+  const fileInput = root.querySelector(".yan-chat-file");
+  const attachBtn = root.querySelector("[data-edu-chat-attach]");
   const launcher = root.querySelector(".yan-chat-launcher");
   const clearBtns = root.querySelectorAll("[data-edu-chat-clear]");
   const minimizeBtns = root.querySelectorAll("[data-edu-chat-minimize]");
@@ -48,6 +51,8 @@
 
   /** @type {HTMLElement|null} */
   let chipsEl = null;
+  /** @type {string[]} */
+  let chipObjectUrls = [];
   /** @type {HTMLElement|null} */
   let workingEl = null;
   let busyLabel = "Working…";
@@ -107,20 +112,38 @@
     return chipsEl;
   }
 
+  function clearChipObjectUrls() {
+    for (const url of chipObjectUrls) URL.revokeObjectURL(url);
+    chipObjectUrls = [];
+  }
+
   function renderChips() {
     const el = ensureChipsEl();
     el.innerHTML = "";
+    clearChipObjectUrls();
+    const had = root.classList.contains("has-attachments");
     if (!pendingFiles.length) {
       el.hidden = true;
       root.classList.remove("has-attachments");
+      if (had) scheduleGlassRefresh();
       return;
     }
     el.hidden = false;
     root.classList.add("has-attachments");
+    if (!had) scheduleGlassRefresh();
     for (const item of pendingFiles) {
       const chip = document.createElement("span");
       chip.className = "yan-chat-attach-chip";
       chip.title = item.file.name;
+      if (item.file.type.startsWith("image/")) {
+        const thumb = document.createElement("img");
+        thumb.className = "yan-chat-attach-chip-thumb";
+        thumb.alt = "";
+        const url = URL.createObjectURL(item.file);
+        chipObjectUrls.push(url);
+        thumb.src = url;
+        chip.appendChild(thumb);
+      }
       const label = document.createElement("span");
       label.className = "yan-chat-attach-chip-name";
       label.textContent = item.file.name;
@@ -165,6 +188,9 @@
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         file,
       });
+    }
+    if (pendingFiles.length && showingHistory) {
+      hideHistory({ markVisibleRead: true });
     }
     renderChips();
   }
@@ -907,6 +933,7 @@
         );
       }
     }
+    if (attachBtn) attachBtn.tabIndex = open ? 0 : -1;
     syncComposerSize();
     scheduleGlassRefresh();
   }
@@ -1567,6 +1594,17 @@
   let sendHoldConsumed = false;
   let enterHoldActive = false;
 
+  attachBtn?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    fileInput?.click();
+  });
+  fileInput?.addEventListener("change", () => {
+    addFiles(fileInput.files);
+    fileInput.value = "";
+    input?.focus({ preventScroll: true });
+  });
+
   form?.addEventListener("submit", (event) => {
     event.preventDefault();
     if (event.shiftKey) return;
@@ -1702,46 +1740,77 @@
     clearSendHold();
   });
 
-  // Drag-and-drop attachments onto the chat input / form.
-  const dropTargets = [form, input, pill].filter(Boolean);
-  let dragDepth = 0;
+  // Drag-and-drop onto the composer or the open transcript (later turns too).
+  function isFileDrag(event) {
+    const types = event.dataTransfer?.types;
+    if (!types) return false;
+    return [...types].includes("Files");
+  }
+
+  function nodeInChatDrop(node) {
+    if (!(node instanceof Node)) return false;
+    if (pill && (node === pill || pill.contains(node))) return true;
+    if (
+      panel &&
+      !panel.hidden &&
+      (node === panel || panel.contains(node))
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  function filesFromDrop(event) {
+    const dt = event.dataTransfer;
+    if (!dt) return [];
+    if (dt.files?.length) return Array.from(dt.files);
+    const files = [];
+    for (const item of dt.items || []) {
+      if (item.kind !== "file") continue;
+      const file = item.getAsFile();
+      if (file) files.push(file);
+    }
+    return files;
+  }
 
   function onDragEnter(event) {
-    if (![...event.dataTransfer.types].includes("Files")) return;
+    if (!isFileDrag(event) || !nodeInChatDrop(event.target)) return;
     event.preventDefault();
-    dragDepth += 1;
     root.classList.add("is-dragover");
     if (state() === "closed") openChat();
   }
 
   function onDragOver(event) {
-    if (![...event.dataTransfer.types].includes("Files")) return;
+    if (!isFileDrag(event) || !nodeInChatDrop(event.target)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
+    root.classList.add("is-dragover");
   }
 
   function onDragLeave(event) {
-    if (![...event.dataTransfer.types].includes("Files")) return;
-    dragDepth = Math.max(0, dragDepth - 1);
-    if (dragDepth === 0) root.classList.remove("is-dragover");
+    if (!isFileDrag(event)) return;
+    const next = event.relatedTarget;
+    if (next instanceof Node && nodeInChatDrop(next)) return;
+    root.classList.remove("is-dragover");
   }
 
   function onDrop(event) {
-    if (!event.dataTransfer?.files?.length) return;
+    if (!nodeInChatDrop(event.target)) return;
+    const files = filesFromDrop(event);
+    if (!files.length) return;
     event.preventDefault();
     event.stopPropagation();
-    dragDepth = 0;
     root.classList.remove("is-dragover");
     if (state() === "closed") openChat();
-    addFiles(event.dataTransfer.files);
+    addFiles(files);
     input?.focus({ preventScroll: true });
   }
 
-  dropTargets.forEach((el) => {
+  [pill, panel].filter(Boolean).forEach((el) => {
     el.addEventListener("dragenter", onDragEnter);
-    el.addEventListener("dragover", onDragOver);
+    el.addEventListener("dragover", onDragOver, true);
     el.addEventListener("dragleave", onDragLeave);
-    el.addEventListener("drop", onDrop);
+    el.addEventListener("drop", onDrop, true);
   });
 
   // Paste images into the input.
