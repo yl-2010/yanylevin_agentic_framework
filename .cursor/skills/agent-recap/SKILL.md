@@ -44,6 +44,10 @@ Use this order. **Omit a section entirely** when it does not apply that day (do 
      or a missing `/tmp/yanylevin-apple-mail-export`. That fill is one-shot
      and not on the overnight schedule. The dump is deleted when it finishes.
      Overnight mail is `mailSince`.
+   - ExampleCo or ExampleNotes LM Studio model not running. Prefetch `lmStudio.down`
+     is the product names. `targets[]` has `ok` (server answered) vs
+     `modelLoaded` (expected id is in `/v1/models`). Empty `down` means both
+     are up; do not mention LM Studio then.
    - Anything else from logs or notes that Yan must fix before things work again.
 
 2. **`Actions:`** (only when the nightly-actions phase did something)
@@ -63,7 +67,7 @@ Use this order. **Omit a section entirely** when it does not apply that day (do 
 
 ## Read first
 
-1. `/tmp/yanylevin-nightly-status.json` (runner prefetch: per-agent `ran`, `pipelineFinished`, `pipelinePhase`, `brainNotes`, `brainCursors`, `journalExists`, `serverLogTail`, `gitCommits`).
+1. `/tmp/yanylevin-nightly-status.json` (runner prefetch: per-agent `ran`, `pipelineFinished`, `pipelinePhase`, `brainNotes`, `brainCursors`, `journalExists`, `serverLogTail`, `gitCommits`, `lmStudio`).
 2. `education/you@example.com/brain/state.json` (especially `notes`, `notes.factCheck`, and `lastSynthesisDateKey`).
 3. Yesterday's journal: `brain/journal/<dateKey minus 1>.md` when it exists.
 4. `location/state.json`, `health/state.json`, `daily-briefing/chat-title-refresh-state.json` if prefetch is thin.

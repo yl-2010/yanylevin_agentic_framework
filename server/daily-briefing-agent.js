@@ -14,6 +14,7 @@ import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { gitAddCommitPush } from "./git-publish.js";
 import { scheduleNowParts, scheduleTodayKey } from "./education-data.js";
+import { probeBriefingLmStudios } from "./lmstudio.js";
 import {
   createLaterAuthRetry,
   promptWithAuthRetry,
@@ -563,6 +564,7 @@ export async function prefetchNightlyStatus(dateKey, timezone) {
     brainCursors: brainState?.cursors || {},
     serverLogTail: await tailServerLogLines(dateKey),
     gitCommits: await recentEducationCommits(dateKey),
+    lmStudio: await probeBriefingLmStudios(),
   };
 
   await writeFile(NIGHTLY_STATUS_PATH, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
@@ -636,6 +638,7 @@ export function buildAgentRecapPrompt({ dateKey, timezone }) {
     `Read ${NIGHTLY_STATUS_PATH} first, then dig as the skill says (brain/state.json notes, journal, git log, server log tail).`,
     "notes.calendar is written by synthesis before actions. It is not a record of calendar creates. List Apple Calendar before saying an event stayed off.",
     `pipelineFinished false or lastPipelinePhase not finished means actions/lint did not complete. Put that under URGENT.`,
+    `lmStudio.down is ExampleCo/ExampleNotes whose expected local model is not loaded or whose LM Studio did not answer. Non-empty down is URGENT (name the product). Omit when down is empty.`,
     `Write only ${recap} as JSON:`,
     '{ "id": "agent-recap", "title": "Agent Recap", "category": "other", "noVote": true, "vote": null, "body": "..." }',
     "Body: URGENT section (omit if none), Actions section (omit if none), then general recap prose. No citations.",
