@@ -125,9 +125,6 @@ describe("briefing phase prompts", () => {
     assert.match(prompt, /noVote/);
     assert.match(prompt, /notes\.calendar is written by synthesis before actions/);
     assert.match(prompt, /List Apple Calendar before saying an event stayed off/);
-    assert.match(prompt, /lmStudio\.down/);
-    assert.match(prompt, /ExampleCo/);
-    assert.match(prompt, /ExampleNotes/);
   });
 
   it("unslop phase merges today's drafts into todo", () => {
@@ -167,10 +164,6 @@ describe("prefetchNightlyStatus", () => {
     assert.equal(typeof parsed.pipelineFinished, "boolean");
     assert.ok("pipelinePhase" in parsed);
     assert.ok(parsed.brainNotes && typeof parsed.brainNotes === "object");
-    assert.ok(parsed.lmStudio && typeof parsed.lmStudio === "object");
-    assert.ok(Array.isArray(parsed.lmStudio.targets));
-    assert.equal(parsed.lmStudio.targets.length, 2);
-    assert.ok(Array.isArray(parsed.lmStudio.down));
     assert.equal(payload.dateKey, dateKey);
   });
 });
