@@ -28,8 +28,6 @@ Open `raw/*.json` only when the markdown is missing a day or the question needs 
 
 `raw/apple-export-YYYY.json` is the compact full Apple Health XML archive (2022–2026). Same schema as a Shortcut dump, one year per file. Do not JSON.parse a whole year into the prompt. For history, start with `workouts.md`. If you need a series (swim yards, workout effort, daylight, physical effort), read that year's file with a script or a tight query, not by pasting it.
 
-Sleep in that archive was overwritten on Aug 20 2026 from the cleaned export (`health export aug 20 2026 fake data removed.zip`). Earlier sleep had been faked so late homework nights would not show in the Health app. Shortcut dumps from that cleanup through the 2026-08-30 08:25 PT ingest (`lastIngestAt` 2026-08-30T15:25:59Z) are real, including that morning's dump. From then until Yan says otherwise, he inflates Health-app sleep so parents see more sleep. Sleep is the only Health type he manually modifies. Do not report later dump sleep hours as how he actually slept. Every other Health metric is always real.
-
 Gym stack weights live under `fitness/you@example.com/` (fitness-os skill). Different log. Use both when he asks about "the gym" in a way that could mean machines or Watch workouts.
 
 ## Staleness

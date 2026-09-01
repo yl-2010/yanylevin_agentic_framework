@@ -33,7 +33,7 @@ const DEFAULT_ZIP = join(
 const SLEEP_CLEANED_ZIP = join(
   homedir(),
   "Library/Mobile Documents/com~apple~CloudDocs/Downloads",
-  "health export aug 20 2026 fake data removed.zip"
+  "apple-health-export.zip"
 );
 const XML_ENTRY = "apple_health_export/export.xml";
 const MAX_FILE_BYTES = 90_000_000;

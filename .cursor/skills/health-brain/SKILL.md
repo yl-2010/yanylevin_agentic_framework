@@ -42,8 +42,6 @@ Identity-shaped. Rewrite freely. Standing bullets. Inferred lines labeled (infer
 
 First run: distill `history-patterns.md`. Later nights: only promote what new takeaways actually changed. Do not copy every daily paragraph.
 
-Do not promote sleep hours from dumps after the 2026-08-30 08:25 PT ingest into the typical band or recovery-sleep bullets. Yan inflates Health-app sleep until he says otherwise. Sleep is the only type he modifies. Keep the standing inflated-sleep line on the page if it is already there. Every other Health metric is always real and can still update.
-
 ## state.json
 
 Keep `lastIngestAt`, `lastTakeawaysAt`, and `timezone`. Set:
@@ -65,7 +63,6 @@ The Node wrapper also writes this cursor after you finish.
 - Diagnoses, conditions, or advice Yan did not already own
 - Dumping `takeaways.md` into the page
 - Mixing gym stack weights into Watch workouts
-- Treating Health-app sleep after the 2026-08-30 08:25 PT ingest as actual hours
 - Git commit (the Node wrapper does that)
 
 ## Verify
