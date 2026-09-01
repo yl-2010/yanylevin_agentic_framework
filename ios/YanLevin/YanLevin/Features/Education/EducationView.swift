@@ -1038,20 +1038,7 @@ struct DateDetailView: View {
         .toolbar {
             if let url = liveDate.canvasURL {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Link(destination: url) {
-                        Image("CanvasMark")
-                            .renderingMode(.template)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 18, height: 18)
-                            .foregroundStyle(YLTheme.fg(colorScheme))
-                            .frame(width: 36, height: 36)
-                            .contentShape(Circle())
-                            .modifier(CanvasToolbarChrome())
-                    }
-                    .buttonStyle(.plain)
-                    .ylHapticOnTap()
-                    .accessibilityLabel("Open in Canvas")
+                    CanvasToolbarButton(webURL: url)
                 }
             }
         }
@@ -1212,20 +1199,7 @@ struct TodoDetailView: View {
         .toolbar {
             if let url = liveTodo.canvasURL {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Link(destination: url) {
-                        Image("CanvasMark")
-                            .renderingMode(.template)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 18, height: 18)
-                            .foregroundStyle(YLTheme.fg(colorScheme))
-                            .frame(width: 36, height: 36)
-                            .contentShape(Circle())
-                            .modifier(CanvasToolbarChrome())
-                    }
-                    .buttonStyle(.plain)
-                    .ylHapticOnTap()
-                    .accessibilityLabel("Open in Canvas")
+                    CanvasToolbarButton(webURL: url)
                 }
             }
         }
@@ -1280,6 +1254,43 @@ struct TodoDetailView: View {
                 token: token
             )
         }
+    }
+}
+
+/// Opens Canvas Student (`canvas-courses://`) when installed, otherwise Safari.
+private struct CanvasToolbarButton: View {
+    let webURL: URL
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Button {
+            open()
+        } label: {
+            Image("CanvasMark")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 18, height: 18)
+                .foregroundStyle(YLTheme.fg(colorScheme))
+                .frame(width: 36, height: 36)
+                .contentShape(Circle())
+                .modifier(CanvasToolbarChrome())
+        }
+        .buttonStyle(.plain)
+        .ylHapticOnTap()
+        .accessibilityLabel("Open in Canvas")
+    }
+
+    private func open() {
+        if let appURL = CanvasLMS.studentAppURL(from: webURL),
+           UIApplication.shared.canOpenURL(appURL)
+        {
+            UIApplication.shared.open(appURL, options: [:]) { ok in
+                if !ok { UIApplication.shared.open(webURL) }
+            }
+            return
+        }
+        UIApplication.shared.open(webURL)
     }
 }
 

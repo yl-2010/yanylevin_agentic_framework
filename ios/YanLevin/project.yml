@@ -57,6 +57,9 @@ targets:
           - CFBundleURLSchemes:
               - "$(GOOGLE_URL_SCHEME)"
               - personalagent
+        # Query only. Opening canvas-courses:// does not need a paid Apple team.
+        LSApplicationQueriesSchemes:
+          - canvas-courses
         YanSiteBaseURL: https://yanylevin.com
         YanApiBaseURL: https://api.yanylevin.com
         ITSAppUsesNonExemptEncryption: false

@@ -1,5 +1,28 @@
 import Foundation
 
+/// Canvas LMS web URLs and the Student app's `canvas-courses://` scheme.
+enum CanvasLMS {
+    static let studentAppScheme = "canvas-courses"
+
+    /// Normalized http(s) Canvas URL, if present.
+    static func webURL(from raw: String?) -> URL? {
+        let trimmed = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let url = URL(string: trimmed) else { return nil }
+        guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
+            return nil
+        }
+        return url
+    }
+
+    /// Same host and path as the web URL, with the Student app scheme.
+    static func studentAppURL(from webURL: URL) -> URL? {
+        guard let host = webURL.host, !host.isEmpty else { return nil }
+        var comps = URLComponents(url: webURL, resolvingAgainstBaseURL: false)
+        comps?.scheme = studentAppScheme
+        return comps?.url
+    }
+}
+
 struct EducationTreeResponse: Decodable {
     let ok: Bool?
     let email: String?
@@ -219,14 +242,7 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
     }
 
     /// Normalized http(s) Canvas URL, if present.
-    var canvasURL: URL? {
-        let raw = (canvasLink ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !raw.isEmpty, let url = URL(string: raw) else { return nil }
-        guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
-            return nil
-        }
-        return url
-    }
+    var canvasURL: URL? { CanvasLMS.webURL(from: canvasLink) }
 
     var dueDateValue: String? {
         if let dueDate, !dueDate.isEmpty { return dueDate }
@@ -519,14 +535,7 @@ struct EducationDate: Decodable, Identifiable, Hashable {
     }
 
     /// Normalized http(s) Canvas URL, if present.
-    var canvasURL: URL? {
-        let raw = (canvasLink ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !raw.isEmpty, let url = URL(string: raw) else { return nil }
-        guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
-            return nil
-        }
-        return url
-    }
+    var canvasURL: URL? { CanvasLMS.webURL(from: canvasLink) }
 
     func withClassId(_ classId: String) -> EducationDate {
         if let existing = self.classId, !existing.isEmpty { return self }
