@@ -163,6 +163,18 @@ Express Personal Agent turns include a **Live context** clock and in-class-now /
 
 **Web + iOS:** the client also sends the exact education screen open (home, expanded class/project, todo detail, date detail, news capsule). Prefer that object as the default edit target unless the user names something else. On iOS this is the Education tab's navigation (still applied when the user switches to Chat). When a news capsule is open, Live context includes the full story body and citations. Answer follow-ups from that. iOS may also attach the capsule as a markdown file. News source rules: `.cursor/skills/daily-news/SKILL.md`.
 
+### Open the page (`open_education_page`)
+
+Express / web / iOS only. Cursor Desktop does not have this tool.
+
+Call `open_education_page` when the user asks about **one** dashboard object, says show me / take me there, or you just created the thing they would look at. The website navigates in place (chat stays open). iOS stays on Chat; the Education tab is already on that page when they switch to it.
+
+- `view`: `home` | `class` | `project` | `todo` | `date` | `capsule`
+- `todoId` / `dateId` / `classId` / `projectId` are **folder slugs**, not display names. Class todos need `classId`. Project todos need `projectId`. Capsules need `todoId` + `capsuleId`.
+- After a create, call once the folder exists so clients can resolve it.
+- Skip if Live context is already that page. Skip lists of many items. Skip mail, news compile, fitness, and anything outside `/education`.
+- You can call it mid-turn (after you know the id). Do not mention the tool or tell them to refresh.
+
 ## Chat attachments (web + iOS)
 
 Users can attach files in Personal Agent chat (web /education input; iOS paperclip). Staging lands under `education/<email>/.chat-uploads/<sessionId>/`.

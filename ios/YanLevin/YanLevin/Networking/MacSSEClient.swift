@@ -11,7 +11,7 @@ final class MacSSEClient: @unchecked Sendable {
     private var retry = 0
 
     @MainActor
-    func start(path: String, bearer: String, onChange: @escaping @MainActor () -> Void) {
+    func start(path: String, bearer: String, onChange: @escaping @MainActor (_ data: String) -> Void) {
         stop()
         let pathCopy = path
         let token = bearer
@@ -19,8 +19,8 @@ final class MacSSEClient: @unchecked Sendable {
             guard let self else { return }
             while !Task.isCancelled {
                 do {
-                    try await self.streamOnce(path: pathCopy, bearer: token) {
-                        await onChange()
+                    try await self.streamOnce(path: pathCopy, bearer: token) { payload in
+                        await onChange(payload)
                     }
                     self.setRetry(0)
                 } catch is CancellationError {
@@ -62,7 +62,7 @@ final class MacSSEClient: @unchecked Sendable {
     private func streamOnce(
         path: String,
         bearer: String,
-        onChange: @escaping @Sendable () async -> Void
+        onChange: @escaping @Sendable (_ data: String) async -> Void
     ) async throws {
         guard let url = await MainActor.run(body: { APIClient.makeURL(path: path) }) else {
             throw APIError.offline("Bad URL")
@@ -87,10 +87,11 @@ final class MacSSEClient: @unchecked Sendable {
             if Task.isCancelled { throw CancellationError() }
             if line.isEmpty {
                 let name = eventName
+                let payload = dataLines.joined(separator: "\n")
                 eventName = "message"
                 dataLines = []
                 if name == "change" {
-                    await onChange()
+                    await onChange(payload)
                 }
                 continue
             }

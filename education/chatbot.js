@@ -1304,6 +1304,13 @@
       return;
     }
     if (!res.ok) return;
+    if (data.navigate) {
+      try {
+        window.__eduNavigate?.(data.navigate);
+      } catch {
+        /* ignore */
+      }
+    }
     if (Array.isArray(data.messages)) {
       applyServerMessages(data.messages);
     }
@@ -1558,6 +1565,15 @@
   launcher?.addEventListener("click", (event) => {
     event.preventDefault();
     openChat();
+  });
+
+  root.addEventListener("click", (event) => {
+    const a = event.target?.closest?.("a");
+    if (!a || !root.contains(a)) return;
+    const href = a.getAttribute("href") || "";
+    if (!window.__eduNavigatePath?.(href)) return;
+    event.preventDefault();
+    event.stopPropagation();
   });
 
   clearBtns.forEach((btn) => {

@@ -128,6 +128,138 @@ final class EducationFocusStore: ObservableObject {
         return false
     }
 
+    private var pendingAgentNavigate: AgentEducationNavigate?
+    private var lastAppliedNavigateKey = ""
+
+    /// Set Education's stack from the Personal Agent. Does not switch tabs.
+    @discardableResult
+    func applyAgentNavigate(_ nav: AgentEducationNavigate, tree: EducationTreeResponse?) -> Bool {
+        let key = nav.dedupeKey
+        if !key.isEmpty, key == lastAppliedNavigateKey { return true }
+        let view = (nav.view ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let ok: Bool
+        switch view {
+        case "home":
+            if !path.isEmpty { path = [] }
+            ok = true
+        case "class":
+            ok = applyClassNavigate(nav.classId, tree: tree)
+        case "project":
+            ok = applyProjectNavigate(nav.projectId, tree: tree)
+        case "todo":
+            ok = applyTodoNavigate(nav, tree: tree)
+        case "date":
+            ok = applyDateNavigate(nav, tree: tree)
+        case "capsule":
+            ok = applyCapsuleNavigate(nav, tree: tree)
+        default:
+            return false
+        }
+        if ok {
+            lastAppliedNavigateKey = key
+            pendingAgentNavigate = nil
+            return true
+        }
+        pendingAgentNavigate = nav
+        return false
+    }
+
+    func applyPendingNavigate(tree: EducationTreeResponse?) {
+        guard let pending = pendingAgentNavigate else { return }
+        _ = applyAgentNavigate(pending, tree: tree)
+    }
+
+    private func applyClassNavigate(_ classId: String?, tree: EducationTreeResponse?) -> Bool {
+        let id = (classId ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !id.isEmpty else { return false }
+        guard let cls = tree?.classes?.first(where: { $0.id == id }) else { return false }
+        if isShowingClass(id) { return true }
+        path = [.classDetail(cls)]
+        return true
+    }
+
+    private func applyProjectNavigate(_ projectId: String?, tree: EducationTreeResponse?) -> Bool {
+        let id = (projectId ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !id.isEmpty else { return false }
+        guard let project = tree?.projects?.first(where: { $0.id == id }) else { return false }
+        if isShowingProject(id) { return true }
+        path = [.projectDetail(project)]
+        return true
+    }
+
+    private func applyTodoNavigate(_ nav: AgentEducationNavigate, tree: EducationTreeResponse?) -> Bool {
+        let todoId = (nav.todoId ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !todoId.isEmpty else { return false }
+        guard let todo = EducationTodoHelpers.todo(
+            todoId: todoId,
+            classId: nav.classId,
+            projectId: nav.projectId,
+            from: tree
+        ) else { return false }
+        if isShowingTodo(todo.id) { return true }
+        path = parentStack(for: todo, tree: tree) + [.todoDetail(todo)]
+        return true
+    }
+
+    private func applyDateNavigate(_ nav: AgentEducationNavigate, tree: EducationTreeResponse?) -> Bool {
+        let dateId = (nav.dateId ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !dateId.isEmpty else { return false }
+        guard let date = EducationDateHelpers.date(
+            dateId: dateId,
+            classId: nav.classId,
+            projectId: nav.projectId,
+            from: tree
+        ) else { return false }
+        if isShowingDate(date.id) { return true }
+        path = parentStack(forDate: date, tree: tree) + [.dateDetail(date)]
+        return true
+    }
+
+    private func applyCapsuleNavigate(_ nav: AgentEducationNavigate, tree: EducationTreeResponse?) -> Bool {
+        let todoId = (nav.todoId ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let capsuleId = (nav.capsuleId ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !todoId.isEmpty, !capsuleId.isEmpty else { return false }
+        guard let todo = EducationTodoHelpers.todo(
+            todoId: todoId,
+            classId: nav.classId,
+            projectId: nav.projectId,
+            from: tree
+        ) else { return false }
+        guard let capsule = (todo.capsules ?? []).first(where: { $0.id == capsuleId }) else {
+            return false
+        }
+        if isShowingCapsule(todoId: todo.id, capsuleId: capsule.id) { return true }
+        path = parentStack(for: todo, tree: tree) + [
+            .todoDetail(todo),
+            .capsuleDetail(todo, capsule),
+        ]
+        return true
+    }
+
+    private func parentStack(for todo: EducationTodo, tree: EducationTreeResponse?) -> [EducationRoute] {
+        if let projectId = todo.projectId, !projectId.isEmpty,
+           let project = tree?.projects?.first(where: { $0.id == projectId }) {
+            return [.projectDetail(project)]
+        }
+        if let classId = todo.classId, !classId.isEmpty,
+           let cls = tree?.classes?.first(where: { $0.id == classId }) {
+            return [.classDetail(cls)]
+        }
+        return []
+    }
+
+    private func parentStack(forDate date: EducationDate, tree: EducationTreeResponse?) -> [EducationRoute] {
+        if let projectId = date.projectId, !projectId.isEmpty,
+           let project = tree?.projects?.first(where: { $0.id == projectId }) {
+            return [.projectDetail(project)]
+        }
+        if let classId = date.classId, !classId.isEmpty,
+           let cls = tree?.classes?.first(where: { $0.id == classId }) {
+            return [.classDetail(cls)]
+        }
+        return []
+    }
+
     /// Same shape as web `__eduUiContext` for `/api/education/agent/message`.
     func agentUiContext(tree: EducationTreeResponse?) -> AgentUiContext {
         switch path.last {
@@ -243,6 +375,28 @@ struct AgentChatWireMessage: Decodable {
     let widgets: [ChatWidget]?
 }
 
+struct AgentEducationNavigate: Decodable, Equatable {
+    let id: String?
+    let view: String?
+    let classId: String?
+    let projectId: String?
+    let todoId: String?
+    let dateId: String?
+    let capsuleId: String?
+
+    var dedupeKey: String {
+        if let id, !id.isEmpty { return id }
+        return [view, classId, projectId, todoId, dateId, capsuleId]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "|")
+    }
+}
+
+private struct EducationSSEPayload: Decodable {
+    let navigate: AgentEducationNavigate?
+}
+
 struct AgentMessageResponse: Decodable {
     let ok: Bool?
     let reply: String?
@@ -268,6 +422,7 @@ struct AgentStateResponse: Decodable {
     let queueLength: Int?
     let error: String?
     let workingLabel: String?
+    let navigate: AgentEducationNavigate?
 }
 
 struct AgentStopBody: Encodable {
@@ -410,6 +565,8 @@ final class EducationStore: ObservableObject {
     @Published var agentWorkingLabel = "Working"
     @Published var chatHistory: [AgentChatListItem] = []
     @Published var chatHistoryLoading = false
+    @Published var agentNavigate: AgentEducationNavigate?
+    @Published private(set) var treeEpoch = 0
 
     private let sse = MacSSEClient()
     private var liveToken: String?
@@ -422,6 +579,7 @@ final class EducationStore: ObservableObject {
     private var lastEducationData: Data?
     private var lastOpenedProjectId: String?
     private var lastOpenedAt = Date.distantPast
+    private var lastIngestedNavigateKey = ""
     /// Bumped when the visible thread changes so in-flight polls/resumes cannot
     /// paint an older chat.
     private var agentViewGen = 0
@@ -615,7 +773,8 @@ final class EducationStore: ObservableObject {
 
     func startLiveUpdates(token: String) {
         liveToken = token
-        sse.start(path: "api/education/events", bearer: token) { [weak self] in
+        sse.start(path: "api/education/events", bearer: token) { [weak self] data in
+            self?.ingestSSEPayload(data)
             self?.scheduleReloadFromSSE()
         }
     }
@@ -625,6 +784,22 @@ final class EducationStore: ObservableObject {
         sseReloadTask = nil
         sse.stop()
         liveToken = nil
+    }
+
+    private func ingestSSEPayload(_ data: String) {
+        guard !data.isEmpty, let raw = data.data(using: .utf8) else { return }
+        guard let payload = try? JSONDecoder().decode(EducationSSEPayload.self, from: raw) else {
+            return
+        }
+        ingestAgentNavigate(payload.navigate)
+    }
+
+    private func ingestAgentNavigate(_ nav: AgentEducationNavigate?) {
+        guard let nav else { return }
+        let key = nav.dedupeKey
+        if !key.isEmpty, key == lastIngestedNavigateKey { return }
+        lastIngestedNavigateKey = key
+        agentNavigate = nav
     }
 
     private func scheduleReloadFromSSE() {
@@ -674,6 +849,7 @@ final class EducationStore: ObservableObject {
                 lastEducationData = stable
                 tree = res
                 AppGroupStore.cacheEducationData(data)
+                treeEpoch += 1
             }
             if let email = res.email, !email.isEmpty {
                 persistEmail = email.lowercased()
@@ -873,6 +1049,7 @@ final class EducationStore: ObservableObject {
             }
             applyWireMessages(state.messages)
             applyAgentRunState(status: state.status, workingLabel: state.workingLabel)
+            ingestAgentNavigate(state.navigate)
             if agentBusy {
                 startAgentPolling(token: token)
             } else {

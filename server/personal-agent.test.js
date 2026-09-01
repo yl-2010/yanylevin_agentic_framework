@@ -17,6 +17,8 @@ import {
   stampMessage,
   systemPrompt,
   formatVisibleTranscript,
+  normalizeEducationNavigate,
+  educationNavigateHref,
 } from "./personal-agent.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -33,6 +35,7 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.soul));
     assert.match(prompt, /Always Read SOUL\.md/);
     assert.match(prompt, /send_chat_message/);
+    assert.match(prompt, /open_education_page/);
     assert.match(prompt, /No period when the reply is one word/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.education));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.schedule));
@@ -147,6 +150,7 @@ describe("Personal Agent skill files", () => {
     );
     assert.match(dashboard, /Todo identity/);
     assert.match(dashboard, /Date identity/);
+    assert.match(dashboard, /open_education_page/);
     assert.match(dashboard, /Description formatting/);
     assert.match(dashboard, /always write markdown/);
     assert.match(dashboard, /similar name/);
@@ -252,6 +256,7 @@ describe("Personal Agent skill files", () => {
 
     const agent = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.agent), "utf8");
     assert.match(agent, /send_chat_message/);
+    assert.match(agent, /open_education_page/);
     assert.match(agent, /unslop/);
     assert.match(agent, /SOUL\.md/);
     assert.match(agent, /identity-school\.md/);
@@ -493,6 +498,87 @@ describe("formatVisibleTranscript", () => {
     assert.match(text, /what does ALARM mean/);
     assert.match(text, /the building alarm tripped/);
     assert.doesNotMatch(text, /check again now/);
+  });
+});
+
+describe("open_education_page navigate payload", () => {
+  it("validates views and required ids", () => {
+    assert.equal(normalizeEducationNavigate(null), null);
+    assert.equal(normalizeEducationNavigate({ view: "fitness" }), null);
+    assert.equal(normalizeEducationNavigate({ view: "class" }), null);
+    assert.equal(normalizeEducationNavigate({ view: "todo" }), null);
+    assert.equal(normalizeEducationNavigate({ view: "capsule", todoId: "brief" }), null);
+    assert.equal(normalizeEducationNavigate({ view: "home" })?.view, "home");
+    assert.equal(
+      normalizeEducationNavigate({ view: "class", classId: "am-lit" })?.classId,
+      "am-lit"
+    );
+    const todo = normalizeEducationNavigate({
+      view: "todo",
+      todoId: "hw-personal-infographic",
+      classId: "data-science-1",
+    });
+    assert.equal(todo?.todoId, "hw-personal-infographic");
+    assert.equal(todo?.classId, "data-science-1");
+  });
+
+  it("builds website hrefs", () => {
+    assert.equal(educationNavigateHref({ view: "home" }), "/education/");
+    assert.equal(
+      educationNavigateHref({ view: "class", classId: "am-lit" }),
+      "/education/class/am-lit"
+    );
+    assert.equal(
+      educationNavigateHref({
+        view: "todo",
+        todoId: "hw-personal-infographic",
+        classId: "data-science-1",
+      }),
+      "/education/todo/hw-personal-infographic?class=data-science-1"
+    );
+    assert.equal(
+      educationNavigateHref({
+        view: "todo",
+        todoId: "make-public-repo",
+        projectId: "yanylevin",
+      }),
+      "/education/todo/make-public-repo?project=yanylevin"
+    );
+    assert.equal(
+      educationNavigateHref({
+        view: "capsule",
+        todoId: "2026-09-01-daily-briefing",
+        capsuleId: "cap-1",
+      }),
+      "/education/todo/2026-09-01-daily-briefing/capsule/cap-1"
+    );
+    assert.equal(
+      educationNavigateHref({
+        view: "date",
+        dateId: "fall-orientation-day-1",
+      }),
+      "/education/date/fall-orientation-day-1"
+    );
+    assert.equal(educationNavigateHref({ view: "nope" }), null);
+  });
+
+  it("keeps navigate off the chat history snapshot", () => {
+    const snap = snapshotMessages({
+      messages: [stampMessage("assistant", "That essay is due Friday")],
+      navigate: {
+        id: "nav-1",
+        view: "todo",
+        todoId: "essay",
+        classId: "am-lit",
+      },
+    });
+    assert.equal(snap.length, 1);
+    assert.equal(snap[0].content, "That essay is due Friday");
+    assert.equal("navigate" in snap[0], false);
+    assert.equal(
+      JSON.stringify(snap).includes("nav-1"),
+      false
+    );
   });
 });
 

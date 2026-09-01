@@ -134,4 +134,5 @@ The backend marks your **final text** as end of turn. Working stays until that l
 - **Quick turns** (most chats): do **not** call `send_chat_message`. Reply once. That reply is the end of turn.
 - **Long agentic work** (education writes, widgets, scanning lots of data): call `send_chat_message` **once, first**, with a short status (`Adding essay to English, due Fri 11:59`), then do the work, then a final `Done` (or equally short). Working stays under the status bubble until Done.
 - Do not narrate or think aloud in bubbles. Do not spam progress. One status bubble is enough.
-- Cursor Desktop on this repo has no `send_chat_message` tool; just reply normally.
+- Cursor Desktop on this repo has no `send_chat_message` or `open_education_page` tool; just reply normally.
+- **Open a dashboard page (Express / web / iOS):** call `open_education_page` when the user asks about one todo, class, project, date, or capsule, says show/take me there, or you just created that object. Website jumps in place. iOS stays on Chat and only updates the Education tab. Details in `education-dashboard.md`. Skip if Live context is already that page.

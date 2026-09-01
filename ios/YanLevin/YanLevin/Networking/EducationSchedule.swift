@@ -595,6 +595,21 @@ enum EducationDateHelpers {
         return nil
     }
 
+    static func uniqueDateId(dateId: String, classId: String?, projectId: String?) -> String {
+        if let projectId, !projectId.isEmpty { return "p/\(projectId)/\(dateId)" }
+        if let classId, !classId.isEmpty { return "\(classId)/\(dateId)" }
+        return dateId
+    }
+
+    static func date(
+        dateId: String,
+        classId: String?,
+        projectId: String?,
+        from tree: EducationTreeResponse?
+    ) -> EducationDate? {
+        date(id: uniqueDateId(dateId: dateId, classId: classId, projectId: projectId), from: tree)
+    }
+
     static func contextName(for date: EducationDate, in tree: EducationTreeResponse?) -> String? {
         if let projectId = date.projectId, !projectId.isEmpty {
             return tree?.projects?.first(where: { $0.id == projectId })?.displayName

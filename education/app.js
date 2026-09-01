@@ -288,6 +288,121 @@
   }
 
   /** @type {string|null} */
+  let lastAgentNavigateId = null;
+
+  /**
+   * @param {string} href
+   * @returns {boolean}
+   */
+  function sameEducationHref(href) {
+    try {
+      const next = new URL(href, window.location.origin);
+      const norm = (p) => String(p || "").replace(/\/+$/, "") || "/";
+      return (
+        norm(next.pathname) === norm(window.location.pathname) &&
+        next.search === window.location.search
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * @param {unknown} target
+   * @returns {string|null}
+   */
+  function educationNavigateHrefFromTarget(target) {
+    if (!target || typeof target !== "object") return null;
+    const src = /** @type {Record<string, unknown>} */ (target);
+    const view = String(src.view || "")
+      .trim()
+      .toLowerCase();
+    const classId = String(src.classId || "").trim();
+    const projectId = String(src.projectId || "").trim();
+    const todoId = String(src.todoId || "").trim();
+    const dateId = String(src.dateId || "").trim();
+    const capsuleId = String(src.capsuleId || "").trim();
+    const q = projectId
+      ? `?project=${encodeURIComponent(projectId)}`
+      : classId
+        ? `?class=${encodeURIComponent(classId)}`
+        : "";
+    if (view === "home") return "/education/";
+    if (view === "class" && classId) {
+      return `/education/class/${encodeURIComponent(classId)}`;
+    }
+    if (view === "project" && projectId) {
+      return `/education/project/${encodeURIComponent(projectId)}`;
+    }
+    if (view === "todo" && todoId) {
+      return `/education/todo/${encodeURIComponent(todoId)}${q}`;
+    }
+    if (view === "date" && dateId) {
+      return `/education/date/${encodeURIComponent(dateId)}${q}`;
+    }
+    if (view === "capsule" && todoId && capsuleId) {
+      return `/education/todo/${encodeURIComponent(todoId)}/capsule/${encodeURIComponent(
+        capsuleId
+      )}${q}`;
+    }
+    return null;
+  }
+
+  /**
+   * Agent (or in-chat link) opening an education page. Chat panel stays put.
+   * @param {unknown} target
+   * @returns {boolean}
+   */
+  function applyEducationNavigate(target) {
+    if (!target || typeof target !== "object") return false;
+    const src = /** @type {Record<string, unknown>} */ (target);
+    const id = String(src.id || "").trim();
+    if (id && id === lastAgentNavigateId) return false;
+    const href = educationNavigateHrefFromTarget(src);
+    if (!href) return false;
+    if (id) lastAgentNavigateId = id;
+    if (sameEducationHref(href)) return false;
+    navigate(href);
+    return true;
+  }
+
+  /**
+   * @param {string} rawHref
+   * @returns {string|null}
+   */
+  function educationPathFromHref(rawHref) {
+    const href = String(rawHref || "").trim();
+    if (!href) return null;
+    try {
+      if (href.startsWith("/education")) {
+        const u = new URL(href, window.location.origin);
+        return u.pathname + u.search;
+      }
+      const u = new URL(href, window.location.origin);
+      if (
+        u.origin === window.location.origin &&
+        u.pathname.startsWith("/education")
+      ) {
+        return u.pathname + u.search;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
+  /**
+   * @param {string} rawHref
+   * @returns {boolean}
+   */
+  function applyEducationNavigatePath(rawHref) {
+    const path = educationPathFromHref(rawHref);
+    if (!path) return false;
+    if (!sameEducationHref(path)) navigate(path);
+    return true;
+  }
+
+  /** @type {string|null} */
   let lastOpenedProjectId = null;
   /** @type {number} */
   let lastOpenedAtMs = 0;
@@ -2345,6 +2460,15 @@
     const mac = window.YanMacApi;
     if (!mac) return;
     mac.subscribeEvents("/api/education/events", {
+      onEvent: (name, data) => {
+        if (name !== "change") return;
+        try {
+          const parsed = JSON.parse(data || "{}");
+          if (parsed?.navigate) applyEducationNavigate(parsed.navigate);
+        } catch {
+          /* ignore bad SSE JSON */
+        }
+      },
       onChange: () => {
         fetchData().catch((err) => console.error("[edu refresh]", err));
         // Same SSE path refreshes the floating education chat (agent reply / status).
@@ -2420,6 +2544,8 @@
 
   // Expose refresh for chatbot after agent turns
   window.__eduRefresh = () => fetchData().catch(() => {});
+  window.__eduNavigate = (target) => applyEducationNavigate(target);
+  window.__eduNavigatePath = (href) => applyEducationNavigatePath(href);
   window.__eduUserEmail = () =>
     String(userEmail || tree?.email || "")
       .trim()

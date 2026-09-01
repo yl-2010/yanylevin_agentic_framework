@@ -78,7 +78,21 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
  *   replayUiTranscript?: boolean,
  *   activeRun?: any,
  *   interrupting?: boolean,
+ *   navigate?: EducationNavigate|null,
  * }} Session
+ */
+
+/**
+ * One-shot education SPA / iOS stack target. Not stored in chat history.
+ * @typedef {{
+ *   id: string,
+ *   view: 'home'|'class'|'project'|'todo'|'date'|'capsule',
+ *   classId?: string,
+ *   projectId?: string,
+ *   todoId?: string,
+ *   dateId?: string,
+ *   capsuleId?: string,
+ * }} EducationNavigate
  */
 
 /** @typedef {{ name: string, mimeType?: string, data: string }} AttachmentInput */
@@ -408,6 +422,150 @@ function setSessionWorkingLabel(session, sid, label) {
   });
 }
 
+function mintNavigateId() {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `nav-${Date.now().toString(36)}`;
+}
+
+/**
+ * Sanitize an education page target from the agent tool (or tests).
+ * @param {unknown} raw
+ * @returns {Omit<EducationNavigate, 'id'> & { id?: string } | null}
+ */
+export function normalizeEducationNavigate(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const src = /** @type {Record<string, unknown>} */ (raw);
+  const view = String(src.view || "")
+    .trim()
+    .toLowerCase();
+  if (!EDUCATION_VIEWS.has(view)) return null;
+  const str = (key, max = 120) => {
+    if (src[key] == null) return "";
+    return String(src[key]).trim().slice(0, max);
+  };
+  const classId = str("classId");
+  const projectId = str("projectId");
+  const todoId = str("todoId");
+  const dateId = str("dateId");
+  const capsuleId = str("capsuleId");
+  if (view === "class" && !classId) return null;
+  if (view === "project" && !projectId) return null;
+  if (view === "todo" && !todoId) return null;
+  if (view === "date" && !dateId) return null;
+  if (view === "capsule" && (!todoId || !capsuleId)) return null;
+  /** @type {Omit<EducationNavigate, 'id'> & { id?: string }} */
+  const out = { view: /** @type {EducationNavigate['view']} */ (view) };
+  if (classId) out.classId = classId;
+  if (projectId) out.projectId = projectId;
+  if (todoId) out.todoId = todoId;
+  if (dateId) out.dateId = dateId;
+  if (capsuleId) out.capsuleId = capsuleId;
+  const id = str("id", 80);
+  if (id) out.id = id;
+  return out;
+}
+
+/**
+ * Website pathname (+ query) for a navigate target.
+ * @param {unknown} raw
+ * @returns {string|null}
+ */
+export function educationNavigateHref(raw) {
+  const n = normalizeEducationNavigate(raw);
+  if (!n) return null;
+  const q = n.projectId
+    ? `?project=${encodeURIComponent(n.projectId)}`
+    : n.classId
+      ? `?class=${encodeURIComponent(n.classId)}`
+      : "";
+  switch (n.view) {
+    case "home":
+      return "/education/";
+    case "class":
+      return `/education/class/${encodeURIComponent(n.classId || "")}`;
+    case "project":
+      return `/education/project/${encodeURIComponent(n.projectId || "")}`;
+    case "todo":
+      return `/education/todo/${encodeURIComponent(n.todoId || "")}${q}`;
+    case "date":
+      return `/education/date/${encodeURIComponent(n.dateId || "")}${q}`;
+    case "capsule":
+      return `/education/todo/${encodeURIComponent(n.todoId || "")}/capsule/${encodeURIComponent(
+        n.capsuleId || ""
+      )}${q}`;
+    default:
+      return null;
+  }
+}
+
+/**
+ * @param {Session} session
+ * @returns {EducationNavigate|null}
+ */
+function sessionNavigatePayload(session) {
+  return session?.navigate || null;
+}
+
+/**
+ * @param {string} sid
+ * @param {Session} session
+ */
+function openEducationPageTool(sid, session) {
+  return {
+    open_education_page: {
+      description:
+        "Open an education dashboard page on the website (in place) and iOS Education tab (without leaving Chat). Call when the user asks about one todo, class, project, date, or capsule, says show/take me there, or you just created that object. Skip if Live context is already that page, for lists of many items, or for mail/news/fitness. Call after the folder exists. Express/web/iOS only; not Cursor Desktop.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          view: {
+            type: "string",
+            description: "home | class | project | todo | date | capsule",
+          },
+          classId: { type: "string", description: "Class folder id" },
+          projectId: { type: "string", description: "Project folder id" },
+          todoId: {
+            type: "string",
+            description: "Todo folder slug (not the display name)",
+          },
+          dateId: { type: "string", description: "Date folder slug" },
+          capsuleId: { type: "string", description: "Briefing capsule id" },
+        },
+        required: ["view"],
+      },
+      execute(input) {
+        if (!sessions.has(sid) || sessions.get(sid) !== session) {
+          return "session gone";
+        }
+        const nav = normalizeEducationNavigate(input);
+        if (!nav) return "invalid target";
+        /** @type {EducationNavigate} */
+        const next = { ...nav, id: mintNavigateId() };
+        session.navigate = next;
+        notifyEducationClients(session.email, "change", {
+          source: "agent",
+          sessionId: sid,
+          status: session.status || "running",
+          navigate: next,
+        });
+        return `opened ${next.view}`;
+      },
+    },
+  };
+}
+
+/**
+ * @param {string} sid
+ * @param {Session} session
+ */
+function sessionCustomTools(sid, session) {
+  return {
+    ...sendChatMessageTool(sid, session),
+    ...openEducationPageTool(sid, session),
+  };
+}
+
 /**
  * @param {string} sid
  * @param {Session} session
@@ -658,6 +816,7 @@ export function systemPrompt(email) {
     "",
     "Reply: short. School mutations 1-3 lines. Markdown OK in the text bubble; never HTML tags or markdown images. Never em dashes. No thinking aloud. Do not tell the user to refresh. Read the widgets skill before emitting any widget fence.",
     "Long work: call send_chat_message first with a short status, then act, then a final Done. Quick answers: one reply only (that is the end of turn).",
+    "To show one education page on web/iOS, call open_education_page (education-dashboard skill). Skip if already on that page. Not on Cursor Desktop.",
     "No period when the reply is one word, one phrase, or one sentence.",
   ].join("\n");
 }
@@ -1386,7 +1545,7 @@ async function executeAgentTurn(sid, session, opts) {
         }
         const sendOpts = {
           model: nextModel,
-          local: { customTools: sendChatMessageTool(sid, session) },
+          local: { customTools: sessionCustomTools(sid, session) },
         };
         const history = session.replayUiTranscript
           ? formatVisibleTranscript(session, opts.bubble)
@@ -1837,6 +1996,8 @@ export function getAgentState(sessionId, email) {
   if (session.status !== "running" && session.lastResult?.content) {
     out.content = session.lastResult.content;
   }
+  const navigate = sessionNavigatePayload(session);
+  if (navigate) out.navigate = navigate;
   return out;
 }
 
@@ -1860,7 +2021,8 @@ export function getActiveAgent(email) {
     return { ok: true, sessionId: null, status: null, messages: [] };
   }
   session.lastUsedAt = Date.now();
-  return {
+  /** @type {Record<string, unknown>} */
+  const out = {
     ok: true,
     sessionId: sid,
     status: session.status || "idle",
@@ -1873,6 +2035,9 @@ export function getActiveAgent(email) {
         ? session.lastResult.content
         : null,
   };
+  const navigate = sessionNavigatePayload(session);
+  if (navigate) out.navigate = navigate;
+  return out;
 }
 
 /**

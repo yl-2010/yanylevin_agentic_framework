@@ -331,6 +331,12 @@ struct ChatView: View {
                     closeChatHistory(animated: false)
                 }
             }
+            .onChange(of: educationStore.agentNavigate) { _, _ in
+                applyAgentEducationNavigate()
+            }
+            .onChange(of: educationStore.treeEpoch) { _, _ in
+                applyPendingAgentEducationNavigate()
+            }
             .onChange(of: composerFocused) { _, focused in
                 if focused { closeChatHistory() }
             }
@@ -449,6 +455,18 @@ struct ChatView: View {
             email: auth.session?.email,
             token: token
         )
+        applyPendingAgentEducationNavigate()
+    }
+
+    private func applyAgentEducationNavigate() {
+        guard let nav = educationStore.agentNavigate else { return }
+        let tree = educationStore.tree ?? AppGroupStore.loadCachedEducationTree()
+        educationFocus.applyAgentNavigate(nav, tree: tree)
+    }
+
+    private func applyPendingAgentEducationNavigate() {
+        let tree = educationStore.tree ?? AppGroupStore.loadCachedEducationTree()
+        educationFocus.applyPendingNavigate(tree: tree)
     }
 
     private var backendToggle: some View {

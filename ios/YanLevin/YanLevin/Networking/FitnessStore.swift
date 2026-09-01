@@ -32,7 +32,7 @@ final class FitnessStore: ObservableObject {
 
     func startLiveUpdates(token: String) {
         liveToken = token
-        sse.start(path: "api/fitness/events", bearer: token) { [weak self] in
+        sse.start(path: "api/fitness/events", bearer: token) { [weak self] _ in
             self?.scheduleReloadFromSSE()
         }
     }

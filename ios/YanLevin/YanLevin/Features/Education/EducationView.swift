@@ -90,6 +90,12 @@ struct EducationView: View {
         .onChange(of: nav.educationTodoHandoff) { _, _ in
             applyEducationTodoHandoff()
         }
+        .onChange(of: store.agentNavigate) { _, _ in
+            applyAgentEducationNavigate()
+        }
+        .onChange(of: store.treeEpoch) { _, _ in
+            applyPendingAgentEducationNavigate()
+        }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             Task { await reloadAndRestartLiveSession() }
@@ -425,10 +431,22 @@ struct EducationView: View {
         }
     }
 
+    private func applyAgentEducationNavigate() {
+        guard let nav = store.agentNavigate else { return }
+        let tree = store.tree ?? AppGroupStore.loadCachedEducationTree()
+        educationFocus.applyAgentNavigate(nav, tree: tree)
+    }
+
+    private func applyPendingAgentEducationNavigate() {
+        let tree = store.tree ?? AppGroupStore.loadCachedEducationTree()
+        educationFocus.applyPendingNavigate(tree: tree)
+    }
+
     private func reload() async {
         guard let token = auth.session?.token else { return }
         await store.load(token: token)
         applyEducationTodoHandoff()
+        applyPendingAgentEducationNavigate()
     }
 
     /// Same as leaving Education and coming back: tear down SSE/polling, reload, restart.

@@ -21,6 +21,12 @@ describe("YLMarkdown.render", () => {
     assert.match(html, /rel="noopener noreferrer"/);
   });
 
+  it("keeps /education links in-app without a new tab", () => {
+    const html = render(`[todo](/education/todo/essay?class=am-lit)`);
+    assert.match(html, /href="\/education\/todo\/essay\?class=am-lit"/);
+    assert.doesNotMatch(html, /target="_blank"/);
+  });
+
   it("drops javascript: links", () => {
     const html = render(`[x](javascript:alert(1))`);
     assert.equal(html.includes("javascript:"), false);

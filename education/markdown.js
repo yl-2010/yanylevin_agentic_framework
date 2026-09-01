@@ -58,10 +58,12 @@
     s = s.replace(/\[([^\]]+)\]\(((?:[^()\s]|\([^)]*\))+)(?:\s+"[^"]*")?\)/g, (_, label, url) => {
       const href = safeUrl(url);
       if (!href) return label;
+      const internal = href.startsWith("/education");
+      const extra = internal
+        ? ""
+        : ' target="_blank" rel="noopener noreferrer"';
       return hold(
-        `<a href="${escapeHtml(
-          href
-        )}" target="_blank" rel="noopener noreferrer">${renderInline(label, ctx)}</a>`
+        `<a href="${escapeHtml(href)}"${extra}>${renderInline(label, ctx)}</a>`
       );
     });
 
