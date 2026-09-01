@@ -22,7 +22,7 @@ Typical fields: `latitude`, `longitude`, optional `accuracyMeters`, `timestamp` 
 Do **not** dump history into every turn. When the question is about today, yesterday, a trip, “where was I”, or “how did I get here”, read these files first:
 
 - `education/you@example.com/location/places.md` — stays with arrive/leave/dwell (enriched overnight with business/building/activity when known)
-- `education/you@example.com/location/trips.md` — walk / car / driven / plane / uber / robotaxi / lyft paths
+- `education/you@example.com/location/trips.md` — walk / bike / car / driven / plane / uber / robotaxi / lyft paths
 
 Only open `log-YYYY-MM.jsonl` if the markdown is missing or the question needs raw coordinates. Do not invent a timeline from `.location.json` alone.
 
@@ -34,4 +34,4 @@ Do **not** scrape Find My, do **not** run Mac Shortcuts for location, and do **n
 
 The **iPhone** app posts `POST /api/education/location` while Yan is signed in (When In Use, and Always if he allows background). Always: significant-change (~500m) plus visit monitoring, and a 15-minute heartbeat tagged `source: "periodic"` (raw `.location.json` + JSONL only; does not start compose/enrichment). Force-quit stops the 15-minute heartbeat until the app is opened again; significant-change and visits still relaunch the app and post. Chat maps on iPhone and iPad may use on-device GPS for the blue dot; the **iPad app does not post** to this ingest or send `phoneLocation` in agent uiContext. Chat from iPad still uses this iPhone feed on the Mac. An iPhone Shortcut can post the same URL with `Authorization: Bearer` + `LOCATION_INGEST_TOKEN` from `server/.env` if the app is not running.
 
-For maps / nearby, use this lat/lng then Read `.cursor/skills/chat-widgets/SKILL.md` before emitting a map widget. Every pin needs a **1–2 sentence `description`** (one full sentence at least) for the location card. Never one-word card copy like `"Italian"` or `"Cafe"`. Hours for a nearby place: official website first, then Google Maps. Never Apple Maps hours alone.
+For maps / nearby, use this lat/lng then Read `.cursor/skills/chat-widgets/SKILL.md` before emitting a map widget. Suggested places (nearby, restaurants, hangouts) need **at least 5 pins**. Every pin needs a **1–2 sentence `description`** (one full sentence at least) for the location card. Never one-word card copy like `"Italian"` or `"Cafe"`. Hours for a nearby place: official website first, then Google Maps. Never Apple Maps hours alone.

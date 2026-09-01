@@ -24,6 +24,7 @@ Short intro in the text bubble.
 ````
 
 - `map`: one per reply (multiple fences merge). Pins need `id`, `lat`, `lng`, `title`. Optional `subtitle` is one short line (cuisine, neighborhood, hours). **Always emit the full map + pins even on web** so iPhone can open the same thread. Web hides the map canvas and shows a small “View map on iOS” chip plus location cards; iOS shows the live map. Never skip maps because the prompt came from the browser. Hours in subtitle or description follow **Place hours** below.
+- **Suggested places: at least 5 pins.** Restaurants, cafes, nearby, “where should I go”, hangout spots, alternatives. More is fine. One or two pins only when Yan named a specific place, asked “where is X”, or you are pinning a single known destination. If fewer than 5 real options fit, say so in the bubble and still pin every one that does.
 - Each pin automatically becomes a following **glass location card** with that title, subtitle, and description as normal text. **Do not emit `widget html` for restaurants / places.** Do not set card background colors.
 - `html`: only for custom charts or interactive viz that is not a location card. Optional `id=` + `theme=light` / `theme=dark` when colors matter. For colored custom viz, two fences with the same `id=`: `theme=light` and `theme=dark`.
 - `image`: HTTPS URL only, one photo per card. JSON `{"url":"https://...","alt":"optional"}` or a bare https URL. Add more image widgets for a gallery.

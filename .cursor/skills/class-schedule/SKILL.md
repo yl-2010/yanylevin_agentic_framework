@@ -23,7 +23,7 @@ education/<email>/schedule.json
 
 Example: `education/you@example.com/schedule.json`
 
-That JSON is Yan's (or Alex's) live bell schedule. A classmate's recurring classes live on their brain card as `people/<slug>/schedule.md`, not here.
+That JSON is Yan's (or Alex's) live bell schedule. A classmate's recurring classes live on their brain card as `people/<slug>/schedule.md`, not here. Do not dump Four11 PDFs or schedule screenshots into `education/<email>/`.
 
 Express may inject a **Live context** clock plus in-class-now / next / previous / today's classes. Trust that for “what class am I in?” Do not guess from the clock alone. Classes are in person: say “in a class”, never “class meeting”. Open the PDF / `schedule.json` when editing, verifying, or when Live context does not answer.
 

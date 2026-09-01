@@ -33,7 +33,7 @@ All under `education/you@example.com/health/`:
 `history-patterns.md`: a few sections of prose, not a spreadsheet.
 
 - Training mix over 2022–2026 (swim seasons, strength, running, climbing)
-- Sleep timing that repeats (late nights, short nights before hard days)
+- Sleep timing that repeats (late nights, short nights before hard days). Health-app sleep after the 2026-08-30 08:25 PT ingest is inflated by Yan until he says otherwise. Sleep is the only type he modifies. Do not fold those later hours into the pattern. Every other Health metric is always real.
 - Recovery tells that show up more than once (RHR jumps, HRV crashes)
 - Anything that clearly changed after a move or a season
 

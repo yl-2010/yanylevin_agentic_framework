@@ -54,6 +54,7 @@ Upgrade when a receipt or text matches:
 - `uber` / `lyft` / `rideshare` — human driver receipts
 - `driven` — texts like "I'll pick you up" / "on my way"
 - `walk` / `plane` — keep if compose already got this right
+- `bike` — Watch cycling or Yan chat. One workout is one trip. Do not split it back into walks
 - `car` — only after Mail + iMessage + chat history turned up nothing for that leg
 
 ## Context you may use

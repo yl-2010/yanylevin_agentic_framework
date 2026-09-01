@@ -2,7 +2,7 @@
 name: location-history
 description: >-
   Scheduled Composer job: turn Yan's GPS JSONL into stays and trips
-  (walk / car / plane / uber / robotaxi). Yan only. Not for live "where
+  (walk / bike / car / plane / uber / robotaxi). Yan only. Not for live "where
   am I" chat — that is phone-location.
 disable-model-invocation: true
 ---
@@ -33,7 +33,8 @@ Live last-known fix (do not use as history): `education/you@example.com/.locatio
 3. Keep only lines with `receivedAt` (or `timestamp`) **after** `lastProcessedReceivedAt`. If none, stop without rewriting markdown.
 4. Cluster nearby points into **stays**: same named place or roughly the same block (hundreds of meters). `visitKind` arrival/departure is a strong stay boundary. Use reverse-geocoded `placeName` / `areasOfInterest` / `locality` when present; otherwise a short real-world name from coords (campus, airport, neighborhood). Arrive = first point, leave = last point, dwell = leave − arrive. A single ping is a brief stay, not a trip.
 5. Infer **trips** between consecutive stays:
-   - **walk:** short distance, slow or missing speed
+   - **walk:** short distance, slow or missing speed, and no overlapping Watch cycling workout
+   - **bike:** Watch cycling (or Yan chat) wins over GPS walk splits. One workout is one trip even if GPS cut it into two short walks around a park cluster
    - **car:** tens of km, minutes to a couple of hours, personal/unknown driver unless a receipt matches
    - **plane:** city/region jump, hundreds of km, or a multi-hour gap with a new metro (phone often off in flight)
    - **uber / robotaxi / lyft / rideshare:** receipt wins (below)
@@ -46,7 +47,7 @@ Live last-known fix (do not use as history): `education/you@example.com/.locatio
    From each match, extract **only** trip facts: service, pickup, dropoff, start/end time, duration, distance if present. Do **not** copy fare, payment, card digits, or full email bodies into `trips.md`.
 
    Match a receipt to a GPS leg by overlapping time (and pickup/dropoff vs nearby stays). Receipt wins for mode, endpoints, and duration. GPS fills the path if it exists. Label `uber` / `robotaxi` / `lyft` / `rideshare`, not generic `car`.
-7. Merge into `places.md` and `trips.md`. Newest calendar day on top. Update that day's section; do not rewrite older days unless a receipt clearly corrects one. Local dates use the job timezone from the prompt. If a stay already has a specific name (person's house, business, gym) for the same address, **keep it**. Do not revert "Milos's house" back to the street number. The 02:30 context-synthesis job may correct names after you run.
+7. Merge into `places.md` and `trips.md`. Newest calendar day on top. Update that day's section; do not rewrite older days unless a receipt clearly corrects one. Local dates use the job timezone from the prompt. If a stay already has a specific name (person's house, business, gym) for the same address, **keep it**. Do not revert "Milos's house" back to the street number. Do not revert a chat-corrected `bike` trip back to `walk`. The 02:30 context-synthesis job may correct names after you run.
 8. Write `state.json`:
 
 ```json
@@ -88,6 +89,6 @@ Keep lines short. Real place names. No coordinates in the markdown unless the pl
 
 - Airport names and sudden metro jumps → plane, even with a GPS gap.
 - `visitKind` arrival/departure beats clustering when they disagree.
-- Speed ~1–2 m/s → walk; ~10–30 m/s → car/rideshare; hundreds of km/h equivalent or a city jump → plane.
+- Speed ~1–2 m/s → walk unless Apple Health has an overlapping cycling workout, then **bike**. ~10–30 m/s → car/rideshare; hundreds of km/h equivalent or a city jump → plane.
 - Receipt vs GPS mismatch: keep both facts if needed ("uber per receipt; GPS sparse").
 - Do not invent stays for missing hours at home overnight unless a visit says so; a quiet night is one stay.
