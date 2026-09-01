@@ -177,7 +177,7 @@ Call `open_education_page` when the user asks about **one** dashboard object, sa
 
 ## Chat attachments (web + iOS)
 
-Users can attach files in Personal Agent chat (web /education input; iOS paperclip). Staging lands under `education/<email>/.chat-uploads/<sessionId>/`.
+Users can attach files in Personal Agent chat (web: drag onto /education composer or thread, or paste; iOS paperclip). Staging lands under `education/<email>/.chat-uploads/<sessionId>/`.
 
 - Files stay available for the **entire chat session** — later turns can still copy/read them; do not ask the user to re-send
 - Inspect attachments as needed (images may also be shown inline to the model)

@@ -4,8 +4,8 @@
  * Runs continue on the Mac after tab close or a new chat; resume via
  * /agent/active, /agent/state, or past-chats. New chat does not stop the
  * previous thread (queued turns still drain in the background).
- * Drag-and-drop files onto the composer or an open thread. Paperclip also
- * opens a file picker. Attachments work on later turns, not only the first.
+ * Drag-and-drop files onto the composer or an open thread (paste images too).
+ * Attachments work on later turns, not only the first.
  */
 (() => {
   const root = document.getElementById("edu-chat");
@@ -17,8 +17,6 @@
   const historyEl = root.querySelector(".yan-chat-history");
   const form = root.querySelector(".yan-chat-form");
   const input = root.querySelector(".yan-chat-input");
-  const fileInput = root.querySelector(".yan-chat-file");
-  const attachBtn = root.querySelector("[data-edu-chat-attach]");
   const launcher = root.querySelector(".yan-chat-launcher");
   const clearBtns = root.querySelectorAll("[data-edu-chat-clear]");
   const minimizeBtns = root.querySelectorAll("[data-edu-chat-minimize]");
@@ -933,7 +931,6 @@
         );
       }
     }
-    if (attachBtn) attachBtn.tabIndex = open ? 0 : -1;
     syncComposerSize();
     scheduleGlassRefresh();
   }
@@ -1609,17 +1606,6 @@
   let sendHoldArmed = false;
   let sendHoldConsumed = false;
   let enterHoldActive = false;
-
-  attachBtn?.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    fileInput?.click();
-  });
-  fileInput?.addEventListener("change", () => {
-    addFiles(fileInput.files);
-    fileInput.value = "";
-    input?.focus({ preventScroll: true });
-  });
 
   form?.addEventListener("submit", (event) => {
     event.preventDefault();

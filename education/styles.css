@@ -1613,25 +1613,6 @@ html[data-resolved-theme="dark"] .yan-chat-pill.corner.lg-refraction::after {
 }
 .yan-chat.is-composer-tall .yan-chat-input { align-self: stretch; height: auto; }
 .yan-chat-input::placeholder { color: var(--muted); opacity: 0.8; }
-.yan-chat-attach {
-  flex: 0 0 1.65rem;
-  width: 1.65rem;
-  min-width: 1.65rem;
-  height: 1.65rem;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--fg);
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  opacity: 0.72;
-}
-.yan-chat-attach svg { width: 72%; height: 72%; display: block; }
-.yan-chat-attach:hover { opacity: 1; }
-.yan-chat-attach:focus-visible { outline: 2px solid var(--chat-orange); outline-offset: 2px; }
 .yan-chat.is-dragover .yan-chat-pill.corner {
   box-shadow: 0 0 0 2px var(--chat-orange), 0 4px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
 }
