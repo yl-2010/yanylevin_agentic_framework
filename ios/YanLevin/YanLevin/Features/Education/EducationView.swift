@@ -543,6 +543,13 @@ struct ClassDetailView: View {
         .ylPageBackground()
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if let url = liveClass.canvasURL {
+                ToolbarItem(placement: .topBarTrailing) {
+                    CanvasToolbarButton(webURL: url)
+                }
+            }
+        }
         .refreshable {
             guard let token = auth.session?.token else { return }
             await store.load(token: token)

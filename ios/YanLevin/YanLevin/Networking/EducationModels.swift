@@ -21,6 +21,22 @@ enum CanvasLMS {
         comps?.scheme = studentAppScheme
         return comps?.url
     }
+
+    /// Course gradebook from an assignment, syllabus, or course URL.
+    static func gradebookURL(from raw: String?) -> URL? {
+        guard let url = webURL(from: raw) else { return nil }
+        let parts = url.path.split(separator: "/").map(String.init)
+        guard let i = parts.firstIndex(of: "courses"), i + 1 < parts.count else {
+            return nil
+        }
+        let courseId = parts[i + 1]
+        guard courseId.allSatisfy(\.isNumber) else { return nil }
+        var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        comps?.path = "/courses/\(courseId)/grades"
+        comps?.query = nil
+        comps?.fragment = nil
+        return comps?.url
+    }
 }
 
 struct EducationTreeResponse: Decodable {
@@ -124,16 +140,30 @@ struct EducationClass: Decodable, Identifiable, Hashable {
     let period: String?
     let freePeriod: Bool?
     let detail: String?
+    /// Optional Canvas gradebook URL — toolbar button only when set (or derived).
+    let canvasLink: String?
     let files: [EducationContextFile]?
     let todos: [EducationTodo]?
     let dates: [EducationDate]?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, teacher, room, period, freePeriod, files, todos, dates
+        case id, name, teacher, room, period, freePeriod, canvasLink, files, todos, dates
         case detail = "description"
     }
 
     var isFreePeriod: Bool { freePeriod == true }
+
+    /// Gradebook URL from `canvasLink`, else the first child assignment/syllabus link.
+    var canvasURL: URL? {
+        if let direct = CanvasLMS.webURL(from: canvasLink) { return direct }
+        for todo in todos ?? [] {
+            if let url = CanvasLMS.gradebookURL(from: todo.canvasLink) { return url }
+        }
+        for date in dates ?? [] {
+            if let url = CanvasLMS.gradebookURL(from: date.canvasLink) { return url }
+        }
+        return nil
+    }
 
     var descriptionText: String {
         (detail ?? "").trimmingCharacters(in: .whitespacesAndNewlines)

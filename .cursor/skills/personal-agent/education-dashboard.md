@@ -57,7 +57,7 @@ education/<email>/
 
 ### Properties
 
-- **class.json:** `name`, `period` (A–H letter), `trimester`, optional `description` (always markdown when set), optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays — dashboard file-tile visibility and pin order; `context.md` is hidden by default), optional `canvasLink` (https URL to that course’s Canvas gradebook, e.g. `https://canvas.instructure.com/courses/3639020/grades` — **web class view** shows the same Canvas orb as todos/dates only when set; iOS class view does not; clear/omit to hide), optional extras
+- **class.json:** `name`, `period` (A–H letter), `trimester`, optional `description` (always markdown when set), optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays — dashboard file-tile visibility and pin order; `context.md` is hidden by default), optional `canvasLink` (https URL to that course’s Canvas gradebook, e.g. `https://canvas.instructure.com/courses/3639020/grades` — web and iOS class views show the same Canvas orb as todos/dates only when set; clear/omit to hide), optional extras
   - `trimester`: `"year"` (always visible), `"fall"` | `"winter"` | `"spring"` (one tri), or an array like `["fall", "spring"]` for multi-tri but not year-long
   - Year-long folders + context stay on disk all year
   - Trimester-only classes stay on disk forever (never delete)
