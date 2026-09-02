@@ -57,7 +57,7 @@ education/<email>/
 
 ### Properties
 
-- **class.json:** `name`, `period` (A–H letter), `trimester`, optional `description` (always markdown when set), optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays — dashboard file-tile visibility and pin order; `context.md` is hidden by default), optional extras
+- **class.json:** `name`, `period` (A–H letter), `trimester`, optional `description` (always markdown when set), optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays — dashboard file-tile visibility and pin order; `context.md` is hidden by default), optional `canvasLink` (https URL to that course’s Canvas gradebook, e.g. `https://canvas.instructure.com/courses/3639020/grades` — **web class view** shows the same Canvas orb as todos/dates only when set; iOS class view does not; clear/omit to hide), optional extras
   - `trimester`: `"year"` (always visible), `"fall"` | `"winter"` | `"spring"` (one tri), or an array like `["fall", "spring"]` for multi-tri but not year-long
   - Year-long folders + context stay on disk all year
   - Trimester-only classes stay on disk forever (never delete)
@@ -199,7 +199,7 @@ Text-only and attachment turns both run on **grok-4.6 high** (not fast). The two
 - Pin dropped-file tile order when the user asks. Write `filesTop` / `filesBottom` on that object's properties JSON (same files as hidden/visible). Array order is the stuck order. Add or reorder names as asked; remove a name to unstick it (it goes back to mtime order in the middle). A name should not sit in both lists: top wins if they conflict, but prefer deleting it from the other list. Drop the key if the array would be empty. Do not invent an order they did not ask for.
 - Pin Projects-box order when the user asks. Write `projectsTop` / `projectsBottom` on `meta.json`. Array order is the stuck order. Entries are folder ids or display names (case-insensitive). Add or reorder as asked; remove a name to unstick it (it goes back to last-opened order in the middle). A name should not sit in both lists: top wins if they conflict, but prefer deleting it from the other list. Drop the key if the array would be empty. Do not invent an order they did not ask for.
 - When creating a project, also merge its folder id and now (ISO) into `education/<email>/.projects-opened.json` so it sorts like a just-opened project (below `projectsTop`, above older unpinned). Create the file if missing. Keep other keys. Remove that id if the project is deleted. Do not git add this file.
-- Set/clear `canvasLink` (and `canvasId`) on todos/dates when the user provides a Canvas URL, or when following the personal-canvas sync skill for mapped classes. Yan checks off `done` himself; Canvas sync must not copy completion.
+- Set/clear `canvasLink` (and `canvasId`) on todos/dates when the user provides a Canvas URL, or when following the personal-canvas sync skill for mapped classes. On mapped **classes**, set `class.json` `canvasLink` to the course gradebook (`htmlUrl` + `/grades`). Yan checks off `done` himself; Canvas sync must not copy completion.
 - Store chat attachments into object folders when they are useful context (identical file bytes)
 - Maintain `schedule.json` when the PDF or calendar changes
 - Read OneDrive school files using `meta.json` `onedriveRoot` + `gradeFolder` (read-only unless asked to write). Yan’s Mac: `onedriveRoot` is `$HOME/Documents`; current year folder is `11th Grade`.

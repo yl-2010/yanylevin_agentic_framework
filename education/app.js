@@ -116,6 +116,37 @@
     )}" target="_blank" rel="noopener noreferrer" aria-label="Open in Canvas">${CANVAS_ICON_SVG}</a></div>`;
   }
 
+  /** Course gradebook from a Canvas assignment/syllabus/course URL. */
+  function gradebookUrlFromCanvasLink(raw) {
+    const href = normalizeCanvasLink(raw);
+    if (!href) return "";
+    try {
+      const u = new URL(href);
+      const m = u.pathname.match(/\/courses\/(\d+)/);
+      if (!m) return "";
+      u.pathname = `/courses/${m[1]}/grades`;
+      u.search = "";
+      u.hash = "";
+      return u.href;
+    } catch {
+      return "";
+    }
+  }
+
+  function classCanvasLink(cls) {
+    const direct = normalizeCanvasLink(cls && cls.canvasLink);
+    if (direct) return direct;
+    const kids = [
+      ...flattenTodos(tree, { classId: cls && cls.id }),
+      ...((cls && cls.dates) || []),
+    ];
+    for (const item of kids) {
+      const g = gradebookUrlFromCanvasLink(item && item.canvasLink);
+      if (g) return g;
+    }
+    return "";
+  }
+
   function loadFilters() {
     try {
       const raw = localStorage.getItem(FILTER_KEY);
@@ -1704,16 +1735,20 @@
       : "";
     const name = escapeHtml(classScheduleName(cls));
     const classDesc = String(cls.description || "").trim();
+    const canvas = canvasOrbHtml(classCanvasLink(cls));
 
     appEl.innerHTML = `
-      <header class="edu-hero edu-hero--detail">
-        ${backLinkHtml("/education/", "lg-edu-back-class")}
-        <h1 class="edu-hero-title edu-hero-title--class">${period}<span class="edu-hero-class-name">${name}</span></h1>
-        ${
-          nextWhen
-            ? `<p class="edu-hero-sub">${escapeHtml(nextWhen)}</p>`
-            : ""
-        }
+      <header class="edu-hero edu-hero--detail${canvas ? " edu-hero--detail-canvas" : ""}">
+        <div class="edu-hero-lead">
+          ${backLinkHtml("/education/", "lg-edu-back-class")}
+          <h1 class="edu-hero-title edu-hero-title--class">${period}<span class="edu-hero-class-name">${name}</span></h1>
+          ${
+            nextWhen
+              ? `<p class="edu-hero-sub">${escapeHtml(nextWhen)}</p>`
+              : ""
+          }
+        </div>
+        ${canvas}
       </header>
       ${classDesc ? markdownPanelHtml(classDesc, "lg-edu-class-desc") : ""}
       <div class="edu-grid edu-grid--home">

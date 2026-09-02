@@ -219,6 +219,7 @@ describe("Personal Agent skill files", () => {
     const canvas = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.canvas), "utf8");
     assert.match(canvas, /canvas.instructure.com/);
     assert.match(canvas, /canvasLink/);
+    assert.match(canvas, /\/grades/);
     assert.match(canvas, /completedAt/);
     assert.match(canvas, /course-map\.json/);
     assert.match(canvas, /stop immediately/);

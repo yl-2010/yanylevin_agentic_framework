@@ -277,6 +277,7 @@ describe("buildCanvasSyncPrompt", () => {
         "Manually deleted objects (deleted.md).\n- deleted 2026-08-25 15:04 | todo | Essay | on 2026-09-12 | class:lit | was classes/lit/todos/essay",
     });
     assert.match(prompt, /personal-canvas/);
+    assert.match(prompt, /class\.json canvasLink to that course gradebook/);
     assert.match(prompt, /Do not recreate a todo or date that looks like a manually deleted\.md row/);
     assert.match(prompt, /classes\/lit\/todos\/essay/);
   });

@@ -701,7 +701,7 @@ export function buildCanvasSyncPrompt({ dateKey, timezone, force, deletedBlock }
     `Snapshot: ${CANVAS_REL}/snapshot.json (also assignments.md). Optional map: ${CANVAS_REL}/course-map.json.`,
     "Yan is a 2026-27 junior. Those academic dashboard classes are often missing from Canvas until school publishes them. That is expected.",
     "FIRST: map snapshot courses to education/you@example.com/classes/ (skip free-period shells and fixtures). The snapshot already dropped non-dashboard enrollments. If ZERO dashboard classes appear in Canvas, STOP immediately. Do not invent Class of 2028, EPS Library, Iceland EBC, Graphic Design, or prior-year shells. Do not create todos. One short note is enough.",
-    "If at least one class maps: create or update todos for every Canvas assignment on those mapped classes only. Set canvasLink and canvasId. Tag CW/HW/QA/MA. Use snapshot dueDate/dueTime.",
+    "If at least one class maps: set class.json canvasLink to that course gradebook (htmlUrl + /grades). Create or update todos for every Canvas assignment on those mapped classes only. Set canvasLink and canvasId. Tag CW/HW/QA/MA. Use snapshot dueDate/dueTime.",
     "Pull major syllabus / calendar-event dates onto date.json with canvasLink.",
     "NEVER write done or completedAt from Canvas. New todos start done false. Updates leave those keys untouched.",
     "Do not POST to Canvas. Do not delete education todos just because Canvas dropped a row.",
