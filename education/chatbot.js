@@ -1565,6 +1565,15 @@
   });
 
   root.addEventListener("click", (event) => {
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
     const a = event.target?.closest?.("a");
     if (!a || !root.contains(a)) return;
     const href = a.getAttribute("href") || "";

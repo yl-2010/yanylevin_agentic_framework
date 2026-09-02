@@ -14,7 +14,7 @@
 
   /** Circular Canvas LMS logomark (monochrome). */
   const CANVAS_ICON_SVG =
-    '<svg viewBox="0 0 26.7 26.8" aria-hidden="true" focusable="false" fill="currentColor"><path d="M3.9 13.5c0-2-1.5-3.6-3.4-3.8C.2 10.9 0 12.1 0 13.5s.2 2.6.5 3.8c1.9-.2 3.4-1.9 3.4-3.8z"/><circle cx="6.2" cy="13.4" r="1.2"/><path d="M22.8 13.5c0 2 1.5 3.6 3.4 3.8.3-1.2.5-2.5.5-3.8s-.2-2.6-.5-3.8c-1.9.2-3.4 1.8-3.4 3.8z"/><circle cx="20.2" cy="13.4" r="1.2"/><path d="M13.3 23c-2 0-3.6 1.5-3.8 3.4 1.2.3 2.5.5 3.8.5 1.3 0 2.6-.2 3.8-.5-.2-1.9-1.8-3.4-3.8-3.4z"/><circle cx="13.2" cy="20.4" r="1.2"/><path d="M13.3 4c2 0 3.6-1.5 3.8-3.4-1.2-.3-2.5-.5-3.8-.5-1.3 0-2.6.2-3.8.5C9.7 2.5 11.3 4 13.3 4z"/><circle cx="13.2" cy="6.4" r="1.2"/><path d="M20 20.2c-1.4 1.4-1.5 3.6-.3 5.1 2.2-1.3 4.1-3.2 5.4-5.4-1.5-1.2-3.7-1.1-5.1.3z"/><circle cx="18.2" cy="18.4" r="1.2"/><path d="M6.6 6.8C8 5.4 8.1 3.2 6.9 1.7 4.7 3 2.8 4.9 1.5 7.1 3 8.3 5.2 8.2 6.6 6.8z"/><circle cx="8.2" cy="8.4" r="1.2"/><path d="M20 6.8c1.4 1.4 3.6 1.5 5.1.3-1.3-2.2-3.2-4.1-5.4-5.4-1.2 1.5-1.1 3.7.3 5.1z"/><circle cx="18.2" cy="8.4" r="1.2"/><path d="M6.6 20.2c-1.4-1.4-3.6-1.5-5.1-.3 1.3 2.2 3.2 4.1 5.4 5.4 1.2-1.6 1.1-3.7-.3-5.1z"/><circle cx="8.2" cy="18.4" r="1.2"/></svg>';
+    '<svg viewBox="0 0 26.7 26.8" aria-hidden="true" focusable="false" draggable="false" fill="currentColor"><path d="M3.9 13.5c0-2-1.5-3.6-3.4-3.8C.2 10.9 0 12.1 0 13.5s.2 2.6.5 3.8c1.9-.2 3.4-1.9 3.4-3.8z"/><circle cx="6.2" cy="13.4" r="1.2"/><path d="M22.8 13.5c0 2 1.5 3.6 3.4 3.8.3-1.2.5-2.5.5-3.8s-.2-2.6-.5-3.8c-1.9.2-3.4 1.8-3.4 3.8z"/><circle cx="20.2" cy="13.4" r="1.2"/><path d="M13.3 23c-2 0-3.6 1.5-3.8 3.4 1.2.3 2.5.5 3.8.5 1.3 0 2.6-.2 3.8-.5-.2-1.9-1.8-3.4-3.8-3.4z"/><circle cx="13.2" cy="20.4" r="1.2"/><path d="M13.3 4c2 0 3.6-1.5 3.8-3.4-1.2-.3-2.5-.5-3.8-.5-1.3 0-2.6.2-3.8.5C9.7 2.5 11.3 4 13.3 4z"/><circle cx="13.2" cy="6.4" r="1.2"/><path d="M20 20.2c-1.4 1.4-1.5 3.6-.3 5.1 2.2-1.3 4.1-3.2 5.4-5.4-1.5-1.2-3.7-1.1-5.1.3z"/><circle cx="18.2" cy="18.4" r="1.2"/><path d="M6.6 6.8C8 5.4 8.1 3.2 6.9 1.7 4.7 3 2.8 4.9 1.5 7.1 3 8.3 5.2 8.2 6.6 6.8z"/><circle cx="8.2" cy="8.4" r="1.2"/><path d="M20 6.8c1.4 1.4 3.6 1.5 5.1.3-1.3-2.2-3.2-4.1-5.4-5.4-1.2 1.5-1.1 3.7.3 5.1z"/><circle cx="18.2" cy="8.4" r="1.2"/><path d="M6.6 20.2c-1.4-1.4-3.6-1.5-5.1-.3 1.3 2.2 3.2 4.1 5.4 5.4 1.2-1.6 1.1-3.7-.3-5.1z"/><circle cx="8.2" cy="18.4" r="1.2"/></svg>';
 
   const FILTER_KEY = "yl-edu-type-filters";
   const DATE_FILTER_KEY = "yl-edu-date-filters";
@@ -1564,11 +1564,13 @@
         if (!name) return "";
         const qs = contextFileQuery({ ...owner, name });
         const filterId = `${filterPrefix}-${i}`;
-        return `<button type="button" class="edu-file-tile" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
+        return `<a class="edu-file-tile" href="/api/education/file?${escapeHtml(
+          qs
+        )}" target="_blank" rel="noopener noreferrer" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
           filterId
         )}" data-edu-file="${escapeHtml(qs)}" title="${escapeHtml(name)}"><span class="edu-file-name">${escapeHtml(
           name
-        )}</span></button>`;
+        )}</span></a>`;
       })
       .filter(Boolean)
       .join("");
@@ -1622,7 +1624,7 @@
     const shadowFilterId = `${filterId}-shadow`;
     return `<a class="edu-back" href="${escapeHtml(
       href
-    )}" aria-label="Back"><svg class="edu-back-shadow" viewBox="0 0 63 68" width="63" height="68" aria-hidden="true" focusable="false"><defs><filter id="${escapeHtml(
+    )}" aria-label="Back"><svg class="edu-back-shadow" viewBox="0 0 63 68" width="63" height="68" aria-hidden="true" focusable="false" draggable="false"><defs><filter id="${escapeHtml(
       shadowFilterId
     )}" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="12" result="blur"/><feOffset in="blur" dx="0" dy="6" result="offset"/><feFlood flood-color="currentColor" result="flood"/><feComposite in="flood" in2="offset" operator="in" result="shadow"/></filter></defs><path fill="#000" filter="url(#${escapeHtml(
       shadowFilterId
@@ -1869,8 +1871,15 @@
         const noVote = c?.noVote === true;
         const current = capsuleVoteKey(c);
         const href = link && !noVote ? capsuleHref(todo, id) : "";
-        const openAttr = href
-          ? ` data-capsule-href="${escapeHtml(href)}" role="link" tabindex="0"`
+        const titleHtml = href
+          ? `<a class="edu-capsule-link" href="${escapeHtml(href)}">${escapeHtml(title)}</a>`
+          : escapeHtml(title);
+        const bodyHtml = body
+          ? href
+            ? `<a class="edu-capsule-link edu-capsule-body-link" href="${escapeHtml(
+                href
+              )}"><p class="edu-capsule-body">${escapeHtml(body)}</p></a>`
+            : `<p class="edu-capsule-body">${escapeHtml(body)}</p>`
           : "";
         const votesHtml = noVote
           ? ""
@@ -1882,12 +1891,12 @@
           href ? " edu-capsule--open" : ""
         }${noVote ? " edu-capsule--no-vote" : ""}" data-liquid-glass="rounded" data-filter-id="lg-edu-capsule-${escapeHtml(
           id
-        )}" data-capsule-id="${escapeHtml(id)}"${openAttr}>
+        )}" data-capsule-id="${escapeHtml(id)}">
           <div class="edu-panel-head">
-            <h2 class="edu-panel-title">${escapeHtml(title)}</h2>
+            <h2 class="edu-panel-title">${titleHtml}</h2>
             ${votesHtml}
           </div>
-          ${body ? `<p class="edu-capsule-body">${escapeHtml(body)}</p>` : ""}
+          ${bodyHtml}
         </section>`;
       })
       .join("");
@@ -2387,6 +2396,16 @@
     }
   }
 
+  function isUnmodifiedLeftClick(event) {
+    return (
+      event.button === 0 &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.shiftKey &&
+      !event.altKey
+    );
+  }
+
   function bindAppClicks() {
     appEl?.addEventListener("click", (event) => {
       const t = /** @type {HTMLElement} */ (event.target);
@@ -2415,14 +2434,6 @@
         setCapsuleVote(todoId, capsuleId, next, { classId, projectId }).catch(
           (err) => console.error("[edu vote]", err)
         );
-        return;
-      }
-
-      const capsuleHit = t.closest?.("[data-capsule-href]");
-      if (capsuleHit) {
-        event.preventDefault();
-        const href = capsuleHit.getAttribute("data-capsule-href");
-        if (href) navigate(href);
         return;
       }
 
@@ -2472,16 +2483,17 @@
 
       const fileBtn = t.closest?.("[data-edu-file]");
       if (fileBtn) {
+        if (!isUnmodifiedLeftClick(event)) return;
         event.preventDefault();
         const qs = fileBtn.getAttribute("data-edu-file");
         if (qs) openContextFile(qs);
         return;
       }
 
-      const link = t.closest?.("a.edu-row-link, a.edu-back");
+      const link = t.closest?.("a.edu-row-link, a.edu-back, a.edu-capsule-link");
       if (link && link instanceof HTMLAnchorElement) {
         const href = link.getAttribute("href") || "";
-        if (href.startsWith("/education")) {
+        if (href.startsWith("/education") && isUnmodifiedLeftClick(event)) {
           event.preventDefault();
           navigate(href, {
             scroll: link.classList.contains("edu-back") ? "restore" : "top",
@@ -2532,16 +2544,6 @@
     route = parseRoute();
     render({ scroll: "restore" });
     maybeTouchProjectOpened();
-  });
-
-  appEl?.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    const t = /** @type {HTMLElement} */ (event.target);
-    const capsuleHit = t.closest?.("[data-capsule-href]");
-    if (!capsuleHit || t.closest?.("[data-capsule-vote]")) return;
-    event.preventDefault();
-    const href = capsuleHit.getAttribute("data-capsule-href");
-    if (href) navigate(href);
   });
 
   async function boot() {

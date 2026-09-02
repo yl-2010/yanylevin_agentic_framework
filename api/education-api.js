@@ -55,7 +55,7 @@ function readJsonBody(req) {
 /**
  * @param {import('http').IncomingMessage} req
  * @param {import('http').ServerResponse} res
- * @param {{ method: string, path: string, body?: object|null, timeoutMs?: number, sse?: boolean }} opts
+ * @param {{ method: string, path: string, body?: object|null, timeoutMs?: number, sse?: boolean, binary?: boolean }} opts
  */
 async function forwardEducation(req, res, opts) {
   res.setHeader("Cache-Control", "no-store");
@@ -88,7 +88,11 @@ async function forwardEducation(req, res, opts) {
   const url = `${macApiBase()}${opts.path}`;
   /** @type {Record<string, string>} */
   const headers = {
-    Accept: opts.sse ? "text/event-stream" : "application/json",
+    Accept: opts.binary
+      ? "*/*"
+      : opts.sse
+        ? "text/event-stream"
+        : "application/json",
     Authorization: `Bearer ${token}`,
   };
 
@@ -102,6 +106,42 @@ async function forwardEducation(req, res, opts) {
   if (opts.body != null) {
     headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(opts.body);
+  }
+
+  if (opts.binary) {
+    const upstream = await fetch(url, init);
+    if (!upstream.body) {
+      const text = await upstream.text().catch(() => "");
+      res.status(upstream.status || 502).json({
+        ok: false,
+        error: text.slice(0, 240) || `Mac file failed (${upstream.status})`,
+      });
+      return;
+    }
+
+    const type = upstream.headers.get("Content-Type");
+    const disposition = upstream.headers.get("Content-Disposition");
+    const length = upstream.headers.get("Content-Length");
+    const cache = upstream.headers.get("Cache-Control");
+    if (type) res.setHeader("Content-Type", type);
+    if (disposition) res.setHeader("Content-Disposition", disposition);
+    if (length) res.setHeader("Content-Length", length);
+    if (cache) res.setHeader("Cache-Control", cache);
+    res.status(upstream.status);
+
+    const reader = upstream.body.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(Buffer.from(value));
+      }
+    } catch (err) {
+      console.error("[education-api file]", err);
+    } finally {
+      res.end();
+    }
+    return;
   }
 
   if (opts.sse) {
@@ -189,6 +229,28 @@ module.exports = async function handler(req, res) {
         path: "/api/education/events",
         timeoutMs: 290_000,
         sse: true,
+      });
+      return;
+    }
+
+    if (route === "file") {
+      if (method !== "GET") {
+        res.setHeader("Allow", "GET");
+        res.status(405).json({ ok: false, error: "method not allowed" });
+        return;
+      }
+      const q = new URLSearchParams();
+      for (const key of ["scope", "name", "id", "classId", "projectId"]) {
+        const raw = req.query?.[key];
+        const val = Array.isArray(raw) ? raw[0] : raw;
+        if (val != null && String(val).trim() !== "") q.set(key, String(val));
+      }
+      const qs = q.toString();
+      await forwardEducation(req, res, {
+        method: "GET",
+        path: `/api/education/file${qs ? `?${qs}` : ""}`,
+        timeoutMs: 120_000,
+        binary: true,
       });
       return;
     }
