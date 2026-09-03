@@ -1371,7 +1371,7 @@
       : "";
     return `<li class="edu-row edu-todo${done ? " is-done" : ""}" data-todo-id="${escapeHtml(
       t.id
-    )}"${classAttr}${projectAttr}>
+    )}" data-due-date="${escapeHtml(t.dueDate || "")}"${classAttr}${projectAttr}>
       <button type="button" class="edu-check${done ? " is-checked" : ""}" data-liquid-glass="circle" data-filter-id="lg-edu-check-${escapeHtml(
         t.projectId
           ? `p-${t.projectId}-${t.id}`
@@ -1617,6 +1617,44 @@
     return `<ul class="edu-list">${itemsHtml}</ul>`;
   }
 
+  function todoDayKey(t) {
+    return String(t?.dueDate || "");
+  }
+
+  function todoDaySepHtml() {
+    return `<li class="edu-day-sep" aria-hidden="true"></li>`;
+  }
+
+  /** Open TODO rows with a hairline between different due dates. */
+  function todoListItemsHtml(todos) {
+    const parts = [];
+    let prev = null;
+    for (const t of todos) {
+      const key = todoDayKey(t);
+      if (prev !== null && key !== prev) parts.push(todoDaySepHtml());
+      parts.push(todoRowHtml(t));
+      prev = key;
+    }
+    return parts.join("");
+  }
+
+  function syncTodoDaySeparators(list) {
+    if (!list) return;
+    list.querySelectorAll(":scope > .edu-day-sep").forEach((el) => el.remove());
+    const rows = [...list.querySelectorAll(":scope > .edu-todo")];
+    let prev = null;
+    for (const row of rows) {
+      const key = row.getAttribute("data-due-date") || "";
+      if (prev !== null && key !== prev) {
+        const sep = document.createElement("li");
+        sep.className = "edu-day-sep";
+        sep.setAttribute("aria-hidden", "true");
+        list.insertBefore(sep, row);
+      }
+      prev = key;
+    }
+  }
+
   const EDU_BACK_PATH =
     "M 18.13 25.56 L 45.69 9.65 Q 59.19 1.85 59.19 17.44 L 59.19 49.26 Q 59.19 64.85 45.69 57.06 L 18.13 41.15 Q 4.63 33.35 18.13 25.56 Z";
 
@@ -1690,7 +1728,7 @@
     appEl.innerHTML = `
       <div class="edu-grid edu-grid--home">
         <div class="edu-col edu-col--main">
-          ${panelHtml("TODO", listOrEmpty(open.map(todoRowHtml).join("")), {
+          ${panelHtml("TODO", listOrEmpty(todoListItemsHtml(open)), {
             filterId: "lg-edu-todo",
             headExtra: filterBarHtml(),
           })}
@@ -1755,7 +1793,7 @@
       ${classDesc ? markdownPanelHtml(classDesc, "lg-edu-class-desc") : ""}
       <div class="edu-grid edu-grid--home">
         <div class="edu-col edu-col--main">
-          ${panelHtml("TODO", listOrEmpty(open.map(todoRowHtml).join("")), {
+          ${panelHtml("TODO", listOrEmpty(todoListItemsHtml(open)), {
             filterId: "lg-edu-class-todo",
             headExtra: filterBarHtml(),
           })}
@@ -1807,7 +1845,7 @@
       ${projectDesc ? markdownPanelHtml(projectDesc, "lg-edu-project-desc") : ""}
       <div class="edu-grid edu-grid--home">
         <div class="edu-col edu-col--main">
-          ${panelHtml("TODO", listOrEmpty(open.map(todoRowHtml).join("")), {
+          ${panelHtml("TODO", listOrEmpty(todoListItemsHtml(open)), {
             filterId: "lg-edu-project-todo",
             headExtra: filterBarHtml(),
           })}
@@ -2113,8 +2151,10 @@
 
   function markPanelEmptyIfNeeded(panel) {
     const list = panel.querySelector(":scope > .edu-list");
-    if (list && list.children.length) return;
-    list?.remove();
+    if (list) {
+      if (list.querySelector(":scope > .edu-row")) return;
+      list.remove();
+    }
     if (!panel.querySelector(":scope > .edu-empty")) {
       const empty = document.createElement("p");
       empty.className = "edu-empty";
@@ -2211,13 +2251,14 @@
 
     if (row.parentElement !== targetList) {
       row.remove();
-      markPanelEmptyIfNeeded(sourcePanel);
       insertTodoRowSorted(
         targetList,
         row,
         findTodoById(todoId, { classId, projectId }),
         nextDone
       );
+      syncTodoDaySeparators(openPanel.querySelector(":scope > .edu-list"));
+      markPanelEmptyIfNeeded(sourcePanel);
     }
     return true;
   }

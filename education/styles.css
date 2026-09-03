@@ -997,6 +997,17 @@ html[data-resolved-theme="light"] .edu-filter.is-on {
   gap: 0.3rem;
 }
 
+.edu-day-sep {
+  flex: 0 0 auto;
+  height: 1px;
+  margin: 0.2rem 0.65rem;
+  padding: 0;
+  border: 0;
+  background: var(--hairline);
+  pointer-events: none;
+  list-style: none;
+}
+
 .edu-row {
   display: flex;
   align-items: flex-start;

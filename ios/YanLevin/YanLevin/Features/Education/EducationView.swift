@@ -1374,13 +1374,18 @@ private struct EducationTodoPanel: View {
                         .foregroundStyle(YLTheme.muted(colorScheme))
                         .padding(.vertical, 6)
                 } else {
-                    ForEach(todos) { todo in
-                        EducationTodoRow(
-                            todo: todo,
-                            className: showClass ? className(todo) : nil,
-                            use24Hour: use24Hour,
-                            onToggleDone: { onToggleDone(todo) }
-                        )
+                    ForEach(Array(todos.enumerated()), id: \.element.id) { index, todo in
+                        VStack(alignment: .leading, spacing: 0) {
+                            if showsDaySeparator(before: index) {
+                                EducationTodoDaySeparator()
+                            }
+                            EducationTodoRow(
+                                todo: todo,
+                                className: showClass ? className(todo) : nil,
+                                use24Hour: use24Hour,
+                                onToggleDone: { onToggleDone(todo) }
+                            )
+                        }
                     }
                 }
             }
@@ -1388,6 +1393,28 @@ private struct EducationTodoPanel: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .ylGlassRounded(cornerRadius: 22, interactive: true)
+    }
+
+    private func showsDaySeparator(before index: Int) -> Bool {
+        guard index > 0, index < todos.count else { return false }
+        return Self.dayKey(todos[index - 1]) != Self.dayKey(todos[index])
+    }
+
+    private static func dayKey(_ todo: EducationTodo) -> String {
+        todo.dueDateValue ?? ""
+    }
+}
+
+private struct EducationTodoDaySeparator: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Rectangle()
+            .fill(YLTheme.fg(colorScheme).opacity(0.12))
+            .frame(height: 1)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .accessibilityHidden(true)
     }
 }
 
