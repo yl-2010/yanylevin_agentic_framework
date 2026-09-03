@@ -1000,7 +1000,7 @@ html[data-resolved-theme="light"] .edu-filter.is-on {
 .edu-day-sep {
   flex: 0 0 auto;
   height: 1px;
-  margin: 0.2rem 0.65rem;
+  margin: 0.42rem 0.65rem;
   padding: 0;
   border: 0;
   background: var(--hairline);

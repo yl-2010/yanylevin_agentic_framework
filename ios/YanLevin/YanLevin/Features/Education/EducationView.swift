@@ -1413,7 +1413,7 @@ private struct EducationTodoDaySeparator: View {
             .fill(YLTheme.fg(colorScheme).opacity(0.12))
             .frame(height: 1)
             .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .padding(.vertical, 8)
             .accessibilityHidden(true)
     }
 }
