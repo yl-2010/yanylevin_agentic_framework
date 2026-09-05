@@ -4,7 +4,7 @@
  * and keep Personal + EPS OneDrive accounts running on Mac.
  *
  * Watches local changes → commit + push those paths.
- * Polls origin → pull --rebase when remote moves.
+ * Polls origin → fast-forward when local has no extra commits, else pull --rebase.
  * On each poll, relaunches OneDrive if either signed-in account quit.
  *
  * Paths:
@@ -14,7 +14,7 @@
  * Run via LaunchAgent com.personalagent.education-sync (Mac Studio + MacBook).
  */
 
-import { watch, writeSync, statSync } from "node:fs";
+import { watch, writeSync, statSync, unlinkSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +33,8 @@ const PATHS = [
 const DEBOUNCE_MS = Number(process.env.EDU_SYNC_DEBOUNCE_MS || 2500);
 const POLL_MS = Number(process.env.EDU_SYNC_POLL_MS || 20000);
 const GIT_TIMEOUT_MS = Number(process.env.EDU_SYNC_GIT_TIMEOUT_MS || 45000);
+const PULL_TIMEOUT_MS = Number(process.env.EDU_SYNC_PULL_TIMEOUT_MS || 300000);
+const STALE_LOCK_MS = Number(process.env.EDU_SYNC_STALE_LOCK_MS || 15000);
 const GIT_SSH_COMMAND =
   process.env.GIT_SSH_COMMAND ||
   "ssh -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=5 -o ServerAliveCountMax=3";
@@ -61,15 +63,16 @@ function log(...args) {
 
 /**
  * @param {string[]} args
- * @param {{ allowFail?: boolean }} [opts]
+ * @param {{ allowFail?: boolean, timeout?: number }} [opts]
  */
 async function git(args, opts = {}) {
+  const timeout = opts.timeout ?? GIT_TIMEOUT_MS;
   try {
     const { stdout, stderr } = await execFileAsync("git", args, {
       cwd: ROOT,
       maxBuffer: 10 * 1024 * 1024,
-      timeout: GIT_TIMEOUT_MS,
-      killSignal: "SIGKILL",
+      timeout,
+      killSignal: "SIGTERM",
       env: {
         ...process.env,
         GIT_TERMINAL_PROMPT: "0",
@@ -83,9 +86,10 @@ async function git(args, opts = {}) {
       stderr: String(stderr || ""),
     };
   } catch (err) {
-    const timedOut = Boolean(err.killed) || err.signal === "SIGKILL";
+    const timedOut =
+      Boolean(err.killed) || err.signal === "SIGTERM" || err.signal === "SIGKILL";
     const stderr = timedOut
-      ? `timed out after ${GIT_TIMEOUT_MS}ms`
+      ? `timed out after ${timeout}ms`
       : String(err.stderr || err.message || "");
     if (opts.allowFail) {
       return {
@@ -96,6 +100,43 @@ async function git(args, opts = {}) {
       };
     }
     throw timedOut ? new Error(stderr) : err;
+  }
+}
+
+/** True if a live process has .git/index.lock open. */
+async function lockHasHolder(lockPath) {
+  try {
+    const { stdout } = await execFileAsync("lsof", [lockPath], {
+      timeout: 5000,
+      maxBuffer: 64 * 1024,
+    });
+    return Boolean(String(stdout || "").trim());
+  } catch (err) {
+    if (err && err.code === 1) return false;
+    return true;
+  }
+}
+
+/** SIGKILL / crash can leave index.lock with nobody holding it. */
+async function clearStaleIndexLock() {
+  const lockPath = join(ROOT, ".git", "index.lock");
+  let st;
+  try {
+    st = statSync(lockPath);
+  } catch {
+    return;
+  }
+  if (await lockHasHolder(lockPath)) return;
+  const ageMs = Date.now() - st.mtimeMs;
+  if (ageMs < STALE_LOCK_MS) return;
+  try {
+    unlinkSync(lockPath);
+    log(`removed stale .git/index.lock (${Math.round(ageMs / 1000)}s old)`);
+  } catch (err) {
+    log(
+      "could not remove index.lock:",
+      err instanceof Error ? err.message : err
+    );
   }
 }
 
@@ -187,7 +228,7 @@ async function commitLocalIfNeeded() {
   return true;
 }
 
-async function pullRebase() {
+async function pullRemote() {
   const fetch = await git(["fetch", "origin", "main"], { allowFail: true });
   if (!fetch.ok) {
     log("fetch failed:", fetch.stderr.trim() || fetch.stdout.trim());
@@ -201,16 +242,31 @@ async function pullRebase() {
   ]);
   if (String(behind).trim() === "0") return false;
 
-  const pull = await git(
-    ["-c", "rebase.autoStash=true", "pull", "--rebase", "origin", "main"],
-    { allowFail: true }
-  );
+  const { stdout: ahead } = await git([
+    "rev-list",
+    "--count",
+    "origin/main..HEAD",
+  ]);
+  const canFf = String(ahead).trim() === "0";
+  const pull = canFf
+    ? await git(["merge", "--ff-only", "origin/main"], {
+        allowFail: true,
+        timeout: PULL_TIMEOUT_MS,
+      })
+    : await git(
+        ["-c", "rebase.autoStash=true", "pull", "--rebase", "origin", "main"],
+        { allowFail: true, timeout: PULL_TIMEOUT_MS }
+      );
   if (!pull.ok) {
-    log("pull --rebase failed:", pull.stderr.trim() || pull.stdout.trim());
-    await git(["rebase", "--abort"], { allowFail: true });
+    log(
+      canFf ? "merge --ff-only failed:" : "pull --rebase failed:",
+      pull.stderr.trim() || pull.stdout.trim()
+    );
+    if (!canFf) await git(["rebase", "--abort"], { allowFail: true });
+    await clearStaleIndexLock();
     return false;
   }
-  log("pulled origin/main");
+  log(canFf ? "fast-forwarded origin/main" : "pulled origin/main");
   return true;
 }
 
@@ -225,7 +281,7 @@ async function pushIfNeeded() {
   const push = await git(["push", "origin", "main"], { allowFail: true });
   if (!push.ok) {
     log("push failed:", push.stderr.trim() || push.stdout.trim());
-    // Someone else pushed — next cycle will rebase.
+    // Someone else pushed — next cycle will pull.
     return false;
   }
   log("pushed to origin/main");
@@ -239,8 +295,9 @@ async function syncCycle(reason) {
     syncing = true;
     try {
       log(`sync (${reason})`);
+      await clearStaleIndexLock();
       await commitLocalIfNeeded();
-      await pullRebase();
+      await pullRemote();
       // After rebase, local folder edits may need another commit (rare).
       await commitLocalIfNeeded();
       await pushIfNeeded();
@@ -283,7 +340,9 @@ function startWatchers() {
 async function main() {
   log(`starting in ${ROOT}`);
   log(`paths: ${PATHS.join(", ")}`);
-  log(`debounce=${DEBOUNCE_MS}ms poll=${POLL_MS}ms gitTimeout=${GIT_TIMEOUT_MS}ms`);
+  log(
+    `debounce=${DEBOUNCE_MS}ms poll=${POLL_MS}ms gitTimeout=${GIT_TIMEOUT_MS}ms pullTimeout=${PULL_TIMEOUT_MS}ms`
+  );
 
   startWatchers();
   await ensureOneDriveRunning().catch((err) => {

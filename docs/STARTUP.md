@@ -39,8 +39,8 @@ Keeps these paths in sync with `origin/main`:
 
 Behavior:
 
-- Local file changes → debounce → commit → pull `--rebase` → push
-- Remote changes → poll (~20s) → pull `--rebase`. Git fetch/push die after 45s so a hung SSH cannot block later polls.
+- Local file changes → debounce → commit → pull → push
+- Remote changes → poll (~20s) → fast-forward when this Mac has no extra commits, otherwise pull `--rebase`. Fetch/push die after 45s so a hung SSH cannot block later polls. Catch-up merges get 5 minutes. A leftover `.git/index.lock` with no holder is deleted so a killed git cannot freeze sync.
 - Same poll: if fewer than two `OneDrive` GUI processes are running, optionally relaunch OneDrive. Waits 2 minutes between retries if launch fails.
 
 Install / reload on each Mac (repo path `$HOME/yanylevin_agentic_framework`, Homebrew node):

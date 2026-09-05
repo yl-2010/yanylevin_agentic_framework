@@ -576,7 +576,7 @@ html[data-resolved-theme="dark"] .edu-check.lg-refraction::after {
 
 .edu-hero-title--class {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
 }
@@ -1017,7 +1017,8 @@ html[data-resolved-theme="light"] .edu-filter.is-on {
   transition: background 0.2s var(--ease);
 }
 
-.edu-row.edu-todo {
+.edu-row.edu-todo,
+.edu-row.edu-class-row {
   align-items: center;
 }
 
@@ -1043,6 +1044,11 @@ html[data-resolved-theme="light"] .edu-filter.is-on {
   min-width: 0;
 }
 
+.edu-class-row .edu-row-link {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
 .edu-name {
   font-weight: 600;
 }
@@ -1059,6 +1065,11 @@ html[data-resolved-theme="light"] .edu-filter.is-on {
 }
 
 .edu-period {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 1.375rem;
+  width: 1.375rem;
   font-size: var(--text-caption);
   font-weight: 700;
   line-height: 1;
@@ -1070,6 +1081,8 @@ html[data-resolved-theme="light"] .edu-filter.is-on {
   font-weight: 700;
   line-height: 1;
   flex: 0 0 auto;
+  width: auto;
+  justify-content: flex-start;
 }
 
 .edu-todo.is-done .edu-name {

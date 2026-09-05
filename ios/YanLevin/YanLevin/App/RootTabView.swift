@@ -158,7 +158,7 @@ struct RootTabView: View {
             }
         }
         .modifier(AdaptiveTabStyleModifier(isRegularWidth: AdaptiveLayout.isRegularWidth(horizontalSizeClass)))
-        .modifier(LiquidTabBarModifier())
+        .modifier(LiquidTabBarModifier(selectedTab: nav.selectedTab))
         .background {
             TabReselectObserver {
                 nav.noteTabReselect()
@@ -289,10 +289,15 @@ private struct AdaptiveTabStyleModifier: ViewModifier {
 }
 
 private struct LiquidTabBarModifier: ViewModifier {
+    let selectedTab: RootTab
+
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {
+            // Chat is the prominent tab, so minimizing it duplicates the chat
+            // icon on both circles. Education is the only tab where collapse
+            // looks right (cap on the left, chat on the right).
             content
-                .tabBarMinimizeBehavior(.onScrollDown)
+                .tabBarMinimizeBehavior(selectedTab == .education ? .onScrollDown : .never)
         } else {
             content
         }
