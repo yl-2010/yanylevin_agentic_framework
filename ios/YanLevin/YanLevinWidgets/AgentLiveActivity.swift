@@ -52,7 +52,7 @@ private struct AgentLiveActivityBody: View {
                 AgentLiveActivityRows(state: state, limit: 1)
             }
         }
-        .padding(12)
+        .padding(LiveActivityChrome.lockScreenPad)
         .background { LiveActivityBannerBackground() }
         .liveActivityLockScreenChrome()
     }

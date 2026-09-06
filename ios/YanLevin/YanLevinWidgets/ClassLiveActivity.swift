@@ -75,7 +75,7 @@ private struct ClassLiveActivityBody: View {
             ClassLiveActivityMeter(state: state)
             ClassLiveActivityAssignments(state: state, compact: false)
         }
-        .padding(14)
+        .padding(LiveActivityChrome.lockScreenPad)
         .background { LiveActivityBannerBackground() }
         .liveActivityLockScreenChrome()
     }

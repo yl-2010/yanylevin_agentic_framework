@@ -3,9 +3,10 @@ import SwiftUI
 /// Shared Live Activity chrome: calmer palette than the app, YL mark, busy pulse.
 enum LiveActivityChrome {
     /// Dynamic Island expanded corner radius is 44pt. Keep content inside that curve.
-    static let islandBottomPad: CGFloat = 22
-    static let islandSidePad: CGFloat = 18
-    static let islandEarPad: CGFloat = 20
+    static let islandBottomPad: CGFloat = 16
+    static let islandSidePad: CGFloat = 14
+    static let islandEarPad: CGFloat = 16
+    static let lockScreenPad: CGFloat = 16
 }
 
 /// Live Activity colors only. App `YLTheme` stays as-is.
