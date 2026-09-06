@@ -71,6 +71,7 @@ education/<email>/
   - **Defaults:** `tag: "MA"` → `showInDates` defaults **on** (omit or `true`); any other todo → defaults **off**
   - Set `showInDates: false` when the user asks to hide a specific MA from Dates; set `showInDates: true` when they ask to show a non-MA todo in Dates
   - **Open TODO sort (web + iOS):** earliest `dueDate` first (overdue included); undated below all dated; same date → timed above date-only; exact same due (or both undated) → older `createdAt` above newer (most recently added at the bottom)
+  - **Class page Completed (web + iOS only):** a checked-off todo stays in that class's TODO list (struck through) until the class period it is due in ends. If the due time is outside that class's period, or the class does not meet that day, it stays until the end of this class's next meeting after the due datetime. Date-only due = start of that day, so a class that meets later that day is the one that counts. No due date → Completed immediately. Home and project pages still move to Completed as soon as the box is checked.
 - **date.json:** `name`; `date`; optional `time`, `description` (always markdown when set); optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays); optional `canvasLink` / `canvasId` (same Canvas button as todos, used for syllabus or calendar-event dates)
   - Dates / showInDates todos under a **class** filter as the education-hat (`class`) category
   - Dates / showInDates todos under the **PathIvy** project filter as `pa` (PA circle)

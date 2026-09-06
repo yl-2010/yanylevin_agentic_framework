@@ -25,6 +25,7 @@
   const DATE_FILTERS_PATHIVY = ["ma", "pa"];
   const DATE_FILTERS_PROJECT = ["ma", "loose"];
   const DATES_COLLAPSED_LIMIT = 6;
+  const TODOS_COLLAPSED_LIMIT = 6;
   const GRAD_CAP_SVG =
     '<svg class="edu-filter-cap" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3zm-7 12.18v2.66c0 .74 1.94 2.16 7 2.16s7-1.42 7-2.16v-2.66l-7 3.82-7-3.82z"/></svg>';
   const THUMB_UP_SVG =
@@ -84,6 +85,8 @@
   let dateFilter = loadDateFilters();
   /** Dates panel: collapsed shows upcoming 6; expanded shows all. */
   let datesExpanded = false;
+  /** TODO panel: web starts fully expanded; collapsed shows 6 and hides type filters. */
+  let todoExpanded = true;
   let route = parseRoute();
 
   function show(name) {
@@ -1348,6 +1351,22 @@
     });
   }
 
+  function todoPanelHtml(openTodos, filterId = "lg-edu-todo") {
+    const visible = todoExpanded
+      ? openTodos
+      : openTodos.slice(0, TODOS_COLLAPSED_LIMIT);
+    const titleHtml = `<button type="button" class="edu-todos-toggle" data-todos-expand aria-expanded="${
+      todoExpanded ? "true" : "false"
+    }" aria-label="${
+      todoExpanded ? "Collapse todos" : "Expand todos"
+    }">TODO</button>`;
+    return panelHtml("TODO", listOrEmpty(todoListItemsHtml(visible)), {
+      filterId,
+      titleHtml,
+      headExtra: todoExpanded ? filterBarHtml() : "",
+    });
+  }
+
   function todoRowHtml(t) {
     const done = Boolean(t.done);
     const tag = todoTagKey(t);
@@ -1490,6 +1509,132 @@
       day = addDays(day.y, day.m, day.day, 1);
     }
     return null;
+  }
+
+  function ymdPartsFromKey(s) {
+    const p = parseYmd(s);
+    if (!p) return null;
+    const dt = new Date(p.y, p.m - 1, p.day);
+    return { y: p.y, m: p.m, day: p.day, weekday: dt.getDay() };
+  }
+
+  function classMeetingOnDay(cls, day, schedule) {
+    const meetings = classesForDay(day, schedule, [cls]);
+    return meetings.find((m) => m.class?.id === cls.id) || meetings[0] || null;
+  }
+
+  /**
+   * End of the meeting that gates Completed on the class page.
+   * Due during this class → that period's end. Otherwise the next meeting
+   * of this class after the due datetime. Null → move immediately.
+   */
+  function classTodoArchiveMeeting(todo, cls, schedule) {
+    const dueDay = ymdPartsFromKey(todo?.dueDate);
+    if (!dueDay || !cls) return null;
+    const dueMin = timeToMinutes(todo.dueTime);
+    const dueMinutes = dueMin == null ? 0 : dueMin;
+
+    if (isSchoolDay(dueDay, schedule)) {
+      const sameDay = classMeetingOnDay(cls, dueDay, schedule);
+      if (
+        sameDay &&
+        sameDay.startMin != null &&
+        sameDay.endMin != null &&
+        dueMinutes >= sameDay.startMin &&
+        dueMinutes < sameDay.endMin
+      ) {
+        return { dateKey: dateKeyOf(dueDay), endMin: sameDay.endMin };
+      }
+    }
+
+    let day = { ...dueDay };
+    for (let i = 0; i < 120; i++) {
+      if (isSchoolDay(day, schedule)) {
+        const meeting = classMeetingOnDay(cls, day, schedule);
+        if (meeting && meeting.endMin != null) {
+          const isDueDay =
+            day.y === dueDay.y && day.m === dueDay.m && day.day === dueDay.day;
+          if (
+            !isDueDay ||
+            (meeting.startMin != null && meeting.startMin > dueMinutes)
+          ) {
+            return { dateKey: dateKeyOf(day), endMin: meeting.endMin };
+          }
+        }
+      }
+      day = addDays(day.y, day.m, day.day, 1);
+    }
+    return null;
+  }
+
+  function classTodoReadyForCompleted(todo, cls, schedule, now = todayParts()) {
+    if (!todo?.done) return false;
+    const meeting = classTodoArchiveMeeting(todo, cls, schedule);
+    if (!meeting) return true;
+    const nowKey = dateKeyOf(now);
+    if (nowKey > meeting.dateKey) return true;
+    if (nowKey < meeting.dateKey) return false;
+    return meeting.endMin != null && now.minutes >= meeting.endMin;
+  }
+
+  function partitionClassPageTodos(todos, cls, schedule) {
+    const open = [];
+    const completed = [];
+    for (const t of todos) {
+      if (t.done && classTodoReadyForCompleted(t, cls, schedule)) {
+        completed.push(t);
+      } else {
+        open.push(t);
+      }
+    }
+    open.sort((a, b) => dueSortKey(a).localeCompare(dueSortKey(b)));
+    completed.sort((a, b) =>
+      completedSortKey(b).localeCompare(completedSortKey(a))
+    );
+    return { open, completed };
+  }
+
+  function msUntilClassTodoArchive(todo, cls, schedule) {
+    const meeting = classTodoArchiveMeeting(todo, cls, schedule);
+    if (!meeting || meeting.endMin == null) return null;
+    const day = parseYmd(meeting.dateKey);
+    if (!day) return null;
+    const end = new Date(
+      day.y,
+      day.m - 1,
+      day.day,
+      Math.floor(meeting.endMin / 60),
+      meeting.endMin % 60,
+      0,
+      0
+    );
+    return end.getTime() - Date.now();
+  }
+
+  let classTodoArchiveTimer = 0;
+
+  function clearClassTodoArchiveTimer() {
+    if (classTodoArchiveTimer) {
+      window.clearTimeout(classTodoArchiveTimer);
+      classTodoArchiveTimer = 0;
+    }
+  }
+
+  function armClassTodoArchiveTimer(cls, todos) {
+    clearClassTodoArchiveTimer();
+    if (!cls || route.view !== "class") return;
+    const schedule = tree?.schedule || {};
+    let soonest = Infinity;
+    for (const t of todos || []) {
+      if (!t.done || classTodoReadyForCompleted(t, cls, schedule)) continue;
+      const ms = msUntilClassTodoArchive(t, cls, schedule);
+      if (ms != null && ms > 0 && ms < soonest) soonest = ms;
+    }
+    if (soonest === Infinity) return;
+    classTodoArchiveTimer = window.setTimeout(() => {
+      classTodoArchiveTimer = 0;
+      if (route.view === "class") render({ scroll: "keep" });
+    }, Math.min(soonest + 250, 2147483647));
   }
 
   function formatNextClassWhen(next) {
@@ -1728,10 +1873,7 @@
     appEl.innerHTML = `
       <div class="edu-grid edu-grid--home">
         <div class="edu-col edu-col--main">
-          ${panelHtml("TODO", listOrEmpty(todoListItemsHtml(open)), {
-            filterId: "lg-edu-todo",
-            headExtra: filterBarHtml(),
-          })}
+          ${todoPanelHtml(open, "lg-edu-todo")}
           ${panelHtml("Completed", listOrEmpty(completed.map(todoRowHtml).join("")), {
             filterId: "lg-edu-completed",
             extraClass: "edu-panel--completed",
@@ -1758,12 +1900,11 @@
       return;
     }
     const todos = flattenTodos(tree, { classId: cls.id }).filter(matchesFilter);
-    const open = todos
-      .filter((t) => !t.done)
-      .sort((a, b) => dueSortKey(a).localeCompare(dueSortKey(b)));
-    const completed = todos
-      .filter((t) => t.done)
-      .sort((a, b) => completedSortKey(b).localeCompare(completedSortKey(a)));
+    const { open, completed } = partitionClassPageTodos(
+      todos,
+      cls,
+      tree.schedule || {}
+    );
 
     const nextWhen = formatNextClassWhen(
       nextClassOccurrence(cls, tree.schedule || {})
@@ -1793,10 +1934,7 @@
       ${classDesc ? markdownPanelHtml(classDesc, "lg-edu-class-desc") : ""}
       <div class="edu-grid edu-grid--home">
         <div class="edu-col edu-col--main">
-          ${panelHtml("TODO", listOrEmpty(todoListItemsHtml(open)), {
-            filterId: "lg-edu-class-todo",
-            headExtra: filterBarHtml(),
-          })}
+          ${todoPanelHtml(open, "lg-edu-class-todo")}
           ${panelHtml("Completed", listOrEmpty(completed.map(todoRowHtml).join("")), {
             filterId: "lg-edu-class-completed",
             extraClass: "edu-panel--completed",
@@ -1810,6 +1948,7 @@
         </div>
       </div>
     `;
+    armClassTodoArchiveTimer(cls, todos);
   }
 
   function renderProject() {
@@ -1845,10 +1984,7 @@
       ${projectDesc ? markdownPanelHtml(projectDesc, "lg-edu-project-desc") : ""}
       <div class="edu-grid edu-grid--home">
         <div class="edu-col edu-col--main">
-          ${panelHtml("TODO", listOrEmpty(todoListItemsHtml(open)), {
-            filterId: "lg-edu-project-todo",
-            headExtra: filterBarHtml(),
-          })}
+          ${todoPanelHtml(open, "lg-edu-project-todo")}
           ${panelHtml("Completed", listOrEmpty(completed.map(todoRowHtml).join("")), {
             filterId: "lg-edu-project-completed",
             extraClass: "edu-panel--completed",
@@ -2119,6 +2255,7 @@
       window.setTimeout(() => appEl.classList.add("is-settled"), 1100);
     }
 
+    clearClassTodoArchiveTimer();
     if (route.view === "class") renderClass();
     else if (route.view === "project") renderProject();
     else if (route.view === "capsule") renderCapsuleDetail();
@@ -2245,20 +2382,37 @@
       appEl.querySelector('[data-filter-id="lg-edu-project-completed"]');
     if (!openPanel || !donePanel) return true;
 
-    const targetPanel = nextDone ? donePanel : openPanel;
-    const sourcePanel = nextDone ? openPanel : donePanel;
+    const todo = findTodoById(todoId, { classId, projectId });
+    let linger = false;
+    if (route.view === "class" && nextDone && classId) {
+      const cls = (tree.classes || []).find((c) => c.id === classId);
+      linger = Boolean(
+        cls && !classTodoReadyForCompleted(todo, cls, tree.schedule || {})
+      );
+    }
+    const stayOpen = !nextDone || linger;
+    const targetPanel = stayOpen ? openPanel : donePanel;
+    const sourcePanel = stayOpen ? donePanel : openPanel;
     const targetList = ensurePanelList(targetPanel);
 
     if (row.parentElement !== targetList) {
       row.remove();
-      insertTodoRowSorted(
-        targetList,
-        row,
-        findTodoById(todoId, { classId, projectId }),
-        nextDone
-      );
+      insertTodoRowSorted(targetList, row, todo, !stayOpen);
       syncTodoDaySeparators(openPanel.querySelector(":scope > .edu-list"));
       markPanelEmptyIfNeeded(sourcePanel);
+      if (!todoExpanded) {
+        render({ scroll: "keep" });
+        return true;
+      }
+    }
+    if (route.view === "class" && classId) {
+      const cls = (tree.classes || []).find((c) => c.id === classId);
+      if (cls) {
+        armClassTodoArchiveTimer(
+          cls,
+          flattenTodos(tree, { classId: cls.id })
+        );
+      }
     }
     return true;
   }
@@ -2455,6 +2609,14 @@
       if (datesToggle) {
         event.preventDefault();
         datesExpanded = !datesExpanded;
+        render();
+        return;
+      }
+
+      const todosToggle = t.closest?.("[data-todos-expand]");
+      if (todosToggle) {
+        event.preventDefault();
+        todoExpanded = !todoExpanded;
         render();
         return;
       }

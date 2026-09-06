@@ -170,6 +170,155 @@ enum EducationScheduleHelper {
         return nil
     }
 
+    /// End of the meeting that gates Completed on the class page.
+    /// Due during this class → that period's end. Otherwise the next meeting
+    /// of this class after the due datetime. Nil → move immediately.
+    static func classTodoArchiveAt(
+        todo: EducationTodo,
+        cls: EducationClass,
+        schedule: EducationSchedule?,
+        activeClassIdsByDate: [String: [String]]?
+    ) -> Date? {
+        guard let dueKey = todo.dueDateValue, !dueKey.isEmpty,
+              var day = ymdFromKey(dueKey)
+        else { return nil }
+        let schedule = schedule ?? EducationSchedule(
+            timezone: nil,
+            schoolStart: nil,
+            schoolEnd: nil,
+            bells: nil,
+            weekdayPeriods: nil,
+            closedDates: nil,
+            dayOverrides: nil
+        )
+        let query = ScheduleQuery(schedule: schedule)
+        let dueMinutes = timeToMinutes(todo.dueTimeValue) ?? 0
+
+        if isSchoolDay(day, query: query) {
+            if let meeting = classMeeting(
+                cls,
+                on: day,
+                query: query,
+                activeClassIdsByDate: activeClassIdsByDate
+            ),
+               let start = meeting.startMin,
+               let end = meeting.endMin,
+               dueMinutes >= start,
+               dueMinutes < end
+            {
+                return meetingEndDate(day: day, endMin: end)
+            }
+        }
+
+        for _ in 0..<120 {
+            if isSchoolDay(day, query: query),
+               let meeting = classMeeting(
+                cls,
+                on: day,
+                query: query,
+                activeClassIdsByDate: activeClassIdsByDate
+               ),
+               let end = meeting.endMin
+            {
+                let isDueDay = dateKey(day) == dueKey
+                if !isDueDay {
+                    return meetingEndDate(day: day, endMin: end)
+                }
+                if let start = meeting.startMin, start > dueMinutes {
+                    return meetingEndDate(day: day, endMin: end)
+                }
+            }
+            day = addDays(day, 1)
+        }
+        return nil
+    }
+
+    /// Checked-off class todos stay in the class TODO list until `classTodoArchiveAt`.
+    static func classTodoStaysInOpenList(
+        todo: EducationTodo,
+        cls: EducationClass,
+        schedule: EducationSchedule?,
+        activeClassIdsByDate: [String: [String]]?,
+        asOf: Date = Date()
+    ) -> Bool {
+        guard todo.done == true else { return true }
+        guard let archiveAt = classTodoArchiveAt(
+            todo: todo,
+            cls: cls,
+            schedule: schedule,
+            activeClassIdsByDate: activeClassIdsByDate
+        ) else { return false }
+        return asOf < archiveAt
+    }
+
+    static func nextClassTodoArchiveDate(
+        todos: [EducationTodo],
+        cls: EducationClass,
+        schedule: EducationSchedule?,
+        activeClassIdsByDate: [String: [String]]?,
+        asOf: Date = Date()
+    ) -> Date? {
+        var soonest: Date?
+        for todo in todos {
+            guard todo.done == true else { continue }
+            guard let archiveAt = classTodoArchiveAt(
+                todo: todo,
+                cls: cls,
+                schedule: schedule,
+                activeClassIdsByDate: activeClassIdsByDate
+            ), archiveAt > asOf
+            else { continue }
+            if soonest == nil || archiveAt < soonest! {
+                soonest = archiveAt
+            }
+        }
+        return soonest
+    }
+
+    private static func classMeeting(
+        _ cls: EducationClass,
+        on day: YMD,
+        query: ScheduleQuery,
+        activeClassIdsByDate: [String: [String]]?
+    ) -> DayClass? {
+        let meetings = classesForDay(
+            day,
+            query: query,
+            classes: [cls],
+            activeClassIdsByDate: activeClassIdsByDate
+        )
+        return meetings.first(where: { $0.cls.id == cls.id }) ?? meetings.first
+    }
+
+    private static func ymdFromKey(_ key: String) -> YMD? {
+        let parts = key.split(separator: "-")
+        guard parts.count == 3,
+              let y = Int(parts[0]),
+              let m = Int(parts[1]),
+              let day = Int(parts[2])
+        else { return nil }
+        let cal = Calendar.current
+        guard let date = cal.date(from: DateComponents(year: y, month: m, day: day)) else {
+            return nil
+        }
+        return YMD(
+            y: y,
+            m: m,
+            day: day,
+            weekday: cal.component(.weekday, from: date) - 1
+        )
+    }
+
+    private static func meetingEndDate(day: YMD, endMin: Int) -> Date? {
+        Calendar.current.date(from: DateComponents(
+            year: day.y,
+            month: day.m,
+            day: day.day,
+            hour: endMin / 60,
+            minute: endMin % 60
+        ))
+    }
+
     private struct YMD {
         var y: Int
         var m: Int

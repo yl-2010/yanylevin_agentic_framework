@@ -472,6 +472,7 @@ struct ClassDetailView: View {
     @State private var todoTypeFilters: Set<String> = EducationTodoFilter.load()
     @State private var datesExpanded = false
     @State private var dateFilters: Set<String> = EducationDateFilter.load()
+    @State private var archiveNow = Date()
 
     private static let collapsedTodoLimit = 6
 
@@ -543,6 +544,9 @@ struct ClassDetailView: View {
         .ylPageBackground()
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: classArchiveTaskId) {
+            await waitForClassTodoArchive()
+        }
         .toolbar {
             if let url = liveClass.canvasURL {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -583,9 +587,56 @@ struct ClassDetailView: View {
         (liveClass.todos ?? []).map { $0.withClassId(liveClass.id) }
     }
 
+    private var classSchedule: EducationSchedule? { store.tree?.schedule }
+    private var classActiveIds: [String: [String]]? { store.tree?.activeClassIdsByDate }
+
+    private var classAsOf: Date { max(archiveNow, Date()) }
+
+    private func classTodoStaysOpen(_ todo: EducationTodo) -> Bool {
+        EducationScheduleHelper.classTodoStaysInOpenList(
+            todo: todo,
+            cls: liveClass,
+            schedule: classSchedule,
+            activeClassIdsByDate: classActiveIds,
+            asOf: classAsOf
+        )
+    }
+
+    private var classArchiveTaskId: String {
+        classTodos
+            .filter { $0.done == true && classTodoStaysOpen($0) }
+            .map(\.id)
+            .sorted()
+            .joined(separator: ",")
+    }
+
+    private func waitForClassTodoArchive() async {
+        guard let fire = EducationScheduleHelper.nextClassTodoArchiveDate(
+            todos: classTodos,
+            cls: liveClass,
+            schedule: classSchedule,
+            activeClassIdsByDate: classActiveIds,
+            asOf: Date()
+        ) else { return }
+        let delay = fire.timeIntervalSinceNow + 0.25
+        if delay <= 0 {
+            archiveNow = Date()
+            return
+        }
+        do {
+            try await Task.sleep(for: .seconds(delay))
+        } catch {
+            return
+        }
+        archiveNow = Date()
+    }
+
     private func filteredClassTodos(done: Bool) -> [EducationTodo] {
         classTodos.filter { todo in
-            (todo.done == true) == done && todoTypeFilters.contains(todo.filterTagKey)
+            todoTypeFilters.contains(todo.filterTagKey) &&
+                (done
+                    ? todo.done == true && !classTodoStaysOpen(todo)
+                    : todo.done != true || classTodoStaysOpen(todo))
         }
     }
 

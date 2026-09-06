@@ -867,7 +867,8 @@ html[data-resolved-theme="dark"] .edu-back-shadow feGaussianBlur {
   min-width: 0;
 }
 
-.edu-dates-toggle {
+.edu-dates-toggle,
+.edu-todos-toggle {
   display: inline;
   margin: 0;
   padding: 0;
@@ -884,7 +885,8 @@ html[data-resolved-theme="dark"] .edu-back-shadow feGaussianBlur {
   text-align: left;
 }
 
-.edu-dates-toggle:focus-visible {
+.edu-dates-toggle:focus-visible,
+.edu-todos-toggle:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--accent) 65%, transparent);
   outline-offset: 3px;
   border-radius: 4px;
