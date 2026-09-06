@@ -204,6 +204,7 @@ Text-only and attachment turns both run on **grok-4.6 high** (not fast). The two
 - When creating a project, also merge its folder id and now (ISO) into `education/<email>/.projects-opened.json` so it sorts like a just-opened project (below `projectsTop`, above older unpinned). Create the file if missing. Keep other keys. Remove that id if the project is deleted. Do not git add this file.
 - Set/clear `canvasLink` (and `canvasId`) on todos/dates when the user provides a Canvas URL, or when following the personal-canvas sync skill for mapped classes. On mapped **classes**, set `class.json` `canvasLink` to the course gradebook (`htmlUrl` + `/grades`). Yan checks off `done` himself; Canvas sync must not copy completion.
 - Store chat attachments into object folders when they are useful context (identical file bytes)
+- When creating a static `.html` on a todo / date / project / class (quotes, errors, study sheet), read `.cursor/skills/object-html/SKILL.md`. One standalone file. Not the public webpage skill.
 - Maintain `schedule.json` when the PDF or calendar changes
 - Read OneDrive school files using `meta.json` `onedriveRoot` + `gradeFolder` (read-only unless asked to write). Yan’s Mac: `onedriveRoot` is `$HOME/Documents`; current year folder is `11th Grade`.
 - Browser / computer use: prefer Cursor Desktop on this repo, not cloud

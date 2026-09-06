@@ -62,6 +62,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Every reply (cut AI tells) | `.cursor/skills/unslop/SKILL.md` (always; see above) |
 | Every reply (persona / vibe) | `SOUL.md` at repo root (always; see above) |
 | Classes, todos, dates, projects, `/education` dashboard, chat attachments into school folders | `.cursor/skills/personal-agent/education-dashboard.md` |
+| Static HTML on a todo / date / project / class | `.cursor/skills/object-html/SKILL.md` |
 | Weekly PDF, `schedule.json`, bells, what class is now | `.cursor/skills/class-schedule/SKILL.md` |
 | Past Personal Agent transcripts | `.cursor/skills/past-chats/SKILL.md` |
 | Yan iPhone location (live + stays/trips) | `.cursor/skills/phone-location/SKILL.md` |
