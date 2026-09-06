@@ -46,11 +46,7 @@ private struct AgentLiveActivityBody: View {
                 Spacer(minLength: 0)
                 LiveActivityBusyDots()
             }
-            ViewThatFits(in: .vertical) {
-                AgentLiveActivityRows(state: state, limit: 3)
-                AgentLiveActivityRows(state: state, limit: 2)
-                AgentLiveActivityRows(state: state, limit: 1)
-            }
+            AgentLiveActivityRows(state: state)
         }
         .padding(LiveActivityChrome.lockScreenPad)
         .background { LiveActivityBannerBackground() }
@@ -86,7 +82,7 @@ private struct AgentLiveActivityIslandBottom: View {
                 }
                 .buttonStyle(.plain)
             }
-            if state.overflowCount > 0 {
+            if state.overflowCount > 0, state.agents.count >= 3 {
                 Text("+\(state.overflowCount) more")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(LiveActivityPalette.islandMuted)
@@ -106,11 +102,10 @@ private struct AgentLiveActivityIslandBottom: View {
 private struct AgentLiveActivityRows: View {
     @Environment(\.colorScheme) private var colorScheme
     let state: AgentActivityAttributes.ContentState
-    var limit: Int
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            ForEach(shown, id: \.sessionId) { row in
+            ForEach(state.agents, id: \.sessionId) { row in
                 Button(intent: OpenAgentChatIntent(sessionId: row.sessionId)) {
                     AgentLiveActivityLine(
                         row: row,
@@ -120,20 +115,12 @@ private struct AgentLiveActivityRows: View {
                 }
                 .buttonStyle(.plain)
             }
-            if extra > 0 {
-                Text("+\(extra) more")
+            if state.overflowCount > 0, state.agents.count >= 3 {
+                Text("+\(state.overflowCount) more")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(YLTheme.muted(colorScheme))
             }
         }
-    }
-
-    private var shown: [AgentActivityRow] {
-        Array(state.agents.prefix(limit))
-    }
-
-    private var extra: Int {
-        state.overflowCount + max(0, state.agents.count - shown.count)
     }
 }
 
