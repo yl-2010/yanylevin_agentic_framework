@@ -206,7 +206,7 @@ Text-only and attachment turns both run on **grok-4.6 high** (not fast). The two
 - Store chat attachments into object folders when they are useful context (identical file bytes)
 - When creating a static `.html` on a todo / date / project / class (quotes, errors, study sheet), read `.cursor/skills/object-html/SKILL.md`. One standalone file. Not the public webpage skill.
 - Maintain `schedule.json` when the PDF or calendar changes
-- Read OneDrive school files using `meta.json` `onedriveRoot` + `gradeFolder` (read-only unless asked to write). Yan’s Mac: `onedriveRoot` is `$HOME/Documents`; current year folder is `11th Grade`.
+- Read OneDrive school files using `meta.json` `onedriveRoot` + `gradeFolder` (read-only unless asked to write). Yan’s Mac: `onedriveRoot` is `$HOME/Documents`; current year folder is `11th Grade`. Class Notebooks are not those grade folders. Use `.cursor/skills/personal-onenote/SKILL.md` when a todo or question needs a OneNote page.
 - Browser / computer use: prefer Cursor Desktop on this repo, not cloud
 
 ## After edits

@@ -69,6 +69,9 @@ only phase that reads every source. You write nothing to the brain.
 - **Briefing memory** (light): `daily-briefing/profile.md`, `preferences.md`
   for new standing facts only.
 
+Not a source: OneNote / Class Notebooks. Do not run `school-onenote.js`. A
+Canvas or mail line that *mentions* OneNote is still just that line.
+
 ## Digest format
 
 ```markdown

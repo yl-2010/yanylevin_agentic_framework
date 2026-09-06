@@ -139,7 +139,7 @@ is when the Mail.app history fill last finished. That job deletes
 `/tmp/yanylevin-apple-mail-export` when it succeeds. A missing dump is
 expected. Do not retry it, do not write `notes.appleMail`, do not leave a
 cursor for it. Overnight personal mail is `mailSince` plus Mail.app
-(personal-mail skill).
+(personal-mail skill). OneNote is not a nightly source and has no cursor.
 
 ## Manual run
 

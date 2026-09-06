@@ -63,6 +63,9 @@ one-shot fill is running. After that job it is deleted. A missing dump is
 expected, not a failed ingest. A quiet overnight Inbox is not proof the
 confirmation does not exist.
 
+Do not scan OneNote. Open `.cursor/skills/personal-onenote/SKILL.md` only if
+a claim you are already checking is specifically about a OneNote page.
+
 Round-trip confirmations: read every leg, not the subject-line outbound. A Tesla subject that says "processing" can still post a refund line in the same body. Search Exchange first, then Google, then iCloud. Do not stop at the since-cursor window.
 
 ## How to correct

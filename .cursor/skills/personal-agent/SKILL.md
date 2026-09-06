@@ -18,8 +18,8 @@ The public site chatbot and LM Studio wiring are separate. The **/education** we
 
 - Allowed users: `you@example.com`, `you@example.com`
 - Web/iOS sessions inject the signed-in email; Cursor Desktop on Yan’s Mac defaults to Yan unless the user names Alex
-- **Yan (`you@example.com`):** full write access — any path in this repo **and** anywhere on the Mac Studio filesystem when asked. Do not refuse repo-wide or Mac-wide work. Mail.app, Calendar, Contacts, iMessage, Screen Time, Canvas, phone location, and Apple Health dumps are Yan-only.
-- **Alex (`you@example.com`):** write **only** under `education/you@example.com/`. Read-only outside that folder is fine when needed. **Never** Mail.app / `osascript` mail. **Never** Apple Calendar, Contacts, Messages/`chat.db`, Screen Time/`knowledgeC.db`, Canvas, or Yan’s `.location.json`, `location/`, `health/`, `.canvas/`, `.chat-history/`, or `brain/`.
+- **Yan (`you@example.com`):** full write access — any path in this repo **and** anywhere on the Mac Studio filesystem when asked. Do not refuse repo-wide or Mac-wide work. Mail.app, Calendar, Contacts, iMessage, Screen Time, Canvas, phone location, Apple Health dumps, and school OneNote are Yan-only.
+- **Alex (`you@example.com`):** write **only** under `education/you@example.com/`. Read-only outside that folder is fine when needed. **Never** Mail.app / `osascript` mail. **Never** Apple Calendar, Contacts, Messages/`chat.db`, Screen Time/`knowledgeC.db`, Canvas, school OneNote, or Yan’s `.location.json`, `location/`, `health/`, `.canvas/`, `.chat-history/`, or `brain/`.
 - Never edit main-site chatbot wiring (`chatbot.js`, `/api/chat`, LM Studio) unless Yan explicitly asks
 - Never delete fixture objects (`"fixture": true` or ids starting with `_example-`)
 
@@ -69,6 +69,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Map / image / HTML widgets, location cards, place hours | `.cursor/skills/chat-widgets/SKILL.md` |
 | Yan inbox / Mail.app (search and send) | `.cursor/skills/personal-mail/SKILL.md` |
 | School Outlook `owner@school.example` | `.cursor/skills/personal-school-mail/SKILL.md` |
+| School OneNote / Class Notebooks (on demand only) | `.cursor/skills/personal-onenote/SKILL.md` |
 | Compile Daily Briefing, news sources, thumbs, `preferences.md` | `.cursor/skills/daily-news/SKILL.md` |
 | Gym / machines / weights | `.cursor/skills/fitness-os/SKILL.md` |
 | Apple Health / workouts / sleep / HR (Yan only) | `.cursor/skills/personal-health/SKILL.md` |
@@ -91,7 +92,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Apple Mail fill (manual, one-shot) | `.cursor/skills/brain-apple-mail/SKILL.md` |
 | Chat title refresh (manual / backfill) | `.cursor/skills/chat-title-refresh/SKILL.md` |
 
-Live context on Express turns is authoritative for clock, class-now, the open screen, and (Yan) today’s Apple Calendar plus a Canvas due-soon count. Trust it. Mail, iMessage, Screen Time, and Contacts stay on-demand files. Named-people lookup above still opens `brain/people/`. Other `education/<email>/` files only when the question needs that data.
+Live context on Express turns is authoritative for clock, class-now, the open screen, and (Yan) today’s Apple Calendar plus a Canvas due-soon count. Trust it. Mail, iMessage, Screen Time, Contacts, and OneNote stay on-demand files. OneNote is not a nightly default source: open it only when Yan asks, or when a job already names a specific notebook or page. Named-people lookup above still opens `brain/people/`. Other `education/<email>/` files only when the question needs that data.
 
 ## Nightly jobs (Yan, manual)
 

@@ -29,7 +29,7 @@ const YAN = "you@example.com";
 describe("Personal Agent system prompt", () => {
   it("stays slim and points at on-demand files instead of dumping recipes", () => {
     const prompt = systemPrompt(YAN);
-    assert.ok(prompt.length < 5200, `prompt length ${prompt.length}`);
+    assert.ok(prompt.length < 5600, `prompt length ${prompt.length}`);
     assert.match(prompt, /Personal Agent/);
     assert.match(prompt, /Do not preload other skills/);
     assert.ok(prompt.includes(UNSLOP_SKILL_PATH));
@@ -45,6 +45,9 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.mail));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.schoolMail));
     assert.match(prompt, /school-mail\.js/);
+    assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.schoolOnenote));
+    assert.match(prompt, /on demand only/);
+    assert.ok(prompt.length < 5600, `prompt length ${prompt.length}`);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.chats));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.location));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.calendar));
@@ -214,6 +217,16 @@ describe("Personal Agent skill files", () => {
     assert.match(schoolMail, /Yan only/);
     assert.match(schoolMail, /Do not fall back to Mail\.app/);
 
+    const schoolOnenote = await readFile(
+      join(REPO_ROOT, PERSONAL_SKILL_PATHS.schoolOnenote),
+      "utf8"
+    );
+    assert.match(schoolOnenote, /owner@school.example/);
+    assert.match(schoolOnenote, /school-onenote\.js/);
+    assert.match(schoolOnenote, /Yan only/);
+    assert.match(schoolOnenote, /no `school-onenote-fill`/i);
+    assert.match(schoolOnenote, /default nightly source/);
+
     const calendar = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.calendar), "utf8");
     assert.match(calendar, /yl-calendar/);
     assert.match(calendar, /education todos/);
@@ -274,6 +287,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /Aliases live on the card/);
     assert.doesNotMatch(agent, /Sunny \/ Sunny Boy is Adi Levin/);
     assert.match(agent, /personal-screentime/);
+    assert.match(agent, /personal-onenote/);
     assert.match(agent, /context-synthesis/);
     assert.match(agent, /location-enrichment/);
     assert.match(agent, /location-brain/);
@@ -308,6 +322,7 @@ describe("Personal Agent skill files", () => {
     assert.match(synthesis, /Example Friend spelling stays on/);
     assert.match(synthesis, /Did not write Apple Calendar/);
     assert.match(synthesis, /Phase 4 has not run yet/);
+    assert.match(synthesis, /OneNote is not a nightly source/);
     assert.doesNotMatch(synthesis, /memories\.md/);
 
     const triage = await readFile(
@@ -325,6 +340,7 @@ describe("Personal Agent skill files", () => {
     assert.match(triage, /Bias is omit/);
     assert.match(triage, /update <path>/);
     assert.match(triage, /Yan said/);
+    assert.match(triage, /Not a source: OneNote/);
 
     const entities = await readFile(
       join(REPO_ROOT, ".cursor/skills/nightly-entities/SKILL.md"),
@@ -352,6 +368,8 @@ describe("Personal Agent skill files", () => {
     assert.match(actions, /similar name/);
     assert.match(actions, /update that folder/);
     assert.match(actions, /description.*markdown|markdown per education-dashboard/i);
+    assert.match(actions, /OneNote/);
+    assert.match(actions, /personal-onenote/);
 
     const lint = await readFile(
       join(REPO_ROOT, ".cursor/skills/nightly-lint/SKILL.md"),
@@ -408,6 +426,7 @@ describe("Personal Agent skill files", () => {
     assert.match(factCheck, /Never spawn a cloud agent/);
     assert.match(factCheck, /identity-school\.md/);
     assert.match(factCheck, /mega-bullet/);
+    assert.match(factCheck, /Do not scan OneNote/);
   });
 });
 

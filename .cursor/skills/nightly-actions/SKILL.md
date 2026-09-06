@@ -144,6 +144,10 @@ Do not git commit; the Node wrapper does that.
 - **Repo/file work**: only what Yan asked for in the scanned context. Small
   and reversible at night; anything large or destructive gets a journal note
   proposing it instead.
+- **OneNote**: not a default read. If a Directive or Suggested action already
+  names a specific notebook, section, or page you must open to finish that
+  item, use `.cursor/skills/personal-onenote/SKILL.md`. Do not list notebooks
+  otherwise.
 
 ## Anti-patterns
 

@@ -1,0 +1,162 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  GRAPH_BASE,
+  buildNotebooksUrl,
+  buildPageContentUrl,
+  buildPagesUrl,
+  buildSearchUrl,
+  flattenNotebookSections,
+  isNotesToken,
+  parseArgs,
+  pickByName,
+  runSchoolOnenote,
+  tokenFromUrl,
+} from "./school-onenote.js";
+
+function fakeJwt(payload) {
+  const h = Buffer.from(JSON.stringify({ alg: "none" })).toString("base64url");
+  const p = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${h}.${p}.sig`;
+}
+
+describe("school-onenote parseArgs", () => {
+  it("parses notebooks and section flags", () => {
+    const a = parseArgs(["sections", "--notebook", "Spanish", "4", "--limit", "8"]);
+    assert.equal(a.cmd, "sections");
+    assert.equal(a.notebook, "Spanish 4");
+    assert.equal(a.limit, 8);
+  });
+
+  it("joins search words until a flag", () => {
+    const a = parseArgs(["search", "colonial", "map", "--limit", "3"]);
+    assert.equal(a.query, "colonial map");
+    assert.equal(a.limit, 3);
+  });
+
+  it("reads a page id", () => {
+    const a = parseArgs(["page", "1-abc"]);
+    assert.equal(a.id, "1-abc");
+  });
+
+  it("rejects unknown flags", () => {
+    assert.throws(() => parseArgs(["notebooks", "--nope"]), /unknown arg/);
+  });
+});
+
+describe("school-onenote tokens", () => {
+  it("accepts a Graph token with Notes.Read", () => {
+    const token = fakeJwt({
+      aud: "https://graph.microsoft.com",
+      scp: "User.Read Notes.Read Notes.Read.All",
+      preferred_username: "owner@school.example",
+    });
+    assert.equal(isNotesToken(token), true);
+  });
+
+  it("rejects Outlook-audience tokens even with Notes scopes", () => {
+    const token = fakeJwt({
+      aud: "https://outlook.office.com",
+      scp: "Mail.Read Notes.ReadWrite",
+    });
+    assert.equal(isNotesToken(token), false);
+  });
+
+  it("rejects Graph tokens without Notes scopes", () => {
+    const token = fakeJwt({
+      aud: "https://graph.microsoft.com",
+      scp: "Files.ReadWrite.All User.Read",
+    });
+    assert.equal(isNotesToken(token), false);
+  });
+
+  it("pulls an access_token from a redirect hash", () => {
+    const token = fakeJwt({
+      aud: "https://graph.microsoft.com",
+      scp: "Notes.Read",
+    });
+    const url = `https://outlook.office.com/mail/#access_token=${token}&token_type=Bearer`;
+    assert.equal(tokenFromUrl(url), token);
+  });
+});
+
+describe("school-onenote urls and shapes", () => {
+  it("builds Graph notebook and page URLs", () => {
+    assert.match(buildNotebooksUrl(), /\/me\/onenote\/notebooks/);
+    assert.equal(buildPageContentUrl("1-x"), `${GRAPH_BASE}/me/onenote/pages/1-x/content`);
+    assert.match(buildPagesUrl("sec1", { limit: 5 }), /\/sections\/sec1\/pages/);
+    assert.match(buildSearchUrl("map"), /\$search=/);
+  });
+
+  it("flattens class-notebook section groups", () => {
+    const rows = flattenNotebookSections({
+      sections: [{ id: "a", displayName: "Quick Notes" }],
+      sectionGroups: [
+        {
+          displayName: "_Content Library",
+          sections: [{ id: "b", displayName: "Tri 1" }],
+        },
+      ],
+    });
+    assert.equal(rows.length, 2);
+    assert.equal(rows[1].group, "_Content Library");
+    assert.equal(rows[1].name, "Tri 1");
+  });
+
+  it("picks a unique notebook name", () => {
+    const rows = [
+      { name: "Spanish 4" },
+      { name: "Spanish 3 (25-26)" },
+    ];
+    assert.equal(pickByName(rows, "spanish 4").match.name, "Spanish 4");
+    assert.equal(pickByName(rows, "spanish").ambiguous.length, 2);
+  });
+});
+
+describe("school-onenote status", () => {
+  it("reports signedOut on an empty profile dir", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "school-onenote-"));
+    try {
+      const r = await runSchoolOnenote(["status"], { root: dir });
+      assert.equal(r.ok, true);
+      assert.equal(r.signedIn, false);
+      assert.equal(r.account, "owner@school.example");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("notebooks without a session returns not signed in", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "school-onenote-"));
+    try {
+      const r = await runSchoolOnenote(["notebooks"], { root: dir });
+      assert.equal(r.ok, false);
+      assert.equal(r.error, "not signed in");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not treat a mail token session as signed in", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "school-onenote-"));
+    try {
+      const token = fakeJwt({
+        aud: "https://outlook.office.com",
+        scp: "Mail.Read Notes.ReadWrite",
+        exp: 2_000_000_000,
+        preferred_username: "owner@school.example",
+      });
+      await writeFile(
+        join(dir, "session.json"),
+        JSON.stringify({ token, exp: 2_000_000_000, email: "owner@school.example" })
+      );
+      const r = await runSchoolOnenote(["status"], { root: dir });
+      assert.equal(r.signedIn, false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});

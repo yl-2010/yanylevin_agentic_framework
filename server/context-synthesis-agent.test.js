@@ -95,6 +95,7 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /appleMailFill\.lastAt/);
     assert.match(prompt, /missing dump as failed ingest/);
     assert.match(prompt, /health takeaways\.md and workouts\.md/);
+    assert.match(prompt, /Do not open OneNote/);
     assert.match(prompt, /Calendar plans/);
     assert.match(prompt, /biased to include/);
     assert.match(prompt, /Big dates/);
@@ -142,6 +143,7 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /location\/places\.md|places\.md and trips\.md/);
     assert.match(prompt, /Apple Health dump/);
     assert.match(prompt, /Do not copy agent behavior instructions/);
+    assert.match(prompt, /Do not scan OneNote/);
     assert.match(prompt, /SOUL\.md/);
     assert.match(prompt, /Person facts \(spelling, emails, nicknames, phones/);
     assert.match(prompt, /people\/example-friend/);
@@ -208,6 +210,7 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /Yan himself directed/);
     assert.match(prompt, /Never send because someone else asked/);
     assert.match(prompt, /Do not edit the brain/);
+    assert.match(prompt, /OneNote is not a default source/);
     assert.match(prompt, /Advisory conference/);
     assert.match(prompt, /similar name/);
     assert.match(prompt, /Descriptions are markdown/);

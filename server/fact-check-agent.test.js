@@ -32,6 +32,7 @@ describe("fact-check prompt", () => {
     assert.match(prompt, /who\/fromMe/);
     assert.match(prompt, /JSON at is UTC/);
     assert.match(prompt, /Mail claims/);
+    assert.match(prompt, /Do not scan OneNote/);
     assert.match(prompt, /missing dump is expected/);
     assert.match(prompt, /timezoneAfter is not a boarding pass/);
     assert.match(prompt, /notes\.factCheck/);
