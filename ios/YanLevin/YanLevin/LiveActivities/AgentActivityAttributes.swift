@@ -5,6 +5,22 @@ struct AgentActivityRow: Codable, Hashable {
     var sessionId: String
     var title: String
     var workingLabel: String
+    var startedAt: Date
+
+    init(sessionId: String, title: String, workingLabel: String, startedAt: Date) {
+        self.sessionId = sessionId
+        self.title = title
+        self.workingLabel = workingLabel
+        self.startedAt = startedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        sessionId = try c.decode(String.self, forKey: .sessionId)
+        title = try c.decode(String.self, forKey: .title)
+        workingLabel = try c.decode(String.self, forKey: .workingLabel)
+        startedAt = try c.decodeIfPresent(Date.self, forKey: .startedAt) ?? Date()
+    }
 }
 
 struct AgentActivityAttributes: ActivityAttributes {

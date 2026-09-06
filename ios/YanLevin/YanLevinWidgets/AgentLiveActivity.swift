@@ -16,8 +16,8 @@ struct AgentLiveActivity: Widget {
             } compactLeading: {
                 LiveActivityYLMark(size: 13)
             } compactTrailing: {
-                if context.state.agents.count == 1 {
-                    LiveActivityBusyDots()
+                if let first = context.state.agents.first, context.state.agents.count == 1 {
+                    LiveActivityElapsed(start: first.startedAt, compact: true)
                 } else {
                     Text("\(context.state.agents.count + context.state.overflowCount)")
                         .font(.caption2.weight(.bold))
@@ -44,7 +44,7 @@ private struct AgentLiveActivityBody: View {
                     .font(.caption.weight(.bold))
                     .foregroundStyle(LiveActivityPalette.accent(colorScheme))
                 Spacer(minLength: 0)
-                LiveActivityBusyDots()
+                LiveActivityElapsed(start: state.pulseStart)
             }
             AgentLiveActivityRows(state: state)
         }
@@ -70,7 +70,7 @@ private struct AgentLiveActivityIslandBottom: View {
                     .font(.caption.weight(.bold))
                     .foregroundStyle(LiveActivityPalette.islandAccent)
                 Spacer(minLength: 0)
-                LiveActivityBusyDots()
+                LiveActivityElapsed(start: state.pulseStart)
             }
             ForEach(state.agents, id: \.sessionId) { row in
                 Button(intent: OpenAgentChatIntent(sessionId: row.sessionId)) {
@@ -139,11 +139,13 @@ private struct AgentLiveActivityLine: View {
                 .foregroundStyle(titleColor)
                 .lineLimit(1)
             Spacer(minLength: 6)
-            Text(row.workingLabel)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(labelColor)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            LiveActivityWorkingLabel(label: row.workingLabel, startedAt: row.startedAt, color: labelColor)
         }
+    }
+}
+
+private extension AgentActivityAttributes.ContentState {
+    var pulseStart: Date {
+        agents.map(\.startedAt).min() ?? .now
     }
 }

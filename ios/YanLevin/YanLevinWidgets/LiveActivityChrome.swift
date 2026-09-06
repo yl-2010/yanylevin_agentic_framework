@@ -17,8 +17,8 @@ enum LiveActivityPalette {
     private static let lightAccent = Color(red: 0x30 / 255, green: 0x6D / 255, blue: 0x75 / 255)
     private static let darkAccent = Color(red: 0x7E / 255, green: 0xB7 / 255, blue: 0xB6 / 255)
 
-    /// Dusty orange (chat orange mixed toward gray).
-    static let orange = Color(red: 0xC8 / 255, green: 0x7B / 255, blue: 0x4A / 255)
+    /// Dusty orange, a bit lighter than the first pass.
+    static let orange = Color(red: 0xD6 / 255, green: 0x8C / 255, blue: 0x56 / 255)
 
     /// Island is always a black pill.
     static let islandAccent = darkAccent
@@ -50,21 +50,51 @@ struct LiveActivityYLMark: View {
     }
 }
 
-struct LiveActivityBusyDots: View {
+struct LiveActivityElapsed: View {
+    let start: Date
+    var compact: Bool = false
     var color: Color = LiveActivityPalette.orange
 
     var body: some View {
-        Image(systemName: "ellipsis")
-            .font(.system(size: 17, weight: .heavy))
-            .foregroundStyle(color)
-            .symbolRenderingMode(.hierarchical)
-            .symbolEffect(
-                .variableColor.iterative.dimInactiveLayers.nonReversing,
-                options: .repeating,
-                isActive: true
-            )
-            .frame(width: 22, height: 12)
-            .accessibilityHidden(true)
+        Text(
+            timerInterval: start...start.addingTimeInterval(6 * 60 * 60),
+            countsDown: false,
+            showsHours: false
+        )
+        .font(compact ? .caption2.monospacedDigit().weight(.bold) : .caption.monospacedDigit().weight(.semibold))
+        .foregroundStyle(color)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .multilineTextAlignment(.trailing)
+        .monospacedDigit()
+    }
+}
+
+struct LiveActivityWorkingLabel: View {
+    let label: String
+    let startedAt: Date
+    var color: Color = LiveActivityPalette.orange
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(Self.stem(label))
+            LiveActivityElapsed(start: startedAt, compact: true, color: color)
+        }
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(color)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+    }
+
+    static func stem(_ raw: String) -> String {
+        var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.hasSuffix("...") {
+            s.removeLast(3)
+        } else if s.hasSuffix("…") {
+            s.removeLast()
+        }
+        while s.hasSuffix(".") { s.removeLast() }
+        return s.trimmingCharacters(in: .whitespaces)
     }
 }
 

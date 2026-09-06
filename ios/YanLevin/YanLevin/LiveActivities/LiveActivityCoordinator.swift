@@ -169,6 +169,11 @@ final class LiveActivityCoordinator {
                 await endAgents()
                 return
             }
+            let previousStarts = Dictionary(
+                (Activity<AgentActivityAttributes>.activities.first?.content.state.agents ?? [])
+                    .map { ($0.sessionId, $0.startedAt) },
+                uniquingKeysWith: { _, last in last }
+            )
             let shown = Array(agents.prefix(3)).map { row in
                 AgentActivityRow(
                     sessionId: row.sessionId,
@@ -179,7 +184,8 @@ final class LiveActivityCoordinator {
                     workingLabel: {
                         let t = (row.workingLabel ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                         return t.isEmpty ? "Working" : t
-                    }()
+                    }(),
+                    startedAt: previousStarts[row.sessionId] ?? Date()
                 )
             }
             let state = AgentActivityAttributes.ContentState(
