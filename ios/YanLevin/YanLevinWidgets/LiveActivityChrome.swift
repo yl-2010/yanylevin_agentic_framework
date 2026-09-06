@@ -17,8 +17,8 @@ enum LiveActivityPalette {
     private static let lightAccent = Color(red: 0x30 / 255, green: 0x6D / 255, blue: 0x75 / 255)
     private static let darkAccent = Color(red: 0x7E / 255, green: 0xB7 / 255, blue: 0xB6 / 255)
 
-    /// Dusty orange, a bit lighter than the first pass.
-    static let orange = Color(red: 0xD6 / 255, green: 0x8C / 255, blue: 0x56 / 255)
+    /// Dusty orange. Same hue as before, brightness bumped.
+    static let orange = Color(hue: 25 / 360, saturation: 0.55, brightness: 0.93)
 
     /// Island is always a black pill.
     static let islandAccent = darkAccent
@@ -57,7 +57,7 @@ struct LiveActivityElapsed: View {
 
     var body: some View {
         Text(
-            timerInterval: start...start.addingTimeInterval(6 * 60 * 60),
+            timerInterval: start...start.addingTimeInterval(99 * 60),
             countsDown: false,
             showsHours: false
         )
@@ -67,18 +67,21 @@ struct LiveActivityElapsed: View {
         .minimumScaleFactor(0.7)
         .multilineTextAlignment(.trailing)
         .monospacedDigit()
+        .frame(width: compact ? 40 : 48, alignment: .trailing)
     }
 }
 
 struct LiveActivityWorkingLabel: View {
     let label: String
-    let startedAt: Date
+    var startedAt: Date? = nil
     var color: Color = LiveActivityPalette.orange
 
     var body: some View {
         HStack(spacing: 4) {
             Text(Self.stem(label))
-            LiveActivityElapsed(start: startedAt, compact: true, color: color)
+            if let startedAt {
+                LiveActivityElapsed(start: startedAt, compact: true, color: color)
+            }
         }
         .font(.caption2.weight(.semibold))
         .foregroundStyle(color)

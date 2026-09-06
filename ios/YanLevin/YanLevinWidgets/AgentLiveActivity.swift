@@ -16,13 +16,10 @@ struct AgentLiveActivity: Widget {
             } compactLeading: {
                 LiveActivityYLMark(size: 13)
             } compactTrailing: {
-                if let first = context.state.agents.first, context.state.agents.count == 1 {
-                    LiveActivityElapsed(start: first.startedAt, compact: true)
-                } else {
-                    Text("\(context.state.agents.count + context.state.overflowCount)")
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(LiveActivityPalette.orange)
-                }
+                Text("\(context.state.agents.count + context.state.overflowCount)")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(LiveActivityPalette.orange)
+                    .monospacedDigit()
             } minimal: {
                 LiveActivityYLMark(size: 11)
             }
@@ -70,14 +67,14 @@ private struct AgentLiveActivityIslandBottom: View {
                     .font(.caption.weight(.bold))
                     .foregroundStyle(LiveActivityPalette.islandAccent)
                 Spacer(minLength: 0)
-                LiveActivityElapsed(start: state.pulseStart)
             }
             ForEach(state.agents, id: \.sessionId) { row in
                 Button(intent: OpenAgentChatIntent(sessionId: row.sessionId)) {
                     AgentLiveActivityLine(
                         row: row,
                         titleColor: LiveActivityPalette.islandFg,
-                        labelColor: LiveActivityPalette.orange
+                        labelColor: LiveActivityPalette.orange,
+                        showElapsed: false
                     )
                 }
                 .buttonStyle(.plain)
@@ -110,7 +107,8 @@ private struct AgentLiveActivityRows: View {
                     AgentLiveActivityLine(
                         row: row,
                         titleColor: YLTheme.fg(colorScheme),
-                        labelColor: LiveActivityPalette.orange
+                        labelColor: LiveActivityPalette.orange,
+                        showElapsed: true
                     )
                 }
                 .buttonStyle(.plain)
@@ -128,6 +126,7 @@ private struct AgentLiveActivityLine: View {
     let row: AgentActivityRow
     let titleColor: Color
     let labelColor: Color
+    var showElapsed: Bool = true
 
     var body: some View {
         HStack(spacing: 8) {
@@ -139,7 +138,11 @@ private struct AgentLiveActivityLine: View {
                 .foregroundStyle(titleColor)
                 .lineLimit(1)
             Spacer(minLength: 6)
-            LiveActivityWorkingLabel(label: row.workingLabel, startedAt: row.startedAt, color: labelColor)
+            LiveActivityWorkingLabel(
+                label: row.workingLabel,
+                startedAt: showElapsed ? row.startedAt : nil,
+                color: labelColor
+            )
         }
     }
 }
