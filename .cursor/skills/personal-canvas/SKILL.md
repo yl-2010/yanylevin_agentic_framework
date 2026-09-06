@@ -79,6 +79,7 @@ For every snapshot assignment whose `courseId` is mapped:
   - In-class / classwork → `CW`
   - Default take-home work → `HW`
   - High point values that look summative → `MA`
+- Store `name` **without** a CW/HW/QA/MA prefix. Canvas `HW: Signed Syllabus` becomes `Signed Syllabus`. Keep `#F2` / `Final` after the tag (`MA #F2: Forces` → `#F2: Forces`). The dashboard paints the tag in blue next to the title.
 - MA still defaults `showInDates` on; do not turn that off unless Yan asked.
 - Copy a short markdown `description` from the snapshot when it helps (education-dashboard Description formatting: bold lead-ins, bullets, links). Do not dump the whole syllabus into every todo.
 

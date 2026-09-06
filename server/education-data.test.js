@@ -16,6 +16,7 @@ import {
   meetingHighlightStartMin,
   isMeetingHighlighted,
   activeMeetingAt,
+  stripTodoTagPrefix,
 } from "./education-data.js";
 
 describe("parseHiddenFileNames", () => {
@@ -436,5 +437,24 @@ describe("class highlight lead", () => {
     assert.equal(meetingHighlightStartMin(ahDay, 4), 11 * 60 + 40);
     assert.equal(activeMeetingAt(ahDay, 11 * 60 + 40)?.period, "E");
     assert.equal(isMeetingHighlighted(ahDay, 3, 11 * 60 + 40), false);
+  });
+});
+
+describe("stripTodoTagPrefix", () => {
+  it("drops HW:/CW:/QA:/MA: prefixes", () => {
+    assert.equal(stripTodoTagPrefix("HW: Signed Syllabus"), "Signed Syllabus");
+    assert.equal(stripTodoTagPrefix("CW: Presentation"), "Presentation");
+    assert.equal(stripTodoTagPrefix("QA: Constitution Quiz"), "Constitution Quiz");
+    assert.equal(stripTodoTagPrefix("MA: Final Exam"), "Final Exam");
+  });
+
+  it("keeps the rest after a tag plus space", () => {
+    assert.equal(stripTodoTagPrefix("MA #F2: Forces & Graphs of Motion"), "#F2: Forces & Graphs of Motion");
+    assert.equal(stripTodoTagPrefix("MA Final: Presentación oral"), "Final: Presentación oral");
+  });
+
+  it("leaves titles without a tag prefix alone", () => {
+    assert.equal(stripTodoTagPrefix("Summer Read"), "Summer Read");
+    assert.equal(stripTodoTagPrefix(""), "");
   });
 });

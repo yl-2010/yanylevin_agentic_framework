@@ -4,7 +4,7 @@
  */
 
 import { execFile } from "node:child_process";
-import { access, copyFile, mkdir } from "node:fs/promises";
+import { access, copyFile, mkdir, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -33,8 +33,24 @@ async function binExists() {
   }
 }
 
+async function binNeedsCompile() {
+  if (!(await binExists())) return true;
+  try {
+    const [binStat, srcStat, plistStat, entStat] = await Promise.all([
+      stat(BIN),
+      stat(SRC),
+      stat(PLIST_SRC),
+      stat(ENTITLEMENTS),
+    ]);
+    const newestSrc = Math.max(srcStat.mtimeMs, plistStat.mtimeMs, entStat.mtimeMs);
+    return newestSrc > binStat.mtimeMs;
+  } catch {
+    return true;
+  }
+}
+
 export async function ensureCalendarBin() {
-  if (await binExists()) return BIN;
+  if (!(await binNeedsCompile())) return BIN;
   if (compiling) return compiling;
   compiling = (async () => {
     const macosDir = join(APP, "Contents/MacOS");

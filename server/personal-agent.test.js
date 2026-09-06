@@ -226,6 +226,8 @@ describe("Personal Agent skill files", () => {
     assert.match(mail, /Yan only/);
     assert.match(mail, /outgoing message/);
     assert.match(mail, /personal-school-mail/);
+    assert.match(mail, /read `source` of that message/);
+    assert.match(mail, /drops the href/);
     assert.doesNotMatch(mail, /Rajasi forwards/);
     assert.doesNotMatch(mail, /sender contains "Rajasi"/);
     const sendScript = mail.match(/```bash\n([\s\S]*?)```/g)?.at(-1) ?? "";
@@ -254,6 +256,9 @@ describe("Personal Agent skill files", () => {
     const calendar = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.calendar), "utf8");
     assert.match(calendar, /yl-calendar/);
     assert.match(calendar, /education todos/);
+    assert.match(calendar, /Meeting links \(required\)/);
+    assert.match(calendar, /--url/);
+    assert.match(calendar, /zoom\.us\/webinar\/register/);
 
     const canvas = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.canvas), "utf8");
     assert.match(canvas, /canvas.instructure.com/);
@@ -359,6 +364,7 @@ describe("Personal Agent skill files", () => {
     assert.match(triage, /Directives from Yan/);
     assert.match(triage, /Calendar plans/);
     assert.match(triage, /venue is TBD/);
+    assert.match(triage, /meeting URL/);
     assert.match(triage, /Bias is include/);
     assert.match(triage, /## Big dates/);
     assert.match(triage, /Bias is omit/);
@@ -394,6 +400,8 @@ describe("Personal Agent skill files", () => {
     assert.match(actions, /description.*markdown|markdown per education-dashboard/i);
     assert.match(actions, /OneNote/);
     assert.match(actions, /personal-onenote/);
+    assert.match(actions, /Meeting links are required/);
+    assert.match(actions, /--url/);
 
     const lint = await readFile(
       join(REPO_ROOT, ".cursor/skills/nightly-lint/SKILL.md"),

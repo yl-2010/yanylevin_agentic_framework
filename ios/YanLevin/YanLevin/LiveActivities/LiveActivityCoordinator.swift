@@ -71,13 +71,14 @@ final class LiveActivityCoordinator {
                     todoId: $0.todoId,
                     classId: $0.classId,
                     tag: $0.filterTagKey,
-                    name: $0.displayName
+                    name: $0.displayName,
+                    done: $0.done == true
                 )
             },
             overflowCount: overflow
         )
         await upsertClass(state: state, staleDate: endDate)
-        armClassEnd(endDate)
+        armClassRefresh(startDate: startDate, endDate: endDate)
     }
 
     private func upsertClass(state: ClassActivityAttributes.ContentState, staleDate: Date?) async {
@@ -126,7 +127,21 @@ final class LiveActivityCoordinator {
                 soonest = date
             }
         }
-        armClassEnd(soonest)
+        armClassRefresh(startDate: soonest, endDate: nil)
+    }
+
+    /// Wake at class start (lead → elapsed), then once a minute so "N min" stays current.
+    private func armClassRefresh(startDate: Date?, endDate: Date?) {
+        let now = Date()
+        if let startDate, startDate > now {
+            armClassEnd(startDate)
+            return
+        }
+        if let endDate, endDate > now {
+            armClassEnd(min(endDate, now.addingTimeInterval(60)))
+            return
+        }
+        armClassEnd(nil)
     }
 
     private func armClassEnd(_ date: Date?) {

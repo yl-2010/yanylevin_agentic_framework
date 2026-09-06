@@ -1208,9 +1208,7 @@ struct TodoDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                Text(liveTodo.displayName)
-                    .font(.largeTitle.weight(.bold))
-                    .foregroundStyle(YLTheme.fg(colorScheme))
+                EducationTodoTitle(todo: liveTodo, font: .largeTitle.weight(.bold))
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 VStack(alignment: .leading, spacing: 14) {
@@ -1228,12 +1226,6 @@ struct TodoDetailView: View {
                         Text(when)
                             .font(.subheadline)
                             .foregroundStyle(YLTheme.muted(colorScheme))
-                    }
-
-                    if let tag = liveTodo.displayTag {
-                        Text(tag)
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(YLTheme.accent(colorScheme))
                     }
 
                     if let className {
@@ -1574,17 +1566,17 @@ private struct EducationDateItemRow: View {
     private var rowLabel: some View {
         let when = NaturalWhen.format(date: item.date, time: item.time, use24Hour: use24Hour)
         return VStack(alignment: .leading, spacing: 4) {
-            Text(item.name)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(YLTheme.fg(colorScheme))
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if let todo = item.todoValue {
+                EducationTodoTitle(todo: todo, font: .body.weight(.semibold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Text(item.name)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(YLTheme.fg(colorScheme))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
             HStack(spacing: 8) {
-                if item.isMA {
-                    Text("MA")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(YLTheme.accent(colorScheme))
-                }
                 if let className = item.className, !className.isEmpty {
                     Text(className)
                         .font(.caption)
@@ -1927,13 +1919,12 @@ private struct EducationTodoRow: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let tag = todo.displayTag
         let when = NaturalWhen.format(
             date: todo.dueDateValue,
             time: todo.dueTimeValue,
             use24Hour: use24Hour
         )
-        let hasMeta = tag != nil || className != nil || !when.isEmpty
+        let hasMeta = className != nil || !when.isEmpty
 
         HStack(alignment: .top, spacing: 12) {
             EducationTodoCheckbox(done: todo.done == true, action: onToggleDone)
@@ -1941,19 +1932,11 @@ private struct EducationTodoRow: View {
 
             NavigationLink(value: EducationRoute.todoDetail(todo)) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(todo.displayName)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(YLTheme.fg(colorScheme))
-                        .strikethrough(todo.done == true, color: YLTheme.muted(colorScheme))
+                    EducationTodoTitle(todo: todo, font: .body.weight(.semibold), done: todo.done == true)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     if hasMeta {
                         HStack(spacing: 8) {
-                            if let tag {
-                                Text(tag)
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(YLTheme.accent(colorScheme))
-                            }
                             if let className {
                                 Text(className)
                                     .font(.caption)
@@ -1972,6 +1955,28 @@ private struct EducationTodoRow: View {
             .ylHapticNavigation()
         }
         .padding(.vertical, 8)
+    }
+}
+
+/// Title with CW/HW/QA/MA in accent blue at the same size as the name.
+private struct EducationTodoTitle: View {
+    let todo: EducationTodo
+    var font: Font
+    var done: Bool = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            if let tag = todo.displayTag {
+                Text(tag)
+                    .font(font)
+                    .foregroundStyle(done ? YLTheme.muted(colorScheme) : YLTheme.accent(colorScheme))
+            }
+            Text(todo.displayName)
+                .font(font)
+                .foregroundStyle(YLTheme.fg(colorScheme))
+                .strikethrough(done, color: YLTheme.muted(colorScheme))
+        }
     }
 }
 

@@ -104,3 +104,7 @@ APPLESCRIPT
 ```
 
 Look up an address in Contacts (`.cursor/skills/personal-contacts/SKILL.md`) when Yan names a person without an email. Do not add the school Microsoft 365 account to Mail.app.
+
+## URLs in a message
+
+`content` is plaintext. It keeps the words "Registration Link" and drops the href. When you need a Zoom / Meet / Teams / booking URL (calendar events, PathIvy webinars), read `source` of that message and parse `https://` links from the HTML. Quoted-printable mail splits URLs across lines (`href=3D"https://...` then `= ` continuation). Join those before you copy the URL onto a calendar event.

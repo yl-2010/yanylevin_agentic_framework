@@ -209,10 +209,10 @@ struct TodoWidgetView: View {
                 .frame(maxHeight: .infinity)
 
             openTodoButton(todo) {
-                HStack(spacing: 5) {
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
                     if let tag = todo.displayTag {
                         Text(tag)
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(completed ? WidgetTheme.muted : WidgetTheme.accent)
                     }
                     Text(todo.displayName)
@@ -296,10 +296,10 @@ struct TodoWidgetView: View {
 
             openTodoButton(todo) {
                 VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
                         if let tag = todo.displayTag {
                             Text(tag)
-                                .font(.caption2.weight(.bold))
+                                .font(.caption.weight(.bold))
                                 .foregroundStyle(completed ? WidgetTheme.muted : WidgetTheme.accent)
                         }
                         Text(todo.displayName)

@@ -45,6 +45,29 @@ struct DaySection: Identifiable, Hashable {
 enum EducationScheduleHelper {
     static let highlightLeadMinutes = 10
 
+    /// Temporary: pin the in-app school clock to Wed 2026-09-09 9:00 AM (Am Lit / E)
+    /// so the class Live Activity can be previewed. Set `enabled` to false when done.
+    private enum SchedulePreview {
+        static let enabled = true
+        static let now: Date? = Calendar.current.date(from: DateComponents(
+            calendar: Calendar.current,
+            timeZone: Calendar.current.timeZone,
+            year: 2026,
+            month: 9,
+            day: 9,
+            hour: 9,
+            minute: 0
+        ))
+    }
+
+    static var schedulePreviewNow: Date? {
+        SchedulePreview.enabled ? SchedulePreview.now : nil
+    }
+
+    private static var clockNow: Date {
+        schedulePreviewNow ?? Date()
+    }
+
     /// Port of `meetingHighlightStartMin` in server/education-data.js.
     static func highlightStartMin(
         for dayClass: DayClass,
@@ -78,27 +101,37 @@ enum EducationScheduleHelper {
               let m = Int(parts[1]),
               let day = Int(parts[2])
         else { return nil }
-        return Calendar.current.date(from: DateComponents(
+        let scheduled = Calendar.current.date(from: DateComponents(
             year: y,
             month: m,
             day: day,
             hour: minutes / 60,
             minute: minutes % 60
         ))
+        guard let scheduled else { return nil }
+        // ActivityKit timers use the real wall clock. Shift preview bells onto now
+        // so the Live Activity looks in-session instead of counting down to Wednesday.
+        guard let preview = schedulePreviewNow else { return scheduled }
+        return Date().addingTimeInterval(scheduled.timeIntervalSince(preview))
     }
 
     /// Open HW / CW / MA / QA due this meeting. Date-only due that day counts.
-    /// Timed HW due at or before class start still counts as due this period.
+    /// Same-day class HW counts even when Canvas stamps the next bell as dueTime.
     static func periodAssignments(
         for dayClass: DayClass,
         dateKey: String,
         from tree: EducationTreeResponse?,
-        limit: Int = 3
+        limit: Int = 4
     ) -> (items: [EducationTodo], overflow: Int) {
         let tagged = EducationTodoHelpers.flattenTodos(from: tree).filter { todo in
             todoBelongsToMeeting(todo, dayClass: dayClass, dateKey: dateKey)
         }
-        .sorted { $0.dueSortKey < $1.dueSortKey }
+        .sorted { a, b in
+            let aDone = a.done == true
+            let bDone = b.done == true
+            if aDone != bDone { return !aDone }
+            return a.dueSortKey < b.dueSortKey
+        }
         if tagged.count <= limit {
             return (tagged, 0)
         }
@@ -110,18 +143,16 @@ enum EducationScheduleHelper {
         dayClass: DayClass,
         dateKey: String
     ) -> Bool {
-        guard todo.done != true else { return false }
         let tag = todo.filterTagKey
         guard tag == "HW" || tag == "CW" || tag == "MA" || tag == "QA" else { return false }
         guard todo.classId == dayClass.cls.id else { return false }
         guard todo.dueDateValue == dateKey else { return false }
+        if tag == "HW" { return true }
         guard let dueTime = todo.dueTimeValue, let dueMin = timeToMinutes(dueTime) else {
             return true
         }
         guard let start = dayClass.startMin, let end = dayClass.endMin else { return true }
-        if dueMin >= start && dueMin < end { return true }
-        if tag == "HW" && dueMin <= start { return true }
-        return false
+        return dueMin >= start && dueMin < end
     }
 
     /// Port of `classSections` in education/app.js.
@@ -321,8 +352,9 @@ enum EducationScheduleHelper {
         cls: EducationClass,
         schedule: EducationSchedule?,
         activeClassIdsByDate: [String: [String]]?,
-        asOf: Date = Date()
+        asOf: Date? = nil
     ) -> Bool {
+        let asOf = asOf ?? clockNow
         guard todo.done == true else { return true }
         guard let archiveAt = classTodoArchiveAt(
             todo: todo,
@@ -338,8 +370,9 @@ enum EducationScheduleHelper {
         cls: EducationClass,
         schedule: EducationSchedule?,
         activeClassIdsByDate: [String: [String]]?,
-        asOf: Date = Date()
+        asOf: Date? = nil
     ) -> Date? {
+        let asOf = asOf ?? clockNow
         var soonest: Date?
         for todo in todos {
             guard todo.done == true else { continue }
@@ -422,7 +455,8 @@ enum EducationScheduleHelper {
         }
     }
 
-    private static func todayParts(_ date: Date = Date()) -> YMD {
+    private static func todayParts(_ date: Date? = nil) -> YMD {
+        let date = date ?? clockNow
         let cal = Calendar.current
         return YMD(
             y: cal.component(.year, from: date),
@@ -1033,7 +1067,8 @@ enum EducationDateHelpers {
         return Array(upcoming.prefix(collapsedLimit))
     }
 
-    private static func localTodayKey(_ date: Date = Date()) -> String {
+    private static func localTodayKey(_ date: Date? = nil) -> String {
+        let date = date ?? EducationScheduleHelper.schedulePreviewNow ?? Date()
         let cal = Calendar.current
         let y = cal.component(.year, from: date)
         let m = cal.component(.month, from: date)

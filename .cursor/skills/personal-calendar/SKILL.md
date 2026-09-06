@@ -21,6 +21,7 @@ From the repo root:
 node server/calendar-cli.js list
 node server/calendar-cli.js events --from 2026-08-16T07:00:00Z --to 2026-08-18T06:59:59Z
 node server/calendar-cli.js create --title "Dentist" --start 2026-08-20T16:00:00Z --end 2026-08-20T16:45:00Z --calendar "Home"
+node server/calendar-cli.js create --title "PathIvy: PSAT 101" --start 2026-09-06T23:00:00Z --end 2026-09-07T00:00:00Z --calendar "Home" --location "https://us06web.zoom.us/webinar/register/<id-from-mail>" --url "https://us06web.zoom.us/webinar/register/<id-from-mail>" --notes "Zoom registration: https://us06web.zoom.us/webinar/register/<id-from-mail>"
 node server/calendar-cli.js update --id "<eventIdentifier>" --title "Dentist (moved)"
 node server/calendar-cli.js delete --id "<eventIdentifier>"
 ```
@@ -31,7 +32,7 @@ Before `delete`, append a row to `education/you@example.com/deleted.md` (create 
 
 Use the event's local start as `on`. Nightly actions must skip recreating an event that looks like a deleted row (judgement, not exact clocks). If Yan asks to add it back, create it and remove the matching row.
 
-First Studio run should prompt for Calendar access (`yl-calendar.app`). If JSON `ok` is false and the error mentions denied access, tell Yan to grant Calendar to **yl-calendar** (System Settings > Privacy & Security > Calendars). Cursor Full Disk Access does not cover Calendar.
+First Studio run should prompt for Calendar access (`yl-calendar.app`). If JSON `ok` is false and the error mentions denied access, use Calendar.app osascript for that write (location, url, description), then tell Yan to grant Calendar to **yl-calendar** (System Settings > Privacy & Security > Calendars) so the CLI works next time. Cursor Full Disk Access does not cover Calendar.
 
 Output is JSON. Use `id` from create/list when updating or deleting. `--calendar` matches calendar title (or `--calendar-id`).
 
@@ -49,6 +50,18 @@ venue included), and uses the personal / default iCloud calendar when the
 target is unclear. Do not invent a day that nobody named.
 
 When adding a named person as a guest, use the address on their people card (or Contacts). Do not keep a second address table here.
+
+## Meeting links (required)
+
+Whenever the source has a join, register, or booking URL, put that URL on the event. Mail, chat, an invite, Zoom, Google Meet, Teams, FaceTime, pathivy.ai booking. Do not leave location as `virtual` or `Zoom` with no URL.
+
+Write the same URL to `--location` (tappable on iPhone), `--url` (EventKit URL field), and `--notes` as one backup line (`Zoom registration: <url>`).
+
+PathIvy webinars always get the Zoom **registration** link from Calla's mail for that date's row, not the word "virtual". Mail.app `content` drops hrefs. Read `source` of the message (personal-mail skill) and pick the `zoom.us/webinar/register/...` URL that sits on that row.
+
+If you cannot get the URL this turn, say so. A linkless virtual event is not done.
+
+If `yl-calendar` returns Calendar access denied, Calendar.app osascript still works: set `location`, `url`, and `description` on that event.
 
 ## Schoolwork vs Calendar
 

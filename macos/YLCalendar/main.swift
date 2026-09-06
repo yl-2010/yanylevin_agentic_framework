@@ -108,6 +108,7 @@ func eventJSON(_ ev: EKEvent) -> [String: Any] {
     ]
     if let loc = ev.location, !loc.isEmpty { out["location"] = loc }
     if let notes = ev.notes, !notes.isEmpty { out["notes"] = String(notes.prefix(500)) }
+    if let url = ev.url?.absoluteString, !url.isEmpty { out["url"] = url }
     return out
 }
 
@@ -152,6 +153,7 @@ func cmdCreate(_ args: [String]) {
     ev.isAllDay = argValue(args, "--all-day") == "1" || args.contains("--all-day")
     if let loc = argValue(args, "--location") { ev.location = loc }
     if let notes = argValue(args, "--notes") { ev.notes = notes }
+    if let urlS = argValue(args, "--url"), let u = URL(string: urlS) { ev.url = u }
     do {
         try store.save(ev, span: .thisEvent, commit: true)
         print(jsonString(["ok": true, "event": eventJSON(ev)]))
@@ -169,6 +171,7 @@ func cmdUpdate(_ args: [String]) {
     if let endS = argValue(args, "--end"), let end = parseDate(endS) { ev.endDate = end }
     if let loc = argValue(args, "--location") { ev.location = loc }
     if let notes = argValue(args, "--notes") { ev.notes = notes }
+    if let urlS = argValue(args, "--url"), let u = URL(string: urlS) { ev.url = u }
     if args.contains("--all-day") { ev.isAllDay = argValue(args, "--all-day") != "0" }
     if let calArg = argValue(args, "--calendar") ?? argValue(args, "--calendar-id"),
        let cal = findCalendar(id: calArg, title: calArg) {
@@ -199,7 +202,7 @@ let cmd = args.first ?? "help"
 if cmd == "help" || cmd == "--help" {
     print(jsonString([
         "ok": true,
-        "usage": "yl-calendar list | events --from ISO --to ISO | create --title T --start ISO [--end ISO] [--calendar NAME] | update --id ID | delete --id ID",
+        "usage": "yl-calendar list | events --from ISO --to ISO | create --title T --start ISO [--end ISO] [--calendar NAME] [--location S] [--url URL] [--notes S] | update --id ID | delete --id ID",
     ]))
     exit(0)
 }

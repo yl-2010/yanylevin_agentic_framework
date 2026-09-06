@@ -6,6 +6,7 @@ struct ClassActivityAssignment: Codable, Hashable {
     var classId: String?
     var tag: String
     var name: String
+    var done: Bool?
 }
 
 struct ClassActivityAttributes: ActivityAttributes {

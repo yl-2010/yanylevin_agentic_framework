@@ -1182,6 +1182,18 @@
     return "none";
   }
 
+  function stripTodoTagPrefix(name) {
+    const raw = String(name || "").trim();
+    const stripped = raw.replace(/^(CW|HW|QA|MA)(?:\s*:\s*|\s+)/i, "").trim();
+    return stripped || raw;
+  }
+
+  function taggedNameHtml(tag, name) {
+    const title = escapeHtml(stripTodoTagPrefix(name));
+    if (!tag || tag === "none") return title;
+    return `<span class="edu-name-tag">${escapeHtml(tag)}</span> ${title}`;
+  }
+
   /** Effective Dates visibility: MA defaults on; others default off. */
   function todoShowsInDates(t) {
     if (!t || t.done) return false;
@@ -1239,6 +1251,7 @@
         projectId: t.projectId || null,
         projectName: t.projectName || null,
         isMA,
+        tag: todoTagKey(t),
         href: todoHref(t),
       });
     });
@@ -1409,7 +1422,6 @@
   function todoRowHtml(t) {
     const done = Boolean(t.done);
     const tag = todoTagKey(t);
-    const tagLabel = tag === "none" ? "" : `<span class="edu-tag">${escapeHtml(tag)}</span>`;
     const due =
       t.dueDate || t.dueTime
         ? `<span class="edu-meta">${escapeHtml(
@@ -1438,8 +1450,8 @@
             : t.id
       )}" data-todo-toggle aria-pressed="${done}" aria-label="Mark done"><span class="edu-check-dot" aria-hidden="true"></span></button>
       <a class="edu-row-link" href="${href}">
-        <span class="edu-name">${escapeHtml(t.name || t.id)}</span>
-        ${tagLabel}${klass}${due}
+        <span class="edu-name">${taggedNameHtml(tag, t.name || t.id)}</span>
+        ${klass}${due}
       </a>
     </li>`;
   }
@@ -1473,7 +1485,10 @@
     const klass = contextName
       ? `<span class="edu-meta">${escapeHtml(contextName)}</span>`
       : "";
-    const maTag = item.isMA ? `<span class="edu-tag">MA</span>` : "";
+    const nameHtml =
+      item.source === "todo"
+        ? taggedNameHtml(item.tag, item.name)
+        : escapeHtml(item.name);
     // Todos in Dates always deep-link to the normal todo detail page (never /date/).
     const href =
       item.source === "todo"
@@ -1491,8 +1506,8 @@
       <a class="edu-row-link" href="${escapeHtml(href)}" data-date-item-source="${escapeHtml(
       item.source || "date"
     )}">
-        <span class="edu-name">${escapeHtml(item.name)}</span>
-        ${maTag}${klass}${when}
+        <span class="edu-name">${nameHtml}</span>
+        ${klass}${when}
       </a>
     </li>`;
   }
@@ -1853,13 +1868,13 @@
     )})" d="${EDU_BACK_PATH}"/></svg><span class="edu-back-glass" aria-hidden="true"></span></a>`;
   }
 
-  function detailShell(backHref, title, bodyHtml, filterId, { canvasLink = "", filesHtml = "" } = {}) {
+  function detailShell(backHref, title, bodyHtml, filterId, { canvasLink = "", filesHtml = "", titleHtml = "" } = {}) {
     const canvas = canvasOrbHtml(canvasLink);
     return `
       <header class="edu-hero edu-hero--detail${canvas ? " edu-hero--detail-canvas" : ""}">
         <div class="edu-hero-lead">
           ${backLinkHtml(backHref)}
-          <h1 class="edu-hero-title">${escapeHtml(title)}</h1>
+          <h1 class="edu-hero-title">${titleHtml || escapeHtml(title)}</h1>
         </div>
         ${canvas}
       </header>
@@ -2052,7 +2067,7 @@
     )}" aria-pressed="${on}" aria-label="${label}" title="${label}"><span>${glyph}</span></button>`;
   }
 
-  function briefingStatusHtml(todo, { when, tag, contextName }) {
+  function briefingStatusHtml(todo, { when, contextName }) {
     return `<section class="edu-panel edu-briefing-status" data-liquid-glass="rounded" data-filter-id="lg-edu-briefing-status">
         <div class="edu-detail-row">
           <button type="button" class="edu-check${todo.done ? " is-checked" : ""}" data-liquid-glass="circle" data-filter-id="lg-edu-detail-check" data-todo-toggle aria-pressed="${Boolean(
@@ -2061,7 +2076,6 @@
           <span class="edu-detail-status">${todo.done ? "Done" : "Open"}</span>
         </div>
         ${when ? `<p class="edu-detail-meta">${escapeHtml(when)}</p>` : ""}
-        ${tag !== "none" ? `<p class="edu-detail-meta"><span class="edu-tag">${escapeHtml(tag)}</span></p>` : ""}
         ${contextName ? `<p class="edu-detail-meta">${escapeHtml(contextName)}</p>` : ""}
       </section>`;
   }
@@ -2156,14 +2170,14 @@
       <header class="edu-hero edu-hero--detail${canvas ? " edu-hero--detail-canvas" : ""}">
         <div class="edu-hero-lead">
           ${backLinkHtml(backHrefForItem(t))}
-          <h1 class="edu-hero-title">${escapeHtml(t.name || t.id)}</h1>
+          <h1 class="edu-hero-title">${taggedNameHtml(tag, t.name || t.id)}</h1>
         </div>
         ${canvas}
       </header>
       <div class="edu-grid edu-grid--detail edu-detail" data-todo-id="${escapeHtml(
         t.id
       )}"${classAttr}${projectAttr}>
-        ${briefingStatusHtml(t, { when, tag, contextName })}
+        ${briefingStatusHtml(t, { when, contextName })}
         ${capsulesHtml(t)}
       </div>
       ${fileTiles}`;
@@ -2179,13 +2193,13 @@
           <span class="edu-detail-status">${t.done ? "Done" : "Open"}</span>
         </div>
         ${when ? `<p class="edu-detail-meta">${escapeHtml(when)}</p>` : ""}
-        ${tag !== "none" ? `<p class="edu-detail-meta"><span class="edu-tag">${escapeHtml(tag)}</span></p>` : ""}
         ${contextName ? `<p class="edu-detail-meta">${escapeHtml(contextName)}</p>` : ""}
         ${descriptionHtml(desc)}
       </div>`;
     appEl.innerHTML = detailShell(backHrefForItem(t), t.name || t.id, body, "lg-edu-todo-detail", {
       canvasLink: t.canvasLink,
       filesHtml: fileTiles,
+      titleHtml: taggedNameHtml(tag, t.name || t.id),
     });
   }
 

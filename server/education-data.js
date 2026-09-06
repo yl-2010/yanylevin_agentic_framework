@@ -810,6 +810,15 @@ async function fileCreatedAtIso(filePath) {
   }
 }
 
+/** Leading CW/HW/QA/MA on Canvas titles. Tag lives on `tag`; UI paints it separately. */
+const TODO_TAG_PREFIX = /^(CW|HW|QA|MA)(?:\s*:\s*|\s+)/i;
+
+export function stripTodoTagPrefix(name) {
+  const raw = String(name || "").trim();
+  const stripped = raw.replace(TODO_TAG_PREFIX, "").trim();
+  return stripped || raw;
+}
+
 async function loadObjectFolder(
   parentDir,
   kind,
@@ -833,6 +842,7 @@ async function loadObjectFolder(
           ? props.createdAt.trim()
           : null;
       item.createdAt = explicit || (await fileCreatedAtIso(jsonPath)) || null;
+      if (typeof item.name === "string") item.name = stripTodoTagPrefix(item.name);
     }
     if (!includeFixtures && isFixture(item)) continue;
     item.files = await listContextFiles(objectDir, contextFileListOpts(props));

@@ -4,8 +4,9 @@ import SwiftUI
 enum LiveActivityChrome {
     /// Dynamic Island expanded corner radius is 44pt. Keep content inside that curve.
     static let islandBottomPad: CGFloat = 16
-    static let islandSidePad: CGFloat = 14
-    static let islandEarPad: CGFloat = 16
+    static let islandSidePad: CGFloat = 16
+    static let islandEarPad: CGFloat = 20
+    static let islandCompactLeadingPad: CGFloat = 8
     static let lockScreenPad: CGFloat = 16
 }
 
@@ -117,24 +118,6 @@ struct LiveActivityBannerBackground: View {
             )
             .frame(height: 28)
         }
-    }
-}
-
-struct LiveActivityTagChip: View {
-    @Environment(\.colorScheme) private var colorScheme
-    let tag: String
-    var island: Bool = false
-
-    var body: some View {
-        Text(tag)
-            .font(.caption2.weight(.bold))
-            .foregroundStyle(island ? LiveActivityPalette.islandAccent : LiveActivityPalette.accent(colorScheme))
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(
-                (island ? LiveActivityPalette.islandAccent : LiveActivityPalette.accent(colorScheme)).opacity(0.16),
-                in: Capsule()
-            )
     }
 }
 

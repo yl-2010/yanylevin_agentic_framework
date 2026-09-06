@@ -1055,6 +1055,11 @@ html[data-resolved-theme="light"] .edu-filter.is-on {
   font-weight: 600;
 }
 
+.edu-name-tag {
+  font-weight: 700;
+  color: var(--accent);
+}
+
 .edu-meta,
 .edu-tag {
   font-size: var(--text-caption);

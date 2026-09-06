@@ -103,10 +103,12 @@ own sections. "None" if none.
 ## Calendar plans
 Any plan with a date that should go on Apple Calendar. Bias is include.
 Tentative, maybe, TBD venue, and "Saturday 4:30" all belong. One line per
-event: title, local date, start to end (or all-day), calendar hint, evidence.
-"None" if none. Homework, Canvas, and bells do not belong. If it looks like a
-`deleted.md` calendar row, omit it (judgement, not exact clocks). Do not list
-it as new.
+event: title, local date, start to end (or all-day), calendar hint, evidence,
+and the meeting URL when mail or chat has one. PathIvy webinars: the Zoom
+registration href from Mail.app `source` for that date's row, not the words
+"Registration Link". "None" if none. Homework, Canvas, and bells do not belong.
+If it looks like a `deleted.md` calendar row, omit it (judgement, not exact
+clocks). Do not list it as new.
 A named day is enough even when the venue is TBD. Yan `fromMe` "Saturday 4:30
 location tbd" belongs here. Put the missing venue on the line. Do not move it
 to Gaps.

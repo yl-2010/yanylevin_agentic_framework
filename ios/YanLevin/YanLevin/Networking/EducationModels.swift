@@ -249,10 +249,27 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
         return todoId
     }
 
-    var displayName: String { name ?? title ?? todoId }
+    var displayName: String { Self.stripTagPrefix(name ?? title ?? todoId) }
     var displayTag: String? {
         let key = filterTagKey
         return key == "none" ? nil : key
+    }
+
+    /// Drop a leading CW/HW/QA/MA prefix. The tag field carries that.
+    static func stripTagPrefix(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let regex = try? NSRegularExpression(
+            pattern: #"^(CW|HW|QA|MA)(?:\s*:\s*|\s+)"#,
+            options: .caseInsensitive
+        ) else { return trimmed }
+        let range = NSRange(trimmed.startIndex..., in: trimmed)
+        let stripped = regex.stringByReplacingMatches(
+            in: trimmed,
+            options: [],
+            range: range,
+            withTemplate: ""
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+        return stripped.isEmpty ? trimmed : stripped
     }
 
     /// Website type-filter key: CW / HW / QA / MA / none.

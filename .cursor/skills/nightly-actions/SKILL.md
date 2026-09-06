@@ -86,6 +86,13 @@ local times in the digest timezone to UTC for `--start` and `--end`. Pick
 the calendar from the personal-calendar skill. Do not ask; if the calendar
 is not obvious, use the personal / default iCloud calendar.
 
+Meeting links are required on create and update. If mail, chat, or an invite
+has a Zoom / Meet / Teams / FaceTime / registration / booking URL, pass it as
+`--location`, `--url`, and a one-line `--notes`. PathIvy webinars always get
+the Zoom registration href for that date from Calla's Mail.app `source` (plain
+`content` drops the link). Do not write location `virtual` when a URL exists.
+A linkless virtual event is not done.
+
 ## Big dates on the education dashboard (standing)
 
 Bias is **skip**. The Dates panel is not a second calendar. When you are unsure, do not
