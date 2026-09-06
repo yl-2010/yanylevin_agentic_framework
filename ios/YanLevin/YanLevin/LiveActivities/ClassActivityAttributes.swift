@@ -17,6 +17,8 @@ struct ClassActivityAttributes: ActivityAttributes {
         var period: String
         var start: String
         var end: String
+        var startDate: Date?
+        var endDate: Date?
         var assignments: [ClassActivityAssignment]
         var overflowCount: Int
     }

@@ -37,11 +37,13 @@
 		5172BD9CA2C8FCCBCB09D120 /* EducationSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = F05C0EC38920C98140B2615D /* EducationSchedule.swift */; };
 		536ABAA7AA545DDD9015486B /* OpenTodoIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499CB5F2593A83941A69B5D4 /* OpenTodoIntent.swift */; };
 		55E8EB83D402053CEB351A61 /* YLKeyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E41EB89491918E6F0C2E4F19 /* YLKeyboard.swift */; };
+		62D79233F1C8E2BCF847FF14 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20592DA9B5602E124F949B98 /* Theme.swift */; };
 		64221A3AEDE4E019A8BC837F /* OpenChatIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82915689A31137AC9DA6206D /* OpenChatIntent.swift */; };
 		6530B1B04F6935154D6B0C6F /* MacSSEClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FABE02122636C2A1A016FBC /* MacSSEClient.swift */; };
 		6979410754B0AFC1FEC0CE72 /* OpenChatIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82915689A31137AC9DA6206D /* OpenChatIntent.swift */; };
 		6B89D4F726F3E02F409A3328 /* YLKeyboardScrub.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEA3E5AC8DBB39B3548312C6 /* YLKeyboardScrub.swift */; };
 		6C1FD5253AE396A06C06B7B6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3BFC5D2A192A99E4F618F79B /* Assets.xcassets */; };
+		6CAACE8D2A6B7AE17C6904C3 /* LiveActivityChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A86C6C326C4186DB341D3C76 /* LiveActivityChrome.swift */; };
 		750B305214CC33B4665E103E /* ClassActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9762E211D40ABD71EF6B883D /* ClassActivityAttributes.swift */; };
 		759BFDA13D21B1C13ED6D8B5 /* FitnessStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 584356DE1F7514C323536418 /* FitnessStore.swift */; };
 		7851F71BDF6DF7BFF0D7E8B2 /* NaturalWhen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C591473A552F86C4D658DD74 /* NaturalWhen.swift */; };
@@ -151,6 +153,7 @@
 		9A015C81FA07EC99A09C44AE /* YLMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLMotion.swift; sourceTree = "<group>"; };
 		9BBD84778BC1EBA0B291C926 /* ChatHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHistory.swift; sourceTree = "<group>"; };
 		A056C44E530D5338DB54978D /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
+		A86C6C326C4186DB341D3C76 /* LiveActivityChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityChrome.swift; sourceTree = "<group>"; };
 		A94CCFD3097868B59A3491ED /* EducationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EducationStore.swift; sourceTree = "<group>"; };
 		AB6D32A34C8B1C29DF15F180 /* TabReselectObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabReselectObserver.swift; sourceTree = "<group>"; };
 		B3F59C1B7CC61E1680271B65 /* AppLoadingScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLoadingScreen.swift; sourceTree = "<group>"; };
@@ -324,6 +327,7 @@
 				03B019B6E0B0488314D38BD9 /* ChatControlWidget.swift */,
 				EA900CCC225436D37D05FA13 /* ClassLiveActivity.swift */,
 				5999526ED018A9822D26520F /* Info.plist */,
+				A86C6C326C4186DB341D3C76 /* LiveActivityChrome.swift */,
 				67483E28EDDF1CD3D9F6A453 /* ScheduleWidget.swift */,
 				56E5089678AC6FD751ABBA54 /* TodoWidget.swift */,
 				8B63568A4441B0FF78A31482 /* TodoWidgetConfiguration.swift */,
@@ -551,12 +555,14 @@
 				1B7A56181DDF09EE216EDC33 /* CompleteTodoIntent.swift in Sources */,
 				B40C25FBC305B1121634EE49 /* EducationModels.swift in Sources */,
 				2BE3CC08BF6BD93E85A4BB4D /* EducationSchedule.swift in Sources */,
+				6CAACE8D2A6B7AE17C6904C3 /* LiveActivityChrome.swift in Sources */,
 				2B05B5988A1714A285B68747 /* NaturalWhen.swift in Sources */,
 				ED3F577E7DFF1C56B3FD96F7 /* OpenAgentChatIntent.swift in Sources */,
 				64221A3AEDE4E019A8BC837F /* OpenChatIntent.swift in Sources */,
 				212F22C64D79400E5735A554 /* OpenClassIntent.swift in Sources */,
 				37DD00EC16A32006CC2AEFB7 /* OpenTodoIntent.swift in Sources */,
 				C4C827265C7EB2B6010D2E8D /* ScheduleWidget.swift in Sources */,
+				62D79233F1C8E2BCF847FF14 /* Theme.swift in Sources */,
 				9449091BE5AF456E7D7EAAF6 /* TodoWidget.swift in Sources */,
 				378B2508AF4CC7A49975AD47 /* TodoWidgetConfiguration.swift in Sources */,
 				DFF9B7522C2CBE25D1F65B58 /* WidgetEducationLoader.swift in Sources */,

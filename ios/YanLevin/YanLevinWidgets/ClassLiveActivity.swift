@@ -12,69 +12,167 @@ struct ClassLiveActivity: Widget {
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     Text(context.state.period)
-                        .font(.title2.weight(.bold))
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(YLTheme.accent)
                 }
-                DynamicIslandExpandedRegion(.center) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(context.state.className)
-                            .font(.headline)
-                            .lineLimit(1)
-                        Text("\(context.state.start)–\(context.state.end)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                DynamicIslandExpandedRegion(.trailing) {
+                    ClassLiveActivityTimer(state: context.state, compact: true)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    ClassLiveActivityAssignments(state: context.state, compact: true)
+                    ClassLiveActivityIslandBottom(state: context.state)
+                        .padding(.horizontal, LiveActivityChrome.islandSidePad)
+                        .padding(.bottom, LiveActivityChrome.islandBottomPad)
                 }
             } compactLeading: {
                 Text(context.state.period)
                     .font(.caption.weight(.bold))
+                    .foregroundStyle(YLTheme.accent)
             } compactTrailing: {
                 if let first = context.state.assignments.first {
                     Text(first.tag)
                         .font(.caption2.weight(.bold))
+                        .foregroundStyle(YLTheme.accent)
+                } else {
+                    ClassLiveActivityTimer(state: context.state, compact: true)
                 }
             } minimal: {
                 Text(context.state.period)
                     .font(.caption2.weight(.bold))
+                    .foregroundStyle(YLTheme.accent)
             }
+            .keylineTint(YLTheme.accent)
             .widgetURL(ClassActivityAttributes.classURL(id: context.state.classId))
         }
     }
 }
 
 private struct ClassLiveActivityBody: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let state: ClassActivityAttributes.ContentState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 10) {
+                Text(state.period)
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(YLTheme.accent(colorScheme))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(YLTheme.accent(colorScheme).opacity(0.16), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(state.className)
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(YLTheme.fg(colorScheme))
+                        .lineLimit(1)
+                    Text(timeRange)
+                        .font(.caption)
+                        .foregroundStyle(YLTheme.muted(colorScheme))
+                }
+                Spacer(minLength: 0)
+                ClassLiveActivityTimer(state: state, compact: false)
+            }
+            ClassLiveActivityMeter(state: state)
+            ClassLiveActivityAssignments(state: state, compact: false)
+        }
+        .padding(14)
+        .background { LiveActivityBannerBackground() }
+        .liveActivityLockScreenChrome()
+    }
+
+    private var timeRange: String {
+        if state.start.isEmpty || state.end.isEmpty { return state.start + state.end }
+        return "\(state.start)-\(state.end)"
+    }
+}
+
+private struct ClassLiveActivityIslandBottom: View {
+    @Environment(\.colorScheme) private var colorScheme
     let state: ClassActivityAttributes.ContentState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(state.period)
-                    .font(.headline.weight(.bold))
                 Text(state.className)
-                    .font(.headline.weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(YLTheme.fg(colorScheme))
                     .lineLimit(1)
                 Spacer(minLength: 0)
-                Text("\(state.start)–\(state.end)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                ClassLiveActivityMeter(state: state)
+                    .frame(maxWidth: 88)
             }
-            ClassLiveActivityAssignments(state: state, compact: false)
+            ClassLiveActivityAssignments(state: state, compact: true)
         }
-        .padding(14)
+    }
+}
+
+private struct ClassLiveActivityTimer: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let state: ClassActivityAttributes.ContentState
+    var compact: Bool
+
+    var body: some View {
+        Group {
+            if let start = state.startDate, Date.now < start {
+                Text(timerInterval: Date.now...start, countsDown: true)
+            } else if let end = state.endDate, Date.now < end {
+                Text(timerInterval: Date.now...end, countsDown: true)
+            } else if !state.end.isEmpty {
+                Text(state.end)
+            }
+        }
+        .font(compact ? .caption.monospacedDigit().weight(.semibold) : .subheadline.monospacedDigit().weight(.bold))
+        .foregroundStyle(YLTheme.accent(colorScheme))
+        .minimumScaleFactor(0.7)
+        .lineLimit(1)
+        .multilineTextAlignment(.trailing)
+    }
+}
+
+private struct ClassLiveActivityMeter: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let state: ClassActivityAttributes.ContentState
+
+    var body: some View {
+        if let start = state.startDate, let end = state.endDate, end > start {
+            ProgressView(timerInterval: start...end, countsDown: false)
+                .progressViewStyle(.linear)
+                .tint(YLTheme.accent(colorScheme))
+                .labelsHidden()
+        }
     }
 }
 
 private struct ClassLiveActivityAssignments: View {
+    @Environment(\.colorScheme) private var colorScheme
     let state: ClassActivityAttributes.ContentState
     var compact: Bool
 
     var body: some View {
         if state.assignments.isEmpty {
             EmptyView()
+        } else if compact {
+            HStack(spacing: 6) {
+                ForEach(state.assignments, id: \.todoId) { item in
+                    Button(
+                        intent: OpenTodoIntent(
+                            todoId: item.todoId,
+                            classId: item.classId,
+                            projectId: nil
+                        )
+                    ) {
+                        LiveActivityTagChip(tag: item.tag)
+                    }
+                    .buttonStyle(.plain)
+                }
+                if state.overflowCount > 0 {
+                    Text("+\(state.overflowCount)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(YLTheme.muted(colorScheme))
+                }
+                Spacer(minLength: 0)
+            }
         } else {
-            VStack(alignment: .leading, spacing: compact ? 4 : 6) {
+            VStack(alignment: .leading, spacing: 6) {
                 ForEach(state.assignments, id: \.todoId) { item in
                     Button(
                         intent: OpenTodoIntent(
@@ -84,11 +182,10 @@ private struct ClassLiveActivityAssignments: View {
                         )
                     ) {
                         HStack(spacing: 8) {
-                            Text(item.tag)
-                                .font(.caption2.weight(.bold))
-                                .frame(width: 28, alignment: .leading)
+                            LiveActivityTagChip(tag: item.tag)
                             Text(item.name)
                                 .font(.caption.weight(.semibold))
+                                .foregroundStyle(YLTheme.fg(colorScheme))
                                 .lineLimit(1)
                             Spacer(minLength: 0)
                         }
@@ -97,8 +194,8 @@ private struct ClassLiveActivityAssignments: View {
                 }
                 if state.overflowCount > 0 {
                     Text("+\(state.overflowCount) more")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(YLTheme.muted(colorScheme))
                 }
             }
         }

@@ -52,12 +52,20 @@ final class LiveActivityCoordinator {
             dateKey: active.section.dateKey,
             from: tree
         )
+        let startDate = dayClass.startMin.flatMap {
+            EducationScheduleHelper.minutesToDate(dateKey: active.section.dateKey, minutes: $0)
+        }
+        let endDate = dayClass.endMin.flatMap {
+            EducationScheduleHelper.minutesToDate(dateKey: active.section.dateKey, minutes: $0)
+        }
         let state = ClassActivityAttributes.ContentState(
             classId: dayClass.cls.id,
             className: dayClass.cls.displayName,
             period: dayClass.period,
             start: dayClass.start ?? "",
             end: dayClass.end ?? "",
+            startDate: startDate,
+            endDate: endDate,
             assignments: items.map {
                 ClassActivityAssignment(
                     todoId: $0.todoId,
@@ -68,9 +76,6 @@ final class LiveActivityCoordinator {
             },
             overflowCount: overflow
         )
-        let endDate = dayClass.endMin.flatMap {
-            EducationScheduleHelper.minutesToDate(dateKey: active.section.dateKey, minutes: $0)
-        }
         await upsertClass(state: state, staleDate: endDate)
         armClassEnd(endDate)
     }

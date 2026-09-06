@@ -105,6 +105,7 @@ targets:
       - path: YanLevin/Networking/EducationModels.swift
       - path: YanLevin/Networking/EducationSchedule.swift
       - path: YanLevin/Design/NaturalWhen.swift
+      - path: YanLevin/Design/Theme.swift
       - path: YanLevin/App/OpenChatIntent.swift
       - path: YanLevin/App/OpenTodoIntent.swift
       - path: YanLevin/App/OpenClassIntent.swift
