@@ -13,10 +13,12 @@ struct ClassLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.leading) {
                     Text(context.state.period)
                         .font(.headline.weight(.bold))
-                        .foregroundStyle(YLTheme.accent)
+                        .foregroundStyle(LiveActivityPalette.islandAccent)
+                        .padding(.leading, LiveActivityChrome.islandEarPad)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     ClassLiveActivityTimer(state: context.state, compact: true)
+                        .padding(.trailing, LiveActivityChrome.islandEarPad)
                         .dynamicIsland(verticalPlacement: .belowIfTooWide)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
@@ -25,21 +27,21 @@ struct ClassLiveActivity: Widget {
             } compactLeading: {
                 Text(context.state.period)
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(YLTheme.accent)
+                    .foregroundStyle(LiveActivityPalette.islandAccent)
             } compactTrailing: {
                 if let first = context.state.assignments.first {
                     Text(first.tag)
                         .font(.caption2.weight(.bold))
-                        .foregroundStyle(YLTheme.accent)
+                        .foregroundStyle(LiveActivityPalette.islandAccent)
                 } else {
                     ClassLiveActivityTimer(state: context.state, compact: true)
                 }
             } minimal: {
                 Text(context.state.period)
                     .font(.caption2.weight(.bold))
-                    .foregroundStyle(YLTheme.accent)
+                    .foregroundStyle(LiveActivityPalette.islandAccent)
             }
-            .keylineTint(YLTheme.accent)
+            .keylineTint(LiveActivityPalette.islandAccent)
             .widgetURL(ClassActivityAttributes.classURL(id: context.state.classId))
         }
     }
@@ -54,10 +56,10 @@ private struct ClassLiveActivityBody: View {
             HStack(alignment: .center, spacing: 10) {
                 Text(state.period)
                     .font(.title3.weight(.bold))
-                    .foregroundStyle(YLTheme.accent(colorScheme))
+                    .foregroundStyle(LiveActivityPalette.accent(colorScheme))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(YLTheme.accent(colorScheme).opacity(0.16), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(LiveActivityPalette.accent(colorScheme).opacity(0.16), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
                     Text(state.className)
                         .font(.headline.weight(.semibold))
@@ -85,16 +87,15 @@ private struct ClassLiveActivityBody: View {
 }
 
 private struct ClassLiveActivityIslandBottom: View {
-    @Environment(\.colorScheme) private var colorScheme
     let state: ClassActivityAttributes.ContentState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(state.className)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(YLTheme.fg(colorScheme))
+                .foregroundStyle(LiveActivityPalette.islandFg)
                 .lineLimit(1)
-            ClassLiveActivityMeter(state: state)
+            ClassLiveActivityMeter(state: state, island: true)
             ClassLiveActivityAssignments(state: state, compact: true)
         }
         .padding(.horizontal, LiveActivityChrome.islandSidePad)
@@ -119,7 +120,7 @@ private struct ClassLiveActivityTimer: View {
             }
         }
         .font(compact ? .caption.monospacedDigit().weight(.semibold) : .subheadline.monospacedDigit().weight(.bold))
-        .foregroundStyle(YLTheme.accent(colorScheme))
+        .foregroundStyle(compact ? LiveActivityPalette.islandAccent : LiveActivityPalette.accent(colorScheme))
         .minimumScaleFactor(0.7)
         .lineLimit(1)
         .multilineTextAlignment(.trailing)
@@ -129,12 +130,13 @@ private struct ClassLiveActivityTimer: View {
 private struct ClassLiveActivityMeter: View {
     @Environment(\.colorScheme) private var colorScheme
     let state: ClassActivityAttributes.ContentState
+    var island: Bool = false
 
     var body: some View {
         if let start = state.startDate, let end = state.endDate, end > start {
             ProgressView(timerInterval: start...end, countsDown: false)
                 .progressViewStyle(.linear)
-                .tint(YLTheme.accent(colorScheme))
+                .tint(island ? LiveActivityPalette.islandAccent : LiveActivityPalette.accent(colorScheme))
                 .labelsHidden()
         }
     }
@@ -158,14 +160,14 @@ private struct ClassLiveActivityAssignments: View {
                             projectId: nil
                         )
                     ) {
-                        LiveActivityTagChip(tag: item.tag)
+                        LiveActivityTagChip(tag: item.tag, island: compact)
                     }
                     .buttonStyle(.plain)
                 }
                 if state.overflowCount > 0 {
                     Text("+\(state.overflowCount)")
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(YLTheme.muted(colorScheme))
+                        .foregroundStyle(LiveActivityPalette.islandMuted)
                 }
                 Spacer(minLength: 0)
             }

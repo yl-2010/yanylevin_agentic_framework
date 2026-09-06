@@ -10,29 +10,27 @@ struct AgentLiveActivity: Widget {
                 .widgetURL(AgentActivityAttributes.chatURL(sessionId: nil))
         } dynamicIsland: { context in
             DynamicIsland {
-                DynamicIslandExpandedRegion(.leading) {
-                    LiveActivityYLMark(size: 16, color: YLTheme.accent)
-                }
                 DynamicIslandExpandedRegion(.trailing) {
                     LiveActivityBusyDots()
+                        .padding(.trailing, LiveActivityChrome.islandEarPad)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     AgentLiveActivityIslandBottom(state: context.state)
                 }
             } compactLeading: {
-                LiveActivityYLMark(size: 14, color: YLTheme.accent)
+                LiveActivityYLMark(size: 13)
             } compactTrailing: {
                 if context.state.agents.count == 1 {
                     LiveActivityBusyDots()
                 } else {
                     Text("\(context.state.agents.count + context.state.overflowCount)")
                         .font(.caption2.weight(.bold))
-                        .foregroundStyle(YLTheme.chatOrange)
+                        .foregroundStyle(LiveActivityPalette.orange)
                 }
             } minimal: {
-                LiveActivityYLMark(size: 12, color: YLTheme.accent)
+                LiveActivityYLMark(size: 11)
             }
-            .keylineTint(YLTheme.accent)
+            .keylineTint(LiveActivityPalette.islandAccent)
             .widgetURL(AgentActivityAttributes.chatURL(sessionId: nil))
         }
     }
@@ -45,10 +43,10 @@ private struct AgentLiveActivityBody: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                LiveActivityYLMark(size: 18, color: YLTheme.accent(colorScheme))
+                LiveActivityYLMark(size: 18)
                 Text(headerTitle)
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(YLTheme.accent(colorScheme))
+                    .foregroundStyle(LiveActivityPalette.accent(colorScheme))
                 Spacer(minLength: 0)
                 LiveActivityBusyDots()
             }
@@ -66,25 +64,31 @@ private struct AgentLiveActivityBody: View {
 }
 
 private struct AgentLiveActivityIslandBottom: View {
-    @Environment(\.colorScheme) private var colorScheme
     let state: AgentActivityAttributes.ContentState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 8) {
+                LiveActivityYLMark(size: 14)
+                Text(headerTitle)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(LiveActivityPalette.islandAccent)
+                Spacer(minLength: 0)
+            }
             ForEach(state.agents, id: \.sessionId) { row in
                 Button(intent: OpenAgentChatIntent(sessionId: row.sessionId)) {
                     HStack(spacing: 8) {
                         Circle()
-                            .fill(YLTheme.chatOrange)
+                            .fill(LiveActivityPalette.orange)
                             .frame(width: 5, height: 5)
                         Text(row.title)
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(YLTheme.fg(colorScheme))
+                            .foregroundStyle(LiveActivityPalette.islandFg)
                             .lineLimit(1)
                         Spacer(minLength: 6)
                         Text(row.workingLabel)
                             .font(.caption2.weight(.semibold))
-                            .foregroundStyle(YLTheme.chatOrange)
+                            .foregroundStyle(LiveActivityPalette.orange)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                     }
@@ -94,12 +98,17 @@ private struct AgentLiveActivityIslandBottom: View {
             if state.overflowCount > 0 {
                 Text("+\(state.overflowCount) more")
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(YLTheme.muted(colorScheme))
+                    .foregroundStyle(LiveActivityPalette.islandMuted)
             }
         }
         .padding(.horizontal, LiveActivityChrome.islandSidePad)
         .padding(.bottom, LiveActivityChrome.islandBottomPad)
         .padding(.top, 2)
+    }
+
+    private var headerTitle: String {
+        let n = state.agents.count + state.overflowCount
+        return n == 1 ? "Agent" : "\(n) agents"
     }
 }
 
@@ -132,7 +141,7 @@ private struct AgentLiveActivityRows: View {
     private func compactRow(_ row: AgentActivityRow) -> some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(YLTheme.chatOrange)
+                .fill(LiveActivityPalette.orange)
                 .frame(width: 6, height: 6)
             Text(row.title)
                 .font(.caption.weight(.semibold))
@@ -141,14 +150,14 @@ private struct AgentLiveActivityRows: View {
             Spacer(minLength: 4)
             Text(row.workingLabel)
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(YLTheme.chatOrange)
+                .foregroundStyle(LiveActivityPalette.orange)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(
-            YLTheme.accent(colorScheme).opacity(0.12),
+            LiveActivityPalette.accent(colorScheme).opacity(0.12),
             in: RoundedRectangle(cornerRadius: 10, style: .continuous)
         )
     }
@@ -163,7 +172,7 @@ private struct AgentLiveActivityRows: View {
                     .lineLimit(1)
                 Text(row.workingLabel)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(YLTheme.chatOrange)
+                    .foregroundStyle(LiveActivityPalette.orange)
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
@@ -171,7 +180,7 @@ private struct AgentLiveActivityRows: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(
-            YLTheme.accent(colorScheme).opacity(0.12),
+            LiveActivityPalette.accent(colorScheme).opacity(0.12),
             in: RoundedRectangle(cornerRadius: 12, style: .continuous)
         )
     }
