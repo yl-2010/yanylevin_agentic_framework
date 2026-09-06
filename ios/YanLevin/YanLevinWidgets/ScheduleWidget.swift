@@ -124,6 +124,14 @@ struct ScheduleWidgetView: View {
                                 .foregroundStyle(WidgetTheme.muted)
                         }
                     }
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .background {
+                        if item.section.isCurrent(item.dayClass) {
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(WidgetTheme.accent.opacity(0.14))
+                        }
+                    }
                 }
             }
             Spacer(minLength: 0)
@@ -169,6 +177,14 @@ struct ScheduleWidgetView: View {
                                     Text(formatTime(start))
                                         .font(.caption2)
                                         .foregroundStyle(WidgetTheme.muted)
+                                }
+                            }
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background {
+                                if group.section.isCurrent(dayClass) {
+                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                        .fill(WidgetTheme.accent.opacity(0.14))
                                 }
                             }
                         }

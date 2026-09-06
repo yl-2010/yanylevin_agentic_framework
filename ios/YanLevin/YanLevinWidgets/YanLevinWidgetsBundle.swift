@@ -7,5 +7,7 @@ struct YanLevinWidgets: WidgetBundle {
         ScheduleWidget()
         TodoWidget()
         ChatControlWidget()
+        ClassLiveActivity()
+        AgentLiveActivity()
     }
 }

@@ -28,11 +28,12 @@ struct DaySection: Identifiable, Hashable {
     let classes: [DayClass]
 
     func isCurrent(_ dayClass: DayClass) -> Bool {
-        guard isToday,
-              let start = dayClass.startMin,
-              let end = dayClass.endMin
-        else { return false }
-        return nowMinutes >= start && nowMinutes < end
+        guard isToday, let end = dayClass.endMin else { return false }
+        guard let highlightStart = EducationScheduleHelper.highlightStartMin(
+            for: dayClass,
+            in: classes
+        ) else { return false }
+        return nowMinutes >= highlightStart && nowMinutes < end
     }
 
     func isPast(_ dayClass: DayClass) -> Bool {
@@ -42,6 +43,87 @@ struct DaySection: Identifiable, Hashable {
 }
 
 enum EducationScheduleHelper {
+    static let highlightLeadMinutes = 10
+
+    /// Port of `meetingHighlightStartMin` in server/education-data.js.
+    static func highlightStartMin(
+        for dayClass: DayClass,
+        in classes: [DayClass],
+        leadMinutes: Int = highlightLeadMinutes
+    ) -> Int? {
+        guard let start = dayClass.startMin else { return nil }
+        guard let idx = classes.firstIndex(where: { $0.id == dayClass.id }) else {
+            return start - leadMinutes
+        }
+        if idx > 0, let prevEnd = classes[idx - 1].endMin {
+            let gap = start - prevEnd
+            if gap < leadMinutes { return prevEnd }
+        }
+        return start - leadMinutes
+    }
+
+    static func activeDayClass(in sections: [DaySection]) -> (section: DaySection, dayClass: DayClass)? {
+        for section in sections where section.isToday {
+            if let dayClass = section.classes.first(where: { section.isCurrent($0) }) {
+                return (section, dayClass)
+            }
+        }
+        return nil
+    }
+
+    static func minutesToDate(dateKey: String, minutes: Int) -> Date? {
+        let parts = dateKey.split(separator: "-")
+        guard parts.count == 3,
+              let y = Int(parts[0]),
+              let m = Int(parts[1]),
+              let day = Int(parts[2])
+        else { return nil }
+        return Calendar.current.date(from: DateComponents(
+            year: y,
+            month: m,
+            day: day,
+            hour: minutes / 60,
+            minute: minutes % 60
+        ))
+    }
+
+    /// Open HW / CW / MA / QA due this meeting. Date-only due that day counts.
+    /// Timed HW due at or before class start still counts as due this period.
+    static func periodAssignments(
+        for dayClass: DayClass,
+        dateKey: String,
+        from tree: EducationTreeResponse?,
+        limit: Int = 3
+    ) -> (items: [EducationTodo], overflow: Int) {
+        let tagged = EducationTodoHelpers.flattenTodos(from: tree).filter { todo in
+            todoBelongsToMeeting(todo, dayClass: dayClass, dateKey: dateKey)
+        }
+        .sorted { $0.dueSortKey < $1.dueSortKey }
+        if tagged.count <= limit {
+            return (tagged, 0)
+        }
+        return (Array(tagged.prefix(limit)), tagged.count - limit)
+    }
+
+    static func todoBelongsToMeeting(
+        _ todo: EducationTodo,
+        dayClass: DayClass,
+        dateKey: String
+    ) -> Bool {
+        guard todo.done != true else { return false }
+        let tag = todo.filterTagKey
+        guard tag == "HW" || tag == "CW" || tag == "MA" || tag == "QA" else { return false }
+        guard todo.classId == dayClass.cls.id else { return false }
+        guard todo.dueDateValue == dateKey else { return false }
+        guard let dueTime = todo.dueTimeValue, let dueMin = timeToMinutes(dueTime) else {
+            return true
+        }
+        guard let start = dayClass.startMin, let end = dayClass.endMin else { return true }
+        if dueMin >= start && dueMin < end { return true }
+        if tag == "HW" && dueMin <= start { return true }
+        return false
+    }
+
     /// Port of `classSections` in education/app.js.
     static func classSections(
         schedule: EducationSchedule?,

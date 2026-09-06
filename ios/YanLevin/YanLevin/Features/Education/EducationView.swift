@@ -84,11 +84,18 @@ struct EducationView: View {
             guard let token = auth.session?.token else { return }
             await store.load(token: token)
             applyEducationTodoHandoff()
+            applyEducationClassHandoff()
             await store.runLiveSession(token: token)
         }
-        .onAppear { applyEducationTodoHandoff() }
+        .onAppear {
+            applyEducationTodoHandoff()
+            applyEducationClassHandoff()
+        }
         .onChange(of: nav.educationTodoHandoff) { _, _ in
             applyEducationTodoHandoff()
+        }
+        .onChange(of: nav.educationClassHandoff) { _, _ in
+            applyEducationClassHandoff()
         }
         .onChange(of: store.agentNavigate) { _, _ in
             applyAgentEducationNavigate()
@@ -431,6 +438,19 @@ struct EducationView: View {
         }
     }
 
+    private func applyEducationClassHandoff() {
+        guard let classId = nav.educationClassHandoff, !classId.isEmpty else { return }
+        let tree = store.tree ?? AppGroupStore.loadCachedEducationTree()
+        if let cls = tree?.classes?.first(where: { $0.id == classId }) {
+            educationFocus.path = [.classDetail(cls)]
+            nav.educationClassHandoff = nil
+            return
+        }
+        if store.tree != nil, !store.isLoading {
+            nav.educationClassHandoff = nil
+        }
+    }
+
     private func applyAgentEducationNavigate() {
         guard let nav = store.agentNavigate else { return }
         let tree = store.tree ?? AppGroupStore.loadCachedEducationTree()
@@ -446,6 +466,7 @@ struct EducationView: View {
         guard let token = auth.session?.token else { return }
         await store.load(token: token)
         applyEducationTodoHandoff()
+        applyEducationClassHandoff()
         applyPendingAgentEducationNavigate()
     }
 

@@ -63,14 +63,42 @@ final class AppNavigationStore: ObservableObject {
     @Published var chatHandoffStartNew = false
     /// Widget / `yanylevin://todo` handoff until Education has a tree to open.
     @Published var educationTodoHandoff: PendingOpenTodo?
+    /// Live Activity / `yanylevin://class` handoff until Education has a tree.
+    @Published var educationClassHandoff: String?
+    /// Live Activity / `yanylevin://chat?sessionId=` resume.
+    @Published var chatHandoffSessionId: String?
+    /// Live Activity banner: open Chat without starting a new thread.
+    @Published var chatHandoffOpenExisting = false
     /// Bumped when the user taps the already-selected tab (UIKit intercept).
     @Published var tabReselectGeneration = 0
 
-    func openChat(startNew: Bool = false) {
+    func openChat(startNew: Bool = false, sessionId: String? = nil) {
         selectedTab = .chat
+        if let sessionId {
+            let sid = sessionId.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !sid.isEmpty {
+                chatHandoffPreferPersonalAgent = true
+                chatHandoffStartNew = false
+                chatHandoffOpenExisting = false
+                chatHandoffSessionId = sid
+                chatHandoffID = UUID()
+                return
+            }
+        }
         guard startNew else { return }
         chatHandoffPreferPersonalAgent = true
         chatHandoffStartNew = true
+        chatHandoffOpenExisting = false
+        chatHandoffSessionId = nil
+        chatHandoffID = UUID()
+    }
+
+    func openExistingChat() {
+        selectedTab = .chat
+        chatHandoffPreferPersonalAgent = true
+        chatHandoffStartNew = false
+        chatHandoffOpenExisting = true
+        chatHandoffSessionId = nil
         chatHandoffID = UUID()
     }
 
@@ -80,8 +108,24 @@ final class AppNavigationStore: ObservableObject {
 
     func handleOpenURL(_ url: URL) {
         guard url.scheme == "yanylevin" else { return }
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        func val(_ name: String) -> String? {
+            items.first(where: { $0.name == name })?.value.flatMap { $0.isEmpty ? nil : $0 }
+        }
         if url.host == "chat" {
+            if let sessionId = val("sessionId") {
+                openChat(sessionId: sessionId)
+                return
+            }
+            if val("open") == "1" {
+                openExistingChat()
+                return
+            }
             openChat(startNew: true)
+            return
+        }
+        if url.host == "class" {
+            openEducationClass(classId: val("id") ?? "")
             return
         }
         if url.host == "todo" {
@@ -111,8 +155,17 @@ final class AppNavigationStore: ObservableObject {
         )
     }
 
+    func openEducationClass(classId: String) {
+        let id = classId.trimmingCharacters(in: .whitespacesAndNewlines)
+        selectedTab = .education
+        guard !id.isEmpty else { return }
+        educationClassHandoff = id
+    }
+
     func consumePendingNewChatIfNeeded() {
         if educationTodoHandoff != nil || AppGroupStore.hasPendingOpenTodo() { return }
+        if educationClassHandoff != nil || AppGroupStore.hasPendingOpenClass() { return }
+        if chatHandoffSessionId != nil || AppGroupStore.hasPendingOpenChat() { return }
         if chatHandoffStartNew {
             _ = AppGroupStore.consumePendingNewChat()
             selectedTab = .chat
@@ -131,6 +184,30 @@ final class AppNavigationStore: ObservableObject {
         guard let pending = AppGroupStore.consumePendingOpenTodo() else { return }
         selectedTab = .education
         educationTodoHandoff = pending
+    }
+
+    func consumePendingOpenClassIfNeeded() {
+        if educationClassHandoff != nil {
+            selectedTab = .education
+            _ = AppGroupStore.consumePendingOpenClass()
+            return
+        }
+        guard let pending = AppGroupStore.consumePendingOpenClass() else { return }
+        openEducationClass(classId: pending.classId)
+    }
+
+    func consumePendingOpenChatIfNeeded() {
+        if chatHandoffSessionId != nil || chatHandoffOpenExisting {
+            selectedTab = .chat
+            _ = AppGroupStore.consumePendingOpenChat()
+            return
+        }
+        guard let pending = AppGroupStore.consumePendingOpenChat() else { return }
+        if let sid = pending.sessionId, !sid.isEmpty {
+            openChat(sessionId: sid)
+        } else {
+            openExistingChat()
+        }
     }
 
     func openPersonalAgent(attaching files: [PendingChatAttachment]) {
@@ -268,6 +345,8 @@ struct RootTabView: View {
         guard auth.hasFullAccess, !didApplyAuthorizedDefault else { return }
         didApplyAuthorizedDefault = true
         nav.consumePendingOpenTodoIfNeeded()
+        nav.consumePendingOpenClassIfNeeded()
+        nav.consumePendingOpenChatIfNeeded()
         // Keep Account/Chat if the user is mid sign-in or already browsing
         // (lock-screen Chat or a widget todo tap). Only rewrite leftover Home.
         if nav.selectedTab == .home {

@@ -518,6 +518,27 @@
     return +m[1] * 60 + +m[2];
   }
 
+  const CLASS_HIGHLIGHT_LEAD_MINUTES = 10;
+
+  /** Port of server/education-data.js meetingHighlightStartMin. */
+  function meetingHighlightStartMin(meetings, index, leadMinutes = CLASS_HIGHLIGHT_LEAD_MINUTES) {
+    const meeting = meetings?.[index];
+    if (!meeting || meeting.startMin == null) return null;
+    const prevEnd = index > 0 ? meetings[index - 1]?.endMin : null;
+    if (prevEnd == null) return meeting.startMin - leadMinutes;
+    const gap = meeting.startMin - prevEnd;
+    if (gap < leadMinutes) return prevEnd;
+    return meeting.startMin - leadMinutes;
+  }
+
+  function isMeetingHighlighted(meetings, index, nowMinutes, leadMinutes = CLASS_HIGHLIGHT_LEAD_MINUTES) {
+    const meeting = meetings?.[index];
+    if (!meeting || meeting.startMin == null || meeting.endMin == null) return false;
+    const highlightStart = meetingHighlightStartMin(meetings, index, leadMinutes);
+    if (highlightStart == null) return false;
+    return nowMinutes >= highlightStart && nowMinutes < meeting.endMin;
+  }
+
   function use24Hour() {
     return false;
   }
@@ -1860,13 +1881,8 @@
 
     const dayPanel = (sec, i) => {
       const rows = sec.classes
-        .map((m) => {
-          const hl =
-            sec.isToday &&
-            m.startMin != null &&
-            m.endMin != null &&
-            sec.nowMinutes >= m.startMin &&
-            sec.nowMinutes < m.endMin;
+        .map((m, i) => {
+          const hl = sec.isToday && isMeetingHighlighted(sec.classes, i, sec.nowMinutes);
           return classRowHtml(m, hl);
         })
         .join("");

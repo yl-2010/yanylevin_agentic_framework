@@ -1101,7 +1101,9 @@ struct ChatView: View {
         let files = nav.chatHandoffAttachments
         let preferPersonal = nav.chatHandoffPreferPersonalAgent
         let startNew = nav.chatHandoffStartNew
-        guard preferPersonal || startNew || !files.isEmpty else { return }
+        let resumeSid = nav.chatHandoffSessionId
+        let openExisting = nav.chatHandoffOpenExisting
+        guard preferPersonal || startNew || openExisting || resumeSid != nil || !files.isEmpty else { return }
         if preferPersonal {
             didChooseBackend = true
             if backend != .educationAgent {
@@ -1109,6 +1111,27 @@ struct ChatView: View {
                     backend = .educationAgent
                 }
             }
+        }
+        let token = auth.session?.token ?? AppGroupStore.token
+        let fullAccess = auth.hasFullAccess || AppGroupStore.hasFullAccess
+        if let resumeSid, !resumeSid.isEmpty {
+            guard fullAccess, let token, !token.isEmpty else { return }
+            closeChatHistory(animated: false, markVisibleRead: false)
+            nav.chatHandoffAttachments = []
+            nav.chatHandoffPreferPersonalAgent = false
+            nav.chatHandoffStartNew = false
+            nav.chatHandoffOpenExisting = false
+            nav.chatHandoffSessionId = nil
+            Task { await educationStore.resumePersistedChat(sessionId: resumeSid, token: token) }
+            return
+        }
+        if openExisting {
+            nav.chatHandoffAttachments = []
+            nav.chatHandoffPreferPersonalAgent = false
+            nav.chatHandoffStartNew = false
+            nav.chatHandoffOpenExisting = false
+            nav.chatHandoffSessionId = nil
+            return
         }
         if startNew {
             closeChatHistory(animated: false, markVisibleRead: false)
@@ -1144,6 +1167,8 @@ struct ChatView: View {
         nav.chatHandoffAttachments = []
         nav.chatHandoffPreferPersonalAgent = false
         nav.chatHandoffStartNew = false
+        nav.chatHandoffOpenExisting = false
+        nav.chatHandoffSessionId = nil
     }
 
     private func toggleBackend() {

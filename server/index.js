@@ -52,6 +52,7 @@ import {
   stopAgent,
   getAgentState,
   getActiveAgent,
+  getRunningAgents,
   listAgentChats,
   resumeAgent,
   markAgentChatRead,
@@ -698,6 +699,20 @@ app.get("/api/education/agent/active", requireEducationUser, (req, res) => {
     res.status(err.status || 500).json({
       ok: false,
       error: err.message || "agent active failed",
+    });
+  }
+});
+
+app.get("/api/education/agent/running", requireEducationUser, async (req, res) => {
+  try {
+    const result = await getRunningAgents(req.user.email);
+    res.setHeader("Cache-Control", "no-store");
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/education/agent/running]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "agent running failed",
     });
   }
 });

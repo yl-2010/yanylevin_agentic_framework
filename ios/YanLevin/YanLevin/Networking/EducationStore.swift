@@ -741,6 +741,7 @@ final class EducationStore: ObservableObject {
                 chatHistory[i].unread = true
             }
         }
+        LiveActivityCoordinator.shared.scheduleSync()
     }
 
     var queuedMessageCount: Int {
@@ -854,6 +855,7 @@ final class EducationStore: ObservableObject {
             if let email = res.email, !email.isEmpty {
                 persistEmail = email.lowercased()
             }
+            LiveActivityCoordinator.shared.scheduleSync()
         } catch {
             errorText = error.localizedDescription
         }

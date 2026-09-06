@@ -379,6 +379,20 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    if (route === "agent/running") {
+      if (method !== "GET") {
+        res.setHeader("Allow", "GET");
+        res.status(405).json({ ok: false, error: "method not allowed" });
+        return;
+      }
+      await forwardEducation(req, res, {
+        method: "GET",
+        path: "/api/education/agent/running",
+        timeoutMs: 15_000,
+      });
+      return;
+    }
+
     if (route === "agent/chats") {
       if (method !== "GET") {
         res.setHeader("Allow", "GET");

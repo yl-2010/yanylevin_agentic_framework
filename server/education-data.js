@@ -906,6 +906,85 @@ function timeToMinutes(t) {
   return Number(m[1]) * 60 + Number(m[2]);
 }
 
+/** Minutes before class start that count as the active highlight, unless passing is shorter. */
+export const CLASS_HIGHLIGHT_LEAD_MINUTES = 10;
+
+/**
+ * Highlight window start for one meeting in a day's sorted list.
+ * First period: start minus lead. Passing shorter than lead: previous end.
+ * Otherwise start minus lead (lunch and 15-minute passing stay 10 minutes).
+ *
+ * @param {{ startMin?: number|null, endMin?: number|null }[]} meetings
+ * @param {number} index
+ * @param {number} [leadMinutes]
+ * @returns {number|null}
+ */
+export function meetingHighlightStartMin(
+  meetings,
+  index,
+  leadMinutes = CLASS_HIGHLIGHT_LEAD_MINUTES
+) {
+  const meeting = Array.isArray(meetings) ? meetings[index] : null;
+  if (!meeting || meeting.startMin == null || !Number.isFinite(meeting.startMin)) {
+    return null;
+  }
+  const prevEnd = index > 0 ? meetings[index - 1]?.endMin : null;
+  if (prevEnd == null || !Number.isFinite(prevEnd)) {
+    return meeting.startMin - leadMinutes;
+  }
+  const gap = meeting.startMin - prevEnd;
+  if (gap < leadMinutes) return prevEnd;
+  return meeting.startMin - leadMinutes;
+}
+
+/**
+ * @param {{ startMin?: number|null, endMin?: number|null }[]} meetings
+ * @param {number} index
+ * @param {number} nowMinutes
+ * @param {number} [leadMinutes]
+ */
+export function isMeetingHighlighted(
+  meetings,
+  index,
+  nowMinutes,
+  leadMinutes = CLASS_HIGHLIGHT_LEAD_MINUTES
+) {
+  const meeting = Array.isArray(meetings) ? meetings[index] : null;
+  if (!meeting || meeting.startMin == null || meeting.endMin == null) return false;
+  const highlightStart = meetingHighlightStartMin(meetings, index, leadMinutes);
+  if (highlightStart == null) return false;
+  return nowMinutes >= highlightStart && nowMinutes < meeting.endMin;
+}
+
+/**
+ * @param {{ startMin?: number|null, endMin?: number|null }[]} meetings
+ * @param {number} nowMinutes
+ * @param {number} [leadMinutes]
+ */
+export function activeMeetingAt(
+  meetings,
+  nowMinutes,
+  leadMinutes = CLASS_HIGHLIGHT_LEAD_MINUTES
+) {
+  const list = Array.isArray(meetings) ? meetings : [];
+  for (let i = 0; i < list.length; i++) {
+    if (isMeetingHighlighted(list, i, nowMinutes, leadMinutes)) return list[i];
+  }
+  return null;
+}
+
+function nowContextClassPayload(meeting) {
+  if (!meeting) return null;
+  return {
+    classId: meeting.classId,
+    name: meeting.className,
+    period: meeting.period,
+    start: meeting.start,
+    end: meeting.end,
+    freePeriod: Boolean(meeting.freePeriod),
+  };
+}
+
 function formatMinutes(mins) {
   if (mins == null || !Number.isFinite(mins)) return null;
   const h = Math.floor(mins / 60);
@@ -1036,24 +1115,32 @@ export async function resolveNowScheduleContext(email, now = new Date()) {
       )
     : [];
 
-  const current =
-    todayClasses.find(
-      (m) =>
-        m.startMin != null &&
-        m.endMin != null &&
-        clock.minutes >= m.startMin &&
-        clock.minutes < m.endMin
-    ) || null;
+  const current = activeMeetingAt(todayClasses, clock.minutes);
+  const inRoom = Boolean(
+    current &&
+      current.startMin != null &&
+      current.endMin != null &&
+      clock.minutes >= current.startMin &&
+      clock.minutes < current.endMin
+  );
 
   const next =
     todayClasses.find(
-      (m) => m.startMin != null && m.startMin > clock.minutes
+      (m) =>
+        m.startMin != null &&
+        m.startMin > clock.minutes &&
+        m !== current
     ) || null;
 
   const previous =
     [...todayClasses]
       .reverse()
-      .find((m) => m.endMin != null && m.endMin <= clock.minutes) || null;
+      .find(
+        (m) =>
+          m.endMin != null &&
+          m.endMin <= clock.minutes &&
+          m !== current
+      ) || null;
 
   return {
     timezone: clock.timezone,
@@ -1061,38 +1148,11 @@ export async function resolveNowScheduleContext(email, now = new Date()) {
     localTime: formatMinutes(clock.minutes),
     minutes: clock.minutes,
     isSchoolDay,
-    inClass: Boolean(current && !current.freePeriod),
-    inFreePeriod: Boolean(current?.freePeriod),
-    currentClass: current
-      ? {
-          classId: current.classId,
-          name: current.className,
-          period: current.period,
-          start: current.start,
-          end: current.end,
-          freePeriod: Boolean(current.freePeriod),
-        }
-      : null,
-    nextClass: next
-      ? {
-          classId: next.classId,
-          name: next.className,
-          period: next.period,
-          start: next.start,
-          end: next.end,
-          freePeriod: Boolean(next.freePeriod),
-        }
-      : null,
-    previousClass: previous
-      ? {
-          classId: previous.classId,
-          name: previous.className,
-          period: previous.period,
-          start: previous.start,
-          end: previous.end,
-          freePeriod: Boolean(previous.freePeriod),
-        }
-      : null,
+    inClass: Boolean(inRoom && current && !current.freePeriod),
+    inFreePeriod: Boolean(inRoom && current?.freePeriod),
+    currentClass: nowContextClassPayload(current),
+    nextClass: nowContextClassPayload(next),
+    previousClass: nowContextClassPayload(previous),
     todayClasses: todayClasses.map((m) => ({
       classId: m.classId,
       name: m.className,

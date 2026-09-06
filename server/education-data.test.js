@@ -13,6 +13,9 @@ import {
   parseOrderedProjectPins,
   mergeCreateOpenedAt,
   sortEducationProjects,
+  meetingHighlightStartMin,
+  isMeetingHighlighted,
+  activeMeetingAt,
 } from "./education-data.js";
 
 describe("parseHiddenFileNames", () => {
@@ -390,5 +393,48 @@ describe("mergeCreateOpenedAt", () => {
     assert.equal(merged.clicked, "2026-08-01T00:00:00.000Z");
     assert.equal(merged.fresh, "2026-08-30T12:00:00.000Z");
     assert.equal(merged.legacy, undefined);
+  });
+});
+
+describe("class highlight lead", () => {
+  const defaultDay = [
+    { period: "A", startMin: 8 * 60 + 30, endMin: 9 * 60 + 40 },
+    { period: "B", startMin: 9 * 60 + 55, endMin: 11 * 60 + 5 },
+    { period: "C", startMin: 12 * 60 + 25, endMin: 13 * 60 + 35 },
+    { period: "D", startMin: 13 * 60 + 50, endMin: 15 * 60 },
+  ];
+  const ahDay = [
+    { period: "A", startMin: 9 * 60 + 10, endMin: 9 * 60 + 40 },
+    { period: "B", startMin: 9 * 60 + 50, endMin: 10 * 60 + 20 },
+    { period: "C", startMin: 10 * 60 + 30, endMin: 11 * 60 },
+    { period: "D", startMin: 11 * 60 + 10, endMin: 11 * 60 + 40 },
+    { period: "E", startMin: 11 * 60 + 45, endMin: 12 * 60 + 15 },
+    { period: "F", startMin: 13 * 60 + 5, endMin: 13 * 60 + 35 },
+  ];
+
+  it("highlights the first period 10 minutes before 08:30", () => {
+    assert.equal(meetingHighlightStartMin(defaultDay, 0), 8 * 60 + 20);
+    assert.equal(activeMeetingAt(defaultDay, 8 * 60 + 20)?.period, "A");
+    assert.equal(activeMeetingAt(defaultDay, 8 * 60 + 19), null);
+  });
+
+  it("uses a 10-minute lead on 15-minute passing", () => {
+    assert.equal(meetingHighlightStartMin(defaultDay, 1), 9 * 60 + 45);
+    assert.equal(isMeetingHighlighted(defaultDay, 0, 9 * 60 + 40), false);
+    assert.equal(activeMeetingAt(defaultDay, 9 * 60 + 44), null);
+    assert.equal(activeMeetingAt(defaultDay, 9 * 60 + 45)?.period, "B");
+  });
+
+  it("highlights after lunch for 10 minutes, not the whole lunch", () => {
+    assert.equal(meetingHighlightStartMin(defaultDay, 2), 12 * 60 + 15);
+    assert.equal(activeMeetingAt(defaultDay, 11 * 60 + 5), null);
+    assert.equal(activeMeetingAt(defaultDay, 12 * 60 + 14), null);
+    assert.equal(activeMeetingAt(defaultDay, 12 * 60 + 15)?.period, "C");
+  });
+
+  it("uses the whole passing period when it is under 10 minutes", () => {
+    assert.equal(meetingHighlightStartMin(ahDay, 4), 11 * 60 + 40);
+    assert.equal(activeMeetingAt(ahDay, 11 * 60 + 40)?.period, "E");
+    assert.equal(isMeetingHighlighted(ahDay, 3, 11 * 60 + 40), false);
   });
 });

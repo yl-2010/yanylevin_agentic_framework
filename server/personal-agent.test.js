@@ -101,6 +101,30 @@ describe("Personal Agent live context", () => {
     assert.match(block, /never class meeting/);
   });
 
+  it("names the upcoming class during the lead window", () => {
+    const block = formatLiveContextBlock(
+      {
+        dateKey: "2026-09-08",
+        localTime: "08:22",
+        timezone: "America/Los_Angeles",
+        isSchoolDay: true,
+        inClass: false,
+        inFreePeriod: false,
+        currentClass: {
+          classId: "physics",
+          name: "Physics",
+          period: "A",
+          start: "08:30",
+          end: "09:40",
+        },
+      },
+      null
+    );
+    assert.match(block, /HEADING TO CLASS: Physics/);
+    assert.doesNotMatch(block, /IN CLASS NOW/);
+    assert.doesNotMatch(block, /Not currently in a class/);
+  });
+
   it("lists today's classes, not meetings", () => {
     const block = formatLiveContextBlock(
       {

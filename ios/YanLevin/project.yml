@@ -67,6 +67,8 @@ targets:
           - location
         NSLocationWhenInUseUsageDescription: "This app uses your location on chat maps. On iPhone it may also send location to the Personal Agent so it knows where you are, including when you chat from the website or iPad."
         NSLocationAlwaysAndWhenInUseUsageDescription: "This app uses your iPhone location in the background so the Personal Agent can see where you are when you chat from the web or a computer. On iPhone it also sends a location update about every 15 minutes, plus when you move a significant distance."
+        NSSupportsLiveActivities: true
+        NSSupportsLiveActivitiesFrequentUpdates: true
     entitlements:
       path: YanLevin/YanLevin.entitlements
       properties:
@@ -105,7 +107,13 @@ targets:
       - path: YanLevin/Design/NaturalWhen.swift
       - path: YanLevin/App/OpenChatIntent.swift
       - path: YanLevin/App/OpenTodoIntent.swift
+      - path: YanLevin/App/OpenClassIntent.swift
+      - path: YanLevin/App/OpenAgentChatIntent.swift
       - path: YanLevin/App/CompleteTodoIntent.swift
+      - path: YanLevin/LiveActivities
+        excludes:
+          - LiveActivityCoordinator.swift
+          - "**/.DS_Store"
       - path: YanLevinWidgets/Assets.xcassets
         type: folder.assetcatalog
         buildPhase: resources

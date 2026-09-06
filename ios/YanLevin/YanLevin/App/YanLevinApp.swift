@@ -38,6 +38,8 @@ struct YanLevinApp: App {
                 YLHaptics.prepareSession()
                 nav.consumePendingNewChatIfNeeded()
                 nav.consumePendingOpenTodoIfNeeded()
+                nav.consumePendingOpenClassIfNeeded()
+                nav.consumePendingOpenChatIfNeeded()
                 DispatchQueue.main.async {
                     withAnimation(.easeOut(duration: 0.32)) {
                         showLaunchCover = false
@@ -53,6 +55,9 @@ struct YanLevinApp: App {
                     YLHaptics.prepareSession()
                     nav.consumePendingNewChatIfNeeded()
                     nav.consumePendingOpenTodoIfNeeded()
+                    nav.consumePendingOpenClassIfNeeded()
+                    nav.consumePendingOpenChatIfNeeded()
+                    LiveActivityCoordinator.shared.scheduleSync()
                 }
                 PhoneLocationReporter.shared.handleScenePhase(phase)
             }

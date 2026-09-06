@@ -265,6 +265,9 @@ final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @uncheck
         }
         setLastFix(fix)
         await post(fix, token: token)
+        await MainActor.run {
+            LiveActivityCoordinator.shared.scheduleSync()
+        }
     }
 
     private func post(_ fix: AgentPhoneLocation, token: String) async {

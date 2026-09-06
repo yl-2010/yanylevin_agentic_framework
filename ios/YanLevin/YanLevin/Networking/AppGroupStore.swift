@@ -12,6 +12,8 @@ enum AppGroupStore {
     private static let educationDataKey = "educationTreeJSON"
     private static let pendingNewChatKey = "pendingOpenNewChat"
     private static let pendingOpenTodoKey = "pendingOpenTodoJSON"
+    private static let pendingOpenClassKey = "pendingOpenClassJSON"
+    private static let pendingOpenChatSessionKey = "pendingOpenChatSessionJSON"
 
     private static let cachedDefaults: UserDefaults? = {
         guard FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: suiteName) != nil else {
@@ -146,6 +148,57 @@ enum AppGroupStore {
         return Date().timeIntervalSince1970 - pending.stamp < 120
     }
 
+    static func setPendingOpenClass(classId: String) {
+        guard let defaults else { return }
+        let pending = PendingOpenClass(classId: classId, stamp: Date().timeIntervalSince1970)
+        guard let data = try? JSONEncoder().encode(pending) else { return }
+        defaults.set(data, forKey: pendingOpenClassKey)
+        defaults.synchronize()
+    }
+
+    static func consumePendingOpenClass() -> PendingOpenClass? {
+        guard let defaults, let data = defaults.data(forKey: pendingOpenClassKey) else { return nil }
+        defaults.removeObject(forKey: pendingOpenClassKey)
+        defaults.synchronize()
+        guard let pending = try? JSONDecoder().decode(PendingOpenClass.self, from: data) else { return nil }
+        guard Date().timeIntervalSince1970 - pending.stamp < 120 else { return nil }
+        return pending
+    }
+
+    static func hasPendingOpenClass() -> Bool {
+        guard let defaults, let data = defaults.data(forKey: pendingOpenClassKey),
+              let pending = try? JSONDecoder().decode(PendingOpenClass.self, from: data)
+        else { return false }
+        return Date().timeIntervalSince1970 - pending.stamp < 120
+    }
+
+    static func setPendingOpenChat(sessionId: String?) {
+        guard let defaults else { return }
+        let pending = PendingOpenChat(
+            sessionId: emptyToNil(sessionId),
+            stamp: Date().timeIntervalSince1970
+        )
+        guard let data = try? JSONEncoder().encode(pending) else { return }
+        defaults.set(data, forKey: pendingOpenChatSessionKey)
+        defaults.synchronize()
+    }
+
+    static func consumePendingOpenChat() -> PendingOpenChat? {
+        guard let defaults, let data = defaults.data(forKey: pendingOpenChatSessionKey) else { return nil }
+        defaults.removeObject(forKey: pendingOpenChatSessionKey)
+        defaults.synchronize()
+        guard let pending = try? JSONDecoder().decode(PendingOpenChat.self, from: data) else { return nil }
+        guard Date().timeIntervalSince1970 - pending.stamp < 120 else { return nil }
+        return pending
+    }
+
+    static func hasPendingOpenChat() -> Bool {
+        guard let defaults, let data = defaults.data(forKey: pendingOpenChatSessionKey),
+              let pending = try? JSONDecoder().decode(PendingOpenChat.self, from: data)
+        else { return false }
+        return Date().timeIntervalSince1970 - pending.stamp < 120
+    }
+
     private static func emptyToNil(_ value: String?) -> String? {
         guard let value, !value.isEmpty else { return nil }
         return value
@@ -156,5 +209,15 @@ struct PendingOpenTodo: Equatable, Codable {
     var todoId: String
     var classId: String?
     var projectId: String?
+    var stamp: TimeInterval
+}
+
+struct PendingOpenClass: Equatable, Codable {
+    var classId: String
+    var stamp: TimeInterval
+}
+
+struct PendingOpenChat: Equatable, Codable {
+    var sessionId: String?
     var stamp: TimeInterval
 }

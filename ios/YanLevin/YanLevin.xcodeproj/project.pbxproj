@@ -20,15 +20,18 @@
 		1D0BBCD7B923BB7B323938D2 /* YanLevinWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 057315720E940707A886B356 /* YanLevinWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		1D54D63591106F2E66FD43BC /* YLMarkdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = F851AE2250BE4269E53498EE /* YLMarkdown.swift */; };
 		1DF40969B828B2CB2F30888B /* FitnessBrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 922B61894A2A07D7CCD9C045 /* FitnessBrowseView.swift */; };
+		212F22C64D79400E5735A554 /* OpenClassIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C2AAC92030253A56EE90A26 /* OpenClassIntent.swift */; };
 		21E339E62F3791B824D65363 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3696B966768BE75F409A9700 /* APIClient.swift */; };
 		2B05B5988A1714A285B68747 /* NaturalWhen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C591473A552F86C4D658DD74 /* NaturalWhen.swift */; };
 		2BE3CC08BF6BD93E85A4BB4D /* EducationSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = F05C0EC38920C98140B2615D /* EducationSchedule.swift */; };
+		2F8898FEF901A1138B646B7E /* ClassLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA900CCC225436D37D05FA13 /* ClassLiveActivity.swift */; };
 		3279B73FA38FB7C0DD4A194A /* APIClient+URL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2723AF7679B0DE1C331A02F3 /* APIClient+URL.swift */; };
 		32B21003D97E555F1A6F5D88 /* ChatModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEF42D98892009798E7AA8FB /* ChatModels.swift */; };
 		378B2508AF4CC7A49975AD47 /* TodoWidgetConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B63568A4441B0FF78A31482 /* TodoWidgetConfiguration.swift */; };
 		37DD00EC16A32006CC2AEFB7 /* OpenTodoIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499CB5F2593A83941A69B5D4 /* OpenTodoIntent.swift */; };
 		388B229B71EC77D5B676128B /* EducationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94CCFD3097868B59A3491ED /* EducationStore.swift */; };
 		3B957FF9EC905A753653E97F /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DEC95CF8756916C4C1611A6 /* KeychainStore.swift */; };
+		3DA5590F09A92039E16CAB9F /* LiveActivityCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCB80DB0E58FCD6ADF01F139 /* LiveActivityCoordinator.swift */; };
 		44F57A5672664B02EBD73904 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B1AE411FFEEF931F47A4C9E /* HomeView.swift */; };
 		47486BD29572D791F436479F /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20592DA9B5602E124F949B98 /* Theme.swift */; };
 		5172BD9CA2C8FCCBCB09D120 /* EducationSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = F05C0EC38920C98140B2615D /* EducationSchedule.swift */; };
@@ -39,6 +42,7 @@
 		6979410754B0AFC1FEC0CE72 /* OpenChatIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82915689A31137AC9DA6206D /* OpenChatIntent.swift */; };
 		6B89D4F726F3E02F409A3328 /* YLKeyboardScrub.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEA3E5AC8DBB39B3548312C6 /* YLKeyboardScrub.swift */; };
 		6C1FD5253AE396A06C06B7B6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3BFC5D2A192A99E4F618F79B /* Assets.xcassets */; };
+		750B305214CC33B4665E103E /* ClassActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9762E211D40ABD71EF6B883D /* ClassActivityAttributes.swift */; };
 		759BFDA13D21B1C13ED6D8B5 /* FitnessStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 584356DE1F7514C323536418 /* FitnessStore.swift */; };
 		7851F71BDF6DF7BFF0D7E8B2 /* NaturalWhen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C591473A552F86C4D658DD74 /* NaturalWhen.swift */; };
 		824D6E2F1C587C1EFEBBF1E5 /* EducationContextFiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23283A3D071E6F63E623FD38 /* EducationContextFiles.swift */; };
@@ -49,9 +53,11 @@
 		958BCCA3A8A3810849928DDB /* AppLoadingScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F59C1B7CC61E1680271B65 /* AppLoadingScreen.swift */; };
 		9BEC1717E9F8F9A601A23781 /* ChatControlWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B019B6E0B0488314D38BD9 /* ChatControlWidget.swift */; };
 		A0F684FF13DDC6E02923E9CD /* YLMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 080B5543DFC0877FE81D2D84 /* YLMark.swift */; };
+		A2139B04EF6EC6327A839060 /* AgentActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 697A904D8BE3400C45BC3787 /* AgentActivityAttributes.swift */; };
 		A3F8D551C2EE0A3BE4752D3A /* AppGroupStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E7DDEA1EF28086A8752029D /* AppGroupStore.swift */; };
 		A6296BB53F8F6B2A3F71EA80 /* PhoneLocationReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7742B1FA93A28AF4A3108EB /* PhoneLocationReporter.swift */; };
 		AB903E8C34C41CEC4181D2C4 /* AdaptiveLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80FC48973417CD8112FE819E /* AdaptiveLayout.swift */; };
+		ACDFD5656CF7FE57DCD422BA /* OpenAgentChatIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8821DC411CE772F1EBF795CE /* OpenAgentChatIntent.swift */; };
 		AFEE5D756883EFA48D330F94 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3696B966768BE75F409A9700 /* APIClient.swift */; };
 		B1D99F7011A4A4F668A1CFB2 /* AppGroupStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E7DDEA1EF28086A8752029D /* AppGroupStore.swift */; };
 		B40C25FBC305B1121634EE49 /* EducationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29892B1F97CCD28845DB2EEF /* EducationModels.swift */; };
@@ -60,6 +66,8 @@
 		C26C2C6C35B5E1DBD0FE36EF /* YanLevinWidgetsBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE69351E7F5EA54D38D8FA97 /* YanLevinWidgetsBundle.swift */; };
 		C4C827265C7EB2B6010D2E8D /* ScheduleWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67483E28EDDF1CD3D9F6A453 /* ScheduleWidget.swift */; };
 		C52595D82A1AB8D1201B44B3 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B414370293577E90FDB3BC95 /* RootTabView.swift */; };
+		C85075E5E73AB3DCED831596 /* ClassActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9762E211D40ABD71EF6B883D /* ClassActivityAttributes.swift */; };
+		C8C917A12192A2765731C041 /* AgentActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 697A904D8BE3400C45BC3787 /* AgentActivityAttributes.swift */; };
 		C9DF62AF737C33204914CB98 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 9D32EB49F8063F208E32F95D /* GoogleSignIn */; };
 		CB114A65D5AFEEEA56C84CCC /* EducationTabScroll.swift in Sources */ = {isa = PBXBuildFile; fileRef = D52A64A697EC5F95C4A2B684 /* EducationTabScroll.swift */; };
 		CB52F3FD1D3893E8E4A63472 /* CompleteTodoIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC2230637E10DE30D253A23 /* CompleteTodoIntent.swift */; };
@@ -68,9 +76,12 @@
 		DFF9B7522C2CBE25D1F65B58 /* WidgetEducationLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D74026100E777A198580A59 /* WidgetEducationLoader.swift */; };
 		E0DACB5DB2DB4BB7947801BD /* TabReselectObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB6D32A34C8B1C29DF15F180 /* TabReselectObserver.swift */; };
 		E384A7935DC0BB912E24813B /* EducationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29892B1F97CCD28845DB2EEF /* EducationModels.swift */; };
+		ED3F577E7DFF1C56B3FD96F7 /* OpenAgentChatIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8821DC411CE772F1EBF795CE /* OpenAgentChatIntent.swift */; };
 		EDBCEE776FEEB42A93437629 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8651995A2DE1EC4290CBBDCC /* Assets.xcassets */; };
 		F4D7D1D5846E78005F4C7208 /* GymView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832A6558D9C48C7524ACB200 /* GymView.swift */; };
 		F9E81A6B0E896B79B4F154F8 /* EducationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F29B1D9327A0BC8892A063 /* EducationView.swift */; };
+		FCD578D1578794C0352E389D /* OpenClassIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C2AAC92030253A56EE90A26 /* OpenClassIntent.swift */; };
+		FFC0F77C0E51CD50A10215FF /* AgentLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1287B556EE753FA8E29940A /* AgentLiveActivity.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -101,6 +112,7 @@
 		03B019B6E0B0488314D38BD9 /* ChatControlWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatControlWidget.swift; sourceTree = "<group>"; };
 		057315720E940707A886B356 /* YanLevinWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = YanLevinWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		080B5543DFC0877FE81D2D84 /* YLMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLMark.swift; sourceTree = "<group>"; };
+		0C2AAC92030253A56EE90A26 /* OpenClassIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenClassIntent.swift; sourceTree = "<group>"; };
 		0FABE02122636C2A1A016FBC /* MacSSEClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSSEClient.swift; sourceTree = "<group>"; };
 		13E6C6E576FBB4F67B006FB4 /* YLHostedFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLHostedFocus.swift; sourceTree = "<group>"; };
 		1D74026100E777A198580A59 /* WidgetEducationLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetEducationLoader.swift; sourceTree = "<group>"; };
@@ -127,12 +139,15 @@
 		593E309C735275989CBC1866 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
 		5999526ED018A9822D26520F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		67483E28EDDF1CD3D9F6A453 /* ScheduleWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleWidget.swift; sourceTree = "<group>"; };
+		697A904D8BE3400C45BC3787 /* AgentActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentActivityAttributes.swift; sourceTree = "<group>"; };
 		80FC48973417CD8112FE819E /* AdaptiveLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdaptiveLayout.swift; sourceTree = "<group>"; };
 		82915689A31137AC9DA6206D /* OpenChatIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenChatIntent.swift; sourceTree = "<group>"; };
 		832A6558D9C48C7524ACB200 /* GymView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GymView.swift; sourceTree = "<group>"; };
 		8651995A2DE1EC4290CBBDCC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		8821DC411CE772F1EBF795CE /* OpenAgentChatIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAgentChatIntent.swift; sourceTree = "<group>"; };
 		8B63568A4441B0FF78A31482 /* TodoWidgetConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoWidgetConfiguration.swift; sourceTree = "<group>"; };
 		922B61894A2A07D7CCD9C045 /* FitnessBrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitnessBrowseView.swift; sourceTree = "<group>"; };
+		9762E211D40ABD71EF6B883D /* ClassActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassActivityAttributes.swift; sourceTree = "<group>"; };
 		9A015C81FA07EC99A09C44AE /* YLMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLMotion.swift; sourceTree = "<group>"; };
 		9BBD84778BC1EBA0B291C926 /* ChatHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHistory.swift; sourceTree = "<group>"; };
 		A056C44E530D5338DB54978D /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
@@ -144,6 +159,7 @@
 		BE69351E7F5EA54D38D8FA97 /* YanLevinWidgetsBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YanLevinWidgetsBundle.swift; sourceTree = "<group>"; };
 		C591473A552F86C4D658DD74 /* NaturalWhen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NaturalWhen.swift; sourceTree = "<group>"; };
 		CA73E841EE806831FD0F0861 /* ChatSendFlight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSendFlight.swift; sourceTree = "<group>"; };
+		D1287B556EE753FA8E29940A /* AgentLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentLiveActivity.swift; sourceTree = "<group>"; };
 		D468F5B66C3D9BB130D39AAA /* AuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthStore.swift; sourceTree = "<group>"; };
 		D52A64A697EC5F95C4A2B684 /* EducationTabScroll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EducationTabScroll.swift; sourceTree = "<group>"; };
 		DB1CE3B3DB78550077E7BECD /* YLHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLHaptics.swift; sourceTree = "<group>"; };
@@ -151,12 +167,14 @@
 		DECFCA8CF45C78AC9199902F /* WidgetTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetTheme.swift; sourceTree = "<group>"; };
 		E0293C4406F9D69D94DEF0AF /* ChatWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatWidgets.swift; sourceTree = "<group>"; };
 		E41EB89491918E6F0C2E4F19 /* YLKeyboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLKeyboard.swift; sourceTree = "<group>"; };
+		EA900CCC225436D37D05FA13 /* ClassLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassLiveActivity.swift; sourceTree = "<group>"; };
 		EEA3E5AC8DBB39B3548312C6 /* YLKeyboardScrub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLKeyboardScrub.swift; sourceTree = "<group>"; };
 		F05C0EC38920C98140B2615D /* EducationSchedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EducationSchedule.swift; sourceTree = "<group>"; };
 		F0F29B1D9327A0BC8892A063 /* EducationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EducationView.swift; sourceTree = "<group>"; };
 		F1ADA724BC1A214D2CAE4EBF /* YanLevinWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = YanLevinWidgets.entitlements; sourceTree = "<group>"; };
 		F7742B1FA93A28AF4A3108EB /* PhoneLocationReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneLocationReporter.swift; sourceTree = "<group>"; };
 		F851AE2250BE4269E53498EE /* YLMarkdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLMarkdown.swift; sourceTree = "<group>"; };
+		FCB80DB0E58FCD6ADF01F139 /* LiveActivityCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityCoordinator.swift; sourceTree = "<group>"; };
 		FEF42D98892009798E7AA8FB /* ChatModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatModels.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -193,7 +211,9 @@
 			isa = PBXGroup;
 			children = (
 				DEC2230637E10DE30D253A23 /* CompleteTodoIntent.swift */,
+				8821DC411CE772F1EBF795CE /* OpenAgentChatIntent.swift */,
 				82915689A31137AC9DA6206D /* OpenChatIntent.swift */,
+				0C2AAC92030253A56EE90A26 /* OpenClassIntent.swift */,
 				499CB5F2593A83941A69B5D4 /* OpenTodoIntent.swift */,
 				B414370293577E90FDB3BC95 /* RootTabView.swift */,
 				AB6D32A34C8B1C29DF15F180 /* TabReselectObserver.swift */,
@@ -221,6 +241,7 @@
 				3F50753D4245BBD862D23235 /* App */,
 				C318C6F201DED83075BE025C /* Design */,
 				FB2839EDAD78A6E22CC7836D /* Features */,
+				F8F551D82C8D82F0DC036A4A /* LiveActivities */,
 				6238D86E227DBAB98EDEF8E5 /* Networking */,
 				75415CB453FB8977E91EF810 /* Resources */,
 			);
@@ -298,8 +319,10 @@
 		CDCBB76352E8F1EDBA6E65B3 /* YanLevinWidgets */ = {
 			isa = PBXGroup;
 			children = (
+				D1287B556EE753FA8E29940A /* AgentLiveActivity.swift */,
 				8651995A2DE1EC4290CBBDCC /* Assets.xcassets */,
 				03B019B6E0B0488314D38BD9 /* ChatControlWidget.swift */,
+				EA900CCC225436D37D05FA13 /* ClassLiveActivity.swift */,
 				5999526ED018A9822D26520F /* Info.plist */,
 				67483E28EDDF1CD3D9F6A453 /* ScheduleWidget.swift */,
 				56E5089678AC6FD751ABBA54 /* TodoWidget.swift */,
@@ -328,6 +351,16 @@
 				CDCBB76352E8F1EDBA6E65B3 /* YanLevinWidgets */,
 				40A2D816426D38376D2A48CE /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		F8F551D82C8D82F0DC036A4A /* LiveActivities */ = {
+			isa = PBXGroup;
+			children = (
+				697A904D8BE3400C45BC3787 /* AgentActivityAttributes.swift */,
+				9762E211D40ABD71EF6B883D /* ClassActivityAttributes.swift */,
+				FCB80DB0E58FCD6ADF01F139 /* LiveActivityCoordinator.swift */,
+			);
+			path = LiveActivities;
 			sourceTree = "<group>";
 		};
 		FB2839EDAD78A6E22CC7836D /* Features */ = {
@@ -456,6 +489,7 @@
 				AFEE5D756883EFA48D330F94 /* APIClient.swift in Sources */,
 				196EEE341ED3D3FA75A91793 /* AccountView.swift in Sources */,
 				AB903E8C34C41CEC4181D2C4 /* AdaptiveLayout.swift in Sources */,
+				A2139B04EF6EC6327A839060 /* AgentActivityAttributes.swift in Sources */,
 				B1D99F7011A4A4F668A1CFB2 /* AppGroupStore.swift in Sources */,
 				958BCCA3A8A3810849928DDB /* AppLoadingScreen.swift in Sources */,
 				02E4B0AB334E7E786B92BAFF /* AuthStore.swift in Sources */,
@@ -464,6 +498,7 @@
 				016EA89B8F227C0DDEED8851 /* ChatSendFlight.swift in Sources */,
 				034756E6C4184A83EB15F7F2 /* ChatView.swift in Sources */,
 				0176F9C055AC87C95524E633 /* ChatWidgets.swift in Sources */,
+				C85075E5E73AB3DCED831596 /* ClassActivityAttributes.swift in Sources */,
 				CB52F3FD1D3893E8E4A63472 /* CompleteTodoIntent.swift in Sources */,
 				824D6E2F1C587C1EFEBBF1E5 /* EducationContextFiles.swift in Sources */,
 				E384A7935DC0BB912E24813B /* EducationModels.swift in Sources */,
@@ -478,9 +513,12 @@
 				F4D7D1D5846E78005F4C7208 /* GymView.swift in Sources */,
 				44F57A5672664B02EBD73904 /* HomeView.swift in Sources */,
 				3B957FF9EC905A753653E97F /* KeychainStore.swift in Sources */,
+				3DA5590F09A92039E16CAB9F /* LiveActivityCoordinator.swift in Sources */,
 				6530B1B04F6935154D6B0C6F /* MacSSEClient.swift in Sources */,
 				7851F71BDF6DF7BFF0D7E8B2 /* NaturalWhen.swift in Sources */,
+				ACDFD5656CF7FE57DCD422BA /* OpenAgentChatIntent.swift in Sources */,
 				6979410754B0AFC1FEC0CE72 /* OpenChatIntent.swift in Sources */,
+				FCD578D1578794C0352E389D /* OpenClassIntent.swift in Sources */,
 				536ABAA7AA545DDD9015486B /* OpenTodoIntent.swift in Sources */,
 				A6296BB53F8F6B2A3F71EA80 /* PhoneLocationReporter.swift in Sources */,
 				BE062D44E3319A3659ABBE58 /* PortfolioContent.swift in Sources */,
@@ -504,13 +542,19 @@
 			files = (
 				3279B73FA38FB7C0DD4A194A /* APIClient+URL.swift in Sources */,
 				21E339E62F3791B824D65363 /* APIClient.swift in Sources */,
+				C8C917A12192A2765731C041 /* AgentActivityAttributes.swift in Sources */,
+				FFC0F77C0E51CD50A10215FF /* AgentLiveActivity.swift in Sources */,
 				A3F8D551C2EE0A3BE4752D3A /* AppGroupStore.swift in Sources */,
 				9BEC1717E9F8F9A601A23781 /* ChatControlWidget.swift in Sources */,
+				750B305214CC33B4665E103E /* ClassActivityAttributes.swift in Sources */,
+				2F8898FEF901A1138B646B7E /* ClassLiveActivity.swift in Sources */,
 				1B7A56181DDF09EE216EDC33 /* CompleteTodoIntent.swift in Sources */,
 				B40C25FBC305B1121634EE49 /* EducationModels.swift in Sources */,
 				2BE3CC08BF6BD93E85A4BB4D /* EducationSchedule.swift in Sources */,
 				2B05B5988A1714A285B68747 /* NaturalWhen.swift in Sources */,
+				ED3F577E7DFF1C56B3FD96F7 /* OpenAgentChatIntent.swift in Sources */,
 				64221A3AEDE4E019A8BC837F /* OpenChatIntent.swift in Sources */,
+				212F22C64D79400E5735A554 /* OpenClassIntent.swift in Sources */,
 				37DD00EC16A32006CC2AEFB7 /* OpenTodoIntent.swift in Sources */,
 				C4C827265C7EB2B6010D2E8D /* ScheduleWidget.swift in Sources */,
 				9449091BE5AF456E7D7EAAF6 /* TodoWidget.swift in Sources */,

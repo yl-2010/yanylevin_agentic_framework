@@ -927,6 +927,11 @@ export function formatLiveContextBlock(nowContext, uiContext, appendix = "") {
       lines.push(
         `IN FREE PERIOD NOW: period ${c.period} (${c.start}–${c.end}, id ${c.classId}).`
       );
+    } else if (nowContext.currentClass) {
+      const c = nowContext.currentClass;
+      lines.push(
+        `HEADING TO CLASS: ${c.name} (period ${c.period}, ${c.start}–${c.end}, id ${c.classId}). Not in the room yet.`
+      );
     } else {
       lines.push("Not currently in a class.");
       if (nowContext.nextClass) {
@@ -2066,6 +2071,56 @@ export function getActiveAgent(email) {
   const navigate = sessionNavigatePayload(session);
   if (navigate) out.navigate = navigate;
   return out;
+}
+
+/**
+ * Personal Agent threads that still have work (running or queued).
+ * @param {string} email
+ */
+export async function getRunningAgents(email) {
+  const normalized = canonicalizeEmail(email);
+  if (!isEducationUser(normalized)) {
+    const err = new Error("forbidden");
+    err.status = 403;
+    throw err;
+  }
+  /** @type {{ sessionId: string, status: string, workingLabel: string, queueLength: number, lastUsedAt: number }[]} */
+  const live = [];
+  for (const [sid, session] of sessions) {
+    if (session?.email !== normalized) continue;
+    if (!sessionHasBackgroundWork(session)) continue;
+    live.push({
+      sessionId: sid,
+      status: session.status || "idle",
+      workingLabel:
+        session.status === "running"
+          ? session.workingLabel || WORKING_LABEL_DEFAULT
+          : "Queued",
+      queueLength: queuedTurnCount(session),
+      lastUsedAt: session.lastUsedAt || session.createdAt || 0,
+    });
+  }
+  live.sort((a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0));
+  const chats = live.length ? await listChatHistory({ email: normalized }) : [];
+  const titleById = new Map(
+    (chats || []).map((row) => [
+      String(row.sessionId || ""),
+      row.title || row.preview || "",
+    ])
+  );
+  return {
+    ok: true,
+    agents: live.map((row) => {
+      const raw = String(titleById.get(row.sessionId) || "").trim();
+      return {
+        sessionId: row.sessionId,
+        title: raw || "Chat",
+        workingLabel: row.workingLabel,
+        status: row.status,
+        queueLength: row.queueLength,
+      };
+    }),
+  };
 }
 
 /**
