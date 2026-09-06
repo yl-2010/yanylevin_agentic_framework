@@ -321,8 +321,26 @@
     maybeTouchProjectOpened();
   }
 
+  const AGENT_NAV_STORE = "edu-agent-navigate-id";
   /** @type {string|null} */
   let lastAgentNavigateId = null;
+  try {
+    lastAgentNavigateId = sessionStorage.getItem(AGENT_NAV_STORE) || null;
+  } catch {
+    /* ignore */
+  }
+
+  /**
+   * @param {string} id
+   */
+  function rememberAgentNavigateId(id) {
+    lastAgentNavigateId = id;
+    try {
+      sessionStorage.setItem(AGENT_NAV_STORE, id);
+    } catch {
+      /* ignore */
+    }
+  }
 
   /**
    * @param {string} href
@@ -394,7 +412,7 @@
     if (id && id === lastAgentNavigateId) return false;
     const href = educationNavigateHrefFromTarget(src);
     if (!href) return false;
-    if (id) lastAgentNavigateId = id;
+    if (id) rememberAgentNavigateId(id);
     if (sameEducationHref(href)) return false;
     navigate(href);
     return true;

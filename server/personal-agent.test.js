@@ -19,6 +19,8 @@ import {
   formatVisibleTranscript,
   normalizeEducationNavigate,
   educationNavigateHref,
+  queueEducationNavigate,
+  publishQueuedEducationNavigate,
 } from "./personal-agent.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -561,6 +563,35 @@ describe("open_education_page navigate payload", () => {
       "/education/date/fall-orientation-day-1"
     );
     assert.equal(educationNavigateHref({ view: "nope" }), null);
+  });
+
+  it("queues a jump and publishes it once", () => {
+    const session = {};
+    const queued = queueEducationNavigate(session, {
+      view: "todo",
+      todoId: "hw",
+      classId: "spanish-4",
+    });
+    assert.equal(queued?.todoId, "hw");
+    assert.equal("id" in (queued || {}), false);
+    assert.equal(session.navigate, undefined);
+    const first = publishQueuedEducationNavigate(session);
+    assert.ok(first?.id);
+    assert.equal(first?.view, "todo");
+    assert.equal(first?.todoId, "hw");
+    assert.equal(session.pendingNavigate, null);
+    assert.equal(session.navigate?.id, first?.id);
+    assert.equal(publishQueuedEducationNavigate(session), null);
+    assert.equal(session.navigate?.id, first?.id);
+  });
+
+  it("keeps the last queued page when the tool is called twice", () => {
+    const session = {};
+    queueEducationNavigate(session, { view: "home" });
+    queueEducationNavigate(session, { view: "class", classId: "am-lit" });
+    const pub = publishQueuedEducationNavigate(session);
+    assert.equal(pub?.view, "class");
+    assert.equal(pub?.classId, "am-lit");
   });
 
   it("keeps navigate off the chat history snapshot", () => {

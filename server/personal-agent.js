@@ -78,6 +78,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
  *   replayUiTranscript?: boolean,
  *   activeRun?: any,
  *   interrupting?: boolean,
+ *   pendingNavigate?: Omit<EducationNavigate, 'id'>|null,
  *   navigate?: EducationNavigate|null,
  * }} Session
  */
@@ -508,6 +509,52 @@ function sessionNavigatePayload(session) {
 }
 
 /**
+ * Remember a page to open when this turn finishes. Last call wins.
+ * Does not jump clients yet.
+ * @param {Session|null|undefined} session
+ * @param {unknown} raw
+ * @returns {Omit<EducationNavigate, 'id'>|null}
+ */
+export function queueEducationNavigate(session, raw) {
+  const nav = normalizeEducationNavigate(raw);
+  if (!session || !nav) return null;
+  const { id: _ignored, ...rest } = nav;
+  session.pendingNavigate = rest;
+  return rest;
+}
+
+/**
+ * Mint the one-shot jump for a finished turn. No-op if nothing was queued.
+ * @param {Session|null|undefined} session
+ * @returns {EducationNavigate|null}
+ */
+export function publishQueuedEducationNavigate(session) {
+  if (!session?.pendingNavigate) return null;
+  /** @type {EducationNavigate} */
+  const next = { ...session.pendingNavigate, id: mintNavigateId() };
+  session.pendingNavigate = null;
+  session.navigate = next;
+  return next;
+}
+
+/**
+ * @param {Session} session
+ * @param {string} sid
+ * @param {Record<string, unknown>} extra
+ */
+function notifyTurnFinished(session, sid, extra) {
+  const navigate = publishQueuedEducationNavigate(session);
+  /** @type {Record<string, unknown>} */
+  const payload = {
+    source: "agent",
+    sessionId: sid,
+    ...extra,
+  };
+  if (navigate) payload.navigate = navigate;
+  notifyEducationClients(session.email, "change", payload);
+}
+
+/**
  * @param {string} sid
  * @param {Session} session
  */
@@ -515,7 +562,7 @@ function openEducationPageTool(sid, session) {
   return {
     open_education_page: {
       description:
-        "Open an education dashboard page on the website (in place) and iOS Education tab (without leaving Chat). Call when the user asks about one todo, class, project, date, or capsule, says show/take me there, or you just created that object. Skip if Live context is already that page, for lists of many items, or for mail/news/fitness. Call after the folder exists. Express/web/iOS only; not Cursor Desktop.",
+        "Queue an education dashboard page to open once this turn finishes (website in place, iOS Education tab without leaving Chat). The jump happens when your final reply lands, not when you call this tool. Last call in the turn wins. Call when the user asks about one todo, class, project, date, or capsule, says show/take me there, or you just created that object. Skip if Live context is already that page, for lists of many items, or for mail/news/fitness. Call after the folder exists. Express/web/iOS only; not Cursor Desktop.",
       inputSchema: {
         type: "object",
         properties: {
@@ -538,18 +585,9 @@ function openEducationPageTool(sid, session) {
         if (!sessions.has(sid) || sessions.get(sid) !== session) {
           return "session gone";
         }
-        const nav = normalizeEducationNavigate(input);
-        if (!nav) return "invalid target";
-        /** @type {EducationNavigate} */
-        const next = { ...nav, id: mintNavigateId() };
-        session.navigate = next;
-        notifyEducationClients(session.email, "change", {
-          source: "agent",
-          sessionId: sid,
-          status: session.status || "running",
-          navigate: next,
-        });
-        return `opened ${next.view}`;
+        const queued = queueEducationNavigate(session, input);
+        if (!queued) return "invalid target";
+        return `queued ${queued.view} (opens when this turn finishes)`;
       },
     },
   };
@@ -816,7 +854,7 @@ export function systemPrompt(email) {
     "",
     "Reply: short. School mutations 1-3 lines. Markdown OK in the text bubble; never HTML tags or markdown images. Never em dashes. No thinking aloud. Do not tell the user to refresh. Read the widgets skill before emitting any widget fence.",
     "Long work: call send_chat_message first with a short status, then act, then a final Done. Quick answers: one reply only (that is the end of turn).",
-    "To show one education page on web/iOS, call open_education_page (education-dashboard skill). Skip if already on that page. Not on Cursor Desktop.",
+    "To show one education page on web/iOS, call open_education_page (education-dashboard skill). The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Skip if already on that page. Not on Cursor Desktop.",
     "No period when the reply is one word, one phrase, or one sentence.",
   ].join("\n");
 }
@@ -1501,6 +1539,8 @@ async function executeAgentTurn(sid, session, opts) {
     sessionAttachmentCount,
   } = opts;
 
+  session.pendingNavigate = null;
+
   try {
     /** @type {string[]} */
     const chunks = [];
@@ -1584,6 +1624,7 @@ async function executeAgentTurn(sid, session, opts) {
       },
     });
     if (outcome.aborted || session.interrupting) {
+      session.pendingNavigate = null;
       if (session.interrupting) releaseTurnRun(session);
       return;
     }
@@ -1668,25 +1709,18 @@ async function executeAgentTurn(sid, session, opts) {
       appendPromotedUserMessage(session, next);
       persistSessionHistory(sid, session);
       session.status = "running";
-      notifyEducationClients(normalized, "change", {
-        source: "agent",
-        sessionId: sid,
-        status: "running",
-      });
+      notifyTurnFinished(session, sid, { status: "running" });
       kickoffTurn(sid, session, next);
     } else {
       session.status = finishedStatus;
-      notifyEducationClients(normalized, "change", {
-        source: "agent",
-        sessionId: sid,
-        status: session.status,
-      });
+      notifyTurnFinished(session, sid, { status: session.status });
     }
   } catch (err) {
     if (
       session.interrupting ||
       (err instanceof Error && err.message === "interrupted")
     ) {
+      session.pendingNavigate = null;
       releaseTurnRun(session);
       return;
     }
@@ -1715,19 +1749,11 @@ async function executeAgentTurn(sid, session, opts) {
       appendPromotedUserMessage(session, next);
       persistSessionHistory(sid, session);
       session.status = "running";
-      notifyEducationClients(normalized, "change", {
-        source: "agent",
-        sessionId: sid,
-        status: "running",
-      });
+      notifyTurnFinished(session, sid, { status: "running" });
       kickoffTurn(sid, session, next);
     } else {
       session.status = "error";
-      notifyEducationClients(normalized, "change", {
-        source: "agent",
-        sessionId: sid,
-        status: "error",
-      });
+      notifyTurnFinished(session, sid, { status: "error" });
     }
   }
 }

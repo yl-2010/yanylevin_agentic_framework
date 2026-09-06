@@ -170,11 +170,13 @@ Express / web / iOS only. Cursor Desktop does not have this tool.
 
 Call `open_education_page` when the user asks about **one** dashboard object, says show me / take me there, or you just created the thing they would look at. The website navigates in place (chat stays open). iOS stays on Chat; the Education tab is already on that page when they switch to it.
 
+The jump happens **once**, when your final reply for this turn lands. Not when you call the tool. File writes and chat polls do not replay it. Last call in the turn wins. A later turn can jump again (same page or a different one) by calling the tool again.
+
 - `view`: `home` | `class` | `project` | `todo` | `date` | `capsule`
 - `todoId` / `dateId` / `classId` / `projectId` are **folder slugs**, not display names. Class todos need `classId`. Project todos need `projectId`. Capsules need `todoId` + `capsuleId`.
 - After a create, call once the folder exists so clients can resolve it.
 - Skip if Live context is already that page. Skip lists of many items. Skip mail, news compile, fitness, and anything outside `/education`.
-- You can call it mid-turn (after you know the id). Do not mention the tool or tell them to refresh.
+- You can call it mid-turn (after you know the id). The page still waits until the turn ends. Do not mention the tool or tell them to refresh.
 
 ## Chat attachments (web + iOS)
 
