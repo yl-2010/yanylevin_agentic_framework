@@ -10,10 +10,6 @@ struct AgentLiveActivity: Widget {
                 .widgetURL(AgentActivityAttributes.chatURL(sessionId: nil))
         } dynamicIsland: { context in
             DynamicIsland {
-                DynamicIslandExpandedRegion(.trailing) {
-                    LiveActivityBusyDots()
-                        .padding(.trailing, LiveActivityChrome.islandEarPad)
-                }
                 DynamicIslandExpandedRegion(.bottom) {
                     AgentLiveActivityIslandBottom(state: context.state)
                 }
@@ -41,18 +37,22 @@ private struct AgentLiveActivityBody: View {
     let state: AgentActivityAttributes.ContentState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                LiveActivityYLMark(size: 18)
+                LiveActivityYLMark(size: 16)
                 Text(headerTitle)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(LiveActivityPalette.accent(colorScheme))
                 Spacer(minLength: 0)
                 LiveActivityBusyDots()
             }
-            AgentLiveActivityRows(state: state, compact: false)
+            ViewThatFits(in: .vertical) {
+                AgentLiveActivityRows(state: state, limit: 3)
+                AgentLiveActivityRows(state: state, limit: 2)
+                AgentLiveActivityRows(state: state, limit: 1)
+            }
         }
-        .padding(14)
+        .padding(12)
         .background { LiveActivityBannerBackground() }
         .liveActivityLockScreenChrome()
     }
@@ -67,31 +67,22 @@ private struct AgentLiveActivityIslandBottom: View {
     let state: AgentActivityAttributes.ContentState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 8) {
                 LiveActivityYLMark(size: 14)
                 Text(headerTitle)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(LiveActivityPalette.islandAccent)
                 Spacer(minLength: 0)
+                LiveActivityBusyDots()
             }
             ForEach(state.agents, id: \.sessionId) { row in
                 Button(intent: OpenAgentChatIntent(sessionId: row.sessionId)) {
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(LiveActivityPalette.orange)
-                            .frame(width: 5, height: 5)
-                        Text(row.title)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(LiveActivityPalette.islandFg)
-                            .lineLimit(1)
-                        Spacer(minLength: 6)
-                        Text(row.workingLabel)
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(LiveActivityPalette.orange)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
+                    AgentLiveActivityLine(
+                        row: row,
+                        titleColor: LiveActivityPalette.islandFg,
+                        labelColor: LiveActivityPalette.orange
+                    )
                 }
                 .buttonStyle(.plain)
             }
@@ -115,73 +106,57 @@ private struct AgentLiveActivityIslandBottom: View {
 private struct AgentLiveActivityRows: View {
     @Environment(\.colorScheme) private var colorScheme
     let state: AgentActivityAttributes.ContentState
-    var compact: Bool
+    var limit: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: compact ? 5 : 7) {
-            ForEach(state.agents, id: \.sessionId) { row in
+        VStack(alignment: .leading, spacing: 5) {
+            ForEach(shown, id: \.sessionId) { row in
                 Button(intent: OpenAgentChatIntent(sessionId: row.sessionId)) {
-                    if compact {
-                        compactRow(row)
-                    } else {
-                        lockRow(row)
-                    }
+                    AgentLiveActivityLine(
+                        row: row,
+                        titleColor: YLTheme.fg(colorScheme),
+                        labelColor: LiveActivityPalette.orange
+                    )
                 }
                 .buttonStyle(.plain)
             }
-            if state.overflowCount > 0 {
-                Text("+\(state.overflowCount) more")
+            if extra > 0 {
+                Text("+\(extra) more")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(YLTheme.muted(colorScheme))
-                    .padding(.leading, 2)
             }
         }
     }
 
-    private func compactRow(_ row: AgentActivityRow) -> some View {
+    private var shown: [AgentActivityRow] {
+        Array(state.agents.prefix(limit))
+    }
+
+    private var extra: Int {
+        state.overflowCount + max(0, state.agents.count - shown.count)
+    }
+}
+
+private struct AgentLiveActivityLine: View {
+    let row: AgentActivityRow
+    let titleColor: Color
+    let labelColor: Color
+
+    var body: some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(LiveActivityPalette.orange)
-                .frame(width: 6, height: 6)
+                .fill(labelColor)
+                .frame(width: 5, height: 5)
             Text(row.title)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(YLTheme.fg(colorScheme))
+                .foregroundStyle(titleColor)
                 .lineLimit(1)
-            Spacer(minLength: 4)
+            Spacer(minLength: 6)
             Text(row.workingLabel)
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(LiveActivityPalette.orange)
+                .foregroundStyle(labelColor)
                 .lineLimit(1)
-                .minimumScaleFactor(0.75)
+                .minimumScaleFactor(0.7)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(
-            LiveActivityPalette.accent(colorScheme).opacity(0.12),
-            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-        )
-    }
-
-    private func lockRow(_ row: AgentActivityRow) -> some View {
-        HStack(spacing: 10) {
-            LiveActivityBusyDots()
-            VStack(alignment: .leading, spacing: 1) {
-                Text(row.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(YLTheme.fg(colorScheme))
-                    .lineLimit(1)
-                Text(row.workingLabel)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(LiveActivityPalette.orange)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(
-            LiveActivityPalette.accent(colorScheme).opacity(0.12),
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-        )
     }
 }

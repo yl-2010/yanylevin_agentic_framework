@@ -53,22 +53,17 @@ struct LiveActivityBusyDots: View {
     var color: Color = LiveActivityPalette.orange
 
     var body: some View {
-        let stepInterval = 0.32 / 1.5
-        TimelineView(.animation(minimumInterval: stepInterval, paused: false)) { context in
-            let step = Int(context.date.timeIntervalSinceReferenceDate / stepInterval) % 3
-            HStack(spacing: 3) {
-                ForEach(0..<3, id: \.self) { index in
-                    Circle()
-                        .fill(color)
-                        .frame(width: 4, height: 4)
-                        .opacity(index == step ? 1 : 0.28)
-                        .scaleEffect(index == step ? 1.2 : 0.85)
-                }
-            }
-            .animation(.easeInOut(duration: stepInterval * 0.875), value: step)
-        }
-        .frame(width: 20, height: 8)
-        .accessibilityHidden(true)
+        Image(systemName: "ellipsis")
+            .font(.system(size: 17, weight: .heavy))
+            .foregroundStyle(color)
+            .symbolRenderingMode(.hierarchical)
+            .symbolEffect(
+                .variableColor.iterative.dimInactiveLayers.nonReversing,
+                options: .repeating,
+                isActive: true
+            )
+            .frame(width: 22, height: 12)
+            .accessibilityHidden(true)
     }
 }
 
