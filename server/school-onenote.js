@@ -317,6 +317,17 @@ function waitForNotesToken(context, timeoutMs, page) {
   });
 }
 
+async function clickIfVisible(page, name, timeoutMs = 4000) {
+  try {
+    const btn = page.getByRole("button", { name, exact: false });
+    await btn.first().waitFor({ state: "visible", timeout: timeoutMs });
+    await btn.first().click({ timeout: 3000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function captureToken(opts) {
   const headed = Boolean(opts.headed);
   const waitMs = headed ? LOGIN_WAIT_MS : REFRESH_WAIT_MS;
@@ -324,19 +335,24 @@ async function captureToken(opts) {
   try {
     const page = context.pages()[0] || (await context.newPage());
     const pending = waitForNotesToken(context, waitMs, page);
-    const urls = [graphNotesAuthorizeUrl(), GRAPH_EXPLORER_URL, OWA_URL];
-    for (const url of urls) {
-      try {
-        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
-      } catch {
-        // keep trying other URLs; token listener is what matters
-      }
-      const hashed = tokenFromUrl(page.url());
-      if (hashed) {
-        await saveSession({ token: hashed }, opts.root);
-        return hashed;
-      }
-      await sleep(1500);
+    try {
+      await page.goto(GRAPH_EXPLORER_URL, {
+        waitUntil: "domcontentloaded",
+        timeout: 60_000,
+      });
+    } catch {
+      // token listener still runs
+    }
+    await sleep(2500);
+    await clickIfVisible(page, "Sign in");
+    await sleep(2000);
+    await clickIfVisible(page, "Run query");
+    await clickIfVisible(page, "Accept");
+    await clickIfVisible(page, "Consent");
+    const hashed = tokenFromUrl(page.url());
+    if (hashed) {
+      await saveSession({ token: hashed }, opts.root);
+      return hashed;
     }
     const token = await pending;
     await saveSession({ token }, opts.root);
@@ -471,7 +487,7 @@ export async function runSchoolOnenote(argv, opts = {}) {
 
   if (cmd === "login") {
     process.stderr.write(
-      `Sign in as ${SCHOOL_EMAIL} in the Chrome window. It closes once a OneNote Graph token appears.\n`
+      `Chrome opens Graph Explorer as ${SCHOOL_EMAIL}. Sign in if asked. If you see GET /me/onenote/notebooks, click Run query (and Accept if a permissions prompt appears). The window closes once a OneNote token is captured.\n`
     );
     try {
       const token = await captureToken({ headed: true, root });

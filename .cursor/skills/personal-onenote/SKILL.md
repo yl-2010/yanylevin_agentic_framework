@@ -51,11 +51,15 @@ Do not print tokens. Do not dump huge HTML (`page` already returns text;
 `--html` only if you must see markup).
 
 If `signedIn` is false or the payload says `not signed in`, Yan has to finish
-login on the Mac Studio (visible Chrome, including 2FA):
+login on the Mac Studio. Chrome opens **Graph Explorer**, not Outlook:
 
 ```bash
 node server/school-onenote.js login
 ```
+
+Sign in as `owner@school.example` if asked. If the page shows
+`GET /me/onenote/notebooks`, click **Run query**. Accept the Notes permission
+prompt if Microsoft shows one. The window closes when the token is captured.
 
 Cookies live in `~/.yanylevin/school-mail/`. The OneNote Graph token lives in
 `~/.yanylevin/school-onenote/session.json` (not in git). Never copy those
