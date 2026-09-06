@@ -11,15 +11,13 @@ struct AgentLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    LiveActivityYLMark(size: 20, color: YLTheme.accent)
+                    LiveActivityYLMark(size: 16, color: YLTheme.accent)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     LiveActivityBusyDots()
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     AgentLiveActivityIslandBottom(state: context.state)
-                        .padding(.horizontal, LiveActivityChrome.islandSidePad)
-                        .padding(.bottom, LiveActivityChrome.islandBottomPad)
                 }
             } compactLeading: {
                 LiveActivityYLMark(size: 14, color: YLTheme.accent)
@@ -72,9 +70,36 @@ private struct AgentLiveActivityIslandBottom: View {
     let state: AgentActivityAttributes.ContentState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            AgentLiveActivityRows(state: state, compact: true)
+        VStack(alignment: .leading, spacing: 7) {
+            ForEach(state.agents, id: \.sessionId) { row in
+                Button(intent: OpenAgentChatIntent(sessionId: row.sessionId)) {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(YLTheme.chatOrange)
+                            .frame(width: 5, height: 5)
+                        Text(row.title)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(YLTheme.fg(colorScheme))
+                            .lineLimit(1)
+                        Spacer(minLength: 6)
+                        Text(row.workingLabel)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(YLTheme.chatOrange)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            if state.overflowCount > 0 {
+                Text("+\(state.overflowCount) more")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(YLTheme.muted(colorScheme))
+            }
         }
+        .padding(.horizontal, LiveActivityChrome.islandSidePad)
+        .padding(.bottom, LiveActivityChrome.islandBottomPad)
+        .padding(.top, 2)
     }
 }
 

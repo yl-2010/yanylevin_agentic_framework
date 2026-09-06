@@ -2,8 +2,9 @@ import SwiftUI
 
 /// Shared Live Activity chrome: app theme, YL mark, busy pulse.
 enum LiveActivityChrome {
-    static let islandBottomPad: CGFloat = 14
-    static let islandSidePad: CGFloat = 10
+    /// Dynamic Island expanded corner radius is 44pt. Keep content inside that curve.
+    static let islandBottomPad: CGFloat = 22
+    static let islandSidePad: CGFloat = 18
 }
 
 struct LiveActivityYLMark: View {

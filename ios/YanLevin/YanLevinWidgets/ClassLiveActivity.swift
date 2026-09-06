@@ -12,16 +12,15 @@ struct ClassLiveActivity: Widget {
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     Text(context.state.period)
-                        .font(.title3.weight(.bold))
+                        .font(.headline.weight(.bold))
                         .foregroundStyle(YLTheme.accent)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     ClassLiveActivityTimer(state: context.state, compact: true)
+                        .dynamicIsland(verticalPlacement: .belowIfTooWide)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     ClassLiveActivityIslandBottom(state: context.state)
-                        .padding(.horizontal, LiveActivityChrome.islandSidePad)
-                        .padding(.bottom, LiveActivityChrome.islandBottomPad)
                 }
             } compactLeading: {
                 Text(context.state.period)
@@ -91,17 +90,16 @@ private struct ClassLiveActivityIslandBottom: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(state.className)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(YLTheme.fg(colorScheme))
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                ClassLiveActivityMeter(state: state)
-                    .frame(maxWidth: 88)
-            }
+            Text(state.className)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(YLTheme.fg(colorScheme))
+                .lineLimit(1)
+            ClassLiveActivityMeter(state: state)
             ClassLiveActivityAssignments(state: state, compact: true)
         }
+        .padding(.horizontal, LiveActivityChrome.islandSidePad)
+        .padding(.bottom, LiveActivityChrome.islandBottomPad)
+        .padding(.top, 2)
     }
 }
 
@@ -113,9 +111,9 @@ private struct ClassLiveActivityTimer: View {
     var body: some View {
         Group {
             if let start = state.startDate, Date.now < start {
-                Text(timerInterval: Date.now...start, countsDown: true)
+                Text(timerInterval: Date.now...start, countsDown: true, showsHours: !compact)
             } else if let end = state.endDate, Date.now < end {
-                Text(timerInterval: Date.now...end, countsDown: true)
+                Text(timerInterval: Date.now...end, countsDown: true, showsHours: !compact)
             } else if !state.end.isEmpty {
                 Text(state.end)
             }
