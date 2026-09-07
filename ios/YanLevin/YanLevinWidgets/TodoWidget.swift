@@ -64,12 +64,13 @@ struct TodoProvider: AppIntentTimelineProvider {
         return Timeline(entries: entries, policy: .after(refresh))
     }
 
-    /// Small/medium: 6 · large: 8 · extra-large (iPad): 16 (two columns of 8).
+    /// Small/medium: 5 · large: 7 · extra-large (iPad): 14 (two columns of 7).
+    /// One fewer than before so due-date bars still fit with even padding.
     private static func todoLimit(for family: WidgetFamily) -> Int {
         switch family {
-        case .systemExtraLarge: return 16
-        case .systemLarge: return 8
-        default: return 6
+        case .systemExtraLarge: return 14
+        case .systemLarge: return 7
+        default: return 5
         }
     }
 
@@ -130,13 +131,9 @@ struct TodoWidgetView: View {
         family == .systemSmall || family == .systemMedium
     }
 
-    /// Open todos plus optional lingered completed (already capped to 6; completed takes the last slot).
-    private var compactRows: [(todo: EducationTodo, completed: Bool)] {
-        var rows = entry.todos.map { (todo: $0, completed: false) }
-        if let completed = entry.recentCompleted {
-            rows.append((todo: completed, completed: true))
-        }
-        return rows
+    /// Open todos plus optional lingered completed (completed takes the last slot).
+    private var allRows: [(todo: EducationTodo, completed: Bool)] {
+        Self.stackedRows(todos: entry.todos, completed: entry.recentCompleted)
     }
 
     var body: some View {
@@ -175,27 +172,47 @@ struct TodoWidgetView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 
-    /// 2×2 / 2×4: even gaps, up to 6 single-line rows. Completed uses the last slot.
+    /// 2×2 / 2×4: even leftover gaps, up to 5 single-line rows. Completed uses the last slot.
     private var compactTodoList: some View {
         GeometryReader { geo in
-            let rows = compactRows
+            let rows = allRows
             if rows.isEmpty {
                 Text("Nothing here")
                     .font(.caption)
                     .foregroundStyle(WidgetTheme.muted)
                     .frame(width: geo.size.width, height: geo.size.height, alignment: .center)
             } else {
-                let gapCount = CGFloat(rows.count + 1)
+                let sepBefore = Self.separatorBeforeFlags(rows.map(\.todo))
+                let sepCount = CGFloat(sepBefore.filter { $0 }.count)
+                let sepHeight = WidgetTodoDaySeparator.compactHeight
                 let minGap: CGFloat = 4
-                let rowHeight = min(18, max(16, (geo.size.height - gapCount * minGap) / CGFloat(rows.count)))
-                let gap = max(minGap, (geo.size.height - rowHeight * CGFloat(rows.count)) / gapCount)
+                let rowCount = CGFloat(rows.count)
+                let gapCount = rowCount + 1 - sepCount
+                let space = max(0, geo.size.height - sepCount * sepHeight)
+                let rowHeight = min(
+                    18,
+                    max(
+                        15,
+                        gapCount > 0
+                            ? (space - gapCount * minGap) / max(rowCount, 1)
+                            : space / max(rowCount, 1)
+                    )
+                )
+                let gap = gapCount > 0 ? max(0, (space - rowHeight * rowCount) / gapCount) : 0
                 VStack(alignment: .leading, spacing: 0) {
                     Color.clear.frame(height: gap)
-                    ForEach(rows, id: \.todo.id) { item in
+                    ForEach(Array(rows.enumerated()), id: \.element.todo.id) { index, item in
+                        if index > 0 {
+                            if sepBefore[index] {
+                                WidgetTodoDaySeparator(style: .compact)
+                            } else {
+                                Color.clear.frame(height: gap)
+                            }
+                        }
                         compactTodoRow(item.todo, completed: item.completed)
                             .frame(height: rowHeight, alignment: .center)
-                        Color.clear.frame(height: gap)
                     }
+                    Color.clear.frame(height: gap)
                 }
                 .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
             }
@@ -229,20 +246,14 @@ struct TodoWidgetView: View {
     }
 
     private func todoList(showMeta: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        Group {
             if entry.todos.isEmpty && entry.recentCompleted == nil {
                 Text("Nothing here")
                     .font(.caption)
                     .foregroundStyle(WidgetTheme.muted)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             } else {
-                ForEach(entry.todos) { todo in
-                    todoRow(todo, showMeta: showMeta, completed: false)
-                }
-                if let completed = entry.recentCompleted {
-                    todoRow(completed, showMeta: showMeta, completed: true)
-                }
-                Spacer(minLength: 0)
+                stackedTodoColumn(entry.todos, completed: entry.recentCompleted, showMeta: showMeta)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -261,8 +272,8 @@ struct TodoWidgetView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             } else {
                 HStack(alignment: .top, spacing: 20) {
-                    todoColumn(left, completed: nil)
-                    todoColumn(right, completed: entry.recentCompleted)
+                    stackedTodoColumn(left, completed: nil, showMeta: true)
+                    stackedTodoColumn(right, completed: entry.recentCompleted, showMeta: true)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
@@ -270,17 +281,48 @@ struct TodoWidgetView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    private func todoColumn(_ todos: [EducationTodo], completed: EducationTodo?) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(todos) { todo in
-                todoRow(todo, showMeta: true, completed: false)
-            }
-            if let completed {
-                todoRow(completed, showMeta: true, completed: true)
+    private func stackedTodoColumn(
+        _ todos: [EducationTodo],
+        completed: EducationTodo?,
+        showMeta: Bool
+    ) -> some View {
+        let rows = Self.stackedRows(todos: todos, completed: completed)
+        return VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(rows.enumerated()), id: \.element.todo.id) { index, item in
+                if index > 0 {
+                    if Self.dayKey(rows[index - 1].todo) != Self.dayKey(item.todo) {
+                        WidgetTodoDaySeparator(style: .regular)
+                    } else {
+                        Color.clear.frame(height: 8)
+                    }
+                }
+                todoRow(item.todo, showMeta: showMeta, completed: item.completed)
             }
             Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private static func stackedRows(
+        todos: [EducationTodo],
+        completed: EducationTodo?
+    ) -> [(todo: EducationTodo, completed: Bool)] {
+        var rows = todos.map { (todo: $0, completed: false) }
+        if let completed {
+            rows.append((todo: completed, completed: true))
+        }
+        return rows
+    }
+
+    private static func dayKey(_ todo: EducationTodo) -> String {
+        todo.dueDateValue ?? ""
+    }
+
+    private static func separatorBeforeFlags(_ todos: [EducationTodo]) -> [Bool] {
+        todos.enumerated().map { index, todo in
+            guard index > 0 else { return false }
+            return dayKey(todos[index - 1]) != dayKey(todo)
+        }
     }
 
     private func todoRow(_ todo: EducationTodo, showMeta: Bool, completed: Bool) -> some View {
@@ -368,6 +410,33 @@ struct TodoWidgetView: View {
             content()
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// 1pt hairline at 12% foreground, same as the in-app / site TODO day bars.
+private struct WidgetTodoDaySeparator: View {
+    enum Style {
+        case compact
+        case regular
+    }
+
+    var style: Style = .regular
+
+    static let compactHeight: CGFloat = 9
+    static let regularHeight: CGFloat = 13
+
+    private var height: CGFloat {
+        style == .compact ? Self.compactHeight : Self.regularHeight
+    }
+
+    var body: some View {
+        Rectangle()
+            .fill(WidgetTheme.fg.opacity(0.12))
+            .frame(height: 1)
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity)
+            .frame(height: height)
+            .accessibilityHidden(true)
     }
 }
 

@@ -60,7 +60,7 @@ Home Screen widgets require a signed-in allowlisted account (session mirrored vi
 | Widget | Sizes | Behavior |
 |--------|-------|----------|
 | **Schedule** | 2×2, 2×4, 4×4 | Upcoming classes. Small/medium show 4; large shows up to 8 split by the same day groups as `/education`. |
-| **Todos** | 2×2, 2×4, 4×4; iPad also 8×4 | Upcoming open todos (6 / 6 / 8; iPad extra-large: 16 in two columns). Small and medium are title-only (no due/class lines). Large keeps due + class. Widget settings: CW/HW/QA/MA/untagged filters plus optional class filter. Tap the circle to complete; tap the title to open that todo in the app. |
+| **Todos** | 2×2, 2×4, 4×4; iPad also 8×4 | Upcoming open todos (5 / 5 / 7; iPad extra-large: 14 in two columns), with the same due-date hairlines as the in-app / site TODO list. Small and medium are title-only (no due/class lines). Large keeps due + class. Widget settings: CW/HW/QA/MA/untagged filters plus optional class filter. Tap the circle to complete; tap the title to open that todo in the app. |
 
 Enable App Groups for both the app and `com.example.personalagent.widgets` in the Apple Developer portal (**paid Apple Developer Program required** for a physical device). Without that, widgets cannot read your login session. The Simulator often still creates the App Group from the entitlements file alone.
 
