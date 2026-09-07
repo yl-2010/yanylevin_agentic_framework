@@ -48,7 +48,7 @@ Lock Screen + Dynamic Island, full-access only. Started from the app (foreground
 
 | Activity | When | Tap |
 |----------|------|-----|
-| **Class** | Current class, including the 10-minute lead (or the whole passing period if that gap is under 10 minutes). Shows open HW / CW / MA / QA due that period. | Banner → class page. A row → that assignment (`yanylevin://class?id=` / `yanylevin://todo?id=`). |
+| **Class** | Current real class only (not free periods), including the 10-minute lead (or the whole passing period if that gap is under 10 minutes). Shows open HW / CW / MA / QA due that period. | Banner → class page. A row → that assignment (`yanylevin://class?id=` / `yanylevin://todo?id=`). |
 | **Agents** | Personal Agent threads that are running or queued. Up to 3 rows; `+N more` after that. | Banner → Chat tab. A row → that session (`yanylevin://chat?open=1` / `yanylevin://chat?sessionId=`). |
 
 Enable Live Activities for Yan Levin in iPhone Settings if they do not appear.

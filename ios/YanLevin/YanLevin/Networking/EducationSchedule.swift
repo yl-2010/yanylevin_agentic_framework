@@ -45,29 +45,6 @@ struct DaySection: Identifiable, Hashable {
 enum EducationScheduleHelper {
     static let highlightLeadMinutes = 10
 
-    /// Temporary: pin the in-app school clock to Wed 2026-09-09 9:00 AM (Am Lit / E)
-    /// so the class Live Activity can be previewed. Set `enabled` to false when done.
-    private enum SchedulePreview {
-        static let enabled = true
-        static let now: Date? = Calendar.current.date(from: DateComponents(
-            calendar: Calendar.current,
-            timeZone: Calendar.current.timeZone,
-            year: 2026,
-            month: 9,
-            day: 9,
-            hour: 9,
-            minute: 0
-        ))
-    }
-
-    static var schedulePreviewNow: Date? {
-        SchedulePreview.enabled ? SchedulePreview.now : nil
-    }
-
-    private static var clockNow: Date {
-        schedulePreviewNow ?? Date()
-    }
-
     /// Port of `meetingHighlightStartMin` in server/education-data.js.
     static func highlightStartMin(
         for dayClass: DayClass,
@@ -101,18 +78,13 @@ enum EducationScheduleHelper {
               let m = Int(parts[1]),
               let day = Int(parts[2])
         else { return nil }
-        let scheduled = Calendar.current.date(from: DateComponents(
+        return Calendar.current.date(from: DateComponents(
             year: y,
             month: m,
             day: day,
             hour: minutes / 60,
             minute: minutes % 60
         ))
-        guard let scheduled else { return nil }
-        // ActivityKit timers use the real wall clock. Shift preview bells onto now
-        // so the Live Activity looks in-session instead of counting down to Wednesday.
-        guard let preview = schedulePreviewNow else { return scheduled }
-        return Date().addingTimeInterval(scheduled.timeIntervalSince(preview))
     }
 
     /// Open HW / CW / MA / QA due this meeting. Date-only due that day counts.
@@ -352,9 +324,8 @@ enum EducationScheduleHelper {
         cls: EducationClass,
         schedule: EducationSchedule?,
         activeClassIdsByDate: [String: [String]]?,
-        asOf: Date? = nil
+        asOf: Date = Date()
     ) -> Bool {
-        let asOf = asOf ?? clockNow
         guard todo.done == true else { return true }
         guard let archiveAt = classTodoArchiveAt(
             todo: todo,
@@ -370,9 +341,8 @@ enum EducationScheduleHelper {
         cls: EducationClass,
         schedule: EducationSchedule?,
         activeClassIdsByDate: [String: [String]]?,
-        asOf: Date? = nil
+        asOf: Date = Date()
     ) -> Date? {
-        let asOf = asOf ?? clockNow
         var soonest: Date?
         for todo in todos {
             guard todo.done == true else { continue }
@@ -455,8 +425,7 @@ enum EducationScheduleHelper {
         }
     }
 
-    private static func todayParts(_ date: Date? = nil) -> YMD {
-        let date = date ?? clockNow
+    private static func todayParts(_ date: Date = Date()) -> YMD {
         let cal = Calendar.current
         return YMD(
             y: cal.component(.year, from: date),
@@ -1067,8 +1036,7 @@ enum EducationDateHelpers {
         return Array(upcoming.prefix(collapsedLimit))
     }
 
-    private static func localTodayKey(_ date: Date? = nil) -> String {
-        let date = date ?? EducationScheduleHelper.schedulePreviewNow ?? Date()
+    private static func localTodayKey(_ date: Date = Date()) -> String {
         let cal = Calendar.current
         let y = cal.component(.year, from: date)
         let m = cal.component(.month, from: date)

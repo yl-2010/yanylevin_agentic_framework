@@ -41,7 +41,9 @@ final class LiveActivityCoordinator {
             classes: tree?.classes ?? [],
             activeClassIdsByDate: tree?.activeClassIdsByDate
         )
-        guard let active = EducationScheduleHelper.activeDayClass(in: sections) else {
+        guard let active = EducationScheduleHelper.activeDayClass(in: sections),
+              !active.dayClass.cls.isFreePeriod
+        else {
             await endClass()
             armNextHighlight(in: sections)
             return
@@ -114,7 +116,8 @@ final class LiveActivityCoordinator {
         guard let section = sections.first(where: { $0.isToday }) else { return }
         var soonest: Date?
         for dayClass in section.classes {
-            guard let startMin = EducationScheduleHelper.highlightStartMin(
+            guard !dayClass.cls.isFreePeriod,
+                  let startMin = EducationScheduleHelper.highlightStartMin(
                 for: dayClass,
                 in: section.classes
             ), startMin > section.nowMinutes,

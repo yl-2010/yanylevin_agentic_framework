@@ -98,16 +98,9 @@ private struct ClassLiveActivityTimer: View {
             if let start = state.startDate, Date.now < start {
                 Text(timerInterval: Date.now...start, countsDown: true, showsHours: false)
             } else if let start = state.startDate, let end = state.endDate, Date.now < end {
-                if compact {
-                    TimelineView(.periodic(from: Date(), by: 60)) { context in
-                        let mins = max(0, Int(ceil(end.timeIntervalSince(context.date) / 60)))
-                        Text("\(mins)m")
-                    }
-                } else {
-                    TimelineView(.periodic(from: start, by: 60)) { context in
-                        let mins = max(0, Int(context.date.timeIntervalSince(start) / 60))
-                        Text("\(mins) min")
-                    }
+                TimelineView(.periodic(from: start, by: 60)) { context in
+                    let mins = max(0, Int(context.date.timeIntervalSince(start) / 60))
+                    Text(compact ? "\(mins)m" : "\(mins) min")
                 }
             } else if !state.end.isEmpty {
                 Text(state.end)
