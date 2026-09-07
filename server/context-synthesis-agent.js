@@ -39,6 +39,18 @@ import { OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
 
 export const BRAIN_REL = `education/${YAN_EMAIL}/brain`;
 
+/** Education trees plus `server/` so lint tooling fixes like serializers ship with tonight's commit. */
+export const NIGHTLY_GIT_PATHS = [
+  BRAIN_REL,
+  LOCATION_HISTORY_REL,
+  HEALTH_REL,
+  `education/${YAN_EMAIL}/dates`,
+  `education/${YAN_EMAIL}/classes`,
+  `education/${YAN_EMAIL}/projects`,
+  `education/${YAN_EMAIL}/todos`,
+  "server",
+];
+
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = "/tmp/yanylevin-context-synthesis.lock";
 export const IMESSAGE_PREFETCH_PATH = "/tmp/yanylevin-context-imessage.json";
@@ -433,7 +445,7 @@ export function buildLintPrompt({ dateKey, timezone, generatorNotes }) {
     `Today's date key: ${dateKey} (timezone ${timezone}).`,
     `Digest: ${DIGEST_PATH}. Scope: files git status shows as changed tonight.`,
     `Verify ${brain}/state.json nightly cursors moved (mailSince, schoolMailSince, imessageSince, chatHistorySince, screenTimeAt, locationEnrichmentAt, healthAt) and lastSynthesisDateKey is ${dateKey}; fix if missing. appleMailFill.lastAt is a one-shot fill stamp and must not move overnight. Do not create appleMailSince.`,
-    "Run node server/brain-graph.js --check and fix underlying entity files for any problem it reports.",
+    "Run node server/brain-graph.js --check and fix underlying entity files for any problem it reports. If the check fails because serializer or graph tooling is wrong, fix the server/brain*.js file. The runner commits server/ after you finish; do not leave that edit as a local-only working tree.",
     "Run node server/brain-placement-lint.js and move any reported person facts off identity.md onto the matching card. Leave the slug. You may still edit identity.md.",
     ...(notes.length ? [`Generator output from earlier tonight:\n${notes.join("\n")}`] : []),
     "Reply with what you fixed.",
@@ -1357,15 +1369,7 @@ async function runContextSynthesisOnce({
     laterAuthRetry.clear();
     await writePipelineProgress(dir, dateKey, "finished");
     await gitAddCommitPush({
-      paths: [
-        BRAIN_REL,
-        LOCATION_HISTORY_REL,
-        HEALTH_REL,
-        `education/${YAN_EMAIL}/dates`,
-        `education/${YAN_EMAIL}/classes`,
-        `education/${YAN_EMAIL}/projects`,
-        `education/${YAN_EMAIL}/todos`,
-      ],
+      paths: NIGHTLY_GIT_PATHS,
       message: `education: ${dateKey} nightly pipeline`,
     });
 

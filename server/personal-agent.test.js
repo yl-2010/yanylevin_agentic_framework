@@ -410,6 +410,7 @@ describe("Personal Agent skill files", () => {
     assert.match(lint, /brain-graph\.js --check/);
     assert.match(lint, /brain-placement-lint\.js/);
     assert.match(lint, /state\.json/);
+    assert.match(lint, /commits `server\/`/);
 
     const recap = await readFile(
       join(REPO_ROOT, ".cursor/skills/agent-recap/SKILL.md"),

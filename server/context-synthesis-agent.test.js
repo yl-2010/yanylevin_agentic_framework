@@ -11,6 +11,7 @@ import {
   IMESSAGE_PEOPLE_PREFETCH_PATH,
   MAIL_PEOPLE_PREFETCH_PATH,
   NIGHTLY_ACTIONS_MODEL_SPEC,
+  NIGHTLY_GIT_PATHS,
   PEOPLE_ENRICH_BATCH_SIZE,
   PEOPLE_ENRICH_MODEL_SPEC,
   SCHOOL_NAMES_PREFETCH_PATH,
@@ -231,6 +232,11 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /wrote people\/index\.md/);
     assert.match(prompt, /appleMailFill\.lastAt is a one-shot fill stamp/);
     assert.match(prompt, /Do not create appleMailSince/);
+    assert.match(prompt, /The runner commits server\//);
+  });
+
+  it("nightly commit includes server tooling", () => {
+    assert.ok(NIGHTLY_GIT_PATHS.includes("server"));
   });
 
   it("uses grok-4.6 high for the actions phase", () => {
