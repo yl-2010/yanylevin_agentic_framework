@@ -1737,19 +1737,22 @@ private struct EducationBriefingCapsule: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            Group {
-                if allowsNavigation, let todo {
+            VStack(alignment: .leading, spacing: 8) {
+                titleRow(reserveVoteSpace: allowsVote)
+                if allowsNavigation, let todo, !capsule.displayBody.isEmpty {
                     NavigationLink(value: EducationRoute.capsuleDetail(todo, capsule)) {
-                        cardContent(reserveVoteSpace: allowsVote)
+                        bodyContent
                     }
                     .buttonStyle(.plain)
                     .ylHapticNavigation()
                     .accessibilityLabel(capsule.displayTitle)
                     .accessibilityHint("Opens this news story")
                 } else {
-                    cardContent(reserveVoteSpace: allowsVote)
+                    bodyContent
                 }
             }
+            .padding(.top, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
             if allowsVote {
                 voteRow
                     .padding(.top, 16)
@@ -1759,30 +1762,34 @@ private struct EducationBriefingCapsule: View {
         }
         // Glass wraps the vote overlay so the chips ride the card wiggle.
         .ylGlassRounded(cornerRadius: 22, interactive: true)
-        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
-    private func cardContent(reserveVoteSpace: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .bottom, spacing: 8) {
-                Text(capsule.displayTitle)
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(YLTheme.fg(colorScheme))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                if reserveVoteSpace {
-                    Color.clear
-                        .frame(width: 70, height: 32)
-                }
-            }
-            if !capsule.displayBody.isEmpty {
-                Text(capsule.displayBody)
-                    .font(.body)
-                    .foregroundStyle(YLTheme.fg(colorScheme))
+    private func titleRow(reserveVoteSpace: Bool) -> some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            Text(capsule.displayTitle)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(YLTheme.fg(colorScheme))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if reserveVoteSpace {
+                Color.clear
+                    .frame(width: 70, height: 32)
             }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.horizontal, 16)
+        .accessibilityHidden(allowsNavigation)
+    }
+
+    @ViewBuilder
+    private var bodyContent: some View {
+        if !capsule.displayBody.isEmpty {
+            Text(capsule.displayBody)
+                .font(.body)
+                .foregroundStyle(YLTheme.fg(colorScheme))
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+        }
     }
 
     private var voteRow: some View {
