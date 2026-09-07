@@ -304,6 +304,9 @@ final class YLKeyboardAccessoryChrome: UIView {
     private var keyboardPin: NSLayoutConstraint?
     private var restEqual: NSLayoutConstraint?
     private var restFloor: NSLayoutConstraint?
+    /// Landscape-only: keeps the bar above the real keyboard when
+    /// `keyboardLayoutGuide` stays at rest. Inactive in portrait.
+    private var landscapeKeyboardFloor: NSLayoutConstraint?
     private var tokens: [NSObjectProtocol] = []
     private var displayLink: CADisplayLink?
     private var foregroundDisplayLink: CADisplayLink?
@@ -320,6 +323,8 @@ final class YLKeyboardAccessoryChrome: UIView {
     private var scrubReservedFull: CGFloat = 0
     private var scrubReservedRest: CGFloat = 0
     private var lastKeyboardScreenFrame: CGRect = .zero
+    /// Last orientation the vertical pins were built for. Rotation rebuilds them.
+    private var lastInstalledLandscape: Bool?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -450,9 +455,16 @@ final class YLKeyboardAccessoryChrome: UIView {
             publishReserved(animated: false, duration: 0)
             return
         }
+        let landscape = isLandscapeInterface
+        if lastInstalledLandscape != landscape {
+            installVerticalConstraints()
+            publishReserved(animated: false, duration: 0)
+            return
+        }
+        syncLandscapeKeyboardFloor()
         let barH = max(contentHeight, heightConstraint?.constant ?? 0, 56)
         let lift = keyboardLift()
-        let pinGap: CGFloat = lift > 0.5 ? -10 : 0
+        let pinGap = keyboardPinGap(lift: lift)
         let next = barH + lift - pinGap
         guard abs(next - lastReserved) > 1 else { return }
         publishReserved(animated: false, duration: 0)
@@ -504,9 +516,17 @@ final class YLKeyboardAccessoryChrome: UIView {
         restEqual = nil
         restFloor = nil
         keyboardPin = nil
+        landscapeKeyboardFloor?.isActive = false
+        landscapeKeyboardFloor = nil
         guard let bar = host?.view else { return }
 
-        keyboardLayoutGuide.usesBottomSafeArea = true
+        let landscape = isLandscapeInterface
+        lastInstalledLandscape = landscape
+        // Portrait keeps the safe-area rest so the bar sits above the home
+        // indicator. Landscape with this on is the case where the guide
+        // never leaves rest and the keys cover the composer.
+        keyboardLayoutGuide.usesBottomSafeArea = !landscape
+        keyboardLayoutGuide.followsUndockedKeyboard = landscape
 
         // High, not required: a stale guide (lock-screen Control, passcode
         // keyboard) can sit at the screen bottom. The rest floor below keeps
@@ -543,6 +563,84 @@ final class YLKeyboardAccessoryChrome: UIView {
         }
         verticalConstraints = next
         NSLayoutConstraint.activate(verticalConstraints)
+        syncLandscapeKeyboardFloor()
+    }
+
+    private var isLandscapeInterface: Bool {
+        let size = window?.bounds.size ?? bounds.size
+        return size.width > size.height + 1
+    }
+
+    /// Portrait nestles 10pt into the guide (autocomplete gap). Landscape
+    /// stays flush above the keys so that inset cannot bury the field.
+    private func keyboardPinGap(lift: CGFloat) -> CGFloat {
+        guard lift > 0.5 else { return 0 }
+        return isLandscapeInterface ? 0 : -10
+    }
+
+    /// How far the keyboard overlaps this chrome, in chrome-local points.
+    /// 0 when the keys are down or the window is portrait.
+    private func landscapeKeyboardOverlap() -> CGFloat {
+        guard isLandscapeInterface, let window, bounds.height > 1 else { return 0 }
+        let coverage = landscapeKeyboardCoverage()
+        // Home indicator is ~21–34pt. A real keyboard (or iPad shortcuts
+        // bar) is taller. Do not lift the rest position.
+        guard coverage > 40 else { return 0 }
+        let keyboardTop = window.bounds.maxY - coverage
+        let chromeBottom = convert(CGPoint(x: 0, y: bounds.maxY), to: window).y
+        return max(0, chromeBottom - keyboardTop)
+    }
+
+    /// Keyboard height covering the window, preferring the scene's screen
+    /// coordinate space. Portrait `notificationCoverage` is left alone.
+    private func landscapeKeyboardCoverage() -> CGFloat {
+        guard let window else { return 0 }
+        let guideRect = convert(keyboardLayoutGuide.layoutFrame, to: window)
+        let guideCoverage = max(0, window.bounds.maxY - guideRect.minY)
+        var notified: CGFloat = 0
+        if lastKeyboardScreenFrame.height > 1 {
+            let frame: CGRect
+            if let screen = window.windowScene?.screen {
+                frame = window.convert(lastKeyboardScreenFrame, from: screen.coordinateSpace)
+            } else {
+                frame = window.convert(lastKeyboardScreenFrame, from: nil)
+            }
+            if frame.minY < window.bounds.maxY - 0.5 {
+                notified = max(0, window.bounds.maxY - frame.minY)
+            }
+        }
+        return max(guideCoverage, notified, notificationCoverage)
+    }
+
+    /// Required floor so a stale `keyboardLayoutGuide` cannot leave the bar
+    /// in the keys. No-op in portrait (constraint off).
+    private func syncLandscapeKeyboardFloor() {
+        guard let bar = host?.view else { return }
+        let landscape = isLandscapeInterface
+        keyboardLayoutGuide.usesBottomSafeArea = !landscape
+        keyboardLayoutGuide.followsUndockedKeyboard = landscape
+        if !landscape {
+            landscapeKeyboardFloor?.isActive = false
+            return
+        }
+        let overlap = landscapeKeyboardOverlap()
+        let nextConstant = -overlap
+        if let floor = landscapeKeyboardFloor, floor.isActive,
+           abs(floor.constant - nextConstant) <= 0.5
+        {
+            return
+        }
+        if landscapeKeyboardFloor == nil {
+            let floor = bar.bottomAnchor.constraint(
+                lessThanOrEqualTo: bottomAnchor,
+                constant: nextConstant
+            )
+            floor.priority = .required
+            floor.identifier = "yl.landscapeKeyboardFloor"
+            landscapeKeyboardFloor = floor
+        }
+        landscapeKeyboardFloor?.constant = nextConstant
+        landscapeKeyboardFloor?.isActive = true
     }
 
     /// Distance the chrome extends below where the composer should rest
@@ -713,6 +811,7 @@ final class YLKeyboardAccessoryChrome: UIView {
         switch notification.name {
         case UIResponder.keyboardWillHideNotification, UIResponder.keyboardDidHideNotification:
             notificationCoverage = 0
+            lastKeyboardScreenFrame = .zero
             stopDisplayLink()
             captureRestingIfNeeded()
             installVerticalConstraints()
@@ -733,6 +832,7 @@ final class YLKeyboardAccessoryChrome: UIView {
                 startDisplayLink()
             }
         }
+        syncLandscapeKeyboardFloor()
         let duration = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0
         publishReserved(animated: duration > 0.01, duration: duration)
     }
@@ -827,7 +927,7 @@ final class YLKeyboardAccessoryChrome: UIView {
         scrubLift = max(lift, 1)
         scrubProgress = 0
         let barH = max(contentHeight, heightConstraint?.constant ?? 0, 56)
-        let pinGap: CGFloat = scrubLift > 0.5 ? -10 : 0
+        let pinGap = keyboardPinGap(lift: scrubLift)
         scrubReservedFull = barH + scrubLift - pinGap
         scrubReservedRest = barH
     }
@@ -873,11 +973,13 @@ final class YLKeyboardAccessoryChrome: UIView {
         } else {
             let barH = max(contentHeight, heightConstraint?.constant ?? 0, 56)
             let lift = keyboardLift()
-            // Breathing room above the autocomplete bar while the keyboard is up.
-            let pinGap: CGFloat = lift > 0.5 ? -10 : 0
+            // Portrait: 10pt into the autocomplete gap. Landscape sits flush
+            // above the keys (see keyboardPinGap).
+            let pinGap = keyboardPinGap(lift: lift)
             if let keyboardPin, abs(keyboardPin.constant - pinGap) > 0.5 {
                 keyboardPin.constant = pinGap
             }
+            syncLandscapeKeyboardFloor()
             next = barH + lift - pinGap
         }
         guard abs(next - lastReserved) > (isScrubbing ? 0.25 : 1) else { return }
