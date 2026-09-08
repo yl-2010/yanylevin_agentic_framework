@@ -721,12 +721,10 @@ enum EducationTodoFilter {
     }
 }
 
-/// Dates panel filters: MA · PathIvy · class-linked non-MA · user-level / other projects (dot).
+/// Dates panel filters: MA · class-linked non-MA · user-level / projects including PathIvy (dot).
 enum EducationDateFilter {
-    static let pathivyProjectId = "pathivy"
-    static let homeKeys = ["ma", "pa", "class", "loose"]
+    static let homeKeys = ["ma", "class", "loose"]
     static let classKeys = ["ma", "class"]
-    static let pathivyKeys = ["ma", "pa"]
     static let projectKeys = ["ma", "loose"]
     static var allHome: Set<String> { Set(homeKeys) }
 
@@ -771,8 +769,7 @@ struct EducationDateItem: Identifiable, Hashable {
 
     var filterKey: String {
         if isMA { return "ma" }
-        if projectId == EducationDateFilter.pathivyProjectId { return "pa" }
-        // Class-linked → grad cap. Other projects + user-level → loose (dot).
+        // Class-linked → grad cap. Projects (including PathIvy) + user-level → loose (dot).
         if let classId, !classId.isEmpty, projectId == nil || projectId?.isEmpty == true {
             return "class"
         }

@@ -193,7 +193,7 @@ export async function findNamedChat(name, deps = {}) {
 }
 
 /**
- * @param {{ to?: string, text?: string }} opts
+ * @param {{ to?: string, text?: string, chatGuid?: string }} opts
  * @param {{
  *   execFile?: typeof execFileAsync,
  *   resolveHandle?: typeof resolveHandle,
@@ -215,18 +215,31 @@ export async function sendIMessage(opts = {}, deps = {}) {
   const findNamed = deps.findNamedChat || findNamedChat;
   const findGuid = deps.findChatGuid || findChatGuid;
   let handle = "";
-  let chatGuid = "";
-  try {
-    handle = await resolve(opts.to, {
-      listContacts: deps.listContacts,
-    });
-  } catch (err) {
-    const named = await findNamed(opts.to, {
-      queryMessages: deps.queryMessages,
-    });
-    if (!named?.guid) throw err;
-    handle = named.name || named.ident || String(opts.to).trim();
-    chatGuid = named.guid;
+  let chatGuid = String(opts.chatGuid || "").trim();
+  const to = String(opts.to || "").trim();
+  if (chatGuid && to) {
+    handle = to;
+  } else {
+    try {
+      handle = await resolve(to, {
+        listContacts: deps.listContacts,
+      });
+    } catch (err) {
+      const named = await findNamed(to, {
+        queryMessages: deps.queryMessages,
+      });
+      if (named?.guid) {
+        handle = named.name || named.ident || to;
+        if (!chatGuid) chatGuid = named.guid;
+      } else {
+        const identGuid = chatGuid || (await findGuid(to, {
+          queryMessages: deps.queryMessages,
+        }));
+        if (!identGuid) throw err;
+        handle = to;
+        chatGuid = identGuid;
+      }
+    }
   }
   if (!chatGuid) {
     chatGuid = await findGuid(handle, {

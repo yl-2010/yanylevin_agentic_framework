@@ -109,4 +109,42 @@ describe("imessage-send", () => {
     assert.equal(result.chatGuid, "iMessage;+;chat123");
     assert.equal(args?.[3], "iMessage;+;chat123");
   });
+
+  it("sends with an explicit chatGuid without Contacts", async () => {
+    /** @type {string[]|null} */
+    let args = null;
+    const result = await sendIMessage(
+      { to: "JYPE", text: "hi", chatGuid: "iMessage;+;chat123" },
+      {
+        resolveHandle: async () => {
+          throw new Error("should not resolve");
+        },
+        execFile: async (cmd, argv) => {
+          args = argv;
+          return { stdout: "sent-chat\n", stderr: "" };
+        },
+      }
+    );
+    assert.equal(result.ok, true);
+    assert.equal(result.to, "JYPE");
+    assert.equal(args?.[3], "iMessage;+;chat123");
+  });
+
+  it("falls back to chat_identifier when the name is not a contact", async () => {
+    const result = await sendIMessage(
+      { to: "chat123", text: "hi" },
+      {
+        resolveHandle: async () => {
+          const err = new Error("no iMessage handle for chat123");
+          err.status = 400;
+          throw err;
+        },
+        findNamedChat: async () => null,
+        findChatGuid: async (q) => (q === "chat123" ? "iMessage;+;chat123" : ""),
+        execFile: async () => ({ stdout: "sent-chat\n", stderr: "" }),
+      }
+    );
+    assert.equal(result.ok, true);
+    assert.equal(result.chatGuid, "iMessage;+;chat123");
+  });
 });

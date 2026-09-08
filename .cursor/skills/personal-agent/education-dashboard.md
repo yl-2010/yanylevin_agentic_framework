@@ -75,9 +75,8 @@ education/<email>/
   - **Class page Completed (web + iOS only):** a checked-off todo stays in that class's TODO list (struck through) until the class period it is due in ends. If the due time is outside that class's period, or the class does not meet that day, it stays until the end of this class's next meeting after the due datetime. Date-only due = start of that day, so a class that meets later that day is the one that counts. No due date → Completed immediately. Home and project pages still move to Completed as soon as the box is checked.
 - **date.json:** `name`; `date`; optional `time`, `description` (always markdown when set); optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays); optional `canvasLink` / `canvasId` (same Canvas button as todos, used for syllabus or calendar-event dates)
   - Dates / showInDates todos under a **class** filter as the education-hat (`class`) category
-  - Dates / showInDates todos under the **PathIvy** project filter as `pa` (PA circle)
-  - Dates / showInDates todos under any other **project** (or user-level) filter as the dot (`loose`) category — never the hat
-  - Home Dates filter order: MA · PA · class hat · dot
+  - Dates / showInDates todos under a **project** (including PathIvy) or user-level filter as the dot (`loose`) category, never the hat
+  - Home Dates filter order: MA · class hat · dot
 
 Mirror the layout of `classes/_example-dummy/` (and `projects/_example-dummy/` for projects) when creating objects.
 

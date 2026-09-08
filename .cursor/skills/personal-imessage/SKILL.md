@@ -77,3 +77,9 @@ node server/imessage-send.js --to "+14255550100" --text-file /tmp/body.txt
 ```
 
 Text only. No attachments. No new group chats. Sending to an existing named group is allowed. SMS (green bubble) only if the iPhone is forwarding to this Mac.
+
+## @agent
+
+Yan `fromMe` texts that contain `@agent` or `@Agent` (any chat, including groups and to himself) start a Personal Agent session on the Studio. That chat shows up in the app and website. The server sends the agent's final bubble back to the same thread.
+
+Do not put `@agent` in outgoing texts. That would start another session. Extra sends during the turn are only for texts that are not that final bubble.

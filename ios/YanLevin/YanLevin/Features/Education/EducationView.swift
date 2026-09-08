@@ -951,9 +951,7 @@ struct ProjectDetailView: View {
             items: visibleProjectDateItems,
             expanded: datesExpanded,
             dateFilters: dateFilters,
-            filterKeys: liveProject.id == EducationDateFilter.pathivyProjectId
-                ? EducationDateFilter.pathivyKeys
-                : EducationDateFilter.projectKeys,
+            filterKeys: EducationDateFilter.projectKeys,
             use24Hour: use24Hour,
             onToggleExpanded: {
                 withAnimation(.easeInOut(duration: 0.22)) {
@@ -1004,11 +1002,7 @@ struct ProjectDetailView: View {
             dateFilters.insert(key)
         }
         if dateFilters.isEmpty {
-            dateFilters = Set(
-                liveProject.id == EducationDateFilter.pathivyProjectId
-                    ? EducationDateFilter.pathivyKeys
-                    : EducationDateFilter.projectKeys
-            )
+            dateFilters = Set(EducationDateFilter.projectKeys)
         }
         EducationDateFilter.save(dateFilters)
     }
@@ -1652,9 +1646,6 @@ private struct EducationDateFilterBar: View {
                         if key == "class" {
                             Image(systemName: "graduationcap.fill")
                                 .font(.system(size: 11, weight: .bold))
-                        } else if key == "pa" {
-                            Text("PA")
-                                .font(.system(size: 11, weight: .bold))
                         } else if key == "ma" {
                             Text("MA")
                                 .font(.system(size: 11, weight: .bold))
@@ -1673,7 +1664,7 @@ private struct EducationDateFilterBar: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(
-                    key == "ma" ? "MA" : key == "pa" ? "PA" : key == "class" ? "class" : "none"
+                    key == "ma" ? "MA" : key == "class" ? "class" : "none"
                 )
                 .accessibilityAddTraits(on ? .isSelected : [])
             }

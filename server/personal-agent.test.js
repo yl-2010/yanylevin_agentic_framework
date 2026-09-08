@@ -21,6 +21,7 @@ import {
   educationNavigateHref,
   queueEducationNavigate,
   publishQueuedEducationNavigate,
+  deliverIMessageFinalReply,
 } from "./personal-agent.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -279,6 +280,8 @@ describe("Personal Agent skill files", () => {
     assert.match(imessage, /Do not ask for confirmation/);
     assert.match(imessage, /who=yan/);
     assert.match(imessage, /handle.*other person/);
+    assert.match(imessage, /@agent/);
+    assert.match(imessage, /fromMe/);
 
     const screentime = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.screentime), "utf8");
     assert.match(screentime, /screentime-read\.js/);
@@ -307,6 +310,8 @@ describe("Personal Agent skill files", () => {
     assert.doesNotMatch(agent, /once, first/);
     assert.doesNotMatch(agent, /One status bubble is enough/);
     assert.match(agent, /open_education_page/);
+    assert.match(agent, /iMessage @agent/);
+    assert.match(agent, /fromMe/);
     assert.match(agent, /unslop/);
     assert.match(agent, /SOUL\.md/);
     assert.match(agent, /identity-school\.md/);
@@ -668,6 +673,21 @@ describe("open_education_page navigate payload", () => {
       JSON.stringify(snap).includes("nav-1"),
       false
     );
+  });
+});
+
+describe("iMessage final reply delivery", () => {
+  it("skips error fallbacks and empty text", async () => {
+    const origin = { to: "+14255550100", chat: "Example Friend" };
+    const error = await deliverIMessageFinalReply(
+      origin,
+      "The personal agent hit an error. Try again or use Cursor Desktop with the personal-agent skill."
+    );
+    assert.equal(error.skipped, "error");
+    const empty = await deliverIMessageFinalReply(origin, "   ");
+    assert.equal(empty.skipped, "empty");
+    const missing = await deliverIMessageFinalReply({}, "On it");
+    assert.equal(missing.skipped, "no-target");
   });
 });
 

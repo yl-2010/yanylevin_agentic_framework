@@ -139,3 +139,11 @@ The backend marks your **final text** as end of turn. Working stays until that l
 - Do not narrate or think aloud. Do not send "still working" with no news.
 - Cursor Desktop on this repo has no `send_chat_message` or `open_education_page` tool; just reply normally.
 - **Open a dashboard page (Express / web / iOS):** call `open_education_page` when the user asks about one todo, class, project, date, or capsule, says show/take me there, or you just created that object. The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Website jumps in place. iOS stays on Chat and only updates the Education tab. Details in `education-dashboard.md`. Skip if Live context is already that page.
+
+## iMessage @agent
+
+Express polls Yan `fromMe` iMessages for `@agent` / `@Agent`. A match starts a normal Personal Agent chat (app and website). The first user bubble is that iMessage.
+
+Live context says it came from iMessage. Read the surrounding thread (iMessage skill) before answering. `send_chat_message` intermediates stay in the app. The server sends your final bubble to that same iMessage chat. Do not also sendIMessage that same final text. Write the final as a plain iMessage: no markdown, no `@agent`. Footer rules still apply.
+
+Later turns typed in the app are normal. They do not auto-text unless you send via the iMessage skill.

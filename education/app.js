@@ -19,10 +19,8 @@
   const FILTER_KEY = "yl-edu-type-filters";
   const DATE_FILTER_KEY = "yl-edu-date-filters";
   const TAGS = ["MA", "QA", "HW", "CW", "none"];
-  const PATHIVY_PROJECT_ID = "pathivy";
-  const DATE_FILTERS_HOME = ["ma", "pa", "class", "loose"];
+  const DATE_FILTERS_HOME = ["ma", "class", "loose"];
   const DATE_FILTERS_CLASS = ["ma", "class"];
-  const DATE_FILTERS_PATHIVY = ["ma", "pa"];
   const DATE_FILTERS_PROJECT = ["ma", "loose"];
   const DATES_COLLAPSED_LIMIT = 6;
   const TODOS_COLLAPSED_LIMIT = 6;
@@ -1203,8 +1201,7 @@
 
   function dateItemFilterKey(item) {
     if (item.isMA) return "ma";
-    if (item.projectId === PATHIVY_PROJECT_ID) return "pa";
-    // Class-linked → grad cap. Other projects + user-level → loose (dot).
+    // Class-linked → grad cap. Projects (including PathIvy) + user-level → loose (dot).
     if (item.classId && !item.projectId) return "class";
     return "loose";
   }
@@ -1341,14 +1338,12 @@
 
   function dateFilterLabel(key) {
     if (key === "ma") return "MA";
-    if (key === "pa") return "PA";
     if (key === "class") return "class";
     return "none";
   }
 
   function dateFilterGlyph(key) {
     if (key === "ma") return "MA";
-    if (key === "pa") return "PA";
     if (key === "class") return GRAD_CAP_SVG;
     return "·";
   }
@@ -1381,9 +1376,7 @@
     const keys = classScoped
       ? DATE_FILTERS_CLASS
       : projectScoped
-        ? projectId === PATHIVY_PROJECT_ID
-          ? DATE_FILTERS_PATHIVY
-          : DATE_FILTERS_PROJECT
+        ? DATE_FILTERS_PROJECT
         : DATE_FILTERS_HOME;
     const today = todayKey();
     const upcoming = collectDateItems({ classId, projectId })

@@ -9,7 +9,7 @@ import { dirname, join, basename, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isEducationUser, resolveNowScheduleContext } from "./education-data.js";
 import { notifyEducationClients } from "./education-events.js";
-import { canonicalizeEmail, isFullAccessEmail } from "./identity.js";
+import { canonicalizeEmail, isFullAccessEmail, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
 import { gitAddCommitPush } from "./git-publish.js";
 import { enqueueBrainExtraction } from "./brain-extraction.js";
 import { parseLocationPayload } from "./phone-location.js";
@@ -28,6 +28,12 @@ import {
   formatWidgetsAsFences,
   parseAgentReply,
 } from "./chat-widgets.js";
+import { sendIMessage } from "./imessage-send.js";
+import {
+  applyAgentSentFooter,
+  formatIMessageOriginBlock,
+  normalizeIMessageOrigin,
+} from "./imessage-mention.js";
 import {
   AUTO_MODEL_SELECTION,
   INTERACTIVE_FALLBACK_DELAYS_MS,
@@ -44,6 +50,8 @@ import {
 } from "./cursor-sdk-auth.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const PA_ERROR_REPLY =
+  "The personal agent hit an error. Try again or use Cursor Desktop with the personal-agent skill.";
 
 /** @typedef {{ role: 'user'|'assistant', content: string, queued?: boolean, widgets?: object[], at?: string, endOfTurn?: boolean }} ChatMessage */
 
@@ -59,6 +67,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
  *   sessionAttachmentCount: number,
  *   bubble: string,
  *   interrupted?: boolean,
+ *   imessageDeliverFinal?: boolean,
  * }} TurnOpts
  */
 
@@ -80,6 +89,8 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
  *   interrupting?: boolean,
  *   pendingNavigate?: Omit<EducationNavigate, 'id'>|null,
  *   navigate?: EducationNavigate|null,
+ *   imessageOrigin?: object|null,
+ *   imessageDeliverFinal?: boolean,
  * }} Session
  */
 
@@ -680,6 +691,25 @@ function persistSessionHistory(sid, session) {
     .catch((err) => {
       console.error("[personal-agent] chat-history", err);
     });
+}
+
+/**
+ * First turn of an iMessage-originated chat: send the final bubble to that thread.
+ * @param {object|null|undefined} origin
+ * @param {string} content
+ */
+export async function deliverIMessageFinalReply(origin, content) {
+  const body = applyAgentSentFooter(content, origin);
+  if (!body) return { ok: false, skipped: "empty" };
+  if (body.includes(PA_ERROR_REPLY)) return { ok: false, skipped: "error" };
+  const to = String(origin?.to || origin?.chatId || origin?.handle || "").trim();
+  const chatGuid = String(origin?.chatGuid || "").trim();
+  if (!to && !chatGuid) return { ok: false, skipped: "no-target" };
+  return sendIMessage({
+    to: to || chatGuid,
+    text: body,
+    chatGuid: chatGuid || undefined,
+  });
 }
 
 /**
@@ -1343,10 +1373,39 @@ export async function startAgent(email) {
     workingLabel: null,
     runPromise: null,
     turnQueue: [],
+    imessageOrigin: null,
+    imessageDeliverFinal: false,
   });
   activeByEmail.set(normalized, id);
 
   return { sessionId: id, email: normalized, status: "idle", messages: [] };
+}
+
+/**
+ * New Personal Agent thread whose first user message is an iMessage that
+ * mentioned @agent. Shows up in the app/website like any other chat.
+ * @param {object} message
+ */
+export async function startAgentFromIMessageMention(message) {
+  const origin = normalizeIMessageOrigin(message);
+  const text = String(origin?.text || message?.text || "").trim();
+  if (!origin || !text) {
+    const err = new Error("imessage @agent text required");
+    err.status = 400;
+    throw err;
+  }
+  const started = await startAgent(YAN_EMAIL);
+  const session = sessions.get(started.sessionId);
+  if (!session) {
+    const err = new Error("session not found");
+    err.status = 500;
+    throw err;
+  }
+  session.imessageOrigin = origin;
+  session.imessageDeliverFinal = true;
+  return messageAgent(started.sessionId, YAN_EMAIL, text, [], {
+    client: "imessage",
+  });
 }
 
 /**
@@ -1657,7 +1716,7 @@ async function executeAgentTurn(sid, session, opts) {
     if (!content) {
       content =
         result?.status === "error"
-          ? "The personal agent hit an error. Try again or use Cursor Desktop with the personal-agent skill."
+          ? PA_ERROR_REPLY
           : EMPTY_TURN_REPLY;
     }
 
@@ -1696,6 +1755,11 @@ async function executeAgentTurn(sid, session, opts) {
     };
 
     const finishedStatus = result?.status === "error" ? "error" : "idle";
+    if (opts.imessageDeliverFinal && finishedStatus === "idle") {
+      deliverIMessageFinalReply(session.imessageOrigin, content).catch((err) =>
+        console.error("[personal-agent] imessage reply", err)
+      );
+    }
     gitAddCommitPush({
       paths: [`education/${normalized}`],
       message: `education: agent update for ${normalized}`,
@@ -1733,8 +1797,7 @@ async function executeAgentTurn(sid, session, opts) {
     }
     console.error("[personal-agent] run", err);
     if (!sessions.has(sid) || sessions.get(sid) !== session) return;
-    const fallback =
-      "The personal agent hit an error. Try again or use Cursor Desktop with the personal-agent skill.";
+    const fallback = PA_ERROR_REPLY;
     session.messages.push(
       stampMessage("assistant", fallback, undefined, { endOfTurn: true })
     );
@@ -1869,6 +1932,12 @@ export async function messageAgent(
       await buildYanLiveAppendix(normalized, nowContext?.timezone)
     ),
   ];
+  const imessageBlock = formatIMessageOriginBlock(session.imessageOrigin, {
+    deliverFinal: Boolean(session.imessageDeliverFinal),
+  });
+  if (imessageBlock) {
+    promptParts.push("", imessageBlock);
+  }
   if (interrupting) {
     promptParts.push(
       "",
@@ -1934,6 +2003,10 @@ export async function messageAgent(
     bubble,
     interrupted: interrupting,
   };
+  if (session.imessageDeliverFinal) {
+    turnOpts.imessageDeliverFinal = true;
+    session.imessageDeliverFinal = false;
+  }
 
   activeByEmail.set(normalized, sid);
 
