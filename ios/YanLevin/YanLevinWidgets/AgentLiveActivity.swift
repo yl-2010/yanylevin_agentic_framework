@@ -8,6 +8,7 @@ struct AgentLiveActivity: Widget {
         ActivityConfiguration(for: AgentActivityAttributes.self) { context in
             AgentLiveActivityBody(state: context.state)
                 .widgetURL(AgentActivityAttributes.chatURL(sessionId: nil))
+                .liveActivityRootChrome()
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.bottom) {
@@ -26,6 +27,7 @@ struct AgentLiveActivity: Widget {
             .keylineTint(LiveActivityPalette.islandAccent)
             .widgetURL(AgentActivityAttributes.chatURL(sessionId: nil))
         }
+        .contentMarginsDisabled()
     }
 }
 
@@ -46,7 +48,6 @@ private struct AgentLiveActivityBody: View {
             AgentLiveActivityRows(state: state)
         }
         .padding(LiveActivityChrome.lockScreenPad)
-        .background { LiveActivityBannerBackground() }
         .liveActivityLockScreenChrome()
     }
 

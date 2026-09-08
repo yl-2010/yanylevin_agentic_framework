@@ -8,6 +8,7 @@ struct ClassLiveActivity: Widget {
         ActivityConfiguration(for: ClassActivityAttributes.self) { context in
             ClassLiveActivityBody(state: context.state)
                 .widgetURL(ClassActivityAttributes.classURL(id: context.state.classId))
+                .liveActivityRootChrome()
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -29,6 +30,7 @@ struct ClassLiveActivity: Widget {
                 Text(context.state.period)
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(LiveActivityPalette.islandAccent)
+                    .fixedSize()
                     .padding(.leading, LiveActivityChrome.islandCompactLeadingPad)
             } compactTrailing: {
                 ClassLiveActivityTimer(state: context.state, compact: true, compactIsland: true)
@@ -40,6 +42,7 @@ struct ClassLiveActivity: Widget {
             .keylineTint(LiveActivityPalette.islandAccent)
             .widgetURL(ClassActivityAttributes.classURL(id: context.state.classId))
         }
+        .contentMarginsDisabled()
     }
 }
 
@@ -64,7 +67,6 @@ private struct ClassLiveActivityBody: View {
             ClassLiveActivityAssignments(state: state, island: false)
         }
         .padding(LiveActivityChrome.lockScreenPad)
-        .background { LiveActivityBannerBackground() }
         .liveActivityLockScreenChrome()
     }
 }
@@ -97,6 +99,10 @@ private struct ClassLiveActivityTimer: View {
         Group {
             if let start = state.startDate, Date.now < start {
                 Text(timerInterval: Date.now...start, countsDown: true, showsHours: false)
+                    .frame(
+                        width: compactIsland ? LiveActivityChrome.islandCompactTimerWidth : nil,
+                        alignment: .trailing
+                    )
             } else if let start = state.startDate, let end = state.endDate, Date.now < end {
                 TimelineView(.periodic(from: start, by: 60)) { context in
                     let mins = max(0, Int(context.date.timeIntervalSince(start) / 60))
@@ -108,9 +114,9 @@ private struct ClassLiveActivityTimer: View {
         }
         .font(timerFont)
         .foregroundStyle(compact ? LiveActivityPalette.islandAccent : LiveActivityPalette.accent(colorScheme))
-        .minimumScaleFactor(0.7)
+        .minimumScaleFactor(compactIsland ? 0.6 : 0.7)
         .lineLimit(1)
-        .multilineTextAlignment(.trailing)
+        .monospacedDigit()
     }
 
     private var timerFont: Font {

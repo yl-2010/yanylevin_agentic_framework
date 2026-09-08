@@ -7,6 +7,8 @@ enum LiveActivityChrome {
     static let islandSidePad: CGFloat = 16
     static let islandEarPad: CGFloat = 20
     static let islandCompactLeadingPad: CGFloat = 8
+    /// Caps compact-island `Text(timerInterval:)`. That view reports a huge ideal width and stretches the pill.
+    static let islandCompactTimerWidth: CGFloat = 54
     static let lockScreenPad: CGFloat = 16
 }
 
@@ -28,6 +30,12 @@ enum LiveActivityPalette {
 
     static func accent(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? darkAccent : lightAccent
+    }
+
+    static var adaptiveAccent: Color {
+        Color(uiColor: UIColor { trait in
+            UIColor(trait.userInterfaceStyle == .dark ? darkAccent : lightAccent)
+        })
     }
 }
 
@@ -106,24 +114,30 @@ struct LiveActivityBannerBackground: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        ZStack(alignment: .top) {
-            YLTheme.pageFill(colorScheme)
-            LinearGradient(
-                colors: [
-                    LiveActivityPalette.accent(colorScheme).opacity(0.14),
-                    LiveActivityPalette.accent(colorScheme).opacity(0)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 28)
-        }
+        YLTheme.pageFill(colorScheme)
+            .overlay(alignment: .top) {
+                LinearGradient(
+                    colors: [
+                        LiveActivityPalette.accent(colorScheme).opacity(0.14),
+                        LiveActivityPalette.accent(colorScheme).opacity(0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 28)
+            }
     }
 }
 
 extension View {
     func liveActivityLockScreenChrome() -> some View {
         modifier(LiveActivityLockScreenChrome())
+    }
+
+    /// Tint the ActivityKit container, not an inner view wrapped by `widgetURL`.
+    func liveActivityRootChrome() -> some View {
+        activityBackgroundTint(YLTheme.bg0)
+            .activitySystemActionForegroundColor(LiveActivityPalette.adaptiveAccent)
     }
 }
 
@@ -133,7 +147,8 @@ private struct LiveActivityLockScreenChrome: ViewModifier {
     func body(content: Content) -> some View {
         content
             .foregroundStyle(YLTheme.fg(colorScheme))
-            .activityBackgroundTint(YLTheme.bg0(colorScheme))
-            .activitySystemActionForegroundColor(LiveActivityPalette.accent(colorScheme))
+            .containerBackground(for: .widget) {
+                LiveActivityBannerBackground()
+            }
     }
 }
