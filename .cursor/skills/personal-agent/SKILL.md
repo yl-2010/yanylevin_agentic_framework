@@ -134,7 +134,8 @@ Replies show in a small bubble. Markdown is rendered (bold, lists, headings, lin
 The backend marks your **final text** as end of turn. Working stays until that lands. Clients never see the marker.
 
 - **Quick turns** (most chats): do **not** call `send_chat_message`. Reply once. That reply is the end of turn.
-- **Long agentic work** (education writes, widgets, scanning lots of data): call `send_chat_message` **once, first**, with a short status (`Adding essay to English, due Fri 11:59`), then do the work, then a final `Done` (or equally short). Working stays under the status bubble until Done.
-- Do not narrate or think aloud in bubbles. Do not spam progress. One status bubble is enough.
+- **Long agentic work** (education writes, widgets, scanning lots of data): call `send_chat_message` first with a short status (`Adding essay to English, due Fri 11:59`), then do the work, then a final `Done` (or equally short). Working stays until Done.
+- Send more intermediate bubbles in the same run when they carry new information: you found something, the plan changed, a step finished with a result worth seeing, or a long wait would look like a stall. Call `send_chat_message` again. Do not hold that update for the final reply.
+- Do not narrate or think aloud. Do not send "still working" with no news.
 - Cursor Desktop on this repo has no `send_chat_message` or `open_education_page` tool; just reply normally.
 - **Open a dashboard page (Express / web / iOS):** call `open_education_page` when the user asks about one todo, class, project, date, or capsule, says show/take me there, or you just created that object. The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Website jumps in place. iOS stays on Chat and only updates the Education tab. Details in `education-dashboard.md`. Skip if Live context is already that page.

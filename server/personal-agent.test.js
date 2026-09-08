@@ -37,6 +37,8 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.soul));
     assert.match(prompt, /Always Read SOUL\.md/);
     assert.match(prompt, /send_chat_message/);
+    assert.match(prompt, /Send more mid-run/);
+    assert.doesNotMatch(prompt, /once, first/);
     assert.match(prompt, /open_education_page/);
     assert.match(prompt, /No period when the reply is one word/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.education));
@@ -301,6 +303,9 @@ describe("Personal Agent skill files", () => {
 
     const agent = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.agent), "utf8");
     assert.match(agent, /send_chat_message/);
+    assert.match(agent, /Send more intermediate bubbles/);
+    assert.doesNotMatch(agent, /once, first/);
+    assert.doesNotMatch(agent, /One status bubble is enough/);
     assert.match(agent, /open_education_page/);
     assert.match(agent, /unslop/);
     assert.match(agent, /SOUL\.md/);

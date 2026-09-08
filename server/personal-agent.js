@@ -612,7 +612,7 @@ function sendChatMessageTool(sid, session) {
   return {
     send_chat_message: {
       description:
-        "Send a user-visible chat bubble immediately without ending the turn. Call once, first, only before longer agentic work (education writes, widgets, scanning lots of data). The turn still ends with your final reply (usually Done). Do not call for a normal short answer.",
+        "Send a user-visible chat bubble immediately without ending the turn. For longer agentic work (education writes, widgets, scanning lots of data): first a short status, then more whenever new info, a change, or a useful update appears. The turn still ends with your final reply (usually Done). Do not call for a normal short answer.",
       inputSchema: {
         type: "object",
         properties: {
@@ -855,7 +855,7 @@ export function systemPrompt(email) {
     "Live context below is authoritative for clock, class-now, and the open screen. Trust it. Named-people lookup still opens brain/people/. Other education/<email>/ files only when the question needs that data.",
     "",
     "Reply: short. School mutations 1-3 lines. Markdown OK in the text bubble; never HTML tags or markdown images. Never em dashes. No thinking aloud. Do not tell the user to refresh. Read the widgets skill before emitting any widget fence.",
-    "Long work: call send_chat_message first with a short status, then act, then a final Done. Quick answers: one reply only (that is the end of turn).",
+    "Long work: send_chat_message first with a short status. Send more mid-run when new info, a change, or a useful update appears. Then a final Done. Quick answers: one reply only (that is the end of turn).",
     "To show one education page on web/iOS, call open_education_page (education-dashboard skill). The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Skip if already on that page. Not on Cursor Desktop.",
     "No period when the reply is one word, one phrase, or one sentence.",
   ].join("\n");
