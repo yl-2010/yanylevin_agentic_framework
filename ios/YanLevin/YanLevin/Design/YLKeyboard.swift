@@ -556,8 +556,11 @@ final class YLKeyboardAccessoryChrome: UIView {
         restFloor = floorRest
 
         var next: [NSLayoutConstraint] = [toKeyboard, toRest, floorChrome, floorRest]
-        if let tabTop = tabBarTopAnchor() {
-            let floorTab = bar.bottomAnchor.constraint(lessThanOrEqualTo: tabTop, constant: -8)
+        if let tabBar = visibleTabBar(), Self.shareSuperviewHierarchy(bar, tabBar) {
+            let floorTab = bar.bottomAnchor.constraint(
+                lessThanOrEqualTo: tabBar.topAnchor,
+                constant: -8
+            )
             floorTab.priority = .required
             next.append(floorTab)
         }
@@ -684,8 +687,21 @@ final class YLKeyboardAccessoryChrome: UIView {
         restEqual?.constant = -gap
     }
 
-    private func tabBarTopAnchor() -> NSLayoutYAxisAnchor? {
-        visibleTabBar()?.topAnchor
+    /// Same-window is not enough. SwiftUI hosts the composer and the tab bar
+    /// in different UIKit trees; pinning across them throws and kills launch.
+    private static func shareSuperviewHierarchy(_ a: UIView, _ b: UIView) -> Bool {
+        var seen = Set<ObjectIdentifier>()
+        var view: UIView? = a
+        while let current = view {
+            seen.insert(ObjectIdentifier(current))
+            view = current.superview
+        }
+        view = b
+        while let current = view {
+            if seen.contains(ObjectIdentifier(current)) { return true }
+            view = current.superview
+        }
+        return false
     }
 
     /// Only ever returns a tab bar in the SAME window as this chrome.

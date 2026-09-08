@@ -222,7 +222,6 @@ struct RootTabView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var theme: ThemeStore
     @EnvironmentObject private var nav: AppNavigationStore
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
     @State private var didApplyAuthorizedDefault = false
 
@@ -234,8 +233,12 @@ struct RootTabView: View {
                 padTabView
             }
         }
-        .modifier(AdaptiveTabStyleModifier(isRegularWidth: AdaptiveLayout.isRegularWidth(horizontalSizeClass)))
+        .modifier(AdaptiveTabStyleModifier())
         .modifier(LiquidTabBarModifier(selectedTab: nav.selectedTab))
+        // Rebuild when the tab set changes so iOS 27 cannot keep a
+        // sidebar/split selection that is no longer in the tree
+        // (Apple 164516837).
+        .id(auth.hasFullAccess ? "tabs-full" : "tabs-guest")
         .background {
             TabReselectObserver {
                 nav.noteTabReselect()
@@ -356,10 +359,11 @@ struct RootTabView: View {
 }
 
 private struct AdaptiveTabStyleModifier: ViewModifier {
-    let isRegularWidth: Bool
-
     func body(content: Content) -> some View {
-        if isRegularWidth {
+        // iPhone Max landscape is `.regular` width. `.sidebarAdaptable` there
+        // writes UISplitViewController restoration state that crashes the next
+        // portrait launch. Keep the sidebar chrome on iPad only.
+        if AdaptiveLayout.isPad {
             content.tabViewStyle(.sidebarAdaptable)
         } else {
             content
