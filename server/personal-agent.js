@@ -33,6 +33,7 @@ import {
   applyAgentSentFooter,
   formatIMessageOriginBlock,
   normalizeIMessageOrigin,
+  stripAgentSentFooter,
 } from "./imessage-mention.js";
 import {
   AUTO_MODEL_SELECTION,
@@ -401,8 +402,10 @@ export function shouldAppendEndOfTurn(messages, content, widgets) {
  * @param {{ endOfTurn?: boolean }} [extra]
  */
 export function stampMessage(role, content, widgets, extra) {
+  const text =
+    role === "assistant" ? stripAgentSentFooter(content) : content;
   /** @type {ChatMessage} */
-  const row = { role, content, at: new Date().toISOString() };
+  const row = { role, content: text, at: new Date().toISOString() };
   if (Array.isArray(widgets) && widgets.length) row.widgets = widgets;
   if (extra?.endOfTurn) row.endOfTurn = true;
   return row;
@@ -884,7 +887,7 @@ export function systemPrompt(email) {
     "",
     "Live context below is authoritative for clock, class-now, and the open screen. Trust it. Named-people lookup still opens brain/people/. Other education/<email>/ files only when the question needs that data.",
     "",
-    "Reply: short. School mutations 1-3 lines. Markdown OK in the text bubble; never HTML tags or markdown images. Never em dashes. No thinking aloud. Do not tell the user to refresh. Read the widgets skill before emitting any widget fence.",
+    "Reply: short. School mutations 1-3 lines. Markdown OK in the text bubble; never HTML tags or markdown images. Never em dashes. No thinking aloud. Do not tell the user to refresh. Read the widgets skill before emitting any widget fence. Never put Sent by Yan's Personal Agent in app or website bubbles; that footer is only for iMessage and email.",
     "Long work: send_chat_message first with a short status. Send more mid-run when new info, a change, or a useful update appears. Then a final Done. Quick answers: one reply only (that is the end of turn).",
     "To show one education page on web/iOS, call open_education_page (education-dashboard skill). The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Skip if already on that page. Not on Cursor Desktop.",
     "No period when the reply is one word, one phrase, or one sentence.",
@@ -1721,8 +1724,10 @@ async function executeAgentTurn(sid, session, opts) {
     }
 
     const parsed = parseAgentReply(content);
-    content =
-      parsed.content || (parsed.widgets.length ? "" : EMPTY_TURN_REPLY);
+    content = stripAgentSentFooter(
+      parsed.content || (parsed.widgets.length ? "" : EMPTY_TURN_REPLY)
+    );
+    if (!content && !parsed.widgets.length) content = EMPTY_TURN_REPLY;
     if (shouldAppendEndOfTurn(session.messages, content, parsed.widgets)) {
       session.messages.push(
         stampMessage("assistant", content, parsed.widgets, { endOfTurn: true })

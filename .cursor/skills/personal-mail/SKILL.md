@@ -63,6 +63,8 @@ Tesla Robotaxi and Uber Family receipts live on **Exchange**, not Gmail. Subject
 
 If to, subject, and body are clear, send. If any of those is missing, ask. Reply `Sent to …`.  Never from the location-history or daily-briefing jobs.
 
+End the email body with `Sent by Yan's Personal Agent` unless Yan says not to. Same parent-thread skip as iMessage. Never put that line in the Personal Agent app or website reply.
+
 Default From when Yan does not specify a sending address: Exchange `you@example.com`. Use Google `you@example.com` or iCloud `you@icloud.com` only if he names that account.
 
 When mailing a named person, use the address on their people card (or Contacts). Do not keep a second address table here.

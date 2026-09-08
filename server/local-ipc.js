@@ -14,6 +14,7 @@ import {
   searchMessages,
 } from "./imessage-read.js";
 import { sendIMessage } from "./imessage-send.js";
+import { applyAgentSentFooter } from "./imessage-mention.js";
 import { recentSessions, screenTimeSummary } from "./screentime-read.js";
 
 export const LOCAL_SOCK = "/tmp/personal-agent-local.sock";
@@ -184,9 +185,13 @@ export function createLocalIpcHandler(deps = {}) {
       }
       if (method === "POST" && path === "/imessage/send") {
         const payload = await readJsonBody(req);
+        const to = payload?.to || payload?.person || "";
         const result = await sendMsg({
-          to: payload?.to || payload?.person || "",
-          text: payload?.text || payload?.body || "",
+          to,
+          text: applyAgentSentFooter(payload?.text || payload?.body || "", {
+            chat: to,
+            handle: to,
+          }),
         });
         return sendJson(res, 200, result);
       }

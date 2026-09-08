@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { applyAgentSentFooter } from "./imessage-mention.js";
 
 const execFileAsync = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)));
@@ -311,7 +312,10 @@ if (isCli) {
       const { readFile } = await import("node:fs/promises");
       text = await readFile(parsed.textFile, "utf8");
     }
-    return sendIMessage({ to: parsed.to, text });
+    return sendIMessage({
+      to: parsed.to,
+      text: applyAgentSentFooter(text, { chat: parsed.to, handle: parsed.to }),
+    });
   };
   run()
     .then((r) => {

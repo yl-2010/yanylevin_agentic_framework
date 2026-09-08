@@ -42,6 +42,7 @@ describe("Personal Agent system prompt", () => {
     assert.doesNotMatch(prompt, /once, first/);
     assert.match(prompt, /open_education_page/);
     assert.match(prompt, /No period when the reply is one word/);
+    assert.match(prompt, /Never put Sent by Yan's Personal Agent in app or website bubbles/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.education));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.schedule));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.widgets));
@@ -231,6 +232,8 @@ describe("Personal Agent skill files", () => {
     assert.match(mail, /personal-school-mail/);
     assert.match(mail, /read `source` of that message/);
     assert.match(mail, /drops the href/);
+    assert.match(mail, /Sent by Yan's Personal Agent/);
+    assert.match(mail, /Never put that line in the Personal Agent app/);
     assert.doesNotMatch(mail, /Rajasi forwards/);
     assert.doesNotMatch(mail, /sender contains "Rajasi"/);
     const sendScript = mail.match(/```bash\n([\s\S]*?)```/g)?.at(-1) ?? "";
@@ -283,6 +286,7 @@ describe("Personal Agent skill files", () => {
     assert.match(imessage, /@agent/);
     assert.match(imessage, /fromMe/);
     assert.match(imessage, /only `@agent`/);
+    assert.match(imessage, /never put it in Personal Agent app or website bubbles/);
 
     const screentime = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.screentime), "utf8");
     assert.match(screentime, /screentime-read\.js/);
@@ -314,6 +318,8 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /iMessage @agent/);
     assert.match(agent, /fromMe/);
     assert.match(agent, /only `@agent`/);
+    assert.match(agent, /no `Sent by Yan's Personal Agent`/);
+    assert.match(agent, /Never put `Sent by Yan's Personal Agent` in app or website bubbles/);
     assert.match(agent, /unslop/);
     assert.match(agent, /SOUL\.md/);
     assert.match(agent, /identity-school\.md/);
@@ -522,6 +528,16 @@ describe("Personal Agent end of turn", () => {
     });
     assert.equal(eot.endOfTurn, true);
     assert.equal(eot.content, "Done");
+    const withFooter = stampMessage(
+      "assistant",
+      "Nothing after Spanish.\n\nSent by Yan's Personal Agent"
+    );
+    assert.equal(withFooter.content, "Nothing after Spanish.");
+    const userQuote = stampMessage(
+      "user",
+      "keep Sent by Yan's Personal Agent in a user quote"
+    );
+    assert.match(userQuote.content, /Sent by Yan's Personal Agent/);
     const snap = snapshotMessages({
       messages: [
         stampMessage("user", "add essay"),

@@ -172,6 +172,24 @@ describe("format/parse markdown", () => {
     assert.equal(messages[2].role, "assistant");
   });
 
+  it("strips a trailing agent footer from stored assistant bubbles", () => {
+    const md = formatChatHistoryMarkdown({
+      email: EMAIL,
+      sessionId: SID,
+      messages: [
+        { role: "user", content: "@agent answer this", at: "2026-09-08T17:53:00.000Z" },
+        {
+          role: "assistant",
+          content: "Nothing after Spanish.\n\nSent by Yan's Personal Agent",
+          at: "2026-09-08T17:53:59.000Z",
+        },
+      ],
+    });
+    const messages = parseChatHistoryMessages(md);
+    assert.equal(messages[1].content, "Nothing after Spanish.");
+    assert.doesNotMatch(messages[1].content, /Sent by Yan's Personal Agent/);
+  });
+
   it("appends widget fences on assistant turns", () => {
     const md = formatChatHistoryMarkdown({
       email: EMAIL,

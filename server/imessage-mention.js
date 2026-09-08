@@ -4,6 +4,12 @@
  */
 
 export const AGENT_SENT_FOOTER = "Sent by Yan's Personal Agent";
+const FOOTER_ESC = AGENT_SENT_FOOTER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const FOOTER_RE = new RegExp(FOOTER_ESC, "i");
+const TRAILING_FOOTER_RE = new RegExp(
+  `(?:\\r?\\n[ \\t]*)+${FOOTER_ESC}[ \\t]*$`,
+  "i"
+);
 /** Word token, any casing. Avoids emails like foo@agent.com. */
 export const AGENT_MENTION_RE = /(^|[^\w@])@agent\b/i;
 
@@ -58,7 +64,7 @@ export function shouldTriggerIMessageAgent(message) {
   if (associated >= 2000 && associated <= 3007) return false;
   const text = String(message.text || "").trim();
   if (!text) return false;
-  if (new RegExp(AGENT_SENT_FOOTER, "i").test(text)) return false;
+  if (FOOTER_RE.test(text)) return false;
   return messageMentionsAgent(text);
 }
 
@@ -123,13 +129,27 @@ export function shouldOmitAgentFooter(origin) {
 }
 
 /**
+ * Drop a trailing agent attribution. App/website bubbles never keep it.
+ * @param {unknown} text
+ */
+export function stripAgentSentFooter(text) {
+  const body = String(text ?? "");
+  if (!body) return body;
+  const trimmed = body.trim();
+  if (FOOTER_RE.test(trimmed) && trimmed.replace(FOOTER_RE, "").trim() === "") {
+    return "";
+  }
+  if (!TRAILING_FOOTER_RE.test(body)) return body;
+  return body.replace(TRAILING_FOOTER_RE, "").replace(/[ \t]+$/gm, "");
+}
+
+/**
  * @param {string} text
  * @param {object|null|undefined} origin
  */
 export function applyAgentSentFooter(text, origin) {
-  const body = String(text || "").trim();
+  const body = stripAgentSentFooter(text).trim();
   if (!body) return "";
-  if (new RegExp(AGENT_SENT_FOOTER, "i").test(body)) return body;
   if (shouldOmitAgentFooter(origin)) return body;
   return `${body}\n\n${AGENT_SENT_FOOTER}`;
 }
@@ -161,7 +181,7 @@ export function formatIMessageOriginBlock(origin, opts = {}) {
   }
   lines.push(
     `Read the surrounding thread before answering: curl -sS --unix-socket /tmp/personal-agent-local.sock "http://localhost/imessage/thread?person=${threadQ}&limit=${threadLimit}" (iMessage skill).`,
-    "Write the final bubble as the text that should land in that iMessage (plain text, no markdown, no @agent). Intermediate send_chat_message bubbles stay in the Personal Agent app only."
+    "Write the final bubble as the text that should land in that iMessage (plain text, no markdown, no @agent). Do not add Sent by Yan's Personal Agent. The server appends that footer on the iMessage only, never in the app or website thread. Intermediate send_chat_message bubbles stay in the Personal Agent app only."
   );
   if (opts.deliverFinal !== false) {
     lines.push(

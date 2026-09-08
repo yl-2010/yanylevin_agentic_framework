@@ -11,6 +11,7 @@ import {
   replyTargetForMessage,
   shouldOmitAgentFooter,
   shouldTriggerIMessageAgent,
+  stripAgentSentFooter,
 } from "./imessage-mention.js";
 
 describe("imessage-mention", () => {
@@ -91,6 +92,20 @@ describe("imessage-mention", () => {
     assert.equal(shouldOmitAgentFooter({ chat: "JYPE" }), false);
   });
 
+  it("strips a trailing agent footer from app bubbles", () => {
+    assert.equal(
+      stripAgentSentFooter(`Nothing after Spanish.\n\n${AGENT_SENT_FOOTER}`),
+      "Nothing after Spanish."
+    );
+    assert.equal(stripAgentSentFooter("Nothing after Spanish."), "Nothing after Spanish.");
+    assert.equal(stripAgentSentFooter(AGENT_SENT_FOOTER), "");
+    const reapplied = applyAgentSentFooter(
+      `On it\n\n${AGENT_SENT_FOOTER}`,
+      { chat: "JYPE" }
+    );
+    assert.equal(reapplied, `On it\n\n${AGENT_SENT_FOOTER}`);
+  });
+
   it("formats origin context with a thread lookup", () => {
     const origin = normalizeIMessageOrigin({
       fromMe: true,
@@ -124,6 +139,8 @@ describe("imessage-mention", () => {
     assert.match(bare, /only @agent/);
     assert.match(bare, /infer why they called you/);
     assert.match(bare, /limit=80/);
+    assert.match(block, /Do not add Sent by Yan's Personal Agent/);
+    assert.match(block, /server appends that footer on the iMessage only/);
     assert.match(block, /server delivers your final bubble/);
     assert.doesNotMatch(
       formatIMessageOriginBlock(origin, { deliverFinal: false }),

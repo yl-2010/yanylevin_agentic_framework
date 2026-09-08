@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalizeEmail } from "./identity.js";
 import { formatWidgetsAsFences, parseAgentReply } from "./chat-widgets.js";
+import { stripAgentSentFooter } from "./imessage-mention.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const CHAT_HISTORY_DIRNAME = ".chat-history";
@@ -226,7 +227,9 @@ export function parseChatHistoryMessages(markdown) {
       /** @type {{ role: 'user'|'assistant', content: string, at: string, widgets?: object[] }} */
       const row = {
         role,
-        content: parsed.content || (parsed.widgets.length ? "" : body || "(empty)"),
+        content: stripAgentSentFooter(
+          parsed.content || (parsed.widgets.length ? "" : body || "(empty)")
+        ),
         at,
       };
       if (parsed.widgets.length) row.widgets = parsed.widgets;
