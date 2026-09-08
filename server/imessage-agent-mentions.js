@@ -105,9 +105,10 @@ export async function pollIMessageAgentMentions(deps = {}) {
   /** @type {object[]} */
   const hits = [];
   let newest = state.lastAt;
+  if (newest > nowIso) newest = nowIso;
   for (const row of Array.isArray(rows) ? rows : []) {
     const at = messageAtIso(row);
-    if (at && at > newest) newest = at;
+    if (at && at <= nowIso && at > newest) newest = at;
     if (!shouldTriggerIMessageAgent(row)) continue;
     const key = messageKey(row);
     if (!key || seen.has(key)) continue;

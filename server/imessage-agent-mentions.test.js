@@ -99,4 +99,29 @@ describe("imessage-agent-mentions poller", () => {
     assert.equal(second.started, 0);
     assert.equal(started.length, 1);
   });
+
+  it("does not advance the cursor past now when a row has a future date", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "imessage-agent-"));
+    const statePath = join(dir, "state.json");
+    await saveMentionState(
+      { lastAt: "2026-09-08T17:30:00.000Z", seenIds: [] },
+      statePath
+    );
+    await pollIMessageAgentMentions({
+      statePath,
+      now: () => new Date("2026-09-08T17:36:00.000Z"),
+      recentMessages: async () => [
+        {
+          id: 1,
+          guid: "future",
+          fromMe: false,
+          text: "hello",
+          at: "2026-09-10 07:16:00",
+        },
+      ],
+      startFromMessage: async () => {},
+    });
+    const saved = await loadMentionState(statePath);
+    assert.equal(saved.lastAt, "2026-09-08T17:36:00.000Z");
+  });
 });
