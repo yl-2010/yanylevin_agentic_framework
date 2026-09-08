@@ -133,7 +133,8 @@ final class LiveActivityCoordinator {
         armClassRefresh(startDate: soonest, endDate: nil)
     }
 
-    /// Wake at class start (lead → elapsed), then once a minute so "N min" stays current.
+    /// Wake at class start (lead countdown → elapsed) and at class end (dismiss).
+    /// Elapsed time is `Text(timerInterval:)`, so the app does not need a per-minute poke.
     private func armClassRefresh(startDate: Date?, endDate: Date?) {
         let now = Date()
         if let startDate, startDate > now {
@@ -141,7 +142,7 @@ final class LiveActivityCoordinator {
             return
         }
         if let endDate, endDate > now {
-            armClassEnd(min(endDate, now.addingTimeInterval(60)))
+            armClassEnd(endDate)
             return
         }
         armClassEnd(nil)

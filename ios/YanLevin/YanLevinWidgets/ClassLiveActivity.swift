@@ -98,16 +98,10 @@ private struct ClassLiveActivityTimer: View {
     var body: some View {
         Group {
             if let start = state.startDate, Date.now < start {
-                Text(timerInterval: Date.now...start, countsDown: true, showsHours: false)
-                    .frame(
-                        width: compactIsland ? LiveActivityChrome.islandCompactTimerWidth : nil,
-                        alignment: .trailing
-                    )
+                // System timer. TimelineView stays frozen once the app sleeps.
+                timerText(interval: Date.now...start, countsDown: true)
             } else if let start = state.startDate, let end = state.endDate, Date.now < end {
-                TimelineView(.periodic(from: start, by: 60)) { context in
-                    let mins = max(0, Int(context.date.timeIntervalSince(start) / 60))
-                    Text(compact ? "\(mins)m" : "\(mins) min")
-                }
+                timerText(interval: start...end, countsDown: false)
             } else if !state.end.isEmpty {
                 Text(state.end)
             }
@@ -117,6 +111,14 @@ private struct ClassLiveActivityTimer: View {
         .minimumScaleFactor(compactIsland ? 0.6 : 0.7)
         .lineLimit(1)
         .monospacedDigit()
+    }
+
+    private func timerText(interval: ClosedRange<Date>, countsDown: Bool) -> some View {
+        Text(timerInterval: interval, countsDown: countsDown, showsHours: false)
+            .frame(
+                width: compactIsland ? LiveActivityChrome.islandCompactTimerWidth : nil,
+                alignment: .trailing
+            )
     }
 
     private var timerFont: Font {

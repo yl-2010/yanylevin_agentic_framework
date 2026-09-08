@@ -42,9 +42,9 @@ Yan’s **iPhone** session may send location to the Mac API (`POST /api/educatio
 
 Apple/iCloud emails alias onto the same Gmail-backed account folders — Google and Apple sign-in are interchangeable for Yan and Alex.
 
-### Live Activities (iPhone)
+### Live Activities (iPhone and iPad)
 
-Lock Screen + Dynamic Island, full-access only. Started from the app (foreground, education SSE, or iPhone location heartbeat). No ActivityKit push yet.
+Lock Screen on both; Dynamic Island on iPhone; status bar on iPad. Full-access only. Started from the app (foreground, education SSE, or iPhone location heartbeat). The class elapsed timer is system-drawn (`Text(timerInterval:)`), so it keeps counting with the app asleep. No ActivityKit push yet.
 
 | Activity | When | Tap |
 |----------|------|-----|
