@@ -309,38 +309,37 @@ struct RootTabView: View {
         }
     }
 
+    /// Same tabs as phone, without the prominent Chat circle. iPad uses the
+    /// compact top tab bar; the giant sidebar stays available via the toggle.
     private var padTabView: some View {
         TabView(selection: tabSelection) {
             if auth.hasFullAccess {
-                AccountView()
-                    .tabItem { Label("Account", systemImage: "person.crop.circle") }
-                    .tag(RootTab.account)
-
-                GymView()
-                    .tabItem { Label("Fitness", systemImage: "dumbbell.fill") }
-                    .tag(RootTab.fitness)
-
-                EducationView()
-                    .tabItem { Label("Education", systemImage: "graduationcap.fill") }
-                    .tag(RootTab.education)
-
-                ChatView()
-                    .tabItem { Label("Chat", systemImage: "bubble.left.and.bubble.right.fill") }
-                    .tag(RootTab.chat)
+                Tab("Account", systemImage: "person.crop.circle", value: RootTab.account) {
+                    AccountView()
+                }
+                Tab("Fitness", systemImage: "dumbbell.fill", value: RootTab.fitness) {
+                    GymView()
+                }
+                Tab("Education", systemImage: "graduationcap.fill", value: RootTab.education) {
+                    EducationView()
+                }
             } else {
-                HomeView()
-                    .tabItem { Label("Home", systemImage: "house.fill") }
-                    .tag(RootTab.home)
-
+                Tab("Home", systemImage: "house.fill", value: RootTab.home) {
+                    HomeView()
+                }
+                Tab("Account", systemImage: "person.crop.circle", value: RootTab.account) {
+                    AccountView()
+                }
+            }
+            Tab(
+                "Chat",
+                systemImage: "bubble.left.and.bubble.right.fill",
+                value: RootTab.chat
+            ) {
                 ChatView()
-                    .tabItem { Label("Chat", systemImage: "bubble.left.and.bubble.right.fill") }
-                    .tag(RootTab.chat)
-
-                AccountView()
-                    .tabItem { Label("Account", systemImage: "person.crop.circle") }
-                    .tag(RootTab.account)
             }
         }
+        .defaultAdaptableTabBarPlacement(.tabBar)
     }
 
     /// Full-access sessions open on Chat; tab bar order is Account → Fitness → Education.
@@ -362,9 +361,13 @@ private struct AdaptiveTabStyleModifier: ViewModifier {
     func body(content: Content) -> some View {
         // iPhone Max landscape is `.regular` width. `.sidebarAdaptable` there
         // writes UISplitViewController restoration state that crashes the next
-        // portrait launch. Keep the sidebar chrome on iPad only.
+        // portrait launch. Keep the adaptable chrome on iPad only. Compact
+        // top tabs are the default via `defaultAdaptableTabBarPlacement` on
+        // `padTabView` (not the giant sidebar).
         if AdaptiveLayout.isPad {
-            content.tabViewStyle(.sidebarAdaptable)
+            content
+                .tabViewStyle(.sidebarAdaptable)
+                .defaultAdaptableTabBarPlacement(.tabBar)
         } else {
             content
         }
