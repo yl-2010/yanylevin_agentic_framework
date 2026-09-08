@@ -44,7 +44,7 @@ Apple/iCloud emails alias onto the same Gmail-backed account folders — Google 
 
 ### Live Activities (iPhone and iPad)
 
-Lock Screen on both; Dynamic Island on iPhone; status bar on iPad. Full-access only. Started from the app (foreground, education SSE, or iPhone location heartbeat). The class elapsed timer is system-drawn (`Text(timerInterval:)`), so it keeps counting with the app asleep. No ActivityKit push yet.
+Lock Screen on both; Dynamic Island on iPhone; status bar on iPad. Full-access only. Started from the app (foreground, education SSE, or iPhone location heartbeat). Class minutes (`12 min`) are system-drawn, so they keep counting with the app asleep. No ActivityKit push yet.
 
 | Activity | When | Tap |
 |----------|------|-----|

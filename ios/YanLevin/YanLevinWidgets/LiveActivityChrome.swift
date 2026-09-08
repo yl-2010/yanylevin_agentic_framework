@@ -7,7 +7,7 @@ enum LiveActivityChrome {
     static let islandSidePad: CGFloat = 16
     static let islandEarPad: CGFloat = 20
     static let islandCompactLeadingPad: CGFloat = 8
-    /// Caps compact-island `Text(timerInterval:)`. That view reports a huge ideal width and stretches the pill.
+    /// Caps compact-island timers. `Text(timerInterval:)` and `TimeDataSource` report a huge ideal width.
     static let islandCompactTimerWidth: CGFloat = 54
     static let lockScreenPad: CGFloat = 16
 }

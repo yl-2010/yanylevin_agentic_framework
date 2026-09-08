@@ -98,10 +98,9 @@ private struct ClassLiveActivityTimer: View {
     var body: some View {
         Group {
             if let start = state.startDate, Date.now < start {
-                // System timer. TimelineView stays frozen once the app sleeps.
                 timerText(interval: Date.now...start, countsDown: true)
             } else if let start = state.startDate, let end = state.endDate, Date.now < end {
-                timerText(interval: start...end, countsDown: false)
+                elapsedMinutes(from: start)
             } else if !state.end.isEmpty {
                 Text(state.end)
             }
@@ -111,6 +110,24 @@ private struct ClassLiveActivityTimer: View {
         .minimumScaleFactor(compactIsland ? 0.6 : 0.7)
         .lineLimit(1)
         .monospacedDigit()
+    }
+
+    /// System-drawn minutes. `TimelineView` and app wakes freeze once iPad sleeps.
+    private func elapsedMinutes(from start: Date) -> some View {
+        Text("99 min")
+            .hidden()
+            .overlay(alignment: .trailing) {
+                Text(
+                    TimeDataSource<Duration>.durationOffset(to: start),
+                    format: .units(
+                        allowed: [.minutes],
+                        width: .abbreviated,
+                        zeroValueUnits: .show(length: 1),
+                        fractionalPart: .hide(rounded: .down)
+                    )
+                )
+                .lineLimit(1)
+            }
     }
 
     private func timerText(interval: ClosedRange<Date>, countsDown: Bool) -> some View {
@@ -185,10 +202,10 @@ private struct ClassLiveActivityAssignmentTile: View {
             Text(tag)
                 .font(.caption.weight(.bold))
                 .foregroundStyle(island ? YLTheme.darkAccent : YLTheme.accent(colorScheme))
+                .strikethrough(done, color: island ? LiveActivityPalette.islandMuted : YLTheme.muted(colorScheme))
             Text(name)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(island ? LiveActivityPalette.islandFg : YLTheme.fg(colorScheme))
-                .strikethrough(done, color: island ? LiveActivityPalette.islandMuted : YLTheme.muted(colorScheme))
                 .lineLimit(2)
                 .truncationMode(.tail)
                 .multilineTextAlignment(.leading)
