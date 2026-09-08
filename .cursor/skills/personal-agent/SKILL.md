@@ -144,6 +144,6 @@ The backend marks your **final text** as end of turn. Working stays until that l
 
 Express polls Yan `fromMe` iMessages for `@agent` / `@Agent`. A match starts a normal Personal Agent chat (app and website). The first user bubble is that iMessage.
 
-Live context says it came from iMessage. Read the surrounding thread (iMessage skill) before answering. `send_chat_message` intermediates stay in the app. The server sends your final bubble to that same iMessage chat. Do not also sendIMessage that same final text. Write the final as a plain iMessage: no markdown, no `@agent`. Footer rules still apply.
+Live context says it came from iMessage. Read the surrounding thread (iMessage skill) before answering. If the iMessage is only `@agent`, that mention is not the task: the thread is. Infer why they called you and what to do from the recent messages. Do not ask what they want unless the thread is empty. `send_chat_message` intermediates stay in the app. The server sends your final bubble to that same iMessage chat. Do not also sendIMessage that same final text. Write the final as a plain iMessage: no markdown, no `@agent`. Footer rules still apply.
 
 Later turns typed in the app are normal. They do not auto-text unless you send via the iMessage skill.

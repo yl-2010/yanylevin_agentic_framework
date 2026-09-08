@@ -4,6 +4,7 @@ import {
   AGENT_SENT_FOOTER,
   applyAgentSentFooter,
   formatIMessageOriginBlock,
+  isBareAgentMention,
   messageKey,
   messageMentionsAgent,
   normalizeIMessageOrigin,
@@ -20,6 +21,10 @@ describe("imessage-mention", () => {
     assert.equal(messageMentionsAgent("agent please"), false);
     assert.equal(messageMentionsAgent("foo@agent.com"), false);
     assert.equal(messageMentionsAgent("write @agency"), false);
+    assert.equal(isBareAgentMention("@agent"), true);
+    assert.equal(isBareAgentMention(" @Agent. "), true);
+    assert.equal(isBareAgentMention("@agent ping"), false);
+    assert.equal(isBareAgentMention("hey @agent"), false);
   });
 
   it("triggers only on Yan fromMe texts with the token", () => {
@@ -103,6 +108,22 @@ describe("imessage-mention", () => {
     assert.match(block, /JYPE/);
     assert.match(block, /chat123/);
     assert.match(block, /imessage\/thread\?person=chat123/);
+    assert.match(block, /limit=40/);
+    assert.doesNotMatch(block, /only @agent/);
+    const bare = formatIMessageOriginBlock(
+      normalizeIMessageOrigin({
+        fromMe: true,
+        text: "@agent",
+        guid: "def",
+        chat: "JYPE",
+        chatId: "chat123",
+        handle: "+14255550100",
+      }),
+      { deliverFinal: true }
+    );
+    assert.match(bare, /only @agent/);
+    assert.match(bare, /infer why they called you/);
+    assert.match(bare, /limit=80/);
     assert.match(block, /server delivers your final bubble/);
     assert.doesNotMatch(
       formatIMessageOriginBlock(origin, { deliverFinal: false }),

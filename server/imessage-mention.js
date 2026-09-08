@@ -15,6 +15,21 @@ export function messageMentionsAgent(raw) {
 }
 
 /**
+ * True when the body is only the mention (optional surrounding punctuation).
+ * "@agent ping" is not bare. "@agent" / "@Agent." are.
+ * @param {unknown} raw
+ */
+export function isBareAgentMention(raw) {
+  const text = String(raw || "").trim();
+  if (!text || !messageMentionsAgent(text)) return false;
+  const rest = text
+    .replace(AGENT_MENTION_RE, " ")
+    .replace(/[\s.,!?;:'"“”]+/g, " ")
+    .trim();
+  return rest === "";
+}
+
+/**
  * @param {unknown} raw
  */
 function clip(raw, max = 200) {
@@ -131,14 +146,21 @@ export function formatIMessageOriginBlock(origin, opts = {}) {
   const handle = String(origin.handle || "").trim();
   const to = String(origin.to || chatId || handle || chat).trim();
   const threadQ = encodeURIComponent(chatId || handle || chat || to);
+  const bare = isBareAgentMention(origin.text);
+  const threadLimit = bare ? 80 : 40;
   const lines = [
     "Called from iMessage. This Personal Agent chat is otherwise normal (app and website bubbles, send_chat_message, tools).",
     `- iMessage chat: ${chat || "?"}${chatId && chatId !== chat ? ` (${chatId})` : ""}`,
   ];
   if (handle) lines.push(`- handle: ${handle}`);
   if (to) lines.push(`- send replies to: ${to}`);
+  if (bare) {
+    lines.push(
+      "The user message is only @agent. That is not the task. Read the surrounding iMessage thread first, then infer why they called you and what to do from the recent messages (a question someone asked, a plan, a thing they want handled). Do not reply asking what they want unless the thread is empty or you truly cannot tell."
+    );
+  }
   lines.push(
-    `Read the surrounding thread before answering: curl -sS --unix-socket /tmp/personal-agent-local.sock "http://localhost/imessage/thread?person=${threadQ}&limit=40" (iMessage skill).`,
+    `Read the surrounding thread before answering: curl -sS --unix-socket /tmp/personal-agent-local.sock "http://localhost/imessage/thread?person=${threadQ}&limit=${threadLimit}" (iMessage skill).`,
     "Write the final bubble as the text that should land in that iMessage (plain text, no markdown, no @agent). Intermediate send_chat_message bubbles stay in the Personal Agent app only."
   );
   if (opts.deliverFinal !== false) {

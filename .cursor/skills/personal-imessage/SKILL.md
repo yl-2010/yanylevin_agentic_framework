@@ -80,6 +80,6 @@ Text only. No attachments. No new group chats. Sending to an existing named grou
 
 ## @agent
 
-Yan `fromMe` texts that contain `@agent` or `@Agent` (any chat, including groups and to himself) start a Personal Agent session on the Studio. That chat shows up in the app and website. The server sends the agent's final bubble back to the same thread.
+Yan `fromMe` texts that contain `@agent` or `@Agent` (any chat, including groups and to himself) start a Personal Agent session on the Studio. That chat shows up in the app and website. The server sends the agent's final bubble back to the same thread. A message that is only `@agent` means read the surrounding thread and infer the job from it.
 
 Do not put `@agent` in outgoing texts. That would start another session. Extra sends during the turn are only for texts that are not that final bubble.

@@ -282,6 +282,7 @@ describe("Personal Agent skill files", () => {
     assert.match(imessage, /handle.*other person/);
     assert.match(imessage, /@agent/);
     assert.match(imessage, /fromMe/);
+    assert.match(imessage, /only `@agent`/);
 
     const screentime = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.screentime), "utf8");
     assert.match(screentime, /screentime-read\.js/);
@@ -312,6 +313,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /open_education_page/);
     assert.match(agent, /iMessage @agent/);
     assert.match(agent, /fromMe/);
+    assert.match(agent, /only `@agent`/);
     assert.match(agent, /unslop/);
     assert.match(agent, /SOUL\.md/);
     assert.match(agent, /identity-school\.md/);
