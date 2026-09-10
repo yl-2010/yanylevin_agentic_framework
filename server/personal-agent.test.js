@@ -22,6 +22,7 @@ import {
   queueEducationNavigate,
   publishQueuedEducationNavigate,
   deliverIMessageFinalReply,
+  deliverTeamsFinalReply,
 } from "./personal-agent.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -51,6 +52,9 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /school-mail\.js/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.schoolOnenote));
     assert.match(prompt, /on demand only/);
+    assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.schoolTeams));
+    assert.match(prompt, /school-teams\.js/);
+    assert.match(prompt, /iMessage, then Teams, then email/);
     assert.ok(prompt.length < 5600, `prompt length ${prompt.length}`);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.chats));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.location));
@@ -259,6 +263,17 @@ describe("Personal Agent skill files", () => {
     assert.match(schoolOnenote, /no `school-onenote-fill`/i);
     assert.match(schoolOnenote, /default nightly source/);
 
+    const schoolTeams = await readFile(
+      join(REPO_ROOT, PERSONAL_SKILL_PATHS.schoolTeams),
+      "utf8"
+    );
+    assert.match(schoolTeams, /owner@school.example/);
+    assert.match(schoolTeams, /school-teams\.js/);
+    assert.match(schoolTeams, /Yan only/);
+    assert.match(schoolTeams, /Sent by Yan's Personal Agent/);
+    assert.match(schoolTeams, /@agent/);
+    assert.match(schoolTeams, /class channel/);
+
     const calendar = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.calendar), "utf8");
     assert.match(calendar, /yl-calendar/);
     assert.match(calendar, /education todos/);
@@ -316,10 +331,12 @@ describe("Personal Agent skill files", () => {
     assert.doesNotMatch(agent, /One status bubble is enough/);
     assert.match(agent, /open_education_page/);
     assert.match(agent, /iMessage @agent/);
+    assert.match(agent, /Teams @agent/);
     assert.match(agent, /fromMe/);
     assert.match(agent, /only `@agent`/);
     assert.match(agent, /no `Sent by Yan's Personal Agent`/);
     assert.match(agent, /Never put `Sent by Yan's Personal Agent` in app or website bubbles/);
+    assert.match(agent, /iMessage first, then Teams, then email|iMessage, then Teams, then email/);
     assert.match(agent, /unslop/);
     assert.match(agent, /SOUL\.md/);
     assert.match(agent, /identity-school\.md/);
@@ -370,6 +387,7 @@ describe("Personal Agent skill files", () => {
     assert.match(synthesis, /Did not write Apple Calendar/);
     assert.match(synthesis, /Phase 4 has not run yet/);
     assert.match(synthesis, /OneNote is not a nightly source/);
+    assert.match(synthesis, /teamsSince/);
     assert.doesNotMatch(synthesis, /memories\.md/);
 
     const triage = await readFile(
@@ -389,6 +407,8 @@ describe("Personal Agent skill files", () => {
     assert.match(triage, /update <path>/);
     assert.match(triage, /Yan said/);
     assert.match(triage, /Not a source: OneNote/);
+    assert.match(triage, /personal-school-teams/);
+    assert.match(triage, /yanylevin-context-school-teams\.json/);
 
     const entities = await readFile(
       join(REPO_ROOT, ".cursor/skills/nightly-entities/SKILL.md"),
@@ -705,6 +725,21 @@ describe("iMessage final reply delivery", () => {
     const empty = await deliverIMessageFinalReply(origin, "   ");
     assert.equal(empty.skipped, "empty");
     const missing = await deliverIMessageFinalReply({}, "On it");
+    assert.equal(missing.skipped, "no-target");
+  });
+});
+
+describe("Teams final reply delivery", () => {
+  it("skips error fallbacks and empty text", async () => {
+    const origin = { chatId: "19:abc", chat: "Alex" };
+    const error = await deliverTeamsFinalReply(
+      origin,
+      "The personal agent hit an error. Try again or use Cursor Desktop with the personal-agent skill."
+    );
+    assert.equal(error.skipped, "error");
+    const empty = await deliverTeamsFinalReply(origin, "   ");
+    assert.equal(empty.skipped, "empty");
+    const missing = await deliverTeamsFinalReply({}, "On it");
     assert.equal(missing.skipped, "no-target");
   });
 });

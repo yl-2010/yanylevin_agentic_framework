@@ -16,6 +16,7 @@ import {
   PEOPLE_ENRICH_MODEL_SPEC,
   SCHOOL_NAMES_PREFETCH_PATH,
   SCHOOL_MAIL_PREFETCH_PATH,
+  SCHOOL_TEAMS_PREFETCH_PATH,
   SCREENTIME_PREFETCH_PATH,
   buildActionsPrompt,
   buildContextSynthesisPrompt,
@@ -87,8 +88,10 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /yanylevin-context-mail-people\.json/);
     assert.match(prompt, /yanylevin-context-school-names\.json/);
     assert.match(prompt, /yanylevin-context-school-mail\.json/);
+    assert.match(prompt, /yanylevin-context-school-teams\.json/);
     assert.match(prompt, /owner@school.example/);
     assert.match(prompt, /personal-school-mail/);
+    assert.match(prompt, /personal-school-teams/);
     assert.match(prompt, /fromMe=true/);
     assert.match(prompt, /Other people never override Yan/);
     assert.match(prompt, /Never spawn a Cursor cloud agent/);
@@ -105,6 +108,7 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /manually deleted\.md row/);
     assert.match(prompt, /Judgement, not exact date\/time/);
     assert.equal(SCHOOL_MAIL_PREFETCH_PATH, "/tmp/yanylevin-context-school-mail.json");
+    assert.equal(SCHOOL_TEAMS_PREFETCH_PATH, "/tmp/yanylevin-context-school-teams.json");
     assert.equal(SCREENTIME_PREFETCH_PATH, "/tmp/yanylevin-context-screentime.json");
     assert.equal(DIGEST_PATH, "/tmp/yanylevin-context-notable.md");
   });
@@ -153,6 +157,7 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /Did not write Apple Calendar/);
     assert.match(prompt, /Do not add appleMailSince/);
     assert.match(prompt, /appleMailFill\.lastAt stays put/);
+    assert.match(prompt, /teamsSince/);
     assert.doesNotMatch(prompt, /memories\.md/);
     assert.match(prompt, /Never spawn a Cursor cloud agent/);
   });
@@ -233,6 +238,7 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /appleMailFill\.lastAt is a one-shot fill stamp/);
     assert.match(prompt, /Do not create appleMailSince/);
     assert.match(prompt, /The runner commits server\//);
+    assert.match(prompt, /teamsSince/);
   });
 
   it("nightly commit includes server tooling", () => {

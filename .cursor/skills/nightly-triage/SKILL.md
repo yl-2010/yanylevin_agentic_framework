@@ -42,6 +42,10 @@ only phase that reads every source. You write nothing to the brain.
   If it is thin or `ok=false`, follow
   `.cursor/skills/personal-school-mail/SKILL.md`. Same digest rules as Mail.app:
   facts not bodies.
+- **School Teams**: `/tmp/yanylevin-context-school-teams.json`
+  (`owner@school.example`, since `teamsSince`). Chats and joined-team
+  channel posts. Prefetch dump first. If it is thin or `ok=false`, follow
+  `.cursor/skills/personal-school-teams/SKILL.md`. Facts not full threads.
 - **Calendar**: `node server/calendar-cli.js events` for yesterday through
   the next 7 days (`.cursor/skills/personal-calendar/SKILL.md`).
 - **Screen Time**: `/tmp/yanylevin-context-screentime.json` (7-day summary,

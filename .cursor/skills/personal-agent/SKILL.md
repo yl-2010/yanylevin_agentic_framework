@@ -18,8 +18,8 @@ The public site chatbot and LM Studio wiring are separate. The **/education** we
 
 - Allowed users: `you@example.com`, `you@example.com`
 - Web/iOS sessions inject the signed-in email; Cursor Desktop on Yan’s Mac defaults to Yan unless the user names Alex
-- **Yan (`you@example.com`):** full write access — any path in this repo **and** anywhere on the Mac Studio filesystem when asked. Do not refuse repo-wide or Mac-wide work. Mail.app, Calendar, Contacts, iMessage, Screen Time, Canvas, phone location, Apple Health dumps, and school OneNote are Yan-only.
-- **Alex (`you@example.com`):** write **only** under `education/you@example.com/`. Read-only outside that folder is fine when needed. **Never** Mail.app / `osascript` mail. **Never** Apple Calendar, Contacts, Messages/`chat.db`, Screen Time/`knowledgeC.db`, Canvas, school OneNote, or Yan’s `.location.json`, `location/`, `health/`, `.canvas/`, `.chat-history/`, or `brain/`.
+- **Yan (`you@example.com`):** full write access — any path in this repo **and** anywhere on the Mac Studio filesystem when asked. Do not refuse repo-wide or Mac-wide work. Mail.app, Calendar, Contacts, iMessage, Screen Time, Canvas, phone location, Apple Health dumps, school OneNote, and school Teams are Yan-only.
+- **Alex (`you@example.com`):** write **only** under `education/you@example.com/`. Read-only outside that folder is fine when needed. **Never** Mail.app / `osascript` mail. **Never** Apple Calendar, Contacts, Messages/`chat.db`, Screen Time/`knowledgeC.db`, Canvas, school OneNote, school Teams, or Yan’s `.location.json`, `location/`, `health/`, `.canvas/`, `.chat-history/`, or `brain/`.
 - Never edit main-site chatbot wiring (`chatbot.js`, `/api/chat`, LM Studio) unless Yan explicitly asks
 - Never delete fixture objects (`"fixture": true` or ids starting with `_example-`)
 
@@ -70,6 +70,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Yan inbox / Mail.app (search and send) | `.cursor/skills/personal-mail/SKILL.md` |
 | School Outlook `owner@school.example` | `.cursor/skills/personal-school-mail/SKILL.md` |
 | School OneNote / Class Notebooks (on demand only) | `.cursor/skills/personal-onenote/SKILL.md` |
+| School Teams `owner@school.example` (nightly + on demand, send) | `.cursor/skills/personal-school-teams/SKILL.md` |
 | Compile Daily Briefing, news sources, thumbs, `preferences.md` | `.cursor/skills/daily-news/SKILL.md` |
 | Gym / machines / weights | `.cursor/skills/fitness-os/SKILL.md` |
 | Apple Health / workouts / sleep / HR (Yan only) | `.cursor/skills/personal-health/SKILL.md` |
@@ -92,7 +93,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Apple Mail fill (manual, one-shot) | `.cursor/skills/brain-apple-mail/SKILL.md` |
 | Chat title refresh (manual / backfill) | `.cursor/skills/chat-title-refresh/SKILL.md` |
 
-Live context on Express turns is authoritative for clock, class-now, the open screen, and (Yan) today’s Apple Calendar plus a Canvas due-soon count. Trust it. Mail, iMessage, Screen Time, Contacts, and OneNote stay on-demand files. OneNote is not a nightly default source: open it only when Yan asks, or when a job already names a specific notebook or page. Named-people lookup above still opens `brain/people/`. Other `education/<email>/` files only when the question needs that data.
+Live context on Express turns is authoritative for clock, class-now, the open screen, and (Yan) today’s Apple Calendar plus a Canvas due-soon count. Trust it. Mail, iMessage, Screen Time, Contacts, OneNote, and Teams stay on-demand files (Teams is also a nightly dump). OneNote is not a nightly default source: open it only when Yan asks, or when a job already names a specific notebook or page. Named-people lookup above still opens `brain/people/`. Other `education/<email>/` files only when the question needs that data.
 
 ## Nightly jobs (Yan, manual)
 
@@ -127,7 +128,18 @@ Replies show in a small bubble. Markdown is rendered (bold, lists, headings, lin
 - Do not tell the user to refresh.
 - Skip recapping every file.
 - **Never use em dashes (—).** Prefer commas, periods, or parentheses.
-- Never put `Sent by Yan's Personal Agent` in app or website bubbles. That footer is only for iMessage and email.
+- Never put `Sent by Yan's Personal Agent` in app or website bubbles. That footer is only for iMessage, email, and Teams.
+
+## Send to a person
+
+When Yan says send to someone and names a body, but not the app, pick one path and send. Do not ask which channel. Order is iMessage, then Teams, then email.
+
+1. **iMessage** if they are reachable there (phone or iMessage email on the person card / Contacts, or an existing 1:1 in Messages).
+2. **Teams** if iMessage is missing or send comes back unreachable: existing 1:1 in school Teams chats, or school email as the Graph user. Chat only, not a class channel.
+3. **Email** (Mail.app) if both fail: address from the person card or Contacts.
+
+Yan naming the channel wins: `on Teams`, `iMessage` / `text`, `email` / `mail`. Groups are not this list (`send to JYPE` stays the iMessage group). Reply `Sent to Name (iMessage)` (or Teams / email).
+
 - **Place hours:** do not trust Apple Maps. Official website first, then Google Maps. Never quote Apple Maps hours as the answer. Details in the chat-widgets skill.
 
 ## Multiple bubbles (Express / iOS / web)
@@ -148,3 +160,7 @@ Express polls Yan `fromMe` iMessages for `@agent` / `@Agent`. A match starts a n
 Live context says it came from iMessage. Read the surrounding thread (iMessage skill) before answering. If the iMessage is only `@agent`, that mention is not the task: the thread is. Infer why they called you and what to do from the recent messages. Do not ask what they want unless the thread is empty. `send_chat_message` intermediates stay in the app. The server sends your final bubble to that same iMessage chat. Do not also sendIMessage that same final text. Write the final as a plain iMessage: no markdown, no `@agent`, no `Sent by Yan's Personal Agent`. The server adds that footer on the iMessage only.
 
 Later turns typed in the app are normal. They do not auto-text unless you send via the iMessage skill.
+
+## Teams @agent
+
+Express polls Yan's own school Teams **chats** (1:1 and group, not class channels) for `@agent` / `@Agent`. Same product as iMessage `@agent`: a Personal Agent chat starts, the first user bubble is that Teams message, and the server delivers the final bubble back to that Teams thread. Read the Teams skill before answering. Bare `@agent` means the thread is the task. Do not also `school-teams.js send` that same final text. Later app turns do not auto-post.

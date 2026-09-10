@@ -35,6 +35,11 @@ import {
   normalizeIMessageOrigin,
   stripAgentSentFooter,
 } from "./imessage-mention.js";
+import { sendTeamsMessage } from "./school-teams.js";
+import {
+  formatTeamsOriginBlock,
+  normalizeTeamsOrigin,
+} from "./teams-mention.js";
 import {
   AUTO_MODEL_SELECTION,
   INTERACTIVE_FALLBACK_DELAYS_MS,
@@ -69,6 +74,7 @@ const PA_ERROR_REPLY =
  *   bubble: string,
  *   interrupted?: boolean,
  *   imessageDeliverFinal?: boolean,
+ *   teamsDeliverFinal?: boolean,
  * }} TurnOpts
  */
 
@@ -92,6 +98,8 @@ const PA_ERROR_REPLY =
  *   navigate?: EducationNavigate|null,
  *   imessageOrigin?: object|null,
  *   imessageDeliverFinal?: boolean,
+ *   teamsOrigin?: object|null,
+ *   teamsDeliverFinal?: boolean,
  * }} Session
  */
 
@@ -716,6 +724,23 @@ export async function deliverIMessageFinalReply(origin, content) {
 }
 
 /**
+ * First turn of a Teams-originated chat: send the final bubble to that thread.
+ * @param {object|null|undefined} origin
+ * @param {string} content
+ */
+export async function deliverTeamsFinalReply(origin, content) {
+  const body = String(content || "").trim();
+  if (!body) return { ok: false, skipped: "empty" };
+  if (body.includes(PA_ERROR_REPLY)) return { ok: false, skipped: "error" };
+  const chat = String(origin?.chatId || origin?.to || origin?.chat || "").trim();
+  if (!chat) return { ok: false, skipped: "no-target" };
+  return sendTeamsMessage({
+    chat,
+    text: body,
+  });
+}
+
+/**
  * True when this session still has work to finish after the user leaves it.
  * @param {Session|undefined|null} session
  */
@@ -822,6 +847,7 @@ export const PERSONAL_SKILL_PATHS = {
   mail: ".cursor/skills/personal-mail/SKILL.md",
   schoolMail: ".cursor/skills/personal-school-mail/SKILL.md",
   schoolOnenote: ".cursor/skills/personal-onenote/SKILL.md",
+  schoolTeams: ".cursor/skills/personal-school-teams/SKILL.md",
   location: ".cursor/skills/phone-location/SKILL.md",
   calendar: ".cursor/skills/personal-calendar/SKILL.md",
   canvas: ".cursor/skills/personal-canvas/SKILL.md",
@@ -875,6 +901,7 @@ export function systemPrompt(email) {
     `- Yan Mail.app search and send: ${PERSONAL_SKILL_PATHS.mail}`,
     `- School Outlook (owner@school.example) via school-mail.js: ${PERSONAL_SKILL_PATHS.schoolMail}`,
     `- School OneNote (on demand only): ${PERSONAL_SKILL_PATHS.schoolOnenote}`,
+    `- School Teams (owner@school.example) via school-teams.js: ${PERSONAL_SKILL_PATHS.schoolTeams}`,
     `- Phone location: ${PERSONAL_SKILL_PATHS.location}`,
     `- Apple Calendar: ${PERSONAL_SKILL_PATHS.calendar}`,
     `- Canvas: ${PERSONAL_SKILL_PATHS.canvas}`,
@@ -887,7 +914,8 @@ export function systemPrompt(email) {
     "",
     "Live context below is authoritative for clock, class-now, and the open screen. Trust it. Named-people lookup still opens brain/people/. Other education/<email>/ files only when the question needs that data.",
     "",
-    "Reply: short. School mutations 1-3 lines. Markdown OK in the text bubble; never HTML tags or markdown images. Never em dashes. No thinking aloud. Do not tell the user to refresh. Read the widgets skill before emitting any widget fence. Never put Sent by Yan's Personal Agent in app or website bubbles; that footer is only for iMessage and email.",
+    "Reply: short. School mutations 1-3 lines. Markdown OK in the text bubble; never HTML tags or markdown images. Never em dashes. No thinking aloud. Do not tell the user to refresh. Read the widgets skill before emitting any widget fence. Never put Sent by Yan's Personal Agent in app or website bubbles; that footer is only for iMessage, email, and Teams.",
+    "Send to a person with no channel named: iMessage, then Teams, then email. Named channel (on Teams / iMessage / email) wins.",
     "Long work: send_chat_message first with a short status. Send more mid-run when new info, a change, or a useful update appears. Then a final Done. Quick answers: one reply only (that is the end of turn).",
     "To show one education page on web/iOS, call open_education_page (education-dashboard skill). The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Skip if already on that page. Not on Cursor Desktop.",
     "No period when the reply is one word, one phrase, or one sentence.",
@@ -1378,6 +1406,8 @@ export async function startAgent(email) {
     turnQueue: [],
     imessageOrigin: null,
     imessageDeliverFinal: false,
+    teamsOrigin: null,
+    teamsDeliverFinal: false,
   });
   activeByEmail.set(normalized, id);
 
@@ -1408,6 +1438,33 @@ export async function startAgentFromIMessageMention(message) {
   session.imessageDeliverFinal = true;
   return messageAgent(started.sessionId, YAN_EMAIL, text, [], {
     client: "imessage",
+  });
+}
+
+/**
+ * New Personal Agent thread whose first user message is a Teams chat that
+ * mentioned @agent. Shows up in the app/website like any other chat.
+ * @param {object} message
+ */
+export async function startAgentFromTeamsMention(message) {
+  const origin = normalizeTeamsOrigin(message);
+  const text = String(origin?.text || message?.text || "").trim();
+  if (!origin || !text) {
+    const err = new Error("teams @agent text required");
+    err.status = 400;
+    throw err;
+  }
+  const started = await startAgent(YAN_EMAIL);
+  const session = sessions.get(started.sessionId);
+  if (!session) {
+    const err = new Error("session not found");
+    err.status = 500;
+    throw err;
+  }
+  session.teamsOrigin = origin;
+  session.teamsDeliverFinal = true;
+  return messageAgent(started.sessionId, YAN_EMAIL, text, [], {
+    client: "teams",
   });
 }
 
@@ -1765,6 +1822,11 @@ async function executeAgentTurn(sid, session, opts) {
         console.error("[personal-agent] imessage reply", err)
       );
     }
+    if (opts.teamsDeliverFinal && finishedStatus === "idle") {
+      deliverTeamsFinalReply(session.teamsOrigin, content).catch((err) =>
+        console.error("[personal-agent] teams reply", err)
+      );
+    }
     gitAddCommitPush({
       paths: [`education/${normalized}`],
       message: `education: agent update for ${normalized}`,
@@ -1943,6 +2005,12 @@ export async function messageAgent(
   if (imessageBlock) {
     promptParts.push("", imessageBlock);
   }
+  const teamsBlock = formatTeamsOriginBlock(session.teamsOrigin, {
+    deliverFinal: Boolean(session.teamsDeliverFinal),
+  });
+  if (teamsBlock) {
+    promptParts.push("", teamsBlock);
+  }
   if (interrupting) {
     promptParts.push(
       "",
@@ -2011,6 +2079,10 @@ export async function messageAgent(
   if (session.imessageDeliverFinal) {
     turnOpts.imessageDeliverFinal = true;
     session.imessageDeliverFinal = false;
+  }
+  if (session.teamsDeliverFinal) {
+    turnOpts.teamsDeliverFinal = true;
+    session.teamsDeliverFinal = false;
   }
 
   activeByEmail.set(normalized, sid);

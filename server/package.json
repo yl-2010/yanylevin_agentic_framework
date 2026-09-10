@@ -13,6 +13,7 @@
     "canvas-sync": "node --env-file=.env canvas-sync.js",
     "school-mail": "node school-mail.js",
     "school-onenote": "node school-onenote.js",
+    "school-teams": "node school-teams.js",
     "school-mail-fill": "node --env-file=.env school-mail-fill.js",
     "apple-mail": "node apple-mail.js dump",
     "apple-mail-fill": "node --env-file=.env apple-mail-fill.js",

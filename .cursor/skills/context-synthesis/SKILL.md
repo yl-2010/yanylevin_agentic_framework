@@ -114,6 +114,7 @@ rows.
   "cursors": {
     "mailSince": "<ISO>",
     "schoolMailSince": "<ISO>",
+    "teamsSince": "<ISO>",
     "imessageSince": "<ISO>",
     "chatHistorySince": "<ISO>",
     "screenTimeAt": "<ISO>",
@@ -124,7 +125,8 @@ rows.
 ```
 
 Always set `imessageSince` after a successful Messages read. Always set
-`schoolMailSince` after a successful school Outlook prefetch. If a source
+`schoolMailSince` after a successful school Outlook prefetch. Always set
+`teamsSince` after a successful school Teams prefetch. If a source
 failed, say so in a `notes` field and leave that cursor unset so the next run
 retries. Next run starts from these cursors, not from scratch.
 
@@ -133,7 +135,7 @@ write "Did not write Apple Calendar (phase 4)." If you mention calendar in
 `notes`, say what is already on Apple Calendar or listed as Calendar plans in
 the digest.
 
-These seven keys are the nightly sources. Do not add `appleMailSince` or any
+These eight keys are the nightly sources. Do not add `appleMailSince` or any
 other one-shot fill watermark to `cursors`. Top-level `appleMailFill.lastAt`
 is when the Mail.app history fill last finished. That job deletes
 `/tmp/yanylevin-apple-mail-export` when it succeeds. A missing dump is
