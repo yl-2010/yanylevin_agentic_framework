@@ -247,6 +247,9 @@ describe("imessage-mention", () => {
     assert.match(block, /Do not give out confidential information/);
     assert.match(block, /whole graduating class/);
     assert.match(block, /Do not paste private card facts/);
+    assert.match(block, /yanylevin\.com/);
+    assert.match(block, /epschedule/);
+    assert.match(block, /school schedule or class periods/);
     assert.doesNotMatch(block, /People already listed in this chat/);
     assert.doesNotMatch(block, /Grade-wide, class, or huge groups/);
   });

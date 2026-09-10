@@ -87,6 +87,8 @@ describe("teams-mention trigger", () => {
     );
     assert.match(grade, /giant Class of 2028 grade chat/);
     assert.match(grade, /Do not give out confidential information/);
+    assert.match(grade, /yanylevin\.com/);
+    assert.match(grade, /epschedule/);
   });
 
   it("tells the agent a bare @agent is not the task", () => {

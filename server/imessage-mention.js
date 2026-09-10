@@ -216,7 +216,10 @@ export function guestCallerLines(guestCaller, platform) {
     );
     if (gradeWide) {
       audienceLines.push(
-        `This is the giant ${title} grade chat. The whole graduating class can see your reply. Do not give out confidential information. No private calendar, location, mail, iMessage, health, Screen Time, grades, family details, private brain facts, other people's personal information, or anything Yan would not already say in front of the whole class. If they ask for that, refuse. You may pull cards to know who is talking. Do not paste private card facts into this chat. Public school logistics and things already in this thread are fine.`
+        `This is the giant ${title} grade chat. The whole graduating class can see your reply. Do not give out confidential information. No private calendar, live location, mail, iMessage, health, Screen Time, grades, family details, private brain facts, other people's personal information, or anything that is not already public. If they ask for that, refuse.`
+      );
+      audienceLines.push(
+        `Already-public personal facts are fine: yanylevin.com, and school schedule or class periods (classmates can already see those on epschedule). You may pull cards to know who is talking. Do not paste private card facts into this chat. Public school logistics and things already in this thread are also fine.`
       );
     } else {
       if (viewers.length) {
