@@ -91,7 +91,7 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
   );
   if (opts.deliverFinal !== false) {
     lines.push(
-      "The server delivers your final bubble to that same Teams chat. Do not also school-teams send that same final text."
+      "The server delivers your final bubble to that same Teams chat, then replaces the last app/website bubble with a short send confirmation (not the outbound body). Do not also school-teams send that same final text. Write the final as the Teams message, not the confirmation."
     );
   } else {
     lines.push(

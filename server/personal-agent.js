@@ -32,6 +32,7 @@ import { sendIMessage } from "./imessage-send.js";
 import {
   applyAgentSentFooter,
   formatIMessageOriginBlock,
+  formatOutboundSendConfirmation,
   normalizeIMessageOrigin,
   stripAgentSentFooter,
 } from "./imessage-mention.js";
@@ -738,6 +739,60 @@ export async function deliverTeamsFinalReply(origin, content) {
     chat,
     text: body,
   });
+}
+
+/**
+ * Swap the last assistant bubble after an outbound @agent send.
+ * @param {Session|undefined|null} session
+ * @param {string} content
+ */
+export function replaceLastAssistantContent(session, content) {
+  const last = Array.isArray(session?.messages)
+    ? session.messages[session.messages.length - 1]
+    : null;
+  if (!last || last.role !== "assistant") return false;
+  last.content = stripAgentSentFooter(content);
+  last.endOfTurn = true;
+  return true;
+}
+
+function outboundDeliverySucceeded(result) {
+  return Boolean(result && result.ok === true && !result.skipped);
+}
+
+/**
+ * First-turn @agent: send the final to iMessage/Teams, then put a confirmation
+ * in the app so the website does not repeat the outbound text.
+ * @param {Session} session
+ * @param {string} sid
+ * @param {string} content
+ * @param {TurnOpts} opts
+ */
+async function confirmOutboundDelivery(session, sid, content, opts) {
+  const imessage = Boolean(opts?.imessageDeliverFinal);
+  const teams = Boolean(opts?.teamsDeliverFinal);
+  if (!imessage && !teams) return content;
+
+  const channel = imessage ? "iMessage" : "Teams";
+  const origin = imessage ? session.imessageOrigin : session.teamsOrigin;
+  let result;
+  try {
+    result = imessage
+      ? await deliverIMessageFinalReply(origin, content)
+      : await deliverTeamsFinalReply(origin, content);
+  } catch (err) {
+    console.error(
+      `[personal-agent] ${imessage ? "imessage" : "teams"} reply`,
+      err
+    );
+    return content;
+  }
+  if (!outboundDeliverySucceeded(result)) return content;
+  const confirmation = formatOutboundSendConfirmation(channel, origin);
+  if (replaceLastAssistantContent(session, confirmation)) {
+    persistSessionHistory(sid, session);
+  }
+  return confirmation;
 }
 
 /**
@@ -1798,9 +1853,19 @@ async function executeAgentTurn(sid, session, opts) {
     if (String(result?.status || "").toLowerCase() !== "error") {
       session.replayUiTranscript = false;
     }
+    const finishedStatus = result?.status === "error" ? "error" : "idle";
+    let visibleContent = content;
+    if (finishedStatus === "idle") {
+      visibleContent = await confirmOutboundDelivery(
+        session,
+        sid,
+        content,
+        opts
+      );
+    }
     releaseTurnRun(session);
     session.lastResult = {
-      content,
+      content: visibleContent,
       widgets: parsed.widgets,
       status: result?.status || "finished",
       model: outcome.model?.id || model.id,
@@ -1815,18 +1880,6 @@ async function executeAgentTurn(sid, session, opts) {
           }
         : null,
     };
-
-    const finishedStatus = result?.status === "error" ? "error" : "idle";
-    if (opts.imessageDeliverFinal && finishedStatus === "idle") {
-      deliverIMessageFinalReply(session.imessageOrigin, content).catch((err) =>
-        console.error("[personal-agent] imessage reply", err)
-      );
-    }
-    if (opts.teamsDeliverFinal && finishedStatus === "idle") {
-      deliverTeamsFinalReply(session.teamsOrigin, content).catch((err) =>
-        console.error("[personal-agent] teams reply", err)
-      );
-    }
     gitAddCommitPush({
       paths: [`education/${normalized}`],
       message: `education: agent update for ${normalized}`,

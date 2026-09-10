@@ -155,6 +155,34 @@ export function applyAgentSentFooter(text, origin) {
 }
 
 /**
+ * Display name for an iMessage or Teams thread. Skip phones, emails, and ids.
+ * @param {object|null|undefined} origin
+ */
+export function outboundThreadLabel(origin) {
+  const chat = String(origin?.chat || "").trim();
+  if (!chat) return "";
+  if (chat.startsWith("+")) return "";
+  if (chat.includes("@")) return "";
+  if (/^chat\d+$/i.test(chat)) return "";
+  if (/^19:/i.test(chat)) return "";
+  if (/^[0-9a-f-]{20,}$/i.test(chat)) return "";
+  return clip(chat, 80);
+}
+
+/**
+ * App/website last bubble after an @agent final is delivered outbound.
+ * One sentence, no period. Does not quote the sent body.
+ * @param {string} channel
+ * @param {object|null|undefined} origin
+ */
+export function formatOutboundSendConfirmation(channel, origin) {
+  const where = String(channel || "").trim() || "iMessage";
+  const label = outboundThreadLabel(origin);
+  if (!label) return `Sent on ${where}`;
+  return `Sent on ${where} to ${label}`;
+}
+
+/**
  * Live-context block for a session started from an iMessage @agent mention.
  * @param {object|null|undefined} origin
  * @param {{ deliverFinal?: boolean }} [opts]
@@ -185,7 +213,7 @@ export function formatIMessageOriginBlock(origin, opts = {}) {
   );
   if (opts.deliverFinal !== false) {
     lines.push(
-      "The server delivers your final bubble to that same iMessage chat. Do not also sendIMessage that same final text."
+      "The server delivers your final bubble to that same iMessage chat, then replaces the last app/website bubble with a short send confirmation (not the outbound body). Do not also sendIMessage that same final text. Write the final as the iMessage, not the confirmation."
     );
   } else {
     lines.push(

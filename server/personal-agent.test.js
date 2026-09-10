@@ -23,6 +23,7 @@ import {
   publishQueuedEducationNavigate,
   deliverIMessageFinalReply,
   deliverTeamsFinalReply,
+  replaceLastAssistantContent,
 } from "./personal-agent.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -272,6 +273,7 @@ describe("Personal Agent skill files", () => {
     assert.match(schoolTeams, /Yan only/);
     assert.match(schoolTeams, /Sent by Yan's Personal Agent/);
     assert.match(schoolTeams, /@agent/);
+    assert.match(schoolTeams, /send confirmation/);
     assert.match(schoolTeams, /class channel/);
 
     const calendar = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.calendar), "utf8");
@@ -301,6 +303,7 @@ describe("Personal Agent skill files", () => {
     assert.match(imessage, /@agent/);
     assert.match(imessage, /fromMe/);
     assert.match(imessage, /only `@agent`/);
+    assert.match(imessage, /send confirmation/);
     assert.match(imessage, /never put it in Personal Agent app or website bubbles/);
 
     const screentime = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.screentime), "utf8");
@@ -332,6 +335,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /open_education_page/);
     assert.match(agent, /iMessage @agent/);
     assert.match(agent, /Teams @agent/);
+    assert.match(agent, /send confirmation/);
     assert.match(agent, /fromMe/);
     assert.match(agent, /only `@agent`/);
     assert.match(agent, /no `Sent by Yan's Personal Agent`/);
@@ -741,6 +745,25 @@ describe("Teams final reply delivery", () => {
     assert.equal(empty.skipped, "empty");
     const missing = await deliverTeamsFinalReply({}, "On it");
     assert.equal(missing.skipped, "no-target");
+  });
+});
+
+describe("replaceLastAssistantContent", () => {
+  it("swaps the last assistant bubble for a send confirmation", () => {
+    const session = {
+      messages: [
+        stampMessage("user", "@agent"),
+        stampMessage("assistant", "Nothing after Spanish, heading home after 3"),
+      ],
+    };
+    assert.equal(
+      replaceLastAssistantContent(session, "Sent on iMessage to Alex"),
+      true
+    );
+    assert.equal(session.messages[1].content, "Sent on iMessage to Alex");
+    assert.equal(session.messages[1].endOfTurn, true);
+    assert.equal(session.messages[0].content, "@agent");
+    assert.equal(replaceLastAssistantContent({ messages: [] }, "Sent on Teams"), false);
   });
 });
 
