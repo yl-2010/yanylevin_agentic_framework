@@ -16,9 +16,9 @@ Account: `owner@school.example`. Same Chrome login as school Outlook
 (`~/.yanylevin/school-mail/chrome-profile`). No Azure app. No API key.
 
 This is 1:1 and group **chats** plus joined-team **channels**. CSA marks
-Chat-tab 1:1s as hidden; the CLI still lists them. Do not add
-the school account to Mail.app. Personal iMessage stays on
-`.cursor/skills/personal-imessage/SKILL.md`.
+Chat-tab 1:1s and Chat-tab group chats as hidden; the CLI still lists
+them. Do not add the school account to Mail.app. Personal iMessage stays
+on `.cursor/skills/personal-imessage/SKILL.md`.
 
 Unnamed **send to a person** uses the waterfall in
 `.cursor/skills/personal-agent/SKILL.md` (iMessage, then Teams, then email).

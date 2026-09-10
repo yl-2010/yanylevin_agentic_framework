@@ -216,11 +216,12 @@ describe("school-teams urls and shapes", () => {
     assert.equal(pickByName(rows, "prasham").ambiguous.length, 2);
   });
 
-  it("keeps hidden 1:1 chats and drops hidden groups", () => {
+  it("keeps hidden Chat-tab 1:1s and groups, drops deleted threads", () => {
     assert.equal(includeCsaChat({ isOneOnOne: true, hidden: true }), true);
-    assert.equal(includeCsaChat({ isOneOnOne: false, hidden: true }), false);
+    assert.equal(includeCsaChat({ isOneOnOne: false, hidden: true }), true);
     assert.equal(includeCsaChat({ isOneOnOne: false, hidden: false }), true);
     assert.equal(includeCsaChat({ isOneOnOne: true, isConversationDeleted: true }), false);
+    assert.equal(includeCsaChat({ isOneOnOne: false, isConversationDeleted: true }), false);
   });
 
   it("prefers a 1:1 when a group also matches the person", () => {

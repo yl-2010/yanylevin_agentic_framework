@@ -185,14 +185,14 @@ export function pickByName(rows, needle, nameKey = "name") {
 }
 
 /**
- * CSA marks Chat-tab 1:1s as hidden (they are not on the Teams tab).
- * Keep those. Drop user-hidden groups and deleted threads.
+ * CSA marks Chat-tab 1:1s and Chat-tab group chats as hidden (they live
+ * on the Chat tab, not the Teams tab). Keep those. Drop deleted threads
+ * only. Do not treat `hidden` as user-muted: that flag is how CSA
+ * hides Chat-tab groups, and dropping it makes @agent miss them.
  */
 export function includeCsaChat(row) {
   if (!row) return false;
-  if (row.isConversationDeleted === true) return false;
-  if (row.isOneOnOne === true) return true;
-  return row.hidden !== true;
+  return row.isConversationDeleted !== true;
 }
 
 function memberMatchesNeedle(member, needle) {
