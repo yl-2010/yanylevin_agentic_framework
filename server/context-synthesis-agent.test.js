@@ -349,13 +349,13 @@ describe("people enrich prompt", () => {
     const prompt = buildPeopleEnrichPrompt({
       dateKey: "2026-08-17",
       timezone: "America/Chicago",
-      slugs: ["kate-huang", "everette-deng"],
+      slugs: ["kate-huang", "example-neighbor"],
       batch: 2,
       batchCount: 12,
     });
     assert.match(prompt, /Batch 2 of 12/);
     assert.match(prompt, /kate-huang\.md/);
-    assert.match(prompt, /everette-deng\.md/);
+    assert.match(prompt, /example-neighbor\.md/);
     assert.match(prompt, /Do not glob people/);
     assert.match(prompt, /composer-2\.5|Nightly context synthesis stays on grok-4\.6/);
     assert.match(prompt, /promote to a folder/);
@@ -371,10 +371,10 @@ describe("people enrich prompt", () => {
       await writeFile(join(dir, "index.md"), "# People\n", "utf8");
       await writeFile(join(dir, "skipped.md"), "# Skipped\n", "utf8");
       await writeFile(join(dir, "kate-huang.md"), "# Kate\n", "utf8");
-      await writeFile(join(dir, "everette-deng.md"), "# Everette\n", "utf8");
+      await writeFile(join(dir, "example-neighbor.md"), "# Example Neighbor\n", "utf8");
       await writeFile(join(dir, "kate-huang-folder", "person.md"), "# X\n", "utf8");
       const slugs = await listThinPeopleSlugs(dir);
-      assert.deepEqual(slugs, ["everette-deng", "kate-huang"]);
+      assert.deepEqual(slugs, ["example-neighbor", "kate-huang"]);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

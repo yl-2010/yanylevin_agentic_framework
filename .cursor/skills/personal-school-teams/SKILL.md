@@ -94,9 +94,15 @@ Do not post to a class channel as a send-to-person fallback.
 
 ## @agent
 
-Express polls Yan's own Teams **chats** (1:1 and group, not class channels)
-for `@agent` / `@Agent`. A match starts a normal Personal Agent chat. The
-first user bubble is that Teams message.
+Express polls school Teams **chats** (1:1 and group, not class channels)
+for `@agent` / `@Agent`. Yan `fromMe` starts a normal Personal Agent chat.
+The first user bubble is that Teams message.
+
+Anyone can call `@agent` in a 1:1. Groups: only Alex, Example Friend, and
+Example Neighbor. Everyone else in a group: ignore. Guest threads show in Yan's
+app/website history as `From Name on Teams:` then a blank line then their
+text. Live context says they called, not Yan. Same tools; judge what to
+share. Do not name the model in the Teams reply.
 
 Live context says it came from Teams. Read the surrounding thread before
 answering. If the message is only `@agent`, that mention is not the task:
@@ -108,7 +114,5 @@ the last app/website bubble with a short send confirmation. Do not also
 no markdown, no `@agent`, no `Sent by Yan's Personal Agent`. The server adds
 that footer on Teams only.
 
-Later turns typed in the app are normal. They do not auto-post unless you
+Later turns typed in the app are Yan. They do not auto-post unless you
 send via this skill.
-
-Other people typing `@agent` do nothing.

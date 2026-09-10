@@ -30,7 +30,7 @@ describe("imessage-mention", () => {
     assert.equal(isBareAgentMention("hey @agent"), false);
   });
 
-  it("triggers only on Yan fromMe texts with the token", () => {
+  it("triggers on Yan fromMe or guest texts with the token", () => {
     const base = {
       fromMe: true,
       text: "@agent add the essay",
@@ -40,7 +40,7 @@ describe("imessage-mention", () => {
       handle: "+14253260143",
     };
     assert.equal(shouldTriggerIMessageAgent(base), true);
-    assert.equal(shouldTriggerIMessageAgent({ ...base, fromMe: false }), false);
+    assert.equal(shouldTriggerIMessageAgent({ ...base, fromMe: false }), true);
     assert.equal(
       shouldTriggerIMessageAgent({ ...base, tapback: { action: "liked" } }),
       false
@@ -149,6 +149,26 @@ describe("imessage-mention", () => {
       formatIMessageOriginBlock(origin, { deliverFinal: false }),
       /server delivers your final bubble/
     );
+  });
+
+  it("tells the agent a guest called, not Yan", () => {
+    const origin = normalizeIMessageOrigin({
+      fromMe: false,
+      text: "@agent is yan free this afternoon",
+      guid: "g1",
+      chat: "Alex",
+      chatId: "+15555550111",
+      handle: "+15555550111",
+    });
+    const block = formatIMessageOriginBlock(origin, {
+      deliverFinal: true,
+      guestCaller: { displayName: "Alex", slug: "alex-rivera" },
+    });
+    assert.match(block, /Called by Alex \(not Yan\) on iMessage/);
+    assert.match(block, /not Yan's instructions/);
+    assert.match(block, /brain-entity-card\.js "alex-rivera"/);
+    assert.doesNotMatch(block, /Called from iMessage\. This Personal Agent chat is otherwise normal/);
+    assert.doesNotMatch(block, /Composer|Grok|grok-4/);
   });
 
   it("confirms outbound sends without quoting the body", () => {

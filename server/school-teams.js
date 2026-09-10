@@ -1086,7 +1086,13 @@ export async function fetchRecentChatMessages(opts = {}) {
       limit: opts.messageLimit || 20,
     });
     for (const row of rows) {
-      out.push({ ...row, chatId: chat.id, chat: chat.name, kind: "chat" });
+        out.push({
+          ...row,
+          chatId: chat.id,
+          chat: chat.name,
+          chatType: chat.chatType || row.chatType || "",
+          kind: "chat",
+        });
     }
     await sleep(40);
   }

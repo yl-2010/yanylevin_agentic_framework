@@ -6,6 +6,10 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { fetchRecentChatMessages } from "./school-teams.js";
 import {
+  deliverGuestRateLimit,
+  evaluateGuestMention,
+} from "./guest-agent.js";
+import {
   shouldTriggerTeamsAgent,
   teamsMessageKey,
 } from "./teams-mention.js";
@@ -70,8 +74,12 @@ function messageAtIso(message) {
  * @param {{
  *   fetchRecent?: typeof fetchRecentChatMessages,
  *   startFromMessage?: (message: object) => Promise<unknown>,
+ *   evaluateGuestMention?: typeof evaluateGuestMention,
+ *   deliverGuestRateLimit?: typeof deliverGuestRateLimit,
  *   now?: () => Date,
  *   statePath?: string,
+ *   limitsPath?: string,
+ *   people?: object[],
  * }} [deps]
  */
 export async function pollTeamsAgentMentions(deps = {}) {
@@ -127,6 +135,8 @@ export async function pollTeamsAgentMentions(deps = {}) {
       const { startAgentFromTeamsMention } = await import("./personal-agent.js");
       return startAgentFromTeamsMention(message);
     });
+  const evaluateGuest = deps.evaluateGuestMention || evaluateGuestMention;
+  const sendRateLimit = deps.deliverGuestRateLimit || deliverGuestRateLimit;
 
   let started = 0;
   const nextSeen = [...state.seenIds];
@@ -134,8 +144,43 @@ export async function pollTeamsAgentMentions(deps = {}) {
     const key = teamsMessageKey(hit);
     nextSeen.push(key);
     seen.add(key);
+    /** @type {object} */
+    const message = { ...hit };
+    if (message.fromMe !== true) {
+      let decision;
+      try {
+        decision = await evaluateGuest({
+          platform: "teams",
+          message,
+          now: nowFn(),
+          people: deps.people,
+          statePath: deps.limitsPath,
+        });
+      } catch (err) {
+        console.error("[teams-agent] guest", err);
+        continue;
+      }
+      if (!decision || decision.action === "ignore") continue;
+      if (decision.action === "rate-limit") {
+        try {
+          await sendRateLimit({
+            platform: "teams",
+            message,
+            text: decision.text,
+          });
+        } catch (err) {
+          console.error("[teams-agent] rate-limit", err);
+        }
+        continue;
+      }
+      if (decision.action === "start" && decision.caller) {
+        message.guestCaller = decision.caller;
+      } else {
+        continue;
+      }
+    }
     try {
-      await start(hit);
+      await start(message);
       started += 1;
     } catch (err) {
       console.error("[teams-agent] start", err);

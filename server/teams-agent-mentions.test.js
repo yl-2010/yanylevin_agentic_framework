@@ -75,6 +75,7 @@ describe("teams-agent-mentions poller", () => {
           { ...hit, id: "plain", text: "no mention" },
         ];
       },
+      evaluateGuestMention: async () => ({ action: "ignore" }),
       startFromMessage: async (message) => {
         started.push(message);
         return { sessionId: "sid" };
@@ -88,6 +89,7 @@ describe("teams-agent-mentions poller", () => {
       statePath,
       now: () => new Date("2026-09-09T17:36:20.000Z"),
       fetchRecent: async () => [hit],
+      evaluateGuestMention: async () => ({ action: "ignore" }),
       startFromMessage: async (message) => {
         started.push(message);
       },
@@ -115,5 +117,70 @@ describe("teams-agent-mentions poller", () => {
     });
     assert.equal(result.skipped, "not-signed-in");
     assert.equal(result.started, 0);
+  });
+
+  it("starts a guest Teams 1:1 and ignores unauthorized groups", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "teams-agent-"));
+    const statePath = join(dir, "state.json");
+    await saveMentionState(
+      { lastAt: "2026-09-09T17:30:00.000Z", seenIds: [] },
+      statePath
+    );
+    /** @type {object[]} */
+    const started = [];
+    const hit = {
+      id: "g1",
+      fromMe: false,
+      text: "@agent hi",
+      at: "2026-09-09T17:36:10Z",
+      chat: "Sam",
+      chatId: "19:sam",
+      chatType: "oneOnOne",
+      messageType: "message",
+      from: "Sam Classmate",
+      fromEmail: "sam@school.example",
+    };
+    const first = await pollTeamsAgentMentions({
+      statePath,
+      now: () => new Date("2026-09-09T17:36:12.000Z"),
+      fetchRecent: async () => [hit],
+      evaluateGuestMention: async () => ({
+        action: "start",
+        caller: {
+          displayName: "Sam",
+          slug: "",
+          platform: "teams",
+          model: { id: "composer-2.5", params: [{ id: "fast", value: "false" }] },
+        },
+      }),
+      startFromMessage: async (message) => {
+        started.push(message);
+      },
+    });
+    assert.equal(first.started, 1);
+    assert.equal(started[0].guestCaller.displayName, "Sam");
+
+    await saveMentionState(
+      { lastAt: "2026-09-09T17:40:00.000Z", seenIds: [] },
+      statePath
+    );
+    const group = {
+      ...hit,
+      id: "g2",
+      chatType: "group",
+      chat: "Class GC",
+      at: "2026-09-09T17:40:10Z",
+    };
+    const second = await pollTeamsAgentMentions({
+      statePath,
+      now: () => new Date("2026-09-09T17:40:12.000Z"),
+      fetchRecent: async () => [group],
+      evaluateGuestMention: async () => ({ action: "ignore" }),
+      startFromMessage: async (message) => {
+        started.push(message);
+      },
+    });
+    assert.equal(second.started, 0);
+    assert.equal(started.length, 1);
   });
 });

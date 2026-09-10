@@ -1,10 +1,12 @@
 /**
- * Detect Yan fromMe Teams chat texts that mention @agent / @Agent.
- * Poller and Personal Agent share these helpers.
+ * Detect Teams chat texts that mention @agent / @Agent.
+ * Yan fromMe and guest (1:1, or the allowed group trio) share the token gate.
+ * Who may start a session is the poller's job.
  */
 
 import {
   AGENT_SENT_FOOTER,
+  guestCallerLines,
   isBareAgentMention,
   messageMentionsAgent,
   stripAgentSentFooter,
@@ -36,7 +38,6 @@ export function teamsMessageKey(message) {
  */
 export function shouldTriggerTeamsAgent(message) {
   if (!message || typeof message !== "object") return false;
-  if (message.fromMe !== true) return false;
   const type = String(message.messageType || "message").trim().toLowerCase();
   if (type && type !== "message") return false;
   const text = String(message.text || "").trim();
@@ -59,14 +60,17 @@ export function normalizeTeamsOrigin(message) {
     chatId,
     key: teamsMessageKey(message),
     text: String(message.text || "").trim().slice(0, 10_000),
-    fromEmail: clip(message.fromEmail || SCHOOL_EMAIL, 80),
+    fromEmail: clip(
+      message.fromEmail || (message.fromMe === true ? SCHOOL_EMAIL : ""),
+      80
+    ),
   };
 }
 
 /**
  * Live-context block for a session started from a Teams @agent mention.
  * @param {object|null|undefined} origin
- * @param {{ deliverFinal?: boolean }} [opts]
+ * @param {{ deliverFinal?: boolean, guestCaller?: object|null }} [opts]
  */
 export function formatTeamsOriginBlock(origin, opts = {}) {
   if (!origin || typeof origin !== "object") return "";
@@ -75,8 +79,12 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
   const bare = isBareAgentMention(origin.text);
   const threadLimit = bare ? 80 : 40;
   const chatArg = chatId || chat;
+  const guestLines = guestCallerLines(opts.guestCaller, "Teams");
   const lines = [
-    "Called from Teams. This Personal Agent chat is otherwise normal (app and website bubbles, send_chat_message, tools).",
+    guestLines.length
+      ? guestLines[0]
+      : "Called from Teams. This Personal Agent chat is otherwise normal (app and website bubbles, send_chat_message, tools).",
+    ...guestLines.slice(1),
     `- Teams chat: ${chat || "?"}${chatId && chatId !== chat ? ` (${chatId})` : ""}`,
   ];
   if (chatId) lines.push(`- send replies to chat id: ${chatId}`);

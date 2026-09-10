@@ -275,6 +275,8 @@ describe("Personal Agent skill files", () => {
     assert.match(schoolTeams, /@agent/);
     assert.match(schoolTeams, /send confirmation/);
     assert.match(schoolTeams, /class channel/);
+    assert.match(schoolTeams, /Anyone can call/);
+    assert.doesNotMatch(schoolTeams, /Other people typing `@agent` do nothing/);
     assert.match(schoolTeams, /school-teams-fill/);
     assert.match(schoolTeams, /brain-school-teams/);
 
@@ -305,6 +307,8 @@ describe("Personal Agent skill files", () => {
     assert.match(imessage, /@agent/);
     assert.match(imessage, /fromMe/);
     assert.match(imessage, /only `@agent`/);
+    assert.match(imessage, /Apple Contacts/);
+    assert.match(imessage, /From Name on iMessage/);
     assert.match(imessage, /send confirmation/);
     assert.match(imessage, /never put it in Personal Agent app or website bubbles/);
 
@@ -340,6 +344,10 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /send confirmation/);
     assert.match(agent, /fromMe/);
     assert.match(agent, /only `@agent`/);
+    assert.match(agent, /Apple Contacts/);
+    assert.match(agent, /not Yan's instructions/);
+    assert.match(agent, /From Alex on iMessage/);
+    assert.match(agent, /Composer 2\.5/);
     assert.match(agent, /no `Sent by Yan's Personal Agent`/);
     assert.match(agent, /Never put `Sent by Yan's Personal Agent` in app or website bubbles/);
     assert.match(agent, /iMessage first, then Teams, then email|iMessage, then Teams, then email/);

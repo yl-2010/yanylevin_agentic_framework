@@ -34,7 +34,7 @@ def sheet(rows):
 if mode == "inline":
     s1 = sheet([
         [inline_c("A1", "Last Name"), inline_c("B1", "First Name"), inline_c("C1", "Student ID")],
-        [inline_c("A2", "Deng"), inline_c("B2", "Everette"), num_c("C2", "20285521")],
+        [inline_c("A2", "Deng"), inline_c("B2", "Example Neighbor"), num_c("C2", "20285521")],
     ])
     s2 = sheet([
         [inline_c("A1", "Last Name"), inline_c("B1", "First Name"), inline_c("C1", "ID")],
@@ -129,7 +129,7 @@ describe("people source helpers", () => {
       true
     );
     assert.equal(
-      contactMatchesQuery({ name: "Rajasi Saha", emails: "", phones: "" }, "Everette"),
+      contactMatchesQuery({ name: "Rajasi Saha", emails: "", phones: "" }, "Example Neighbor"),
       false
     );
   });
@@ -162,7 +162,7 @@ describe("people source helpers", () => {
         })),
         [
           {
-            first: "Everette",
+            first: "Example Neighbor",
             last: "Deng",
             id: "20285521",
             kind: "student",
@@ -205,13 +205,13 @@ describe("people source helpers", () => {
     try {
       await execFileAsync("sqlite3", [
         db,
-        "CREATE TABLE message (ROWID INTEGER PRIMARY KEY, text TEXT, date INTEGER); INSERT INTO message (text, date) VALUES ('hanging with Everette', 1); INSERT INTO message (text, date) VALUES ('Everette sent photos', 2); INSERT INTO message (text, date) VALUES ('once Yulong', 3);",
+        "CREATE TABLE message (ROWID INTEGER PRIMARY KEY, text TEXT, date INTEGER); INSERT INTO message (text, date) VALUES ('hanging with Example Neighbor', 1); INSERT INTO message (text, date) VALUES ('Example Neighbor sent photos', 2); INSERT INTO message (text, date) VALUES ('once Yulong', 3);",
       ]);
-      const mentions = await countNameMentions(["Everette", "Yulong", "Nobody"], {
+      const mentions = await countNameMentions(["Example Neighbor", "Yulong", "Nobody"], {
         db,
         minCount: 2,
       });
-      assert.deepEqual(mentions, [{ name: "Everette", count: 2 }]);
+      assert.deepEqual(mentions, [{ name: "Example Neighbor", count: 2 }]);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -229,7 +229,7 @@ describe("local ipc people routes", () => {
       }),
       loadSchoolNames: async () => ({
         ok: true,
-        people: [{ first: "Everette", last: "Deng" }],
+        people: [{ first: "Example Neighbor", last: "Deng" }],
       }),
     });
     const contactsRes = mockRes();
@@ -244,7 +244,7 @@ describe("local ipc people routes", () => {
     assert.equal(searchRes.out.body[0].name, "Rajasi Saha");
 
     const missRes = mockRes();
-    await handler(mockReq("GET", "/contacts/search?q=Everette"), missRes);
+    await handler(mockReq("GET", "/contacts/search?q=Example Neighbor"), missRes);
     assert.equal(missRes.out.body.length, 0);
 
     const peopleRes = mockRes();
@@ -258,7 +258,7 @@ describe("local ipc people routes", () => {
 
     const schoolRes = mockRes();
     await handler(mockReq("GET", "/school/names"), schoolRes);
-    assert.equal(schoolRes.out.body.people[0].first, "Everette");
+    assert.equal(schoolRes.out.body.people[0].first, "Example Neighbor");
   });
 
   it("starts people bootstrap in the background", async () => {

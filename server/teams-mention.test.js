@@ -8,7 +8,7 @@ import {
 } from "./teams-mention.js";
 
 describe("teams-mention trigger", () => {
-  it("matches Yan fromMe @agent and skips others", () => {
+  it("matches Yan fromMe or guest @agent and skips footers", () => {
     assert.equal(
       shouldTriggerTeamsAgent({
         fromMe: true,
@@ -23,7 +23,7 @@ describe("teams-mention trigger", () => {
         text: "@agent ignore me",
         messageType: "message",
       }),
-      false
+      true
     );
     assert.equal(
       shouldTriggerTeamsAgent({
@@ -60,6 +60,12 @@ describe("teams-mention trigger", () => {
     assert.match(block, /send confirmation/);
     const later = formatTeamsOriginBlock(origin, { deliverFinal: false });
     assert.match(later, /Later app turns do not auto-post/);
+    const guest = formatTeamsOriginBlock(origin, {
+      deliverFinal: true,
+      guestCaller: { displayName: "Alex", slug: "alex-rivera" },
+    });
+    assert.match(guest, /Called by Alex \(not Yan\) on Teams/);
+    assert.doesNotMatch(guest, /Called from Teams\. This Personal Agent chat is otherwise normal/);
   });
 
   it("tells the agent a bare @agent is not the task", () => {

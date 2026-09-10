@@ -42,6 +42,10 @@ import {
   normalizeTeamsOrigin,
 } from "./teams-mention.js";
 import {
+  formatGuestUserBubble,
+  platformLabel,
+} from "./guest-agent.js";
+import {
   AUTO_MODEL_SELECTION,
   INTERACTIVE_FALLBACK_DELAYS_MS,
   INTERACTIVE_MODEL_DELAYS_MS,
@@ -101,6 +105,7 @@ const PA_ERROR_REPLY =
  *   imessageDeliverFinal?: boolean,
  *   teamsOrigin?: object|null,
  *   teamsDeliverFinal?: boolean,
+ *   guestCaller?: object|null,
  * }} Session
  */
 
@@ -1463,6 +1468,7 @@ export async function startAgent(email) {
     imessageDeliverFinal: false,
     teamsOrigin: null,
     teamsDeliverFinal: false,
+    guestCaller: null,
   });
   activeByEmail.set(normalized, id);
 
@@ -1476,7 +1482,15 @@ export async function startAgent(email) {
  */
 export async function startAgentFromIMessageMention(message) {
   const origin = normalizeIMessageOrigin(message);
-  const text = String(origin?.text || message?.text || "").trim();
+  const raw = String(origin?.text || message?.text || "").trim();
+  const guest = message?.guestCaller || null;
+  const text = guest
+    ? formatGuestUserBubble({
+        name: guest.displayName,
+        platform: platformLabel("imessage"),
+        text: raw,
+      })
+    : raw;
   if (!origin || !text) {
     const err = new Error("imessage @agent text required");
     err.status = 400;
@@ -1491,6 +1505,7 @@ export async function startAgentFromIMessageMention(message) {
   }
   session.imessageOrigin = origin;
   session.imessageDeliverFinal = true;
+  session.guestCaller = guest;
   return messageAgent(started.sessionId, YAN_EMAIL, text, [], {
     client: "imessage",
   });
@@ -1503,7 +1518,15 @@ export async function startAgentFromIMessageMention(message) {
  */
 export async function startAgentFromTeamsMention(message) {
   const origin = normalizeTeamsOrigin(message);
-  const text = String(origin?.text || message?.text || "").trim();
+  const raw = String(origin?.text || message?.text || "").trim();
+  const guest = message?.guestCaller || null;
+  const text = guest
+    ? formatGuestUserBubble({
+        name: guest.displayName,
+        platform: platformLabel("teams"),
+        text: raw,
+      })
+    : raw;
   if (!origin || !text) {
     const err = new Error("teams @agent text required");
     err.status = 400;
@@ -1518,6 +1541,7 @@ export async function startAgentFromTeamsMention(message) {
   }
   session.teamsOrigin = origin;
   session.teamsDeliverFinal = true;
+  session.guestCaller = guest;
   return messageAgent(started.sessionId, YAN_EMAIL, text, [], {
     client: "teams",
   });
@@ -2031,11 +2055,18 @@ export async function messageAgent(
   }
 
   const apiKey = requireKey();
+  const guestFirstTurn =
+    Boolean(session.guestCaller?.model) &&
+    (Boolean(session.imessageDeliverFinal) || Boolean(session.teamsDeliverFinal));
   let model;
   try {
     model = await resolveModelSelection(
       apiKey,
-      hasSessionFiles ? ATTACHMENT_MODEL_SPEC : DEFAULT_MODEL_SPEC
+      guestFirstTurn
+        ? session.guestCaller.model
+        : hasSessionFiles
+          ? ATTACHMENT_MODEL_SPEC
+          : DEFAULT_MODEL_SPEC
     );
   } catch (err) {
     if (claimedIdleSlot) session.status = "idle";
@@ -2054,12 +2085,14 @@ export async function messageAgent(
   ];
   const imessageBlock = formatIMessageOriginBlock(session.imessageOrigin, {
     deliverFinal: Boolean(session.imessageDeliverFinal),
+    guestCaller: session.guestCaller,
   });
   if (imessageBlock) {
     promptParts.push("", imessageBlock);
   }
   const teamsBlock = formatTeamsOriginBlock(session.teamsOrigin, {
     deliverFinal: Boolean(session.teamsDeliverFinal),
+    guestCaller: session.guestCaller,
   });
   if (teamsBlock) {
     promptParts.push("", teamsBlock);

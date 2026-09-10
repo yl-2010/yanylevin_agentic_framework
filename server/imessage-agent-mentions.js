@@ -7,6 +7,10 @@ import { readFile, writeFile } from "node:fs/promises";
 import { recentMessages } from "./imessage-read.js";
 import { findChatGuid } from "./imessage-send.js";
 import {
+  deliverGuestRateLimit,
+  evaluateGuestMention,
+} from "./guest-agent.js";
+import {
   messageKey,
   shouldTriggerIMessageAgent,
 } from "./imessage-mention.js";
@@ -75,8 +79,13 @@ function messageAtIso(message) {
  *   recentMessages?: typeof recentMessages,
  *   findChatGuid?: typeof findChatGuid,
  *   startFromMessage?: (message: object) => Promise<unknown>,
+ *   evaluateGuestMention?: typeof evaluateGuestMention,
+ *   deliverGuestRateLimit?: typeof deliverGuestRateLimit,
  *   now?: () => Date,
  *   statePath?: string,
+ *   limitsPath?: string,
+ *   listContacts?: () => Promise<object[]>,
+ *   people?: object[],
  * }} [deps]
  */
 export async function pollIMessageAgentMentions(deps = {}) {
@@ -129,6 +138,8 @@ export async function pollIMessageAgentMentions(deps = {}) {
       return startAgentFromIMessageMention(message);
     });
   const findGuid = deps.findChatGuid || findChatGuid;
+  const evaluateGuest = deps.evaluateGuestMention || evaluateGuestMention;
+  const sendRateLimit = deps.deliverGuestRateLimit || deliverGuestRateLimit;
 
   let started = 0;
   const nextSeen = [...state.seenIds];
@@ -150,6 +161,40 @@ export async function pollIMessageAgentMentions(deps = {}) {
           "[imessage-agent] chat guid",
           err instanceof Error ? err.message : err
         );
+      }
+    }
+    if (message.fromMe !== true) {
+      let decision;
+      try {
+        decision = await evaluateGuest({
+          platform: "imessage",
+          message,
+          now: nowFn(),
+          listContacts: deps.listContacts,
+          people: deps.people,
+          statePath: deps.limitsPath,
+        });
+      } catch (err) {
+        console.error("[imessage-agent] guest", err);
+        continue;
+      }
+      if (!decision || decision.action === "ignore") continue;
+      if (decision.action === "rate-limit") {
+        try {
+          await sendRateLimit({
+            platform: "imessage",
+            message,
+            text: decision.text,
+          });
+        } catch (err) {
+          console.error("[imessage-agent] rate-limit", err);
+        }
+        continue;
+      }
+      if (decision.action === "start" && decision.caller) {
+        message.guestCaller = decision.caller;
+      } else {
+        continue;
       }
     }
     try {
