@@ -34,6 +34,7 @@ struct ClassLiveActivity: Widget {
                     .padding(.leading, LiveActivityChrome.islandCompactLeadingPad)
             } compactTrailing: {
                 ClassLiveActivityTimer(state: context.state, compact: true, compactIsland: true)
+                    .fixedSize()
             } minimal: {
                 Text(context.state.period)
                     .font(.caption2.weight(.bold))
@@ -131,11 +132,19 @@ private struct ClassLiveActivityTimer: View {
     }
 
     private func timerText(interval: ClosedRange<Date>, countsDown: Bool) -> some View {
-        Text(timerInterval: interval, countsDown: countsDown, showsHours: false)
-            .frame(
-                width: compactIsland ? LiveActivityChrome.islandCompactTimerWidth : nil,
-                alignment: .trailing
-            )
+        let timer = Text(timerInterval: interval, countsDown: countsDown, showsHours: false)
+        if compactIsland {
+            // timerInterval reports a huge ideal width. Size to MM:SS like elapsed minutes.
+            Text("00:00")
+                .hidden()
+                .overlay(alignment: .leading) {
+                    timer.lineLimit(1)
+                }
+                .clipped()
+                .fixedSize()
+        } else {
+            timer
+        }
     }
 
     private var timerFont: Font {
