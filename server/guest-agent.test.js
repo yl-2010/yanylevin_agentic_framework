@@ -20,6 +20,7 @@ import {
   quotaKeyFor,
   resetGuestAgentCaches,
   resolvePerson,
+  describeGuestAudience,
   takeGuestSlot,
 } from "./guest-agent.js";
 
@@ -134,6 +135,45 @@ describe("guest-agent helpers", () => {
   it("keys quota by slug when known", () => {
     assert.equal(quotaKeyFor("+15555550111", "alex-rivera"), "alex-rivera");
     assert.equal(quotaKeyFor("+15555550999", ""), "phone:5555550999");
+  });
+
+  it("labels 1:1 vs group audience", () => {
+    assert.deepEqual(
+      describeGuestAudience("imessage", {
+        chat: "Sam",
+        chatId: "+15555550999",
+        handle: "+15555550999",
+      }),
+      { kind: "dm", threadLabel: "Sam", viewers: [] }
+    );
+    assert.equal(
+      describeGuestAudience("imessage", {
+        chat: "JYPE",
+        chatId: "chat123",
+        handle: "+15555550111",
+      }).kind,
+      "group"
+    );
+    const teamsGroup = describeGuestAudience("teams", {
+      chat: "Class of 2028",
+      chatType: "group",
+      members: [
+        { name: "Alex Rivera" },
+        { name: "Yan Levin" },
+        { name: "Sam Classmate" },
+      ],
+    });
+    assert.equal(teamsGroup.kind, "group");
+    assert.equal(teamsGroup.threadLabel, "Class of 2028");
+    assert.deepEqual(teamsGroup.viewers, ["Alex Rivera", "Sam Classmate"]);
+    assert.equal(
+      describeGuestAudience("teams", {
+        chat: "Alex",
+        chatType: "oneOnOne",
+        members: [{ name: "Alex Rivera" }],
+      }).kind,
+      "dm"
+    );
   });
 });
 
@@ -290,6 +330,7 @@ describe("evaluateGuestMention", () => {
       message: {
         fromMe: false,
         handle: "+15555550999",
+        chatId: "+15555550999",
         text: "@agent hi",
         chat: "Sam",
       },
@@ -302,6 +343,7 @@ describe("evaluateGuestMention", () => {
     assert.equal(decision.caller.displayName, "Sam");
     assert.equal(decision.caller.model.id, "composer-2.5");
     assert.equal(decision.caller.model.params[0].value, "false");
+    assert.equal(decision.caller.audience.kind, "dm");
   });
 
   it("uses Grok for Alex's first iMessage turns and prefixes the name", async () => {
@@ -397,8 +439,10 @@ describe("evaluateGuestMention", () => {
         fromMe: false,
         from: "Alex Rivera",
         fromEmail: "friend@school.example",
+        chat: "Class of 2028",
         chatType: "group",
         text: "@agent hi",
+        members: [{ name: "Alex Rivera" }, { name: "Sam Classmate" }],
       },
       people: PEOPLE,
       now: FIVE_PM,
@@ -406,6 +450,12 @@ describe("evaluateGuestMention", () => {
     });
     assert.equal(groupPrasham.action, "start");
     assert.equal(groupPrasham.caller.model.id, "grok-4.6");
+    assert.equal(groupPrasham.caller.audience.kind, "group");
+    assert.equal(groupPrasham.caller.audience.threadLabel, "Class of 2028");
+    assert.deepEqual(groupPrasham.caller.audience.viewers, [
+      "Alex Rivera",
+      "Sam Classmate",
+    ]);
   });
 
   it("does not treat Yan fromMe as a guest", async () => {

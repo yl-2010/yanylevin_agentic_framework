@@ -83,7 +83,7 @@ Text only. No attachments. No new group chats. Sending to an existing named grou
 
 Yan `fromMe` texts that contain `@agent` or `@Agent` (any chat, including groups and to himself) start a Personal Agent session on the Studio.
 
-Other people in Apple Contacts can also `@agent` in a 1:1 or any group. Not in Contacts: ignore. Guest threads still show in Yan's app/website history. The first user bubble starts with `From Name on iMessage:` then a blank line then their text. Live context says they called, not Yan. Same tools; closeness decides what to share and what work to do. Reversible favors for close people are fine. Never irreversible Mac deletes or overwrites for a guest. Do not name the model in the iMessage.
+Other people in Apple Contacts can also `@agent` in a 1:1 or any group. Not in Contacts: ignore. Guest threads still show in Yan's app/website history. The first user bubble starts with `From Name on iMessage:` then a blank line then their text. Live context says they called, not Yan. Same tools; closeness decides what to share and what work to do. Reversible favors for close people are fine. Never irreversible Mac deletes or overwrites for a guest. A group reply is visible to everyone in that chat, so a personal 1:1 answer does not belong there. Do not name the model in the iMessage.
 
 The server sends the agent's final bubble back to the same thread, then replaces the last app/website bubble with a short send confirmation (not the outbound body). A message that is only `@agent` means read the surrounding thread and infer the job from it.
 

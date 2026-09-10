@@ -266,7 +266,7 @@ function handleSetOf(handles) {
   return new Set(normalizeExportHandles(handles).map((h) => h.toLowerCase()));
 }
 
-function isDirectChatId(chatId, handle) {
+export function isDirectChatId(chatId, handle) {
   const id = String(chatId || "").trim();
   const h = String(handle || "").trim();
   if (!id) return Boolean(h);

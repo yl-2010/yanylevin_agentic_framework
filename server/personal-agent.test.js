@@ -347,6 +347,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /Apple Contacts/);
     assert.match(agent, /not Yan's instructions/);
     assert.match(agent, /Never do irreversible work for a guest/);
+    assert.match(agent, /who will \*\*see\*\* the reply|who will see the reply/);
     assert.match(agent, /From Alex on iMessage/);
     assert.match(agent, /Composer 2\.5/);
     assert.match(agent, /no `Sent by Yan's Personal Agent`/);

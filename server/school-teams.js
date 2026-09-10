@@ -1091,6 +1091,13 @@ export async function fetchRecentChatMessages(opts = {}) {
           chatId: chat.id,
           chat: chat.name,
           chatType: chat.chatType || row.chatType || "",
+          members: (Array.isArray(chat.members) ? chat.members : [])
+            .map((m) => ({
+              name: String(m?.name || "").trim(),
+              email: String(m?.email || "").trim(),
+            }))
+            .filter((m) => m.name || m.email)
+            .slice(0, 12),
           kind: "chat",
         });
     }

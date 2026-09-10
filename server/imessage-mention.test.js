@@ -166,6 +166,8 @@ describe("imessage-mention", () => {
     });
     assert.match(block, /Called by Alex \(not Yan\) on iMessage/);
     assert.match(block, /not Yan's instructions/);
+    assert.match(block, /treat it as a group until you know otherwise/);
+    assert.match(block, /who will see this reply/);
     assert.match(block, /brain-entity-card\.js "alex-rivera"/);
     assert.match(block, /Never do irreversible work for a guest/);
     assert.match(block, /Never delete, trash, empty, or overwrite/);
@@ -173,6 +175,44 @@ describe("imessage-mention", () => {
     assert.match(block, /treat them as not close/);
     assert.doesNotMatch(block, /Called from iMessage\. This Personal Agent chat is otherwise normal/);
     assert.doesNotMatch(block, /Composer|Grok|grok-4/);
+  });
+
+  it("tells the agent a group reply is visible to the whole chat", () => {
+    const origin = normalizeIMessageOrigin({
+      fromMe: false,
+      text: "@agent is yan free",
+      guid: "g2",
+      chat: "JYPE",
+      chatId: "chat123",
+      handle: "+15555550111",
+    });
+    const block = formatIMessageOriginBlock(origin, {
+      deliverFinal: true,
+      guestCaller: {
+        displayName: "Alex",
+        slug: "alex-rivera",
+        audience: {
+          kind: "group",
+          threadLabel: "Class of 2028",
+          viewers: ["Alex", "Sam", "Riley"],
+        },
+      },
+    });
+    assert.match(block, /group chat Class of 2028/);
+    assert.match(block, /Everyone in that chat will see it/);
+    assert.match(block, /People already listed in this chat: Alex, Sam, Riley/);
+    assert.match(block, /must not be answered here/);
+    assert.match(block, /Grade-wide, class, or huge groups/);
+    const dm = formatIMessageOriginBlock(origin, {
+      deliverFinal: true,
+      guestCaller: {
+        displayName: "Alex",
+        slug: "alex-rivera",
+        audience: { kind: "dm", threadLabel: "Alex", viewers: [] },
+      },
+    });
+    assert.match(dm, /1:1 with Alex only/);
+    assert.doesNotMatch(dm, /must not be answered here/);
   });
 
   it("confirms outbound sends without quoting the body", () => {

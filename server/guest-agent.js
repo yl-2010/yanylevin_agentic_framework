@@ -13,6 +13,7 @@ import {
   replyTargetForMessage,
 } from "./imessage-mention.js";
 import { sendIMessage } from "./imessage-send.js";
+import { isDirectChatId } from "./imessage-read.js";
 import { sendTeamsMessage } from "./school-teams.js";
 import { normalizeTeamsOrigin } from "./teams-mention.js";
 
@@ -365,6 +366,50 @@ export function isTeamsOneOnOne(message) {
   return String(message?.chatType || "").trim().toLowerCase() === "oneonone";
 }
 
+function viewerLabels(raw) {
+  if (!Array.isArray(raw)) return [];
+  /** @type {string[]} */
+  const out = [];
+  const seen = new Set();
+  for (const row of raw) {
+    const label =
+      typeof row === "string"
+        ? row.trim()
+        : String(row?.name || row?.email || "").trim();
+    if (!label) continue;
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    if (/^yan(\s|$)/i.test(label)) continue;
+    seen.add(key);
+    out.push(label);
+    if (out.length >= 12) break;
+  }
+  return out;
+}
+
+/**
+ * Who will see the outbound reply. dm = 1:1, group = everyone in the thread.
+ * @param {'imessage'|'teams'} platform
+ * @param {object} message
+ */
+export function describeGuestAudience(platform, message) {
+  const chat = String(message?.chat || "").trim();
+  if (platform === "teams") {
+    return {
+      kind: isTeamsOneOnOne(message) ? "dm" : "group",
+      threadLabel: chat,
+      viewers: viewerLabels(message?.members || message?.viewers),
+    };
+  }
+  return {
+    kind: isDirectChatId(message?.chatId, message?.handle) ? "dm" : "group",
+    threadLabel: chat,
+    viewers: viewerLabels(
+      message?.members || message?.viewers || message?.participants
+    ),
+  };
+}
+
 export function quotaKeyFor(handle, slug) {
   if (slug) return slug;
   const h = String(handle || "").trim().toLowerCase();
@@ -532,6 +577,7 @@ export async function evaluateGuestMention(opts) {
       platform,
       handle,
       inContacts,
+      audience: describeGuestAudience(platform, message),
       model: guestModelSpec(Boolean(slot.useGrok)),
     },
   };
