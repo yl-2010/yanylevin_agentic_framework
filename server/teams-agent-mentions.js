@@ -4,7 +4,7 @@
  */
 
 import { readFile, writeFile } from "node:fs/promises";
-import { fetchRecentChatMessages } from "./school-teams.js";
+import { fetchRecentChatMessages, isTeamsAuthError } from "./school-teams.js";
 import {
   deliverGuestRateLimit,
   evaluateGuestMention,
@@ -98,10 +98,10 @@ export async function pollTeamsAgentMentions(deps = {}) {
   const fetchRecent = deps.fetchRecent || fetchRecentChatMessages;
   let rows = [];
   try {
-    rows = await fetchRecent({ since, chatLimit: 25, messageLimit: 15, allowStale: true });
+    rows = await fetchRecent({ since, chatLimit: 25, messageLimit: 15 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (/no saved school Teams session|not signed in|timed out waiting/i.test(msg)) {
+    if (isTeamsAuthError(err)) {
       return { ok: false, skipped: "not-signed-in", error: msg, started: 0 };
     }
     console.error("[teams-agent] recent", err);

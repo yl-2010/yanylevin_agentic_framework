@@ -119,6 +119,29 @@ describe("teams-agent-mentions poller", () => {
     assert.equal(result.started, 0);
   });
 
+  it("stays quiet on Teams 401", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "teams-agent-"));
+    const statePath = join(dir, "state.json");
+    await saveMentionState(
+      { lastAt: "2026-09-09T17:30:00.000Z", seenIds: [] },
+      statePath
+    );
+    const err = new Error("Teams API 401: User is not authorized.");
+    err.status = 401;
+    const result = await pollTeamsAgentMentions({
+      statePath,
+      now: () => new Date("2026-09-09T17:36:20.000Z"),
+      fetchRecent: async () => {
+        throw err;
+      },
+      startFromMessage: async () => {
+        throw new Error("should not start");
+      },
+    });
+    assert.equal(result.skipped, "not-signed-in");
+    assert.equal(result.started, 0);
+  });
+
   it("starts a guest Teams 1:1 and ignores unauthorized groups", async () => {
     const dir = await mkdtemp(join(tmpdir(), "teams-agent-"));
     const statePath = join(dir, "state.json");

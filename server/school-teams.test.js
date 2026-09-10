@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   extractBackwardLink,
+  fetchRecentChatMessages,
   formatDumpMessage,
   groupMessagesByMonth,
   shouldSkipTeamsDumpMessage,
@@ -18,6 +19,7 @@ import {
   isCsaToken,
   isGraphAudience,
   isIc3Token,
+  isTeamsAuthError,
   isTeamsToken,
   normalizeChat,
   normalizeMessage,
@@ -341,6 +343,59 @@ describe("school-teams history dump", () => {
         ["2025-12", 1],
         ["2026-01", 1],
       ]
+    );
+  });
+});
+
+describe("school-teams auth errors", () => {
+  it("treats 401 and login failures as auth errors", () => {
+    const unauthorized = new Error("Teams API 401: User is not authorized.");
+    unauthorized.status = 401;
+    assert.equal(isTeamsAuthError(unauthorized), true);
+    assert.equal(isTeamsAuthError(new Error("timed out waiting for Teams chat tokens")), true);
+    assert.equal(isTeamsAuthError(new Error("Teams API 500: boom")), false);
+  });
+
+  it("retries recent chat fetch once after 401", async () => {
+    let resolves = 0;
+    let lists = 0;
+    const err = new Error("Teams API 401: User is not authorized.");
+    err.status = 401;
+    const rows = [{ id: "m1", text: "hi" }];
+    const out = await fetchRecentChatMessages({
+      resolveSession: async (opts) => {
+        resolves += 1;
+        if (resolves === 1) assert.equal(opts.allowStale, false);
+        if (resolves === 2) assert.equal(opts.refresh, true);
+        return { token: `t${resolves}` };
+      },
+      listRecent: async (session) => {
+        lists += 1;
+        if (lists === 1) throw err;
+        assert.equal(session.token, "t2");
+        return rows;
+      },
+    });
+    assert.equal(resolves, 2);
+    assert.equal(lists, 2);
+    assert.equal(out, rows);
+  });
+
+  it("does not refresh when the caller passed a session", async () => {
+    const err = new Error("Teams API 401: User is not authorized.");
+    err.status = 401;
+    await assert.rejects(
+      () =>
+        fetchRecentChatMessages({
+          session: { token: "x" },
+          resolveSession: async () => {
+            throw new Error("should not resolve");
+          },
+          listRecent: async () => {
+            throw err;
+          },
+        }),
+      /401/
     );
   });
 });

@@ -818,27 +818,52 @@ async function apiRequest(url, session, { method = "GET", body, token, extra } =
   throw lastErr || new Error("Teams API retry exhausted");
 }
 
+export const CAPTURE_COOLDOWN_MS = 5 * 60_000;
+/** @type {number} */
+let captureFailAt = 0;
+
+export function isTeamsAuthError(err) {
+  const status = Number(err?.status || 0);
+  if (status === 401 || status === 403) return true;
+  const msg = err instanceof Error ? err.message : String(err || "");
+  return /no saved school Teams session|not signed in|timed out waiting|User is not authorized|Teams API 401|Teams API 403/i.test(
+    msg
+  );
+}
+
 async function resolveSession(opts) {
   const root = opts.root || schoolTeamsDir();
   const session = await loadSession(root);
-  if (isTeamsSessionFresh(session) && !opts.force) {
+  if (isTeamsSessionFresh(session) && !opts.force && !opts.refresh) {
     return { ...session, root };
   }
   if (!session) {
     throw new Error("no saved school Teams session");
   }
-  if (opts.allowStale && !opts.force && session.token && session.csaToken) {
+  if (
+    opts.allowStale &&
+    !opts.force &&
+    !opts.refresh &&
+    session.token &&
+    session.csaToken
+  ) {
     return { ...session, root };
+  }
+  if (!opts.force && captureFailAt && Date.now() - captureFailAt < CAPTURE_COOLDOWN_MS) {
+    throw new Error("timed out waiting for Teams chat tokens");
   }
   try {
     const next = await captureToken({
       headed: Boolean(opts.headed),
       root,
     });
+    captureFailAt = 0;
     return { ...next, root };
   } catch (err) {
+    captureFailAt = Date.now();
     const msg = err instanceof Error ? err.message : String(err);
-    if (session.token && session.csaToken && !opts.force) {
+    if (opts.refresh || opts.force) throw new Error(msg);
+    if (session.token && session.csaToken) {
       return { ...session, root };
     }
     throw new Error(msg);
@@ -1070,12 +1095,41 @@ function isoOrEmpty(raw) {
 
 /**
  * Recent chat messages for the @agent poller. Only chats updated since `since`.
- * @param {{ since?: string, chatLimit?: number, messageLimit?: number, root?: string, headed?: boolean, force?: boolean, session?: object }} [opts]
+ * @param {{
+ *   since?: string,
+ *   chatLimit?: number,
+ *   messageLimit?: number,
+ *   root?: string,
+ *   headed?: boolean,
+ *   force?: boolean,
+ *   allowStale?: boolean,
+ *   session?: object,
+ *   resolveSession?: typeof resolveSession,
+ *   listRecent?: typeof listRecentChatMessages,
+ * }} [opts]
  */
 export async function fetchRecentChatMessages(opts = {}) {
-  const session =
-    opts.session ||
-    (await resolveSession({ ...opts, allowStale: opts.allowStale !== false }));
+  const resolve = opts.resolveSession || resolveSession;
+  const list = opts.listRecent || listRecentChatMessages;
+  if (opts.session) return list(opts.session, opts);
+  const session = await resolve({
+    ...opts,
+    allowStale: opts.allowStale === true,
+  });
+  try {
+    return await list(session, opts);
+  } catch (err) {
+    if (!isTeamsAuthError(err)) throw err;
+    const next = await resolve({
+      ...opts,
+      allowStale: false,
+      refresh: true,
+    });
+    return await list(next, opts);
+  }
+}
+
+async function listRecentChatMessages(session, opts = {}) {
   const since = isoOrEmpty(opts.since);
   const chats = await listChats(session, { limit: opts.chatLimit || 40 });
   /** @type {object[]} */
@@ -1086,20 +1140,20 @@ export async function fetchRecentChatMessages(opts = {}) {
       limit: opts.messageLimit || 20,
     });
     for (const row of rows) {
-        out.push({
-          ...row,
-          chatId: chat.id,
-          chat: chat.name,
-          chatType: chat.chatType || row.chatType || "",
-          members: (Array.isArray(chat.members) ? chat.members : [])
-            .map((m) => ({
-              name: String(m?.name || "").trim(),
-              email: String(m?.email || "").trim(),
-            }))
-            .filter((m) => m.name || m.email)
-            .slice(0, 12),
-          kind: "chat",
-        });
+      out.push({
+        ...row,
+        chatId: chat.id,
+        chat: chat.name,
+        chatType: chat.chatType || row.chatType || "",
+        members: (Array.isArray(chat.members) ? chat.members : [])
+          .map((m) => ({
+            name: String(m?.name || "").trim(),
+            email: String(m?.email || "").trim(),
+          }))
+          .filter((m) => m.name || m.email)
+          .slice(0, 12),
+        kind: "chat",
+      });
     }
     await sleep(40);
   }

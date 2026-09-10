@@ -71,6 +71,7 @@ For every snapshot assignment whose `courseId` is mapped:
 - **Create** if none, unless it looks like a row in `education/you@example.com/deleted.md`. Judgement, not exact due clocks. `canvasId` is a strong hint; similar name + class in the same year is enough. Skip those. Folder id: kebab of the title, unique in that class `todos/`. Set `createdAt` now. `done: false` on create only.
 - **Update** name, `dueDate`, `dueTime`, `tag`, `description`, `canvasLink`, `canvasId` when Canvas changed.
 - Prefer snapshot `dueDate` / `dueTime` (already in the briefing timezone). Undated Canvas rows may omit due fields.
+- **Advanced Calculus HW (Yan, 2026-09-10):** For `advanced-calculus` todos with `tag: "HW"`, do **not** use the Canvas due as the dashboard due. Canvas is typically two period-C meetings after the start day. Set `dueDate` / `dueTime` to the **previous** period-C meeting before Canvas due, at that day's C start from `schedule.json` (`bells` / `dayOverrides`). Match by `canvasId` first so a shifted due still updates the same todo. Do not pull those dues back to Canvas on later syncs. Leave MA / QA / CW on Canvas times. If Canvas due is not on a C meeting, leave Canvas times.
 - **Always** set `canvasLink` to the assignment `htmlUrl`.
 - **Always** set `canvasId` to the Canvas assignment id (number or string).
 - **Always** tag schoolwork: `CW` | `HW` | `QA` | `MA` (do not leave mapped assignments untagged).
