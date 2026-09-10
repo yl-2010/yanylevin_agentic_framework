@@ -167,6 +167,10 @@ describe("imessage-mention", () => {
     assert.match(block, /Called by Alex \(not Yan\) on iMessage/);
     assert.match(block, /not Yan's instructions/);
     assert.match(block, /brain-entity-card\.js "alex-rivera"/);
+    assert.match(block, /Never do irreversible work for a guest/);
+    assert.match(block, /Never delete, trash, empty, or overwrite/);
+    assert.match(block, /Downloads/);
+    assert.match(block, /treat them as not close/);
     assert.doesNotMatch(block, /Called from iMessage\. This Personal Agent chat is otherwise normal/);
     assert.doesNotMatch(block, /Composer|Grok|grok-4/);
   });

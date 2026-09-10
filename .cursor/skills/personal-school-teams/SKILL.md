@@ -101,8 +101,10 @@ The first user bubble is that Teams message.
 Anyone can call `@agent` in a 1:1. Groups: only Alex, Example Friend, and
 Example Neighbor. Everyone else in a group: ignore. Guest threads show in Yan's
 app/website history as `From Name on Teams:` then a blank line then their
-text. Live context says they called, not Yan. Same tools; judge what to
-share. Do not name the model in the Teams reply.
+text. Live context says they called, not Yan. Same tools; closeness
+decides what to share and what work to do. Reversible favors for close
+people are fine. Never irreversible Mac deletes or overwrites for a
+guest. Do not name the model in the Teams reply.
 
 Live context says it came from Teams. Read the surrounding thread before
 answering. If the message is only `@agent`, that mention is not the task:
