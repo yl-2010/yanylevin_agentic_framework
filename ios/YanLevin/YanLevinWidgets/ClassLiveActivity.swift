@@ -131,19 +131,20 @@ private struct ClassLiveActivityTimer: View {
             }
     }
 
+    @ViewBuilder
     private func timerText(interval: ClosedRange<Date>, countsDown: Bool) -> some View {
-        let timer = Text(timerInterval: interval, countsDown: countsDown, showsHours: false)
         if compactIsland {
             // timerInterval reports a huge ideal width. Size to MM:SS like elapsed minutes.
             Text("00:00")
                 .hidden()
                 .overlay(alignment: .leading) {
-                    timer.lineLimit(1)
+                    Text(timerInterval: interval, countsDown: countsDown, showsHours: false)
+                        .lineLimit(1)
                 }
                 .clipped()
                 .fixedSize()
         } else {
-            timer
+            Text(timerInterval: interval, countsDown: countsDown, showsHours: false)
         }
     }
 
