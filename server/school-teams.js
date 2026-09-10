@@ -178,6 +178,55 @@ export function pickByName(rows, needle, nameKey = "name") {
   return { match: null, ambiguous: hits };
 }
 
+/**
+ * CSA marks Chat-tab 1:1s as hidden (they are not on the Teams tab).
+ * Keep those. Drop user-hidden groups and deleted threads.
+ */
+export function includeCsaChat(row) {
+  if (!row) return false;
+  if (row.isConversationDeleted === true) return false;
+  if (row.isOneOnOne === true) return true;
+  return row.hidden !== true;
+}
+
+function memberMatchesNeedle(member, needle) {
+  const q = String(needle || "").trim().toLowerCase();
+  if (!q) return false;
+  const name = String(member?.name || "").trim().toLowerCase();
+  const email = String(member?.email || "").trim().toLowerCase();
+  return (name && (name === q || name.includes(q))) || email === q;
+}
+
+export function pickChat(chats, needle) {
+  const n = String(needle || "").trim();
+  const list = Array.isArray(chats) ? chats : [];
+  if (!n) return { match: null, ambiguous: [], chats: list };
+  const byId = list.find((c) => c.id === n);
+  if (byId) return { match: byId, ambiguous: [], chats: list };
+  const namePicked = pickByName(list, n);
+  const hits = [];
+  const seen = new Set();
+  const add = (c) => {
+    const id = c?.id || "";
+    if (!c || (id && seen.has(id))) return;
+    if (id) seen.add(id);
+    hits.push(c);
+  };
+  if (namePicked.match) add(namePicked.match);
+  for (const c of namePicked.ambiguous) add(c);
+  for (const c of list) {
+    if (c?.id && seen.has(c.id)) continue;
+    if ((c.members || []).some((m) => memberMatchesNeedle(m, n))) add(c);
+  }
+  if (hits.length === 1) return { match: hits[0], ambiguous: [], chats: list };
+  if (hits.length > 1) {
+    const ones = hits.filter((c) => c.chatType === "oneOnOne");
+    if (ones.length === 1) return { match: ones[0], ambiguous: [], chats: list };
+    return { match: null, ambiguous: ones.length ? ones : hits, chats: list };
+  }
+  return { match: null, ambiguous: [], chats: list };
+}
+
 export function messageText(raw, max = MESSAGE_TEXT_MAX) {
   const body = raw?.body || {};
   const content = String(body.content || raw?.content || "");
@@ -206,7 +255,7 @@ function memberObjectId(raw) {
 
 export function chatDisplayName(raw, selfEmail = SCHOOL_EMAIL) {
   const topic = String(raw?.title || raw?.topic || raw?.name || "").trim();
-  if (topic) return topic;
+  if (topic && topic !== "(chat)") return topic;
   const self = String(selfEmail || "").trim().toLowerCase();
   const selfId = String(raw?.selfObjectId || "").trim().toLowerCase();
   const members = Array.isArray(raw?.members) ? raw.members : [];
@@ -792,10 +841,12 @@ async function enrichChats(session, chats) {
   const ids = new Set();
   for (const chat of chats) {
     const named = String(chat.name || "").trim();
-    if (named && named !== "(chat)") continue;
-    const others = (chat.members || []).filter(
-      (m) => m.objectId && m.objectId !== selfId && !m.name && !m.email && !cache[m.objectId]
-    );
+    const unnamed = !named || named === "(chat)";
+    const others = (chat.members || []).filter((m) => {
+      if (!m.objectId || m.objectId === selfId || cache[m.objectId]) return false;
+      if (chat.chatType === "oneOnOne") return !m.name || !m.email;
+      return unnamed && !m.name && !m.email;
+    });
     const take = chat.chatType === "oneOnOne" ? others.slice(0, 1) : others.slice(0, 4);
     for (const m of take) ids.add(m.objectId);
   }
@@ -819,6 +870,7 @@ async function enrichChats(session, chats) {
       members,
       selfObjectId: selfId,
       title: chat.name && chat.name !== "(chat)" ? chat.name : "",
+      name: chat.name && chat.name !== "(chat)" ? chat.name : "",
     };
     return {
       ...chat,
@@ -832,7 +884,7 @@ export async function listChats(session, { limit = 50 } = {}) {
   const data = await csaSnapshot(session);
   const rows = Array.isArray(data.chats) ? data.chats : [];
   const mapped = rows
-    .filter((row) => row && row.hidden !== true)
+    .filter((row) => includeCsaChat(row))
     .map((row) =>
       normalizeChat({ ...row, selfObjectId: session.objectId }, session.email || SCHOOL_EMAIL)
     )
@@ -1015,27 +1067,11 @@ export async function fetchSchoolTeams(opts = {}) {
   };
 }
 
-function looksLikeEmail(raw) {
-  return /@/.test(String(raw || ""));
-}
-
 async function resolveChat(session, needle) {
   const n = String(needle || "").trim();
   if (!n) return { match: null, ambiguous: [], chats: [] };
   const chats = await listChats(session, { limit: 200 });
-  const byId = chats.find((c) => c.id === n);
-  if (byId) return { match: byId, ambiguous: [], chats };
-  const picked = pickByName(chats, n);
-  if (picked.match || picked.ambiguous.length) return { ...picked, chats };
-  if (looksLikeEmail(n)) {
-    const email = n.toLowerCase();
-    const hits = chats.filter((c) =>
-      (c.members || []).some((m) => String(m.email || "").toLowerCase() === email)
-    );
-    if (hits.length === 1) return { match: hits[0], ambiguous: [], chats };
-    if (hits.length > 1) return { match: null, ambiguous: hits, chats };
-  }
-  return { match: null, ambiguous: [], chats };
+  return pickChat(chats, n);
 }
 
 async function resolveTeamChannel(session, teamNeedle, channelNeedle) {

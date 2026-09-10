@@ -18,7 +18,9 @@ import {
   normalizeChat,
   normalizeMessage,
   parseArgs,
+  includeCsaChat,
   pickByName,
+  pickChat,
   runSchoolTeams,
   teamsScopes,
 } from "./school-teams.js";
@@ -146,6 +148,18 @@ describe("school-teams urls and shapes", () => {
     assert.equal(name, "Alex Rivera");
   });
 
+  it("replaces the (chat) placeholder once members are named", () => {
+    const name = chatDisplayName({
+      name: "(chat)",
+      title: "",
+      members: [
+        { name: "Yan Levin", email: "owner@school.example", objectId: "a" },
+        { name: "Alex Rivera", email: "friend@school.example", objectId: "b" },
+      ],
+    });
+    assert.equal(name, "Alex Rivera");
+  });
+
   it("marks one-on-one CSA chats", () => {
     const row = normalizeChat({
       id: "19:x",
@@ -186,6 +200,32 @@ describe("school-teams urls and shapes", () => {
     const rows = [{ name: "Alex Rivera" }, { name: "Alex GC" }];
     assert.equal(pickByName(rows, "prasham dhruva").match.name, "Alex Rivera");
     assert.equal(pickByName(rows, "prasham").ambiguous.length, 2);
+  });
+
+  it("keeps hidden 1:1 chats and drops hidden groups", () => {
+    assert.equal(includeCsaChat({ isOneOnOne: true, hidden: true }), true);
+    assert.equal(includeCsaChat({ isOneOnOne: false, hidden: true }), false);
+    assert.equal(includeCsaChat({ isOneOnOne: false, hidden: false }), true);
+    assert.equal(includeCsaChat({ isOneOnOne: true, isConversationDeleted: true }), false);
+  });
+
+  it("prefers a 1:1 when a group also matches the person", () => {
+    const chats = [
+      {
+        id: "g1",
+        name: "Stearns Advisory",
+        chatType: "group",
+        members: [{ name: "Alex Rivera", email: "friend@school.example" }],
+      },
+      {
+        id: "19:prasham",
+        name: "Alex Rivera",
+        chatType: "oneOnOne",
+        members: [{ name: "Alex Rivera", email: "friend@school.example" }],
+      },
+    ];
+    assert.equal(pickChat(chats, "Alex").match.id, "19:prasham");
+    assert.equal(pickChat(chats, "friend@school.example").match.id, "19:prasham");
   });
 
   it("applies the agent footer on send bodies", () => {
