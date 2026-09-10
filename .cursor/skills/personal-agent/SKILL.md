@@ -181,6 +181,6 @@ Later turns typed in the app are Yan. They do not auto-text unless you send via 
 
 Express polls school Teams **chats** (1:1 and group, not class channels) for `@agent` / `@Agent`. Yan `fromMe` is the same product as iMessage `@agent`.
 
-Anyone can call it in a 1:1. Groups: only Alex, Example Friend, and Example Neighbor. Everyone else in a group: ignore. Same hourly and Grok limits as iMessage, counted separately (they do not share a bucket). First user bubble is `From Name on Teams:` then a blank line then their text.
+Anyone can call it in a 1:1 or any group chat, including the giant Class of 2028 grade chat. Same hourly and Grok limits as iMessage, counted separately (they do not share a bucket). First user bubble is `From Name on Teams:` then a blank line then their text.
 
-Live context says they called, not Yan. Same judgment rules as iMessage guest `@agent`. Bare `@agent` means the thread is the task. Do not also `school-teams.js send` that same final text. Later app turns do not auto-post.
+Live context says they called, not Yan. Same judgment rules as iMessage guest `@agent`. Bare `@agent` means the thread is the task. Class of 2028 and other grade-wide chats: the whole class sees the reply. Public-safe only. Do not give out confidential information. No private calendar, location, mail, iMessage, health, Screen Time, grades, family details, private brain facts, or other people's personal information. If they ask for that, refuse. You may pull cards to know who is talking. Do not paste private card facts into that chat. Do not also `school-teams.js send` that same final text. Later app turns do not auto-post.

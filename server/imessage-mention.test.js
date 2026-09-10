@@ -6,6 +6,7 @@ import {
   formatIMessageOriginBlock,
   formatOutboundSendConfirmation,
   isBareAgentMention,
+  isGradeWideThread,
   messageKey,
   messageMentionsAgent,
   normalizeIMessageOrigin,
@@ -28,6 +29,10 @@ describe("imessage-mention", () => {
     assert.equal(isBareAgentMention(" @Agent. "), true);
     assert.equal(isBareAgentMention("@agent ping"), false);
     assert.equal(isBareAgentMention("hey @agent"), false);
+    assert.equal(isGradeWideThread("Class of 2028"), true);
+    assert.equal(isGradeWideThread("EPS Class of 2028"), true);
+    assert.equal(isGradeWideThread("JYPE"), false);
+    assert.equal(isGradeWideThread("Spanish 4"), false);
   });
 
   it("triggers on Yan fromMe or guest texts with the token", () => {
@@ -193,16 +198,17 @@ describe("imessage-mention", () => {
         slug: "alex-rivera",
         audience: {
           kind: "group",
-          threadLabel: "Class of 2028",
+          threadLabel: "JYPE",
           viewers: ["Alex", "Sam", "Riley"],
         },
       },
     });
-    assert.match(block, /group chat Class of 2028/);
+    assert.match(block, /group chat JYPE/);
     assert.match(block, /Everyone in that chat will see it/);
     assert.match(block, /People already listed in this chat: Alex, Sam, Riley/);
     assert.match(block, /must not be answered here/);
     assert.match(block, /Grade-wide, class, or huge groups/);
+    assert.doesNotMatch(block, /confidential information/);
     const dm = formatIMessageOriginBlock(origin, {
       deliverFinal: true,
       guestCaller: {
@@ -213,6 +219,36 @@ describe("imessage-mention", () => {
     });
     assert.match(dm, /1:1 with Alex only/);
     assert.doesNotMatch(dm, /must not be answered here/);
+  });
+
+  it("forbids confidential info in the Class of 2028 grade chat", () => {
+    const origin = normalizeIMessageOrigin({
+      fromMe: false,
+      text: "@agent where is yan",
+      guid: "g3",
+      chat: "Class of 2028",
+      chatId: "chat2028",
+      handle: "+15555550999",
+    });
+    const block = formatIMessageOriginBlock(origin, {
+      deliverFinal: true,
+      guestCaller: {
+        displayName: "Sam",
+        slug: "",
+        audience: {
+          kind: "group",
+          threadLabel: "Class of 2028",
+          gradeWide: true,
+          viewers: ["Sam", "Riley"],
+        },
+      },
+    });
+    assert.match(block, /giant Class of 2028 grade chat/);
+    assert.match(block, /Do not give out confidential information/);
+    assert.match(block, /whole graduating class/);
+    assert.match(block, /Do not paste private card facts/);
+    assert.doesNotMatch(block, /People already listed in this chat/);
+    assert.doesNotMatch(block, /Grade-wide, class, or huge groups/);
   });
 
   it("confirms outbound sends without quoting the body", () => {

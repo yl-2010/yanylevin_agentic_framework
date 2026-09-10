@@ -1,7 +1,7 @@
 /**
  * Other people calling @agent on iMessage / Teams.
  * Yan fromMe stays on the existing Personal Agent path. This module is
- * contacts, group gates, clock-hour limits, and guest model pick.
+ * contacts, clock-hour limits, and guest model pick.
  */
 
 import { readFile, writeFile } from "node:fs/promises";
@@ -9,6 +9,7 @@ import { listEntities } from "./brain-lib.js";
 import { contactMatchesQuery } from "./contacts-read.js";
 import {
   applyAgentSentFooter,
+  isGradeWideThread,
   normalizeIMessageOrigin,
   replyTargetForMessage,
 } from "./imessage-mention.js";
@@ -29,8 +30,6 @@ export const GROK_DAILY = {
   "example-friend": 2,
   "example-neighbor": 2,
 };
-
-export const TEAMS_GROUP_SLUGS = new Set(Object.keys(GROK_DAILY));
 
 export const GUEST_COMPOSER_SPEC = {
   id: "composer-2.5",
@@ -394,19 +393,26 @@ function viewerLabels(raw) {
  */
 export function describeGuestAudience(platform, message) {
   const chat = String(message?.chat || "").trim();
-  if (platform === "teams") {
-    return {
-      kind: isTeamsOneOnOne(message) ? "dm" : "group",
-      threadLabel: chat,
-      viewers: viewerLabels(message?.members || message?.viewers),
-    };
-  }
+  const kind =
+    platform === "teams"
+      ? isTeamsOneOnOne(message)
+        ? "dm"
+        : "group"
+      : isDirectChatId(message?.chatId, message?.handle)
+        ? "dm"
+        : "group";
+  const viewers =
+    platform === "teams"
+      ? viewerLabels(message?.members || message?.viewers)
+      : viewerLabels(
+          message?.members || message?.viewers || message?.participants
+        );
+  const gradeWide = kind === "group" && isGradeWideThread(chat);
   return {
-    kind: isDirectChatId(message?.chatId, message?.handle) ? "dm" : "group",
+    kind,
     threadLabel: chat,
-    viewers: viewerLabels(
-      message?.members || message?.viewers || message?.participants
-    ),
+    viewers,
+    ...(gradeWide ? { gradeWide: true } : {}),
   };
 }
 
@@ -529,16 +535,6 @@ export async function evaluateGuestMention(opts) {
     fromName = String(message.from || "").trim();
     handle = email || fromName;
     if (!handle) return { action: "ignore" };
-    const oneOnOne = isTeamsOneOnOne(message);
-    const personEarly = resolvePerson(people, {
-      handle: email || handle,
-      email,
-      name: fromName,
-    });
-    const slugEarly = personEarly ? personSlug(personEarly) : "";
-    if (!oneOnOne && !TEAMS_GROUP_SLUGS.has(slugEarly)) {
-      return { action: "ignore" };
-    }
     inContacts = true;
   }
 

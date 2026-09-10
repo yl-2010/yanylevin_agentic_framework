@@ -165,6 +165,7 @@ describe("guest-agent helpers", () => {
     });
     assert.equal(teamsGroup.kind, "group");
     assert.equal(teamsGroup.threadLabel, "Class of 2028");
+    assert.equal(teamsGroup.gradeWide, true);
     assert.deepEqual(teamsGroup.viewers, ["Alex Rivera", "Sam Classmate"]);
     assert.equal(
       describeGuestAudience("teams", {
@@ -399,7 +400,7 @@ describe("evaluateGuestMention", () => {
     );
   });
 
-  it("allows any Teams 1:1 and only the trio in groups", async () => {
+  it("allows any Teams 1:1 and any Teams group, including Class of 2028", async () => {
     const dir = await mkdtemp(join(tmpdir(), "guest-eval-"));
     const statePath = join(dir, "limits.json");
     const stranger = await evaluateGuestMention({
@@ -424,6 +425,7 @@ describe("evaluateGuestMention", () => {
         fromMe: false,
         from: "Sam Classmate",
         fromEmail: "sam@school.example",
+        chat: "Class of 2028",
         chatType: "group",
         text: "@agent hi",
       },
@@ -431,7 +433,11 @@ describe("evaluateGuestMention", () => {
       now: FIVE_PM,
       statePath,
     });
-    assert.equal(groupStranger.action, "ignore");
+    assert.equal(groupStranger.action, "start");
+    assert.equal(groupStranger.caller.model.id, "composer-2.5");
+    assert.equal(groupStranger.caller.audience.kind, "group");
+    assert.equal(groupStranger.caller.audience.threadLabel, "Class of 2028");
+    assert.equal(groupStranger.caller.audience.gradeWide, true);
 
     const groupPrasham = await evaluateGuestMention({
       platform: "teams",
@@ -452,6 +458,7 @@ describe("evaluateGuestMention", () => {
     assert.equal(groupPrasham.caller.model.id, "grok-4.6");
     assert.equal(groupPrasham.caller.audience.kind, "group");
     assert.equal(groupPrasham.caller.audience.threadLabel, "Class of 2028");
+    assert.equal(groupPrasham.caller.audience.gradeWide, true);
     assert.deepEqual(groupPrasham.caller.audience.viewers, [
       "Alex Rivera",
       "Sam Classmate",

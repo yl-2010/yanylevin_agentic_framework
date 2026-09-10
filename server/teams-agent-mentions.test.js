@@ -142,7 +142,7 @@ describe("teams-agent-mentions poller", () => {
     assert.equal(result.started, 0);
   });
 
-  it("starts a guest Teams 1:1 and ignores unauthorized groups", async () => {
+  it("starts a guest Teams 1:1 and a Class of 2028 group", async () => {
     const dir = await mkdtemp(join(tmpdir(), "teams-agent-"));
     const statePath = join(dir, "state.json");
     await saveMentionState(
@@ -191,19 +191,33 @@ describe("teams-agent-mentions poller", () => {
       ...hit,
       id: "g2",
       chatType: "group",
-      chat: "Class GC",
+      chat: "Class of 2028",
       at: "2026-09-09T17:40:10Z",
     };
     const second = await pollTeamsAgentMentions({
       statePath,
       now: () => new Date("2026-09-09T17:40:12.000Z"),
       fetchRecent: async () => [group],
-      evaluateGuestMention: async () => ({ action: "ignore" }),
+      evaluateGuestMention: async () => ({
+        action: "start",
+        caller: {
+          displayName: "Sam",
+          slug: "",
+          platform: "teams",
+          audience: {
+            kind: "group",
+            threadLabel: "Class of 2028",
+            gradeWide: true,
+          },
+          model: { id: "composer-2.5", params: [{ id: "fast", value: "false" }] },
+        },
+      }),
       startFromMessage: async (message) => {
         started.push(message);
       },
     });
-    assert.equal(second.started, 0);
-    assert.equal(started.length, 1);
+    assert.equal(second.started, 1);
+    assert.equal(started.length, 2);
+    assert.equal(started[1].guestCaller.audience.gradeWide, true);
   });
 });

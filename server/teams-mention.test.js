@@ -66,6 +66,27 @@ describe("teams-mention trigger", () => {
     });
     assert.match(guest, /Called by Alex \(not Yan\) on Teams/);
     assert.doesNotMatch(guest, /Called from Teams\. This Personal Agent chat is otherwise normal/);
+    const grade = formatTeamsOriginBlock(
+      normalizeTeamsOrigin({
+        id: "m1",
+        chatId: "19:class",
+        chat: "Class of 2028",
+        text: "@agent ping",
+      }),
+      {
+        deliverFinal: true,
+        guestCaller: {
+          displayName: "Sam",
+          audience: {
+            kind: "group",
+            threadLabel: "Class of 2028",
+            gradeWide: true,
+          },
+        },
+      }
+    );
+    assert.match(grade, /giant Class of 2028 grade chat/);
+    assert.match(grade, /Do not give out confidential information/);
   });
 
   it("tells the agent a bare @agent is not the task", () => {

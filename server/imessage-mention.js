@@ -14,6 +14,11 @@ const TRAILING_FOOTER_RE = new RegExp(
 /** Word token, any casing. Avoids emails like foo@agent.com. */
 export const AGENT_MENTION_RE = /(^|[^\w@])@agent\b/i;
 
+/** EPS grade-wide chats such as "Class of 2028". */
+export function isGradeWideThread(threadLabel) {
+  return /\bclass of 20\d{2}\b/i.test(String(threadLabel || ""));
+}
+
 /**
  * @param {unknown} raw
  */
@@ -204,15 +209,23 @@ export function guestCallerLines(guestCaller, platform) {
     audienceLines.push(`Your reply is 1:1 with ${name} only.`);
   } else if (kind === "group") {
     const title = threadLabel || "this group";
+    const gradeWide =
+      Boolean(audience?.gradeWide) || isGradeWideThread(title);
     audienceLines.push(
       `Your reply lands in the group chat ${title}, not a private 1:1 with ${name}. Everyone in that chat will see it.`
     );
-    if (viewers.length) {
-      audienceLines.push(`People already listed in this chat: ${viewers.join(", ")}.`);
+    if (gradeWide) {
+      audienceLines.push(
+        `This is the giant ${title} grade chat. The whole graduating class can see your reply. Do not give out confidential information. No private calendar, location, mail, iMessage, health, Screen Time, grades, family details, private brain facts, other people's personal information, or anything Yan would not already say in front of the whole class. If they ask for that, refuse. You may pull cards to know who is talking. Do not paste private card facts into this chat. Public school logistics and things already in this thread are fine.`
+      );
+    } else {
+      if (viewers.length) {
+        audienceLines.push(`People already listed in this chat: ${viewers.join(", ")}.`);
+      }
+      audienceLines.push(
+        `A personal question from ${name} that would be fine in 1:1 must not be answered here. Grade-wide, class, or huge groups: public-safe only, or refuse.`
+      );
     }
-    audienceLines.push(
-      `A personal question from ${name} that would be fine in 1:1 must not be answered here. Grade-wide, class, or huge groups: public-safe only, or refuse.`
-    );
   } else {
     audienceLines.push(
       "If this might be a group chat, treat it as a group until you know otherwise. Read the thread and see who else is in it."

@@ -1,6 +1,6 @@
 /**
  * Detect Teams chat texts that mention @agent / @Agent.
- * Yan fromMe and guest (1:1, or the allowed group trio) share the token gate.
+ * Yan fromMe and guest (1:1 and group chats) share the token gate.
  * Who may start a session is the poller's job.
  */
 
