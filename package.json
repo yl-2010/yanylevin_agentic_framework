@@ -13,6 +13,7 @@
     "canvas-sync": "npm run canvas-sync --prefix server",
     "school-mail": "npm run school-mail --prefix server",
     "school-mail-fill": "npm run school-mail-fill --prefix server",
+    "school-teams-fill": "npm run school-teams-fill --prefix server",
     "apple-mail": "npm run apple-mail --prefix server",
     "apple-mail-fill": "npm run apple-mail-fill --prefix server",
     "health-takeaways": "npm run health-takeaways --prefix server",

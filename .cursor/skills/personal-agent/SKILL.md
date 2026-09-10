@@ -90,6 +90,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Health history patterns (manual) | `.cursor/skills/health-history/SKILL.md` |
 | Person iMessage fill (manual, one-shot) | `.cursor/skills/brain-person-imessage/SKILL.md` |
 | School Outlook fill (manual, one-shot) | `.cursor/skills/brain-school-mail/SKILL.md` |
+| School Teams fill (manual, one-shot) | `.cursor/skills/brain-school-teams/SKILL.md` |
 | Apple Mail fill (manual, one-shot) | `.cursor/skills/brain-apple-mail/SKILL.md` |
 | Chat title refresh (manual / backfill) | `.cursor/skills/chat-title-refresh/SKILL.md` |
 
@@ -99,7 +100,7 @@ Live context on Express turns is authoritative for clock, class-now, the open sc
 
 Times are in `education/you@example.com/daily-briefing/meta.json` (`nightlyAgentsLocalTime` 01:00, `chatTitleRefreshLocalTime` 01:30, `contextSynthesisLocalTime` 02:30, `brainProjectionLocalTime` 03:00, `compileLocalTime` 06:00). Fact-check starts as soon as both 03:00 agents finish, not on a 03:30 clock.
 
-When Yan says run location enrichment / enrich my places / run health takeaways / run context synthesis / run the nightly pipeline / update my memories / retitle chats / run location brain / project my places / run health brain / run fact check / fact-check overnight context / fill a person from iMessage / fill school Outlook / fill Apple Mail, **do not** do the whole Grok/Composer pass in this chat turn. From the repo root:
+When Yan says run location enrichment / enrich my places / run health takeaways / run context synthesis / run the nightly pipeline / update my memories / retitle chats / run location brain / project my places / run health brain / run fact check / fact-check overnight context / fill a person from iMessage / fill school Outlook / fill school Teams / fill Apple Mail, **do not** do the whole Grok/Composer pass in this chat turn. From the repo root:
 
 ```bash
 node --env-file=server/.env server/location-enrichment-agent.js --force
@@ -113,6 +114,7 @@ node --env-file=server/.env server/health-brain-agent.js --force
 node --env-file=server/.env server/fact-check-agent.js --force
 node --env-file=server/.env server/brain-person-imessage-fill.js --slug alex-rivera --since 2024-09-01
 node --env-file=server/.env server/school-mail-fill.js --since 2024-06-01
+node --env-file=server/.env server/school-teams-fill.js --keep-dump
 node --env-file=server/.env server/apple-mail-fill.js --keep-dump
 ```
 

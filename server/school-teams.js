@@ -9,7 +9,7 @@
  */
 
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { applyAgentSentFooter } from "./imessage-mention.js";
@@ -20,6 +20,7 @@ import {
   jwtEmail,
   jwtExp,
   jwtClaims,
+  monthKeyFromIso,
   redactSecrets,
   schoolMailDir,
   stripHtml,
@@ -35,6 +36,9 @@ export const TEAMS_WEB_URL = "https://teams.microsoft.com/";
 export const TEAMS_CLOUD = "https://teams.cloud.microsoft";
 export const DUMP_BODY_MAX = 400;
 export const DUMP_MAX = 150;
+export const DUMP_PAGE_SIZE = 50;
+export const FILL_BODY_MAX = 4000;
+export const DUMP_CHAT_MAX = 20000;
 const MESSAGE_TEXT_MAX = 4000;
 const PEOPLE_LOOKUP_CONCURRENCY = 6;
 
@@ -76,11 +80,13 @@ export function parseArgs(argv) {
     text: "",
     since: "",
     out: "",
+    full: false,
   };
   while (args.length) {
     const a = args.shift();
     if (a === "--force") out.force = true;
     else if (a === "--headed") out.headed = true;
+    else if (a === "--full") out.full = true;
     else if (a === "--chat" || a === "--to") {
       const rest = [];
       while (args.length && !String(args[0]).startsWith("--")) rest.push(args.shift());
@@ -391,10 +397,72 @@ export function normalizeMessage(raw, extra = {}) {
     messageType: normalizeMessageType(raw),
     chatId: extra.chatId || "",
     chat: extra.chat || "",
+    chatType: extra.chatType || "",
     team: extra.team || "",
     channel: extra.channel || "",
     kind: extra.kind || "chat",
   };
+}
+
+export function defaultDumpDir() {
+  return join(tmpdir(), "yanylevin-school-teams-export");
+}
+
+export function extractBackwardLink(data) {
+  const raw = String(data?._metadata?.backwardLink || "").trim();
+  if (!raw) return "";
+  const url = raw.startsWith("/") ? `${TEAMS_CLOUD}${raw}` : raw;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "https:") return "";
+    const host = u.hostname.toLowerCase();
+    const allowed =
+      host === "teams.cloud.microsoft" ||
+      host === "teams.microsoft.com" ||
+      host.endsWith(".teams.microsoft.com");
+    if (!allowed) return "";
+    if (!u.pathname.includes("/api/chatsvc/") || !u.pathname.includes("/messages")) {
+      return "";
+    }
+    return u.toString();
+  } catch {
+    return "";
+  }
+}
+
+export function shouldSkipTeamsDumpMessage(msg, raw = {}) {
+  const type = String(msg?.messageType || raw?.messagetype || raw?.type || "");
+  if (/^(control|event|threadactivity)\b/i.test(type)) return true;
+  if (/^(Control|Event|ThreadActivity)\//.test(type)) return true;
+  return !String(msg?.text || "").trim();
+}
+
+export function formatDumpMessage(msg) {
+  const from = msg.fromEmail ? `${msg.from} <${msg.fromEmail}>` : String(msg.from || "");
+  const where =
+    msg.kind === "channel"
+      ? `team=${msg.team || ""} | channel=${msg.channel || ""}`
+      : `chat=${msg.chat || ""} | type=${msg.chatType || "chat"}`;
+  const body = String(msg.text || "")
+    .replace(/\r\n/g, "\n")
+    .trim()
+    .slice(0, FILL_BODY_MAX);
+  return [
+    `${msg.at} | kind=${msg.kind || "chat"} | ${where} | from=${from} | fromMe=${msg.fromMe ? "true" : "false"}`,
+    body,
+    "",
+  ].join("\n");
+}
+
+export function groupMessagesByMonth(messages) {
+  /** @type {Map<string, object[]>} */
+  const map = new Map();
+  for (const msg of messages || []) {
+    const key = monthKeyFromIso(msg.at);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(msg);
+  }
+  return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
 
 export function buildCsaUpdatesUrl(region = "amer") {
@@ -915,6 +983,59 @@ export async function listChatMessages(session, chatId, { limit = 20 } = {}) {
   );
 }
 
+/**
+ * Newest-first pages until `since` or no backwardLink. Entire-history fill uses this.
+ * @param {object} session
+ * @param {string} chatId
+ * @param {{ since?: string, max?: number, textMax?: number, extra?: object }} [opts]
+ */
+export async function listChatMessagesPaged(session, chatId, opts = {}) {
+  const since = isoOrEmpty(opts.since);
+  const max = Number(opts.max) || DUMP_CHAT_MAX;
+  const textMax = Number(opts.textMax) || FILL_BODY_MAX;
+  const extra = opts.extra && typeof opts.extra === "object" ? opts.extra : {};
+  const self = { objectId: session.objectId, email: session.email || SCHOOL_EMAIL };
+  /** @type {object[]} */
+  const out = [];
+  const seen = new Set();
+  let url = buildChatMessagesUrl(chatId, { limit: DUMP_PAGE_SIZE, region: session.region });
+  for (let page = 0; page < 500 && url && out.length < max; page++) {
+    const data = await apiRequest(url, session);
+    const rows = Array.isArray(data.messages)
+      ? data.messages
+      : Array.isArray(data.value)
+        ? data.value
+        : [];
+    if (!rows.length) break;
+    let olderThanSince = false;
+    let newIds = 0;
+    for (const row of rows) {
+      const msg = normalizeMessage(row, { ...extra, chatId, textMax, self });
+      if (since && msg.at && msg.at < since) {
+        olderThanSince = true;
+        continue;
+      }
+      if (!msg.id || seen.has(msg.id)) continue;
+      seen.add(msg.id);
+      newIds += 1;
+      if (shouldSkipTeamsDumpMessage(msg, row)) continue;
+      out.push(msg);
+      if (out.length >= max) break;
+    }
+    if (page === 0 || (page + 1) % 10 === 0) {
+      process.stderr.write(
+        `[school-teams]   page ${page + 1} +${out.length} msgs ${extra.chat || extra.channel || chatId}\n`
+      );
+    }
+    if (olderThanSince || out.length >= max || newIds === 0) break;
+    const next = extractBackwardLink(data);
+    if (!next || next === url) break;
+    url = next;
+    await sleep(60);
+  }
+  return out;
+}
+
 export async function listJoinedTeams(session, { limit = 50 } = {}) {
   const data = await csaSnapshot(session);
   const rows = Array.isArray(data.teams) ? data.teams : [];
@@ -1067,6 +1188,109 @@ export async function fetchSchoolTeams(opts = {}) {
   };
 }
 
+/**
+ * Full-history dump for the Composer fill. Monthly files under /tmp.
+ * @param {{ since?: string, outDir?: string, root?: string, headed?: boolean, force?: boolean, session?: object }} [opts]
+ */
+export async function dumpSchoolTeams(opts = {}) {
+  const session = opts.session || (await resolveSession(opts));
+  const since = isoOrEmpty(opts.since);
+  const outDir = String(opts.outDir || "").trim() || defaultDumpDir();
+  const chats = await listChats(session, { limit: 500 });
+  /** @type {object[]} */
+  const messages = [];
+  const seen = new Set();
+  const add = (row) => {
+    const key = `${row.kind || "chat"}:${row.chatId || ""}:${row.id}`;
+    if (!row?.id || seen.has(key)) return;
+    seen.add(key);
+    messages.push(row);
+  };
+
+  for (let i = 0; i < chats.length; i++) {
+    const chat = chats[i];
+    process.stderr.write(`[school-teams] dump chat ${i + 1}/${chats.length} ${chat.name}\n`);
+    try {
+      const rows = await listChatMessagesPaged(session, chat.id, {
+        since,
+        extra: {
+          chatId: chat.id,
+          chat: chat.name,
+          chatType: chat.chatType,
+          kind: "chat",
+        },
+      });
+      for (const row of rows) add({ ...row, chatType: chat.chatType });
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`[school-teams] skip chat ${chat.name}: ${redactSecrets(detail)}\n`);
+    }
+    await sleep(40);
+  }
+
+  let teams = [];
+  try {
+    const snap = await csaSnapshot(session);
+    teams = Array.isArray(snap.teams) ? snap.teams : [];
+  } catch {
+    teams = [];
+  }
+  for (const team of teams) {
+    const teamName = String(team.displayName || team.name || "").trim();
+    const channels = Array.isArray(team.channels)
+      ? team.channels.map((c) => (c.id && (c.name || c.displayName) ? c : normalizeChannel(c)))
+      : [];
+    for (const channel of channels) {
+      const channelName = String(channel.displayName || channel.name || "").trim();
+      if (!channel.id) continue;
+      process.stderr.write(`[school-teams] dump channel ${teamName} / ${channelName}\n`);
+      try {
+        const rows = await listChatMessagesPaged(session, channel.id, {
+          since,
+          extra: {
+            kind: "channel",
+            team: teamName,
+            channel: channelName,
+            chatId: channel.id,
+          },
+        });
+        for (const row of rows) add(row);
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        process.stderr.write(
+          `[school-teams] skip channel ${teamName}/${channelName}: ${redactSecrets(detail)}\n`
+        );
+      }
+      await sleep(40);
+    }
+  }
+
+  messages.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  await mkdir(outDir, { recursive: true, mode: 0o700 });
+  const months = groupMessagesByMonth(messages);
+  /** @type {{ month: string, file: string, count: number, bytes: number }[]} */
+  const files = [];
+  for (const [month, rows] of months) {
+    const file = `${month}.txt`;
+    const body = rows.map((m) => formatDumpMessage(m)).join("\n");
+    await writeFile(join(outDir, file), body, { mode: 0o600 });
+    files.push({ month, file, count: rows.length, bytes: Buffer.byteLength(body) });
+  }
+  const manifest = {
+    ok: true,
+    account: SCHOOL_EMAIL,
+    since,
+    at: new Date().toISOString(),
+    messages: messages.length,
+    chats: chats.length,
+    files,
+  };
+  await writeFile(join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, {
+    mode: 0o600,
+  });
+  return { ...manifest, outDir };
+}
+
 async function resolveChat(session, needle) {
   const n = String(needle || "").trim();
   if (!n) return { match: null, ambiguous: [], chats: [] };
@@ -1193,7 +1417,7 @@ export async function runSchoolTeams(argv, opts = {}) {
     return {
       ok: true,
       usage:
-        "node server/school-teams.js login|status|chats|teams|channels --team <name>|thread --chat <id|name>|thread --team T --channel C|search <q>|send --chat <name> --text <body>|send --team T --channel C --text <body>|dump [--since ISO]",
+        "node server/school-teams.js login|status|chats|teams|channels --team <name>|thread --chat <id|name>|thread --team T --channel C|search <q>|send --chat <name> --text <body>|send --team T --channel C --text <body>|dump [--since ISO]|dump --full [--since ISO] [--out dir]",
       account: SCHOOL_EMAIL,
     };
   }
@@ -1366,6 +1590,23 @@ export async function runSchoolTeams(argv, opts = {}) {
 
   if (cmd === "dump") {
     return withSession(parsed, root, async (session) => {
+      if (parsed.full) {
+        const result = await dumpSchoolTeams({
+          session,
+          since: parsed.since,
+          outDir: parsed.out,
+          root,
+        });
+        return {
+          ok: true,
+          account: SCHOOL_EMAIL,
+          since: result.since,
+          messages: result.messages,
+          chats: result.chats,
+          files: result.files,
+          outDir: result.outDir,
+        };
+      }
       const since =
         parsed.since || new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString();
       const dump = await fetchSchoolTeams({

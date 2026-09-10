@@ -15,6 +15,7 @@
     "school-onenote": "node school-onenote.js",
     "school-teams": "node school-teams.js",
     "school-mail-fill": "node --env-file=.env school-mail-fill.js",
+    "school-teams-fill": "node --env-file=.env school-teams-fill.js",
     "apple-mail": "node apple-mail.js dump",
     "apple-mail-fill": "node --env-file=.env apple-mail-fill.js",
     "health-takeaways": "node --env-file=.env health-takeaways-agent.js",

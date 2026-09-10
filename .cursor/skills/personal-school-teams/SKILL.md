@@ -61,6 +61,12 @@ folders into the repo.
 Prefer `search` or `thread --chat <name>` over paging every chat. Channel
 posts: `--team` and `--channel` together.
 
+## History fill
+
+Do not run the full Composer fill unless Yan asks. That job is
+`node --env-file=server/.env server/school-teams-fill.js` and
+`.cursor/skills/brain-school-teams/SKILL.md`.
+
 ## Send
 
 If destination and body are clear, send. **Do not ask for confirmation.**

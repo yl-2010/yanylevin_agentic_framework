@@ -275,6 +275,8 @@ describe("Personal Agent skill files", () => {
     assert.match(schoolTeams, /@agent/);
     assert.match(schoolTeams, /send confirmation/);
     assert.match(schoolTeams, /class channel/);
+    assert.match(schoolTeams, /school-teams-fill/);
+    assert.match(schoolTeams, /brain-school-teams/);
 
     const calendar = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.calendar), "utf8");
     assert.match(calendar, /yl-calendar/);

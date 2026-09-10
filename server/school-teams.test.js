@@ -4,6 +4,10 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  extractBackwardLink,
+  formatDumpMessage,
+  groupMessagesByMonth,
+  shouldSkipTeamsDumpMessage,
   TEAMS_CLOUD,
   buildChatMessagesUrl,
   buildChatsUrl,
@@ -64,6 +68,14 @@ describe("school-teams parseArgs", () => {
 
   it("rejects unknown flags", () => {
     assert.throws(() => parseArgs(["chats", "--nope"]), /unknown arg/);
+  });
+
+  it("parses dump --full", () => {
+    const a = parseArgs(["dump", "--full", "--since", "2024-04-01", "--out", "/tmp/x"]);
+    assert.equal(a.cmd, "dump");
+    assert.equal(a.full, true);
+    assert.equal(a.since, "2024-04-01");
+    assert.equal(a.out, "/tmp/x");
   });
 });
 
@@ -269,6 +281,67 @@ describe("school-teams urls and shapes", () => {
     assert.equal(row.text, "Hello");
     assert.equal(row.messageType, "message");
     assert.equal(row.chat, "Alex");
+  });
+});
+
+describe("school-teams history dump", () => {
+  it("only follows chatsvc backwardLink on Teams hosts", () => {
+    const ok = extractBackwardLink({
+      _metadata: {
+        backwardLink:
+          "https://teams.cloud.microsoft/api/chatsvc/amer/v1/users/ME/conversations/19:x/messages?startTime=1",
+      },
+    });
+    assert.match(ok, /\/api\/chatsvc\/amer\/v1\/users\/ME\/conversations\/19:x\/messages/);
+    assert.equal(
+      extractBackwardLink({
+        _metadata: { backwardLink: "https://evil.example/api/chatsvc/x/messages" },
+      }),
+      ""
+    );
+    assert.equal(
+      extractBackwardLink({
+        _metadata: { backwardLink: "https://teams.cloud.microsoft/api/mt/amer/beta/users/1" },
+      }),
+      ""
+    );
+  });
+
+  it("skips control and empty messages", () => {
+    assert.equal(shouldSkipTeamsDumpMessage({ messageType: "Event/Call", text: "call" }), true);
+    assert.equal(shouldSkipTeamsDumpMessage({ messageType: "message", text: "" }), true);
+    assert.equal(shouldSkipTeamsDumpMessage({ messageType: "message", text: "hw tonight" }), false);
+  });
+
+  it("formats a monthly dump row", () => {
+    const text = formatDumpMessage({
+      at: "2026-05-13T18:00:00.000Z",
+      kind: "chat",
+      chat: "Alex Rivera",
+      chatType: "oneOnOne",
+      from: "Alex Rivera",
+      fromEmail: "friend@school.example",
+      fromMe: false,
+      text: "you free",
+    });
+    assert.match(text, /^2026-05-13T18:00:00.000Z \| kind=chat \| chat=Alex Rivera/);
+    assert.match(text, /from=Alex Rivera <friend@school.example>/);
+    assert.match(text, /fromMe=false/);
+    assert.match(text, /\nyou free\n/);
+  });
+
+  it("groups dump rows by month", () => {
+    const months = groupMessagesByMonth([
+      { at: "2025-12-31T23:00:00.000Z", text: "a" },
+      { at: "2026-01-01T00:00:00.000Z", text: "b" },
+    ]);
+    assert.deepEqual(
+      months.map(([k, rows]) => [k, rows.length]),
+      [
+        ["2025-12", 1],
+        ["2026-01", 1],
+      ]
+    );
   });
 });
 
