@@ -224,7 +224,9 @@ struct EducationView: View {
 
     private func filteredTodos(done: Bool) -> [EducationTodo] {
         allTodos.filter { todo in
-            (todo.done == true) == done && todoTypeFilters.contains(todo.filterTagKey)
+            (todo.done == true) == done
+                && todoTypeFilters.contains(todo.filterTagKey)
+                && !todo.isHiddenFromHome
         }
     }
 
@@ -391,7 +393,7 @@ struct EducationView: View {
     private var todoClassNames: [String: String] {
         var map: [String: String] = [:]
         for cls in store.tree?.classes ?? [] {
-            for todo in cls.todos ?? [] {
+            for todo in cls.pageTodos {
                 map[todo.withClassId(cls.id).id] = cls.contextDisplayName
             }
         }
@@ -605,7 +607,7 @@ struct ClassDetailView: View {
     }
 
     private var classTodos: [EducationTodo] {
-        (liveClass.todos ?? []).map { $0.withClassId(liveClass.id) }
+        liveClass.pageTodos.map { $0.withClassId(liveClass.id) }
     }
 
     private var classSchedule: EducationSchedule? { store.tree?.schedule }

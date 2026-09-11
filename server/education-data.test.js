@@ -16,6 +16,7 @@ import {
   meetingHighlightStartMin,
   isMeetingHighlighted,
   activeMeetingAt,
+  partitionClassTodos,
   stripTodoTagPrefix,
 } from "./education-data.js";
 
@@ -456,5 +457,28 @@ describe("stripTodoTagPrefix", () => {
   it("leaves titles without a tag prefix alone", () => {
     assert.equal(stripTodoTagPrefix("Summer Read"), "Summer Read");
     assert.equal(stripTodoTagPrefix(""), "");
+  });
+});
+
+describe("partitionClassTodos", () => {
+  it("keeps ordinary todos on home and splits hiddenFromHome", () => {
+    const { home, classOnly } = partitionClassTodos([
+      { id: "essay", name: "Essay" },
+      { id: "yoga", name: "Yoga Class #3", hiddenFromHome: true },
+      { id: "quiz", name: "Quiz", hiddenFromHome: false },
+    ]);
+    assert.deepEqual(
+      home.map((t) => t.id),
+      ["essay", "quiz"]
+    );
+    assert.deepEqual(
+      classOnly.map((t) => t.id),
+      ["yoga"]
+    );
+  });
+
+  it("treats a missing list as empty", () => {
+    assert.deepEqual(partitionClassTodos(null), { home: [], classOnly: [] });
+    assert.deepEqual(partitionClassTodos(undefined), { home: [], classOnly: [] });
   });
 });

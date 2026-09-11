@@ -580,7 +580,7 @@ enum EducationTodoHelpers {
     static func flattenTodos(from tree: EducationTreeResponse?) -> [EducationTodo] {
         var list = tree?.todos ?? []
         for cls in tree?.classes ?? [] {
-            list.append(contentsOf: (cls.todos ?? []).map { $0.withClassId(cls.id) })
+            list.append(contentsOf: cls.pageTodos.map { $0.withClassId(cls.id) })
         }
         for project in tree?.projects ?? [] {
             list.append(contentsOf: (project.todos ?? []).map { $0.withProjectId(project.id) })
@@ -610,7 +610,7 @@ enum EducationTodoHelpers {
             return match
         }
         for cls in tree.classes ?? [] {
-            for todo in cls.todos ?? [] {
+            for todo in cls.pageTodos {
                 let tagged = todo.withClassId(cls.id)
                 if tagged.id == id { return tagged }
             }
@@ -642,9 +642,11 @@ enum EducationTodoHelpers {
     ) -> [EducationTodo] {
         flattenTodos(from: tree)
             .filter { todo in
-                todo.done != true
+                let classScoped = !(classId == nil || classId == "")
+                return todo.done != true
                     && typeFilters.contains(todo.filterTagKey)
-                    && (classId == nil || classId == "" || todo.classId == classId)
+                    && (!classScoped || todo.classId == classId)
+                    && (classScoped || !todo.isHiddenFromHome)
             }
             .sorted { $0.dueSortKey < $1.dueSortKey }
             .prefix(limit)
@@ -664,9 +666,11 @@ enum EducationTodoHelpers {
     ) -> EducationTodo? {
         flattenTodos(from: tree)
             .filter { todo in
+                let classScoped = !(classId == nil || classId == "")
                 guard todo.done == true,
                       typeFilters.contains(todo.filterTagKey),
-                      classId == nil || classId == "" || todo.classId == classId,
+                      !classScoped || todo.classId == classId,
+                      classScoped || !todo.isHiddenFromHome,
                       let completedAt = todo.completedAtDate,
                       completedAt.addingTimeInterval(within) > asOf
                 else { return false }
@@ -915,7 +919,7 @@ enum EducationDateHelpers {
                     )
                 )
             }
-            for todo in cls.todos ?? [] {
+            for todo in cls.pageTodos {
                 let t = todo.withClassId(cls.id)
                 guard t.showsInDates else { continue }
                 items.append(

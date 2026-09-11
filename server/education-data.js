@@ -1263,6 +1263,23 @@ function publicClassProps(cls) {
 }
 
 /**
+ * Home clients flatten `class.todos`. Keep hiddenFromHome items on
+ * `classOnlyTodos` so older home lists omit them while class pages can merge.
+ * @param {object[]} todos
+ */
+export function partitionClassTodos(todos) {
+  /** @type {object[]} */
+  const home = [];
+  /** @type {object[]} */
+  const classOnly = [];
+  for (const t of todos || []) {
+    if (t && t.hiddenFromHome === true) classOnly.push(t);
+    else home.push(t);
+  }
+  return { home, classOnly };
+}
+
+/**
  * @param {string} email
  * @param {{ includeFixtures?: boolean }} [opts]
  *   When false (default), strip fixture + out-of-season classes for the web UI
@@ -1322,13 +1339,20 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
     );
 
     const published = includeFixtures ? cls : publicClassProps(cls);
-    classes.push({
+    const { home: homeTodos, classOnly: classOnlyTodos } =
+      partitionClassTodos(classTodos);
+    /** @type {Record<string, unknown>} */
+    const classRow = {
       ...published,
       files: classFiles,
       // Todos/dates only when the class is in season for today.
-      todos: activeToday ? classTodos : [],
+      todos: activeToday ? homeTodos : [],
       dates: activeToday ? classDates : [],
-    });
+    };
+    if (activeToday && classOnlyTodos.length) {
+      classRow.classOnlyTodos = classOnlyTodos;
+    }
+    classes.push(classRow);
   }
 
   if (!includeFixtures) {

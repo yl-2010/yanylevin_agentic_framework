@@ -193,6 +193,7 @@ describe("Personal Agent skill files", () => {
     assert.match(dashboard, /always write markdown/);
     assert.match(dashboard, /similar name/);
     assert.match(dashboard, /showInDates/);
+    assert.match(dashboard, /hiddenFromHome/);
     assert.doesNotMatch(dashboard, /```widget map/);
     assert.doesNotMatch(dashboard, /osascript/);
 

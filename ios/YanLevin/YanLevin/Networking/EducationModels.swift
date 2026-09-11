@@ -144,19 +144,23 @@ struct EducationClass: Decodable, Identifiable, Hashable {
     let canvasLink: String?
     let files: [EducationContextFile]?
     let todos: [EducationTodo]?
+    /// Todos with hiddenFromHome. Class pages merge these; home lists ignore them.
+    let classOnlyTodos: [EducationTodo]?
     let dates: [EducationDate]?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, teacher, room, period, freePeriod, canvasLink, files, todos, dates
+        case id, name, teacher, room, period, freePeriod, canvasLink, files, todos, classOnlyTodos, dates
         case detail = "description"
     }
 
     var isFreePeriod: Bool { freePeriod == true }
 
+    var pageTodos: [EducationTodo] { (todos ?? []) + (classOnlyTodos ?? []) }
+
     /// Gradebook URL from `canvasLink`, else the first child assignment/syllabus link.
     var canvasURL: URL? {
         if let direct = CanvasLMS.webURL(from: canvasLink) { return direct }
-        for todo in todos ?? [] {
+        for todo in pageTodos {
             if let url = CanvasLMS.gradebookURL(from: todo.canvasLink) { return url }
         }
         for date in dates ?? [] {
@@ -225,6 +229,8 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
     let createdAt: String?
     /// When true, open todo also appears in Dates. MA defaults on when omitted.
     let showInDates: Bool?
+    /// When true, omitted from home TODO/Completed and the unfiltered home widget.
+    let hiddenFromHome: Bool?
     /// Optional Canvas LMS assignment/page URL — toolbar button only when set.
     let canvasLink: String?
     let classId: String?
@@ -238,7 +244,7 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case todoId = "id"
-        case name, title, tag, type, dueDate, dueTime, due, done, completedAt, createdAt, showInDates, canvasLink, classId, projectId, notes, files, kind, capsules, citations
+        case name, title, tag, type, dueDate, dueTime, due, done, completedAt, createdAt, showInDates, hiddenFromHome, canvasLink, classId, projectId, notes, files, kind, capsules, citations
         case detail = "description"
     }
 
@@ -287,6 +293,9 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
         if let showInDates { return showInDates }
         return filterTagKey == "MA"
     }
+
+    /// Home lists skip these; class and project pages still show them.
+    var isHiddenFromHome: Bool { hiddenFromHome == true }
 
     /// Normalized http(s) Canvas URL, if present.
     var canvasURL: URL? { CanvasLMS.webURL(from: canvasLink) }
@@ -359,6 +368,7 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
             completedAt: completedAt,
             createdAt: createdAt,
             showInDates: showInDates,
+            hiddenFromHome: hiddenFromHome,
             canvasLink: canvasLink,
             classId: classId,
             projectId: projectId,
@@ -386,6 +396,7 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
             completedAt: completedAt,
             createdAt: createdAt,
             showInDates: showInDates,
+            hiddenFromHome: hiddenFromHome,
             canvasLink: canvasLink,
             classId: classId,
             projectId: projectId,

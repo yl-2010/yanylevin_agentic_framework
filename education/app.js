@@ -882,7 +882,14 @@
     return id.startsWith("_example-");
   }
 
-  function flattenTodos(data, { classId = null, projectId = null } = {}) {
+  function classPageTodos(c) {
+    return [...(c.todos || []), ...(c.classOnlyTodos || [])];
+  }
+
+  function flattenTodos(
+    data,
+    { classId = null, projectId = null, includeHiddenFromHome = false } = {}
+  ) {
     /** @type {any[]} */
     const out = [];
     if (projectId) {
@@ -904,7 +911,7 @@
     if (classId) {
       const c = (data.classes || []).find((x) => x.id === classId);
       if (c && !isFixture(c)) {
-        (c.todos || []).forEach((t) => {
+        classPageTodos(c).forEach((t) => {
           if (isFixture(t)) return;
           out.push({
             ...t,
@@ -929,7 +936,8 @@
     });
     (data.classes || []).forEach((c) => {
       if (isFixture(c)) return;
-      (c.todos || []).forEach((t) => {
+      const list = includeHiddenFromHome ? classPageTodos(c) : c.todos || [];
+      list.forEach((t) => {
         if (isFixture(t)) return;
         out.push({
           ...t,
@@ -1034,7 +1042,7 @@
     const wantClass = classId || null;
     const wantProject = projectId || null;
     return (
-      flattenTodos(tree).find((t) => {
+      flattenTodos(tree, { includeHiddenFromHome: true }).find((t) => {
         if (t.id !== id) return false;
         return (
           (t.classId || null) === wantClass &&
@@ -1234,7 +1242,11 @@
         href: dateHref(d),
       });
     });
-    flattenTodos(tree, { classId, projectId }).forEach((t) => {
+    flattenTodos(tree, {
+      classId,
+      projectId,
+      includeHiddenFromHome: true,
+    }).forEach((t) => {
       if (!todoShowsInDates(t)) return;
       const isMA = todoTagKey(t) === "MA";
       out.push({
@@ -1257,6 +1269,11 @@
 
   function matchesFilter(t) {
     return typeFilter.has(todoTagKey(t));
+  }
+
+  /** Home TODO/Completed omit these; class and project pages still show them. */
+  function todoHiddenFromHome(t) {
+    return Boolean(t && t.hiddenFromHome);
   }
 
   /**
@@ -1878,7 +1895,9 @@
   }
 
   function renderHome() {
-    const todos = flattenTodos(tree).filter(matchesFilter);
+    const todos = flattenTodos(tree)
+      .filter(matchesFilter)
+      .filter((t) => !todoHiddenFromHome(t));
     const open = todos
       .filter((t) => !t.done)
       .sort((a, b) => dueSortKey(a).localeCompare(dueSortKey(b)));
@@ -2478,7 +2497,10 @@
       if (p) apply(p.todos);
     } else if (wantClass) {
       const c = (tree.classes || []).find((x) => x.id === wantClass);
-      if (c) apply(c.todos);
+      if (c) {
+        apply(c.todos);
+        apply(c.classOnlyTodos);
+      }
     } else {
       apply(tree.todos);
     }
@@ -2561,7 +2583,10 @@
       if (p) apply(p.todos);
     } else if (wantClass) {
       const c = (tree.classes || []).find((x) => x.id === wantClass);
-      if (c) apply(c.todos);
+      if (c) {
+        apply(c.todos);
+        apply(c.classOnlyTodos);
+      }
     } else {
       apply(tree.todos);
     }
