@@ -244,8 +244,8 @@ describe("school-teams urls and shapes", () => {
   });
 
   it("applies the agent footer on send bodies", () => {
-    const body = applyAgentSentFooter("On it", { chat: "Alex" });
-    assert.equal(body, "On it\n\nSent by Yan's Personal Agent");
+    const body = applyAgentSentFooter("On it", { chat: "Alex", platform: "teams" });
+    assert.equal(body, "On it\n\n// Sent by Yan's Personal Agent");
   });
 
   it("builds an IC3 send body without the footer (CLI applies that first)", () => {

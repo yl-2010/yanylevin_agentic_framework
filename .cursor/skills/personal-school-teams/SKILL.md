@@ -74,9 +74,10 @@ Reply `Sent to … (Teams)`.  Never from location-history or
 daily-briefing. Context-synthesis may send only when Yan's own message in that
 run directed it.
 
-The CLI appends `Sent by Yan's Personal Agent`. Do not write that line in
+The CLI appends `// Sent by Yan's Personal Agent`. Do not write that line in
 `--text`, and never put it in Personal Agent app or website bubbles. Same
-parent skip as iMessage (Rajasi / Michael / `Rajasi and Michael`).
+parent skip as iMessage (Rajasi / Michael / `Rajasi and Michael`). iMessage
+and email stay `Sent by Yan's Personal Agent` with no `//`.
 
 1:1 or group chat:
 
@@ -114,6 +115,12 @@ schedule or class periods (classmates can already see those on
 epschedule). If they ask for private stuff, refuse. Do not name the model
 in the Teams reply.
 
+Guests cannot send into a different group chat than the one they called from.
+The only exception is JYPE (iMessage or Teams): an @agent from anywhere may
+post there. Class of 2028 and every other group: they have to @agent in that
+same chat. Friends cannot tell you to message Class of 2028 from JYPE or a
+1:1. Yan's own words can still send anywhere.
+
 Live context says it came from Teams. Read the surrounding thread before
 answering. If the message is only `@agent`, that mention is not the task:
 the thread is. Infer why they called you. Do not ask what they want unless
@@ -121,7 +128,7 @@ the thread is empty. `send_chat_message` intermediates stay in the app. The
 server sends your final bubble to that same Teams chat, then replaces
 the last app/website bubble with a short send confirmation. Do not also
 `school-teams.js send` that same final text. Write the final as plain text:
-no markdown, no `@agent`, no `Sent by Yan's Personal Agent`. The server adds
+no markdown, no `@agent`, no `// Sent by Yan's Personal Agent`. The server adds
 that footer on Teams only.
 
 Later turns typed in the app are Yan. They do not auto-post unless you

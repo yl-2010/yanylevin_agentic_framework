@@ -95,7 +95,7 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
   }
   lines.push(
     `Read the surrounding thread before answering: node server/school-teams.js thread --chat ${JSON.stringify(chatArg)} --limit ${threadLimit} (school Teams skill).`,
-    "Write the final bubble as the text that should land in that Teams chat (plain text, no markdown, no @agent). Do not add Sent by Yan's Personal Agent. The server appends that footer on the Teams message only, never in the app or website thread. Intermediate send_chat_message bubbles stay in the Personal Agent app only."
+    "Write the final bubble as the text that should land in that Teams chat (plain text, no markdown, no @agent). Do not add // Sent by Yan's Personal Agent. The server appends that footer on the Teams message only, never in the app or website thread. Intermediate send_chat_message bubbles stay in the Personal Agent app only."
   );
   if (opts.deliverFinal !== false) {
     lines.push(

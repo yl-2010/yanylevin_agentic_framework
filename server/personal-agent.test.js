@@ -273,6 +273,8 @@ describe("Personal Agent skill files", () => {
     assert.match(schoolTeams, /school-teams\.js/);
     assert.match(schoolTeams, /Yan only/);
     assert.match(schoolTeams, /Sent by Yan's Personal Agent/);
+    assert.match(schoolTeams, /\/\/ Sent by Yan's Personal Agent/);
+    assert.match(schoolTeams, /JYPE \(iMessage or Teams\)/);
     assert.match(schoolTeams, /@agent/);
     assert.match(schoolTeams, /send confirmation/);
     assert.match(schoolTeams, /class channel/);
@@ -312,6 +314,8 @@ describe("Personal Agent skill files", () => {
     assert.match(imessage, /From Name on iMessage/);
     assert.match(imessage, /send confirmation/);
     assert.match(imessage, /never put it in Personal Agent app or website bubbles/);
+    assert.match(imessage, /JYPE \(iMessage or Teams\)/);
+    assert.match(imessage, /\/\/ Sent by Yan's Personal Agent/);
 
     const screentime = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.screentime), "utf8");
     assert.match(screentime, /screentime-read\.js/);
@@ -353,6 +357,8 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /Composer 2\.5/);
     assert.match(agent, /no `Sent by Yan's Personal Agent`/);
     assert.match(agent, /Never put `Sent by Yan's Personal Agent` in app or website bubbles/);
+    assert.match(agent, /cannot send into a different group chat/);
+    assert.match(agent, /JYPE \(iMessage or Teams\)/);
     assert.match(agent, /iMessage first, then Teams, then email|iMessage, then Teams, then email/);
     assert.match(agent, /unslop/);
     assert.match(agent, /SOUL\.md/);

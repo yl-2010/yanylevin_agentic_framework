@@ -55,7 +55,7 @@ describe("teams-mention trigger", () => {
     const block = formatTeamsOriginBlock(origin, { deliverFinal: true });
     assert.match(block, /Called from Teams/);
     assert.match(block, /school-teams\.js thread/);
-    assert.match(block, /Do not add Sent by Yan's Personal Agent/);
+    assert.match(block, /Do not add \/\/ Sent by Yan's Personal Agent/);
     assert.match(block, /Do not also school-teams send/);
     assert.match(block, /send confirmation/);
     const later = formatTeamsOriginBlock(origin, { deliverFinal: false });

@@ -63,7 +63,7 @@ Tesla Robotaxi and Uber Family receipts live on **Exchange**, not Gmail. Subject
 
 If to, subject, and body are clear, send. If any of those is missing, ask. Unnamed send-to-a-person uses iMessage first, then Teams, then email (personal-agent skill). Reply `Sent to … (email)`.  Never from the location-history or daily-briefing jobs.
 
-End the email body with `Sent by Yan's Personal Agent` unless Yan says not to. Same parent-thread skip as iMessage. Never put that line in the Personal Agent app or website reply. That footer is also used on iMessage and Teams.
+End the email body with `Sent by Yan's Personal Agent` unless Yan says not to. Same parent-thread skip as iMessage. Never put that line in the Personal Agent app or website reply. That footer is also used on iMessage. Teams uses `// Sent by Yan's Personal Agent`.
 
 Default From when Yan does not specify a sending address: Exchange `you@example.com`. Use Google `you@example.com` or iCloud `you@icloud.com` only if he names that account.
 
