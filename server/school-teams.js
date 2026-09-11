@@ -233,14 +233,30 @@ export function pickChat(chats, needle) {
   return { match: null, ambiguous: [], chats: list };
 }
 
+/**
+ * Teams quote-replies wrap the parent in a Skype Reply blockquote. stripHtml
+ * would keep that parent's @agent, so a reply with no mention would still
+ * start a session. Drop the quote before converting to text.
+ */
+export function stripTeamsReplyQuoteHtml(html) {
+  let s = String(html || "");
+  s = s.replace(/<blockquote\b[^>]*>[\s\S]*?<\/blockquote>/gi, " ");
+  s = s.replace(
+    /<([a-zA-Z][\w:-]*)\b[^>]*itemtype\s*=\s*["'][^"']*schema\.skype\.com\/Reply["'][^>]*>[\s\S]*?<\/\1>/gi,
+    " "
+  );
+  return s;
+}
+
 export function messageText(raw, max = MESSAGE_TEXT_MAX) {
   const body = raw?.body || {};
   const content = String(body.content || raw?.content || "");
+  const unquoted = stripTeamsReplyQuoteHtml(content);
   const type = String(body.contentType || raw?.contenttype || "").toLowerCase();
-  if (type === "text" && !/<[a-z][\s\S]*>/i.test(content)) {
-    return content.trim().slice(0, max);
+  if (type === "text" && !/<[a-z][\s\S]*>/i.test(unquoted)) {
+    return unquoted.trim().slice(0, max);
   }
-  return stripHtml(content, max);
+  return stripHtml(unquoted, max);
 }
 
 function memberEmail(raw) {

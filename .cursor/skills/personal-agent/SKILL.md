@@ -181,7 +181,7 @@ Later turns typed in the app are Yan. They do not auto-text unless you send via 
 
 ## Teams @agent
 
-Express polls school Teams **chats** (1:1 and group, not class channels) for `@agent` / `@Agent`. Yan `fromMe` is the same product as iMessage `@agent`.
+Express polls school Teams **chats** (1:1 and group, not class channels) for `@agent` / `@Agent`. Yan `fromMe` is the same product as iMessage `@agent`. A reply that only quotes a parent `@agent` does not start a session. The new message has to contain `@agent`.
 
 Anyone can call it in a 1:1 or any group chat, including the giant Class of 2028 grade chat. Same hourly and Grok limits as iMessage, counted separately (they do not share a bucket). First user bubble is `From Name on Teams:` then a blank line then their text.
 

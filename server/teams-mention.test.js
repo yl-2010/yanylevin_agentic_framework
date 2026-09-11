@@ -41,6 +41,14 @@ describe("teams-mention trigger", () => {
       }),
       false
     );
+    assert.equal(
+      shouldTriggerTeamsAgent({
+        fromMe: true,
+        text: "It’s composer 2.5 running in cursor cli",
+        messageType: "message",
+      }),
+      false
+    );
   });
 
   it("builds an origin and a live-context block", () => {

@@ -22,6 +22,7 @@ import {
   isTeamsAuthError,
   isTeamsToken,
   normalizeChat,
+  messageText,
   normalizeMessage,
   parseArgs,
   includeCsaChat,
@@ -31,6 +32,7 @@ import {
   teamsScopes,
 } from "./school-teams.js";
 import { applyAgentSentFooter } from "./imessage-mention.js";
+import { shouldTriggerTeamsAgent } from "./teams-mention.js";
 
 function fakeJwt(payload) {
   const h = Buffer.from(JSON.stringify({ alg: "none" })).toString("base64url");
@@ -284,6 +286,44 @@ describe("school-teams urls and shapes", () => {
     assert.equal(row.text, "Hello");
     assert.equal(row.messageType, "message");
     assert.equal(row.chat, "Alex");
+  });
+
+  it("drops a quoted parent so a reply does not inherit @agent", () => {
+    const html =
+      '<blockquote itemscope="" itemtype="http://schema.skype.com/Reply" itemid="1777952706097"><strong itemprop="mri" itemid="8:orgid:x">Connor West</strong><span itemprop="time" itemid="1777952706097"></span><p itemprop="preview">@agent what model are you and in what harness</p></blockquote>\n<p>It’s composer 2.5 running in cursor cli</p>';
+    const text = messageText({ body: { contentType: "html", content: html } });
+    assert.equal(text.includes("@agent"), false);
+    assert.match(text, /composer 2\.5/i);
+    const row = normalizeMessage(
+      {
+        id: "reply1",
+        messageType: "message",
+        body: { contentType: "html", content: html },
+        from: {
+          user: {
+            displayName: "Yan Levin",
+            userPrincipalName: "owner@school.example",
+          },
+        },
+      },
+      { chat: "Class of 2028", chatId: "19:class" }
+    );
+    assert.equal(shouldTriggerTeamsAgent(row), false);
+    const ic3 = messageText({ contenttype: "text", content: html });
+    assert.equal(ic3.includes("@agent"), false);
+    assert.match(ic3, /composer 2\.5/i);
+  });
+
+  it("still triggers when the new reply text itself has @agent", () => {
+    const html =
+      '<blockquote itemscope="" itemtype="http://schema.skype.com/Reply"><strong itemprop="mri">Connor West</strong><p itemprop="preview">what model are you</p></blockquote><p>@agent what model are you and in what harness</p>';
+    const row = normalizeMessage({
+      id: "reply2",
+      messageType: "message",
+      body: { contentType: "html", content: html },
+    });
+    assert.match(row.text, /@agent what model/);
+    assert.equal(shouldTriggerTeamsAgent(row), true);
   });
 });
 

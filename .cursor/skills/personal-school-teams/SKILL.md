@@ -97,7 +97,9 @@ Do not post to a class channel as a send-to-person fallback.
 
 Express polls school Teams **chats** (1:1 and group, not class channels)
 for `@agent` / `@Agent`. Yan `fromMe` starts a normal Personal Agent chat.
-The first user bubble is that Teams message.
+The first user bubble is that Teams message. A reply that only quotes a
+message with `@agent` does not count. The new text itself has to contain
+`@agent`.
 
 Anyone can call `@agent` in a 1:1 or any group chat, including the giant
 Class of 2028 grade chat. Same 5 Composer turns per Pacific clock hour as
