@@ -61,29 +61,58 @@ describe("claimHeadline", () => {
 });
 
 describe("wipe", () => {
-  it("clears claims once, then keeps later class claims", async () => {
+  it("clears at 11am and again at 1:50, then keeps class claims", async () => {
     const path = await freshFile();
-    const wipeAt = Date.parse("2026-09-11T20:50:00.000Z");
-    configureHeadlinesActivity({ assignmentsPath: path, wipeAtMs: wipeAt });
-    await claimHeadline("Tester", wipeAt - 1000);
-    const afterWipe = await listHeadlineAssignments(wipeAt);
-    assert.deepEqual(afterWipe, []);
-    const raw = JSON.parse(await readFile(path, "utf8"));
-    assert.ok(raw.wipedAt);
+    const eleven = Date.parse("2026-09-11T18:00:00.000Z");
+    const classTime = Date.parse("2026-09-11T20:50:00.000Z");
+    configureHeadlinesActivity({
+      assignmentsPath: path,
+      wipeAtMs: [eleven, classTime],
+    });
+    await claimHeadline("Overnight", eleven - 1000);
+    const afterEleven = await listHeadlineAssignments(eleven);
+    assert.deepEqual(afterEleven, []);
+    const afterFirst = JSON.parse(await readFile(path, "utf8"));
+    assert.deepEqual(afterFirst.appliedWipes, [eleven]);
 
-    const classClaim = await claimHeadline("Class", wipeAt + 1000);
+    const midday = await claimHeadline("Midday", eleven + 1000);
+    assert.equal(midday.headline, HEADLINES[0].headline);
+    const stillThere = await listHeadlineAssignments(classTime - 1000);
+    assert.equal(stillThere.length, 1);
+
+    const afterClassWipe = await listHeadlineAssignments(classTime);
+    assert.deepEqual(afterClassWipe, []);
+    const afterSecond = JSON.parse(await readFile(path, "utf8"));
+    assert.deepEqual(afterSecond.appliedWipes, [eleven, classTime]);
+
+    const classClaim = await claimHeadline("Class", classTime + 1000);
     assert.equal(classClaim.headline, HEADLINES[0].headline);
-    const later = await listHeadlineAssignments(wipeAt + 60_000);
+    const later = await listHeadlineAssignments(classTime + 60_000);
     assert.equal(later.length, 1);
     assert.equal(later[0].voice, "Active");
     assert.equal(later[0].event, "Chauvin verdict");
+  });
+
+  it("applies both due wipes the same way if 11am was missed", async () => {
+    const path = await freshFile();
+    const eleven = Date.parse("2026-09-11T18:00:00.000Z");
+    const classTime = Date.parse("2026-09-11T20:50:00.000Z");
+    configureHeadlinesActivity({
+      assignmentsPath: path,
+      wipeAtMs: [eleven, classTime],
+    });
+    await claimHeadline("Stuck", eleven - 1);
+    const after = await listHeadlineAssignments(classTime);
+    assert.deepEqual(after, []);
+    const raw = JSON.parse(await readFile(path, "utf8"));
+    assert.deepEqual(raw.appliedWipes, [eleven, classTime]);
   });
 });
 
 describe("getHeadlineAssignment", () => {
   it("returns null after wipe", async () => {
     const path = await freshFile();
-    const wipeAt = Date.parse("2026-09-11T20:50:00.000Z");
+    const wipeAt = Date.parse("2026-09-11T18:00:00.000Z");
     configureHeadlinesActivity({ assignmentsPath: path, wipeAtMs: wipeAt });
     await claimHeadline("Yan", wipeAt - 1);
     assert.ok(await getHeadlineAssignment("Yan", wipeAt - 1));

@@ -9,16 +9,19 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_PATH = join(ROOT, "data", "headlines-assignments.json");
-/** Friday Sep 11, 2026 1:50pm PDT. */
-const DEFAULT_WIPE_AT_MS = Date.parse("2026-09-11T20:50:00.000Z");
+/** Friday Sep 11, 2026 11:00am and 1:50pm PDT. Same clear, two clocks. */
+export const DEFAULT_WIPE_AT_MS = [
+  Date.parse("2026-09-11T18:00:00.000Z"),
+  Date.parse("2026-09-11T20:50:00.000Z"),
+];
 const NAME_MAX = 40;
 
 /** @type {string} */
 let assignmentsPath = process.env.HEADLINES_ASSIGNMENTS_PATH || DEFAULT_PATH;
-/** @type {number|null} */
+/** @type {number[]|null} */
 let wipeAtOverride = null;
-/** @type {ReturnType<typeof setTimeout>|null} */
-let wipeTimer = null;
+/** @type {ReturnType<typeof setTimeout>[]} */
+let wipeTimers = [];
 let lock = Promise.resolve();
 
 export const HEADLINES = [
@@ -210,19 +213,29 @@ export const HEADLINES = [
   },
 ];
 
+function normalizeWipeTimes(raw) {
+  const list = Array.isArray(raw) ? raw : [raw];
+  return [...new Set(list.map(Number).filter(Number.isFinite))].sort(
+    (a, b) => a - b
+  );
+}
+
 export function configureHeadlinesActivity(opts = {}) {
   if (opts.assignmentsPath) assignmentsPath = opts.assignmentsPath;
   if (Object.prototype.hasOwnProperty.call(opts, "wipeAtMs")) {
-    wipeAtOverride = opts.wipeAtMs;
+    wipeAtOverride =
+      opts.wipeAtMs == null ? null : normalizeWipeTimes(opts.wipeAtMs);
   }
 }
 
-export function wipeAtMs() {
+export function wipeAtTimesMs() {
   if (wipeAtOverride != null) return wipeAtOverride;
   const fromEnv = process.env.HEADLINES_WIPE_AT;
   if (fromEnv) {
-    const parsed = Date.parse(fromEnv);
-    if (Number.isFinite(parsed)) return parsed;
+    const parsed = normalizeWipeTimes(
+      fromEnv.split(",").map((part) => Date.parse(part.trim()))
+    );
+    if (parsed.length) return parsed;
   }
   return DEFAULT_WIPE_AT_MS;
 }
@@ -260,7 +273,20 @@ function dashboardRow(item, assignment) {
 }
 
 function emptyState() {
-  return { wipedAt: null, assignments: [] };
+  return { appliedWipes: [], assignments: [] };
+}
+
+function parseAppliedWipes(parsed) {
+  if (Array.isArray(parsed?.appliedWipes)) {
+    return parsed.appliedWipes.map(Number).filter(Number.isFinite);
+  }
+  if (typeof parsed?.wipedAt === "string") {
+    const at = Date.parse(parsed.wipedAt);
+    if (Number.isFinite(at)) {
+      return wipeAtTimesMs().filter((wipeAt) => wipeAt <= at);
+    }
+  }
+  return [];
 }
 
 async function readState() {
@@ -278,7 +304,7 @@ async function readState() {
         )
       : [];
     return {
-      wipedAt: typeof parsed?.wipedAt === "string" ? parsed.wipedAt : null,
+      appliedWipes: parseAppliedWipes(parsed),
       assignments,
     };
   } catch (err) {
@@ -293,7 +319,7 @@ async function writeState(state) {
     assignmentsPath,
     `${JSON.stringify(
       {
-        wipedAt: state.wipedAt,
+        appliedWipes: state.appliedWipes,
         assignments: state.assignments,
       },
       null,
@@ -303,14 +329,16 @@ async function writeState(state) {
   );
 }
 
-function applyWipe(state, now) {
-  const at = wipeAtMs();
-  if (now >= at && !state.wipedAt) {
-    state.assignments = [];
-    state.wipedAt = new Date(now).toISOString();
-    return true;
+function applyWipes(state, now) {
+  let changed = false;
+  for (const at of wipeAtTimesMs()) {
+    if (now >= at && !state.appliedWipes.includes(at)) {
+      state.assignments = [];
+      state.appliedWipes.push(at);
+      changed = true;
+    }
   }
-  return false;
+  return changed;
 }
 
 function withLock(fn) {
@@ -324,7 +352,7 @@ function withLock(fn) {
 
 async function mutate(now, fn) {
   const state = await readState();
-  const wiped = applyWipe(state, now);
+  const wiped = applyWipes(state, now);
   try {
     const result = fn(state);
     if (wiped || result?.dirty) await writeState(state);
@@ -416,19 +444,18 @@ export async function wipeHeadlinesIfDue(now = Date.now()) {
 }
 
 export function startHeadlinesWipeScheduler() {
-  if (wipeTimer) {
-    clearTimeout(wipeTimer);
-    wipeTimer = null;
-  }
-  const delay = wipeAtMs() - Date.now();
-  const run = () => {
-    wipeHeadlinesIfDue().catch((err) => {
+  for (const timer of wipeTimers) clearTimeout(timer);
+  wipeTimers = [];
+  const now = Date.now();
+  const times = wipeAtTimesMs();
+  const run = (when) => {
+    wipeHeadlinesIfDue(when).catch((err) => {
       console.error("[headlines] wipe failed", err);
     });
   };
-  if (delay <= 0) {
-    run();
-    return;
+  if (times.some((at) => at <= now)) run(now);
+  for (const at of times) {
+    if (at <= now) continue;
+    wipeTimers.push(setTimeout(() => run(at), at - now));
   }
-  wipeTimer = setTimeout(run, delay);
 }
