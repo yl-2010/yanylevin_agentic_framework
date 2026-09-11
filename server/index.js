@@ -72,6 +72,12 @@ import {
   messageFitnessAgent,
   stopFitnessAgent,
 } from "./fitness-agent.js";
+import {
+  claimHeadline,
+  getHeadlineAssignment,
+  listHeadlineAssignments,
+  startHeadlinesWipeScheduler,
+} from "./headlines-activity.js";
 
 const PORT = Number(process.env.PORT || 3004);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -891,6 +897,50 @@ app.post("/api/fitness/agent/stop", requireFitnessUser, async (req, res) => {
   }
 });
 
+app.post("/api/headlines/claim", async (req, res) => {
+  try {
+    const payload = await claimHeadline(req.body?.name);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, ...payload });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error("[/api/headlines/claim]", err);
+    res.status(status).json({
+      ok: false,
+      error: err.message || "claim failed",
+    });
+  }
+});
+
+app.get("/api/headlines/assignment", async (req, res) => {
+  try {
+    const payload = await getHeadlineAssignment(req.query?.name);
+    res.setHeader("Cache-Control", "no-store");
+    if (!payload) {
+      res.status(404).json({ ok: false, error: "not found" });
+      return;
+    }
+    res.json({ ok: true, ...payload });
+  } catch (err) {
+    console.error("[/api/headlines/assignment]", err);
+    res.status(500).json({ ok: false, error: err.message || "lookup failed" });
+  }
+});
+
+app.get("/api/headlines/assignments", async (_req, res) => {
+  try {
+    const assignments = await listHeadlineAssignments();
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, assignments });
+  } catch (err) {
+    console.error("[/api/headlines/assignments]", err);
+    res.status(500).json({
+      ok: false,
+      error: err.message || "list failed",
+    });
+  }
+});
+
 app.use((_req, res) => {
   res.status(404).json({ ok: false, error: "not found" });
 });
@@ -908,5 +958,6 @@ app.use((_req, res) => {
   startLocalIpc();
   startIMessageAgentMentionScheduler();
   startTeamsAgentMentionScheduler();
+  startHeadlinesWipeScheduler();
 });
 
