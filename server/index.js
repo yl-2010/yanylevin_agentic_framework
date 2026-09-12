@@ -35,6 +35,7 @@ import {
   writePhoneLocation,
 } from "./phone-location.js";
 import { healthTokenMatches, writeHealthDump } from "./phone-health.js";
+import { writeLifeStateIntent } from "./life-state-intent.js";
 import { startDailyBriefingScheduler } from "./daily-briefing-agent.js";
 import { startLocationHistoryScheduler } from "./location-history-agent.js";
 import { startLocationEnrichmentScheduler } from "./location-enrichment-agent.js";
@@ -45,7 +46,7 @@ import { startHealthTakeawaysScheduler } from "./health-takeaways-agent.js";
 import { startLocationBrainScheduler } from "./location-brain-agent.js";
 import { startHealthBrainScheduler } from "./health-brain-agent.js";
 import { startFactCheckScheduler } from "./fact-check-agent.js";
-import { startLifeStateScheduler } from "./life-state-agent.js";
+import { startLifeStateScheduler, runLifeState } from "./life-state-agent.js";
 import { attachEducationEvents } from "./education-events.js";
 import {
   startAgent,
@@ -452,6 +453,29 @@ app.post("/api/education/location", requireYanLocationWriter, async (req, res) =
     res.status(err.status || 500).json({
       ok: false,
       error: err.message || "location write failed",
+    });
+  }
+});
+
+/** Phone dock Shortcut: going_to_shower / going_to_sleep. Same bearer as location. */
+app.post("/api/education/life-state-intent", requireYanLocationWriter, async (req, res) => {
+  try {
+    const saved = await writeLifeStateIntent(req.body);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({
+      ok: true,
+      kind: saved.kind,
+      orientation: saved.orientation,
+      at: saved.at,
+    });
+    void runLifeState({ force: true }).catch((err) => {
+      console.error("[/api/education/life-state-intent] guess", err);
+    });
+  } catch (err) {
+    console.error("[/api/education/life-state-intent]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "intent write failed",
     });
   }
 });

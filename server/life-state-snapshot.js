@@ -11,6 +11,7 @@ import { briefingNow, resolveBriefingTimezone } from "./daily-briefing-agent.js"
 import { resolveNowScheduleContext } from "./education-data.js";
 import { runHome } from "./home-cli.js";
 import { recentMessages } from "./imessage-read.js";
+import { readLifeStateIntent, slimLifeStateIntent } from "./life-state-intent.js";
 import {
   LIFE_STATE_SNAPSHOT_PATH,
   formatLifeStateLocal,
@@ -156,6 +157,7 @@ function powerOn(row) {
 
 function roomKind(room, name) {
   const s = `${room} ${name}`.toLowerCase();
+  if (/closet/.test(s)) return "closet";
   if (/bath/.test(s)) return "bathroom";
   if (/office/.test(s)) return "office";
   if (/bedroom|yan.?s room/.test(s)) return "bedroom";
@@ -174,7 +176,8 @@ function isFan(row, name, category) {
 
 /**
  * Named HomeKit boolean outlets Yan uses as occupancy latches, not lights.
- * Bedroom Boolean on = last motion in the bedroom; off = last motion in the office.
+ * Bedroom Boolean on = last bedroom occupancy; off = last office occupancy or left the house.
+ * Office Boolean is unused. Bathroom Boolean = in-bathroom latch. Leaving Bath Bool = at doorway.
  * @param {string} name
  */
 export function homeBooleanKind(name) {
@@ -183,6 +186,48 @@ export function homeBooleanKind(name) {
   if (/office\s*boolean/.test(s)) return "office";
   if (/bathroom\s*boolean/.test(s)) return "bathroom";
   if (/leaving\s*bath/.test(s)) return "leaving-bath";
+  return null;
+}
+
+/**
+ * Occupancy / motion sensors. Skip office middle (unused). Skip ambiguous duplicate names.
+ * Bathroom occupancy can also fire from the closet.
+ * @param {string} name
+ * @param {string} [room]
+ */
+export function homeOccupancyKind(name, room) {
+  const n = String(name || "").toLowerCase();
+  const r = String(room || "").toLowerCase();
+  if (!n) return null;
+  if (/\bmiddle\b/.test(n)) return null;
+  if (/closet occup|closet occupancy/.test(n)) return "closet";
+  if (/closet/.test(n) && /occup|motion/.test(n)) return "closet";
+  if (/bathroom occup|bath occup/.test(n)) return "bathroom";
+  if (/new bedroom occup|bedroom occup/.test(n)) return "bedroom";
+  if (/^office sensor$/.test(n) || /office occup/.test(n)) return "office";
+  if (/occupancy sensor/.test(n) && /office/.test(r)) return "office";
+  return null;
+}
+
+function occupancyDetected(row) {
+  const cands = [
+    row?.occupancy_detected,
+    row?.motion_detected,
+    row?.occupancy,
+    row?.motion,
+    row?.state?.occupancy_detected,
+    row?.state?.motion_detected,
+    row?.state?.occupancy,
+    row?.state?.motion,
+  ];
+  for (const v of cands) {
+    if (v === true || v === "true" || v === "detected" || v === 1 || v === "1") {
+      return true;
+    }
+    if (v === false || v === "false" || v === "clear" || v === 0 || v === "0") {
+      return false;
+    }
+  }
   return null;
 }
 
@@ -209,22 +254,56 @@ export function rollupHome(listRaw, eventsRaw = null, sinceMs = Date.now() - HOM
     bedroom: { lightsOn: 0, lightsOff: 0, fansOn: 0, fansOff: 0 },
     office: { lightsOn: 0, lightsOff: 0, fansOn: 0, fansOff: 0 },
     bathroom: { lightsOn: 0, lightsOff: 0, fansOn: 0, fansOff: 0 },
+    closet: { lightsOn: 0, lightsOff: 0, fansOn: 0, fansOff: 0 },
     other: { lightsOn: 0, lightsOff: 0, fansOn: 0, fansOff: 0 },
   };
   /** @type {boolean|null} */
   let bedroomBoolean = null;
+  /** @type {boolean|null} */
+  let bathroomBoolean = null;
+  /** @type {boolean|null} */
+  let leavingBathBool = null;
+  /** @type {Record<string, boolean|null>} */
+  const occupancy = { bedroom: null, bathroom: null, closet: null, office: null };
+  /** @type {Record<string, number>} */
+  const occupancyNameCount = {};
+  for (const row of rows) {
+    const name = accessoryName(row);
+    if (homeOccupancyKind(name, accessoryRoom(row))) {
+      occupancyNameCount[name] = (occupancyNameCount[name] || 0) + 1;
+    }
+  }
   for (const row of rows) {
     const name = accessoryName(row);
     const room = accessoryRoom(row);
     const category = accessoryCategory(row);
-    const on = powerOn(row);
-    if (on == null) continue;
     const flag = homeBooleanKind(name);
     if (flag === "bedroom") {
-      bedroomBoolean = on;
+      const on = powerOn(row);
+      if (on != null) bedroomBoolean = on;
+      continue;
+    }
+    if (flag === "bathroom") {
+      const on = powerOn(row);
+      if (on != null) bathroomBoolean = on;
+      continue;
+    }
+    if (flag === "leaving-bath") {
+      const on = powerOn(row);
+      if (on != null) leavingBathBool = on;
       continue;
     }
     if (flag) continue;
+    const occKind = homeOccupancyKind(name, room);
+    if (occKind) {
+      if ((occupancyNameCount[name] || 0) === 1) {
+        const occ = occupancyDetected(row);
+        if (occ != null) occupancy[occKind] = occ;
+      }
+      continue;
+    }
+    const on = powerOn(row);
+    if (on == null) continue;
     const kind = roomKind(room, name);
     const bucket = rooms[kind] || rooms.other;
     if (isFan(row, name, category)) {
@@ -245,7 +324,7 @@ export function rollupHome(listRaw, eventsRaw = null, sinceMs = Date.now() - HOM
     const ms = Date.parse(at);
     if (!Number.isFinite(ms) || ms < sinceMs) continue;
     const name = accessoryName(ev);
-    if (homeBooleanKind(name)) continue;
+    if (homeBooleanKind(name) || homeOccupancyKind(name, accessoryRoom(ev))) continue;
     const room = accessoryRoom(ev);
     const char = clip(ev.characteristic || ev.service || ev.type || "", 40).toLowerCase();
     const value = ev.value ?? ev.state ?? ev.power;
@@ -266,7 +345,11 @@ export function rollupHome(listRaw, eventsRaw = null, sinceMs = Date.now() - HOM
     bathroomFanOn: rooms.bathroom.fansOn > 0,
     bedroomLightsOn: rooms.bedroom.lightsOn > 0,
     officeLightsOn: rooms.office.lightsOn > 0,
+    closetLightsOn: rooms.closet.lightsOn > 0,
     bedroomBoolean,
+    bathroomBoolean,
+    leavingBathBool,
+    occupancy,
     lastMotionRoom:
       bedroomBoolean === true ? "bedroom" : bedroomBoolean === false ? "office" : null,
     recentEvents: events.slice(-12),
@@ -501,6 +584,7 @@ export function assembleLifeStateSnapshot(parts) {
     screen: summarizeScreenSessions(parts.screenSessions || [], nowMs - SCREEN_MS),
     imessageFromMe: lastFromMeMessage(parts.imessage || [], nowMs - IMESSAGE_MS),
     gym: latestGymEntry(parts.gymEntries || [], nowMs - GYM_MS),
+    phoneIntent: slimLifeStateIntent(parts.phoneIntent, now),
     previous: Array.isArray(parts.previous) ? parts.previous.slice(-3) : [],
   };
 }
@@ -539,6 +623,7 @@ export async function buildLifeStateSnapshot(opts = {}) {
     imessage,
     gym,
     previous,
+    phoneIntent,
   ] = await Promise.all([
     safe("location", () => readPhoneLocation()),
     safe("home-list", () => runHome(["list"])),
@@ -559,6 +644,7 @@ export async function buildLifeStateSnapshot(opts = {}) {
     ),
     safe("gym", () => loadGymEntries()),
     safe("previous", () => readRecentLifeState(opts.dir, 3)),
+    safe("phone-intent", () => readLifeStateIntent(opts.dir, now)),
   ]);
 
   const snapshot = assembleLifeStateSnapshot({
@@ -573,6 +659,7 @@ export async function buildLifeStateSnapshot(opts = {}) {
     screenSessions: screen.ok ? screen.value : [],
     imessage: imessage.ok ? imessage.value : [],
     gymEntries: gym.ok ? gym.value : [],
+    phoneIntent: phoneIntent.ok ? phoneIntent.value : null,
     previous: previous.ok ? previous.value : [],
   });
   if (!loc.ok) snapshot.location = { ok: false, error: loc.error };

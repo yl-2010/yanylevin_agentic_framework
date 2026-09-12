@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   assembleLifeStateSnapshot,
+  homeOccupancyKind,
   inferLunch,
   latestGymEntry,
   lastFromMeMessage,
@@ -80,6 +81,71 @@ describe("rollupHome", () => {
     assert.equal(roll.recentEvents.length, 1);
     assert.equal(roll.recentEvents[0].roomKind, "bathroom");
     assert.equal(roll.recentEvents[0].on, true);
+  });
+
+  it("reads Bathroom Boolean and Leaving Bath Bool as latches, not lights", () => {
+    const roll = rollupHome([
+      {
+        name: "Bathroom Boolean",
+        room: "Yan’s Bedroom",
+        category: "outlet",
+        power: true,
+      },
+      {
+        name: "Leaving Bath Bool",
+        room: "Yan’s Bedroom",
+        category: "outlet",
+        power: false,
+      },
+      {
+        name: "Closet Main",
+        room: "Yan’s Bedroom",
+        category: "switch",
+        power: true,
+      },
+    ]);
+    assert.equal(roll.bathroomBoolean, true);
+    assert.equal(roll.leavingBathBool, false);
+    assert.equal(roll.closetLightsOn, true);
+    assert.equal(roll.bedroomLightsOn, false);
+    assert.equal(roll.bathroomLightsOn, false);
+  });
+
+  it("maps unique occupancy names and skips office middle plus duplicate Eve names", () => {
+    assert.equal(homeOccupancyKind("New Bedroom Occupancy"), "bedroom");
+    assert.equal(homeOccupancyKind("Bathroom Occupancy"), "bathroom");
+    assert.equal(homeOccupancyKind("Closet Occupancy"), "closet");
+    assert.equal(homeOccupancyKind("Office Sensor"), "office");
+    assert.equal(homeOccupancyKind("Office Middle Sensor"), null);
+    const roll = rollupHome([
+      {
+        name: "Bathroom Occupancy",
+        room: "Yan’s Bedroom",
+        category: "sensor",
+        state: { occupancy_detected: true },
+      },
+      {
+        name: "Office Sensor",
+        room: "Yan’s Office",
+        category: "sensor",
+        state: { occupancy_detected: false },
+      },
+      {
+        name: "Yan’s Bedroom Eve Motion",
+        room: "Yan’s Bedroom",
+        category: "sensor",
+        state: { occupancy_detected: true },
+      },
+      {
+        name: "Yan’s Bedroom Eve Motion",
+        room: "Yan’s Bedroom",
+        category: "sensor",
+        state: { occupancy_detected: false },
+      },
+    ]);
+    assert.equal(roll.occupancy.bathroom, true);
+    assert.equal(roll.occupancy.office, false);
+    assert.equal(roll.occupancy.bedroom, null);
   });
 
   it("reads Bedroom Boolean as last-motion, not a light", () => {
@@ -164,6 +230,25 @@ describe("assembleLifeStateSnapshot", () => {
     assert.equal(snap.location.stale, true);
     assert.equal(snap.location.device.audio, "speaker");
     assert.equal(snap.location.device.batteryLevel, 81);
+    assert.equal(snap.phoneIntent, null);
+  });
+
+  it("keeps a fresh phone-dock intent", () => {
+    const snap = assembleLifeStateSnapshot({
+      now: new Date("2026-09-12T06:00:00.000Z"),
+      timeZone: "America/Los_Angeles",
+      location: HOME_FIX,
+      homeList: [],
+      schedule: { isSchoolDay: false, minutes: 23 * 60 },
+      phoneIntent: {
+        kind: "going_to_sleep",
+        orientation: "landscape",
+        source: "shortcut",
+        at: "2026-09-12T05:58:00.000Z",
+      },
+    });
+    assert.equal(snap.phoneIntent.kind, "going_to_sleep");
+    assert.equal(snap.phoneIntent.orientation, "landscape");
   });
 });
 

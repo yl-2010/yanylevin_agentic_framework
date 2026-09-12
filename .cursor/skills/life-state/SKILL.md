@@ -23,9 +23,14 @@ education/you@example.com/life-state/
   current.json
   log-YYYY-MM.jsonl
   state.json
+  intent.json
 ```
 
-Read `schema.md` and `heuristics.md` before writing a sample. Contract is the schema. Showering needs bathroom lights (a recent on-event). Fan-only is not a shower. Snapshot `home.lastMotionRoom` is Bedroom Boolean: `bedroom` if that outlet is on, `office` if off. Fairly accurate when he is home, not a lock. He may be downstairs.
+Read `schema.md` and `heuristics.md` before writing a sample. Contract is the schema.
+
+Home latches (not lights): `home.bedroomBoolean` / `lastMotionRoom` (on = last bedroom occupancy, off = last office occupancy or he left the house), `home.bathroomBoolean` (in-bathroom latch so lights survive a long shower), `home.leavingBathBool` (back at the bathroom doorway). Occupancy sensors do not cross-contaminate except bathroom occupancy, which can also see the closet. Sitting in bed or in the shower usually will not retrigger those sensors. Office Boolean and office middle sensor are unused.
+
+Showering: Bathroom Boolean on plus a shower tell, or a fresh `phoneIntent.kind` `going_to_shower` (portrait dock). Fan-only is leftover, unless the fan just came on from that dock. Sleeping: fresh `going_to_sleep` (landscape dock) is a lock. Ignore a dock intent if Bedroom Boolean is off.
 
 ## On demand (chat)
 
@@ -59,4 +64,8 @@ Do not git commit. Do not edit any other file. Do not wander the repo.
 
 ## Evidence tokens
 
-Short, greppable, no secrets. Examples: `gps:home`, `gps:eps`, `gps:pro-club`, `gps:stale`, `speed:car`, `phone:car-audio`, `phone:charging`, `home:bath-lights`, `home:bath-fan`, `home:bedroom-on`, `home:last-motion-bedroom`, `home:last-motion-office`, `home:away`, `schedule:in-class`, `schedule:lunch`, `schedule:free`, `calendar:debate`, `screen:cursor`, `screen:tiktok`, `imessage:from-me`, `gym:recent`.
+Short, greppable, no secrets. Examples: `gps:home`, `gps:eps`, `gps:pro-club`, `gps:stale`, `speed:car`, `phone:car-audio`, `phone:charging`, `intent:going-to-shower`, `intent:going-to-sleep`, `home:bath-lights`, `home:bath-fan`, `home:bath-boolean`, `home:leaving-bath`, `home:bedroom-on`, `home:last-motion-bedroom`, `home:last-motion-office`, `home:away`, `schedule:in-class`, `schedule:lunch`, `schedule:free`, `calendar:debate`, `screen:cursor`, `screen:tiktok`, `imessage:from-me`, `gym:recent`.
+
+## Phone plug-in Shortcut
+
+Yan's existing personal automation already branches on orientation (and Bedroom Boolean, same as Home). Add **Get Contents of URL** on each of those branches. POST `https://api.yanylevin.com/api/education/life-state-intent`. Header `Authorization: Bearer` plus the same `LOCATION_INGEST_TOKEN` as the location/Health Shortcut. Header `Content-Type: application/json`. JSON body `{"intent":"going_to_shower","orientation":"portrait"}` on the portrait/fan branch, `{"intent":"going_to_sleep","orientation":"landscape"}` on the landscape/nighttime-scene branch. Do not POST when Bedroom Boolean is off. The Mac stores `life-state/intent.json` and kicks a life-state guess so the log does not wait for the next 5-minute tick.

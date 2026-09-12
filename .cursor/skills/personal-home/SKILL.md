@@ -21,7 +21,19 @@ The lobster icon has to stay running. Launch at Login from the menu bar icon. `m
 
 This home is named **New House**. HomePods and Apple TVs never appear. Apple does not put them on `HMHome.accessories`.
 
-**Bedroom Boolean** (outlet in Yan's Bedroom) is not a lamp. On means motion was last detected in Yan's bedroom. Off means motion was last detected in the office. Fairly accurate for those two rooms. He can still be downstairs or in the bathroom. Do not treat it as a light. Do not dump its UUID.
+Named **Boolean** / **Bool** outlets are occupancy latches, not lamps. Do not treat them as lights. Do not dump UUIDs.
+
+**Bedroom Boolean.** On when bedroom occupancy fires. Off when office occupancy fires, or when he leaves the house. Bedroom vs office while he is home, not a lock (downstairs / bathroom / kitchen still happen). Sitting in bed usually will not retrigger the bedroom sensor.
+
+**Office Boolean.** Unused. Old armed/not-armed flag. Ignore.
+
+**Bathroom Boolean.** On when bathroom occupancy fires. Off when bedroom occupancy fires and Leaving Bath Bool is on. Keeps bathroom lights on through a shower the sensor cannot see. Bathroom occupancy can also fire from the closet (door bathroom → closet).
+
+**Leaving Bath Bool.** On when bathroom occupancy fires and Bathroom Boolean is already on (back at the doorway, likely leaving). Six-second re-check: still occupied stays on, clear means he went back in or into the closet. Bedroom occupancy while this is on means he just walked out.
+
+Sensors (no cross-talk except closet vs bathroom occupancy): new bedroom occupancy (doorways, not the bed), bathroom occupancy (doorway, not shower/toilet), closet occupancy, office occupancy across the doorway (walk in/out, not sitting). Ignore office middle sensor.
+
+Phone dock on the bedroom stand: Bedroom Boolean on + portrait → about to shower (fan on). Same + landscape → going to sleep (nighttime scene). Bedroom Boolean off → Home does nothing.
 
 ## First action in a session
 
