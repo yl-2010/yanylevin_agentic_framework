@@ -210,6 +210,9 @@ describe("school-teams urls and shapes", () => {
     assert.equal(row.fromMe, true);
     assert.equal(row.text, "Hello");
     assert.equal(row.chat, "Alex");
+    assert.equal(row.speaker, "Yan");
+    assert.equal(row.at, "2026-09-09T12:00:00.000Z");
+    assert.match(String(row.atLocal), /PT$/);
   });
 
   it("picks a unique chat name", () => {
@@ -368,8 +371,10 @@ describe("school-teams history dump", () => {
       text: "you free",
     });
     assert.match(text, /^2026-05-13T18:00:00.000Z \| kind=chat \| chat=Alex Rivera/);
+    assert.match(text, /speaker=Alex/);
     assert.match(text, /from=Alex Rivera <friend@school.example>/);
     assert.match(text, /fromMe=false/);
+    assert.match(text, /atLocal=/);
     assert.match(text, /\nyou free\n/);
   });
 

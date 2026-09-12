@@ -53,20 +53,23 @@ That digest is shortcut types only. Ignore Time in Daylight, Physical Effort, UV
 ```markdown
 # Health takeaways
 
-## 2026-08-19
+## 2026-08-19 Wednesday
 
 Evening mile run (~8 min, easy). Sleep the night before was about 6.5h with a couple of awake stretches. Resting HR quiet.
 
-## 2026-08-16
+## 2026-08-16 Sunday
 
 Strength session plus a stop at Austin Bouldering Project. Active calories up versus the rest of the week.
 ```
+
+The weekday in the heading must match that `YYYY-MM-DD` in America/Los_Angeles (Chicago for Austin 2026-08-13 through 2026-08-26). Do not copy yesterday's weekday. A rest day stays on its date; do not smear it onto a lift day. RHR/steps are that day's numbers.
 
 ## Anti-patterns
 
 - Diagnoses, conditions, or advice Yan did not already own
 - Pasting raw sample arrays into the markdown
 - Mixing gym machine stack weights into Apple Watch workouts
+- Copying a weekday, rest/lift flag, or RHR onto the neighboring day
 - Git commit (the Node wrapper does that)
 
 ## Verify

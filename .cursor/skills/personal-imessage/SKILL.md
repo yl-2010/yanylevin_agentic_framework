@@ -50,7 +50,7 @@ node server/imessage-read.js people
 
 `recent` is newest-first across all chats (optional ISO/date cursor = only messages at or after that time; default/max 1024). Search by person, handle, chat name, message text, or attachment filename. `thread` returns the recent conversation with that person (oldest of the batch first; default/max 1024). Rows include tapbacks (`tapback.action` + `tapback.on`), swipe-replies (`replyTo.text`), and `attachments[]` (`mime`, `bytes`, `sticker`). If `previewPath` is set, **Read** that image (up to 10 recent stills, HEIC already converted to jpeg). Do not open video, zip, or iWork. Stickers are metadata only.
 
-In a 1:1, `handle` and `chatId` are the other person even on Yan's texts. Speaker is `who` (`yan` / `them` / a group handle) or `fromMe`. Never credit the other person with a `who=yan` / `fromMe=true` line. JSON `at` is UTC with no timezone suffix (`2026-08-24 06:33:25` means 06:33 UTC).
+In a 1:1, `handle` and `chatId` are the other person even on Yan's texts. Speaker is `speaker` (`Yan` / `Alex` / …), then `who` (`yan` / `them` / a group handle) or `fromMe`. Never credit the other person with a `speaker=Yan` / `who=yan` / `fromMe=true` line. JSON `at` is UTC ISO with Z. `atLocal` is Pacific with weekday (`Sun Aug 23, 11:33 PM PT`). Copy `atLocal` and `speaker`; do not treat `at` as local.
 
 Quote only what is needed to answer. Do not paste long threads unprompted.
 

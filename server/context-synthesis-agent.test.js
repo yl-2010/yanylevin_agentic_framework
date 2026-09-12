@@ -108,6 +108,10 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /update <path>/);
     assert.match(prompt, /manually deleted\.md row/);
     assert.match(prompt, /Judgement, not exact date\/time/);
+    assert.match(prompt, /atLocal/);
+    assert.match(prompt, /speaker \(who said the line\)/);
+    assert.match(prompt, /PathIvy/);
+    assert.match(prompt, /Thursday this week/);
     assert.equal(SCHOOL_MAIL_PREFETCH_PATH, "/tmp/yanylevin-context-school-mail.json");
     assert.equal(SCHOOL_TEAMS_PREFETCH_PATH, "/tmp/yanylevin-context-school-teams.json");
     assert.equal(SCREENTIME_PREFETCH_PATH, "/tmp/yanylevin-context-screentime.json");
@@ -126,6 +130,9 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /Do not rewrite untouched people/);
     assert.match(prompt, /append-only/);
     assert.match(prompt, /generated files/);
+    assert.match(prompt, /atLocal/);
+    assert.match(prompt, /speaker is Yan/);
+    assert.match(prompt, /Thursday this week/);
   });
 
   it("synthesis writes the new brain pages, not memories.md", () => {

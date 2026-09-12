@@ -48,12 +48,12 @@ curl -sS --unix-socket /tmp/personal-agent-local.sock "http://localhost/imessage
 
 Use the phone from the person card, not the Contacts display name. Prefetch `/tmp/yanylevin-context-imessage.json` is the same JSON if the cursor still covers the window.
 
-A fact on `people/<slug>/` with no "Yan said" reads as something they said. If `who=yan` / `fromMe=true`, rewrite Standing to "Yan told them …" and append a timeline correction. Same for identity/org copies ("Yan and Nikita say" when only Yan said it).
+A fact on `people/<slug>/` with no "Yan said" reads as something they said. If `speaker=Yan` / `who=yan` / `fromMe=true`, rewrite Standing to "Yan told them …" and append a timeline correction. Same for identity/org copies ("Yan and Nikita say" when only Yan said it).
 
 ## Timezone
 
 - Job clock is `daily-briefing/meta.json`: `America/Chicago` until 2026-08-27, then `America/Los_Angeles`.
-- iMessage JSON `at` is UTC with no `Z` (`2026-08-24 06:33:25` = 01:33 CT). Convert before calling a time or journal day wrong.
+- iMessage and Teams JSON `at` is UTC ISO with Z. `atLocal` is already Pacific with weekday. Copy `atLocal`. If a row is missing `atLocal`, convert `at` before calling a time or journal day wrong.
 - Health standing zone is `America/Los_Angeles`. Austin workouts after 2026-08-12 through 2026-08-26 use `America/Chicago`. `workouts.md` times are already adjusted; takeaways/identity must match that, not a second conversion.
 - `timezoneAfter` and Airbnb checkout are not a boarding pass. A travel date is the itinerary's fly day.
 
@@ -98,7 +98,7 @@ Keep `lastSynthesisAt`, `lastSynthesisDateKey`, `timezone`, and `cursors`. Set `
 
 - Compiling news or writing the briefing todo
 - Treating `handle` as speaker in a 1:1
-- Reading JSON `at` as Chicago or Seattle local
+- Reading JSON `at` as Chicago or Seattle local when `atLocal` is on the row
 - Treating `timezoneAfter` or checkout as the flight date
 - Treating "no new mail since cursor" as "this booking is not in mail"
 - Editing last week's journal

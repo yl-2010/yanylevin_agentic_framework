@@ -23,19 +23,19 @@ Model: **composer-2.5** (fast=false). One Composer pass per month. Do not skim.
 Monthly files under `/tmp/yanylevin-school-teams-export/YYYY-MM.txt`. Each
 message is:
 
-`ISO | kind=chat|channel | chat=Name | type=oneOnOne|group|meeting | from=Name <email> | fromMe=true|false`
+`ISO | kind=chat|channel | chat=Name | type=oneOnOne|group|meeting | speaker=Yan|Alex | from=Name <email> | fromMe=true|false | atLocal=Thu Sep 10, 7:15 PM PT`
 
 or for a class channel:
 
-`ISO | kind=channel | team=Spanish 4 | channel=General | from=Name | fromMe=true|false`
+`ISO | kind=channel | team=Spanish 4 | channel=General | speaker=Yan|Name | from=Name | fromMe=true|false | atLocal=...`
 
 then a clipped text body.
 
 Read every message. Skip empty control noise (calls, join/leave). Extract
 classmate, teacher, group, class-channel, and school-logistics facts.
 
-`fromMe=true` is Yan. Speaker matters: a fact on someone else's card still
-needs "Yan told them …" when Yan said it.
+`fromMe=true` / `speaker=Yan` is Yan. Speaker matters: a fact on someone else's card still
+needs "Yan told them …" when Yan said it. Copy `atLocal`, not UTC `at`.
 
 ## Write
 

@@ -40,6 +40,7 @@ describe("health takeaways prompt", () => {
     assert.match(prompt, /education\/you@example.com\/health/);
     assert.match(prompt, /workouts\.md/);
     assert.match(prompt, /takeaways\.md/);
+    assert.match(prompt, /## YYYY-MM-DD Weekday/);
     assert.match(prompt, /life-state/);
     assert.match(prompt, /Never spawn a Cursor cloud agent/);
     assert.match(prompt, /Do not invent diagnoses/);

@@ -18,6 +18,7 @@ import {
   requireCursorApiKey,
 } from "./cursor-sdk-auth.js";
 import { gitAddCommitPush } from "./git-publish.js";
+import { weekDateHelper } from "./local-clock.js";
 import { nextLocalHmAt } from "./location-history-agent.js";
 import {
   HEALTH_REL,
@@ -144,11 +145,12 @@ export function buildHealthTakeawaysPrompt({ dateKey, timezone, force }) {
     "Turn Yan's Apple Health dumps into natural-language takeaways. Yan only (you@example.com).",
     "Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} (timezone ${timezone}).`,
+    weekDateHelper(dateKey, timezone),
     `Health folder: ${hist}/.`,
     "Read new shortcut raw/*.json after state.json lastTakeawaysAt, plus workouts.md and the existing takeaways.md.",
     "Also read /tmp/yanylevin-context-life-state.json or node server/life-state.js day <yesterday>. Life-state sleeping / at_gym / on_computer is the activity clock. After 2026-08-30, Health-app sleep is parent-facing, not real; prefer life-state sleeping spans over those hours.",
     "Skip raw/apple-export-*.json. That is the compact full-history archive from Apple's XML export, too large for this pass.",
-    "Write takeaways.md: short prose per day, newest day on top. Call out workouts by name, duration, and effort. Sleep as hours plus quality tells. Mention RHR/HRV/steps only when they moved.",
+    "Write takeaways.md: short prose per day, newest day on top. Headings are ## YYYY-MM-DD Weekday matching that calendar day in this timezone (example ## 2026-09-10 Thursday). Do not copy the previous day's weekday. A rest day does not smear onto a lift day. Call out workouts by name, duration, and effort. Sleep as hours plus quality tells. Mention RHR/HRV/steps only when they moved versus that same day, not a neighbor.",
     "Do not dump tables of every sample. Do not invent diagnoses. This is lifestyle context, not a medical chart.",
     "Gym machine weights live under fitness/ and are a different log. Do not mix them in unless a workout name clearly matches.",
     "Update state.json lastTakeawaysAt when you finish.",

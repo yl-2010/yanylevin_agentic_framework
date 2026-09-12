@@ -13,6 +13,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { applyAgentSentFooter } from "./imessage-mention.js";
+import { applyDumpClock, givenName } from "./local-clock.js";
 import {
   GRAPH_BASE,
   SCHOOL_EMAIL,
@@ -403,7 +404,7 @@ export function normalizeMessage(raw, extra = {}) {
       raw?.composeTime ||
       ""
   ).trim();
-  return {
+  return applyDumpClock({
     id: String(raw?.id || "").trim(),
     at: isoOrEmpty(at) || at,
     from: fromName,
@@ -417,7 +418,7 @@ export function normalizeMessage(raw, extra = {}) {
     team: extra.team || "",
     channel: extra.channel || "",
     kind: extra.kind || "chat",
-  };
+  });
 }
 
 export function defaultDumpDir() {
@@ -454,6 +455,7 @@ export function shouldSkipTeamsDumpMessage(msg, raw = {}) {
 }
 
 export function formatDumpMessage(msg) {
+  applyDumpClock(msg);
   const from = msg.fromEmail ? `${msg.from} <${msg.fromEmail}>` : String(msg.from || "");
   const where =
     msg.kind === "channel"
@@ -463,8 +465,10 @@ export function formatDumpMessage(msg) {
     .replace(/\r\n/g, "\n")
     .trim()
     .slice(0, FILL_BODY_MAX);
+  const speaker = msg.speaker || (msg.fromMe ? "Yan" : givenName(msg.from) || "them");
+  const local = msg.atLocal ? ` | atLocal=${msg.atLocal}` : "";
   return [
-    `${msg.at} | kind=${msg.kind || "chat"} | ${where} | from=${from} | fromMe=${msg.fromMe ? "true" : "false"}`,
+    `${msg.at} | kind=${msg.kind || "chat"} | ${where} | speaker=${speaker} | from=${from} | fromMe=${msg.fromMe ? "true" : "false"}${local}`,
     body,
     "",
   ].join("\n");

@@ -61,6 +61,10 @@ folders into the repo.
 Prefer `search` or `thread --chat <name>` over paging every chat. Channel
 posts: `--team` and `--channel` together.
 
+JSON rows have `at` (UTC ISO with Z), `atLocal` (Pacific with weekday), and
+`speaker` (`Yan` / `Alex` / …). Copy `speaker` and `atLocal`. `fromMe=true`
+is Yan even in a 1:1 named after the other person.
+
 ## History fill
 
 Do not run the full Composer fill unless Yan asks. That job is

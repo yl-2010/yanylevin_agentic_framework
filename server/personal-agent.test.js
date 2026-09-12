@@ -333,6 +333,7 @@ describe("Personal Agent skill files", () => {
     assert.match(imessage, /\/imessage\/send/);
     assert.match(imessage, /Do not ask for confirmation/);
     assert.match(imessage, /who=yan/);
+    assert.match(imessage, /atLocal/);
     assert.match(imessage, /handle.*other person/);
     assert.match(imessage, /@agent/);
     assert.match(imessage, /fromMe/);
@@ -466,6 +467,9 @@ describe("Personal Agent skill files", () => {
     assert.match(triage, /personal-school-teams/);
     assert.match(triage, /yanylevin-context-school-teams\.json/);
     assert.match(triage, /yanylevin-context-life-state\.json/);
+    assert.match(triage, /atLocal/);
+    assert.match(triage, /Mail standing/);
+    assert.match(triage, /PathIvy/);
 
     const entities = await readFile(
       join(REPO_ROOT, ".cursor/skills/nightly-entities/SKILL.md"),
@@ -475,6 +479,7 @@ describe("Personal Agent skill files", () => {
     assert.match(entities, /append-only/);
     assert.match(entities, /skipped\.md/);
     assert.match(entities, /Yan told them/);
+    assert.match(entities, /atLocal/);
     assert.match(entities, /Aliases live on the card/);
     assert.doesNotMatch(entities, /Sunny \/ Sunny Boy = adi-levin/);
 
@@ -556,6 +561,7 @@ describe("Personal Agent skill files", () => {
     assert.match(factCheck, /identity-school\.md/);
     assert.match(factCheck, /mega-bullet/);
     assert.match(factCheck, /Do not scan OneNote/);
+    assert.match(factCheck, /atLocal/);
   });
 });
 

@@ -30,7 +30,8 @@ describe("fact-check prompt", () => {
     assert.match(prompt, /you@example.com/);
     assert.match(prompt, /journal\/2026-08-23\.md/);
     assert.match(prompt, /who\/fromMe/);
-    assert.match(prompt, /JSON at is UTC/);
+    assert.match(prompt, /JSON at is UTC ISO with Z/);
+    assert.match(prompt, /atLocal/);
     assert.match(prompt, /Mail claims/);
     assert.match(prompt, /Do not scan OneNote/);
     assert.match(prompt, /missing dump is expected/);

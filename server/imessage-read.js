@@ -9,6 +9,11 @@ import { homedir } from "node:os";
 import { extname, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import {
+  applyDumpClock,
+  contactHandleNames,
+  isoUtcFromDumpAt,
+} from "./local-clock.js";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_DB = join(homedir(), "Library/Messages/chat.db");
@@ -149,14 +154,39 @@ function sqlLiteral(value) {
 export function parseSqliteAt(raw) {
   const s = String(raw || "").trim();
   if (!s) return NaN;
-  if (s.includes("T")) return Date.parse(s);
+  if (s.includes("T") || /Z$/i.test(s) || /[+-]\d{2}:\d{2}$/.test(s)) {
+    return Date.parse(s);
+  }
   return Date.parse(`${s.replace(" ", "T")}Z`);
 }
 
 export function isoFromSqliteAt(raw) {
-  const ms = parseSqliteAt(raw);
-  if (!Number.isFinite(ms)) return clip(raw, 40);
-  return new Date(ms).toISOString();
+  const iso = isoUtcFromDumpAt(raw);
+  return iso || clip(raw, 40);
+}
+
+/** @type {{ at: number, map: Map<string, string>|null }} */
+let handleNamesCache = { at: 0, map: null };
+
+/**
+ * Contacts first-name map for group iMessage handles.
+ * @param {{ force?: boolean, root?: string }} [opts]
+ */
+export async function loadHandleNames(opts = {}) {
+  const now = Date.now();
+  if (!opts.force && handleNamesCache.map && now - handleNamesCache.at < 60_000) {
+    return handleNamesCache.map;
+  }
+  try {
+    const { listContacts } = await import("./contacts-read.js");
+    const map = contactHandleNames(await listContacts({ root: opts.root }));
+    handleNamesCache = { at: now, map };
+    return map;
+  } catch {
+    const empty = new Map();
+    handleNamesCache = { at: now, map: empty };
+    return empty;
+  }
 }
 
 export function monthKeyFromAt(raw) {
@@ -507,6 +537,7 @@ export function rowToMessage(row) {
     attachmentName: attachments[0]?.filename || "",
   };
   out.who = speakerWho(out);
+  applyDumpClock(out);
   if (Number(row.is_audio) === 1) out.audio = true;
   if (associatedType) {
     out.associatedType = associatedType;
@@ -621,6 +652,12 @@ async function fetchMessages({ extraWhere, limit, db, previewStills, timeout, ma
   const sql = messageSelectSql({ extraWhere, limit });
   const rows = await queryMessages(sql, { db, timeout, maxBuffer });
   const messages = await hydrateReferences(rows.map(rowToMessage), { db });
+  try {
+    const names = await loadHandleNames();
+    for (const msg of messages) applyDumpClock(msg, { names });
+  } catch {
+    /* contacts optional; atLocal/speaker already stamped */
+  }
   if (previewStills) {
     await stageStillPreviews(messages, {
       limit: previewStills === true ? PREVIEW_STILL_LIMIT : previewStills,

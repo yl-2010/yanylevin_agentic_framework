@@ -65,8 +65,12 @@ for people; you are where person facts land.
 - Facts about Yan himself belong in phase 3's pages, not on a person card.
   Leave them in the digest; do not drop them.
 - Speaker: a fact on someone else's card still needs "Yan told them …" when
-  Yan said it (`who=yan` / `fromMe=true` in the dump, or "Yan said" in the
-  digest). Do not collapse that into Standing that reads as their claim.
+  Yan said it (`speaker=Yan` / `who=yan` / `fromMe=true` in the dump, or
+  "Yan said" in the digest). Do not collapse that into Standing that reads
+  as their claim. In a 1:1, `handle` is the other person even on Yan's texts.
+- Times: copy digest `atLocal` or YYYY-MM-DD. Dump `at` is UTC ISO. Do not
+  paste `02:15` as 2:15 AM PT. Convert weekday words with the job date helper
+  in the prompt (`Thursday this week` is a date, not a vibe).
 - Place/activity from the digest: `/tmp/yanylevin-context-life-state.json`
   has yesterday's 5-minute kinds if a stay is thin (at_friends vs EPS vs gym).
   Read it; do not write that log.
@@ -77,6 +81,8 @@ for people; you are where person facts land.
 - Inventing biography. Only what the digest and existing brain state.
 - "No new info" filler edits. If nothing changed for an entity, skip it.
 - Storing secrets, tokens, card numbers, or school-sheet gender/ethnicity.
+- Crediting the other person in a 1:1 because the line sits on their card.
+- Pasting dump `at` as Pacific time.
 
 ## Verify
 

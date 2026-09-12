@@ -316,6 +316,9 @@ describe("imessage-read", () => {
     assert.equal(msg.who, "yan");
     assert.equal(msg.fromMe, true);
     assert.equal(msg.handle, "+12066976688");
+    assert.equal(msg.speaker, "Yan");
+    assert.equal(msg.at, "2026-08-24T06:33:25.000Z");
+    assert.equal(msg.atLocal, "Sun Aug 23, 11:33 PM PT");
   });
 
   it("labels the other person as them on 1:1 inbound JSON rows", () => {
@@ -329,6 +332,7 @@ describe("imessage-read", () => {
     });
     assert.equal(msg.who, "them");
     assert.equal(msg.fromMe, false);
+    assert.equal(msg.speaker, "Nikita");
   });
 
   it("labels other senders by handle in group dumps", () => {

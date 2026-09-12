@@ -106,8 +106,8 @@ you do not send.
 
 When you copy an iMessage fact onto identity, a thread, or an org card, keep
 the speaker. "Yan told Nikita the refund has not landed" is not "Nikita says
-the refund has not landed." In a 1:1, `handle` is the other person on Yan's
-rows.
+the refund has not landed." Use dump `speaker` and `atLocal`. In a 1:1,
+`handle` is the other person on Yan's rows. Dump `at` is UTC.
 
 ## state.json
 
