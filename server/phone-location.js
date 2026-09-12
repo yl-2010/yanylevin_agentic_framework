@@ -1,7 +1,7 @@
 /**
  * Last-known iPhone location for Yan's Personal Agent (web + iOS + Cursor).
  * Written by the iOS app (or an iPhone Shortcut) via POST /api/education/location.
- * iPhone Always: significant-change, visits, and a 15-minute `periodic` heartbeat.
+ * iPhone Always: significant-change, visits, and a 5-minute `periodic` heartbeat.
  * Stored as education/<email>/.location.json plus
  * education/<email>/location/ (append-only JSONL + composed stays/trips).
  */
@@ -20,6 +20,8 @@ export const HISTORY_DEDUPE_MS = 60_000;
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const MAX_PLACE = 120;
 const STALE_AFTER_MS = 6 * 60 * 60 * 1000;
+const AUDIO_SET = new Set(["speaker", "headphones", "bluetooth", "car"]);
+const NETWORK_SET = new Set(["wifi", "cellular", "none"]);
 
 /** @param {string|null|undefined} email */
 export function isYanLocationUser(email) {
@@ -169,7 +171,44 @@ export function parseLocationPayload(raw) {
   if (country) out.country = country;
   if (areas.length) out.areasOfInterest = areas;
 
+  const device = parseDeviceContext(src);
+  if (device) out.device = device;
+
   return out;
+}
+
+/**
+ * iPhone battery / network / audio bundle on a location POST.
+ * @param {unknown} raw
+ * @returns {Record<string, unknown>|null}
+ */
+export function parseDeviceContext(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const src = /** @type {Record<string, unknown>} */ (raw);
+  const nested =
+    src.device && typeof src.device === "object"
+      ? /** @type {Record<string, unknown>} */ (src.device)
+      : src;
+  /** @type {Record<string, unknown>} */
+  const out = {};
+  const level = finiteNumber(nested.batteryLevel);
+  if (level != null && level >= 0 && level <= 100) {
+    const fraction = level > 0 && level <= 1 && !Number.isInteger(level);
+    out.batteryLevel = Math.round(fraction ? level * 100 : level);
+  }
+  if (typeof nested.charging === "boolean") out.charging = nested.charging;
+  if (typeof nested.lowPowerMode === "boolean") out.lowPowerMode = nested.lowPowerMode;
+  const network = clipStr(nested.network, 16).toLowerCase();
+  if (NETWORK_SET.has(network)) out.network = network;
+  const ssid = clipStr(nested.ssid, 64);
+  if (ssid) out.ssid = ssid;
+  const audio = clipStr(nested.audio, 16).toLowerCase();
+  if (AUDIO_SET.has(audio)) out.audio = audio;
+  const postedAt = clipStr(nested.postedAt, 40);
+  if (postedAt && !Number.isNaN(Date.parse(postedAt))) {
+    out.postedAt = new Date(postedAt).toISOString();
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 /**

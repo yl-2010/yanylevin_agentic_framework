@@ -66,7 +66,7 @@ targets:
         UIBackgroundModes:
           - location
         NSLocationWhenInUseUsageDescription: "This app uses your location on chat maps. On iPhone it may also send location to the Personal Agent so it knows where you are, including when you chat from the website or iPad."
-        NSLocationAlwaysAndWhenInUseUsageDescription: "This app uses your iPhone location in the background so the Personal Agent can see where you are when you chat from the web or a computer. On iPhone it also sends a location update about every 15 minutes, plus when you move a significant distance."
+        NSLocationAlwaysAndWhenInUseUsageDescription: "This app uses your iPhone location in the background so the Personal Agent can see where you are when you chat from the web or a computer. On iPhone it also sends a location update about every 5 minutes, plus when you move a significant distance."
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
     entitlements:

@@ -19,7 +19,7 @@ The public site chatbot and LM Studio wiring are separate. The **/education** we
 - Allowed users: `you@example.com`, `you@example.com`
 - Web/iOS sessions inject the signed-in email; Cursor Desktop on Yan’s Mac defaults to Yan unless the user names Alex
 - **Yan (`you@example.com`):** full write access — any path in this repo **and** anywhere on the Mac Studio filesystem when asked. Do not refuse repo-wide or Mac-wide work. Mail.app, Calendar, Apple Home, Contacts, iMessage, Screen Time, Canvas, phone location, Apple Health dumps, school OneNote, and school Teams are Yan-only.
-- **Alex (`you@example.com`):** write **only** under `education/you@example.com/`. Read-only outside that folder is fine when needed. **Never** Mail.app / `osascript` mail. **Never** Apple Calendar, Apple Home, Contacts, Messages/`chat.db`, Screen Time/`knowledgeC.db`, Canvas, school OneNote, school Teams, or Yan’s `.location.json`, `location/`, `health/`, `.canvas/`, `.chat-history/`, or `brain/`.
+- **Alex (`you@example.com`):** write **only** under `education/you@example.com/`. Read-only outside that folder is fine when needed. **Never** Mail.app / `osascript` mail. **Never** Apple Calendar, Apple Home, Contacts, Messages/`chat.db`, Screen Time/`knowledgeC.db`, Canvas, school OneNote, school Teams, or Yan’s `.location.json`, `location/`, `life-state/`, `health/`, `.canvas/`, `.chat-history/`, or `brain/`.
 - Never edit main-site chatbot wiring (`chatbot.js`, `/api/chat`, LM Studio) unless Yan explicitly asks
 - Never delete fixture objects (`"fixture": true` or ids starting with `_example-`)
 
@@ -66,6 +66,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Weekly PDF, `schedule.json`, bells, what class is now | `.cursor/skills/class-schedule/SKILL.md` |
 | Past Personal Agent transcripts | `.cursor/skills/past-chats/SKILL.md` |
 | Yan iPhone location (live + stays/trips) | `.cursor/skills/phone-location/SKILL.md` |
+| What Yan is doing now / was doing at a time (5-minute log) | `.cursor/skills/life-state/SKILL.md` |
 | Map / image / HTML widgets, location cards, place hours | `.cursor/skills/chat-widgets/SKILL.md` |
 | Yan inbox / Mail.app (search and send) | `.cursor/skills/personal-mail/SKILL.md` |
 | School Outlook `owner@school.example` | `.cursor/skills/personal-school-mail/SKILL.md` |

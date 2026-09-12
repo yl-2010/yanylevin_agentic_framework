@@ -1,5 +1,8 @@
+import AVFoundation
 import CoreLocation
 import Foundation
+import Network
+import NetworkExtension
 import SwiftUI
 import UIKit
 
@@ -7,15 +10,15 @@ import UIKit
 /// can see it too. Only runs for Yan's account, and only on iPhone. iPad chat maps
 /// use MapKit GPS on-device and never post to this ingest.
 ///
-/// Always: significant-change (~500m) + visits + a 15-minute heartbeat (`periodic`).
-/// Heartbeats do not start agents; they only write the live fix and JSONL history.
-/// Force-quit stops the 15-minute timer. Significant-change and visits stay
-/// registered with iOS and can relaunch this process; `restoreFromAppGroup()`
-/// restarts monitoring so those posts still land.
+/// Always: significant-change (~500m) + visits + a 5-minute heartbeat (`periodic`).
+/// Heartbeats do not start agents; they only write the live fix, device context,
+/// and JSONL history. Force-quit stops the 5-minute timer. Significant-change
+/// and visits stay registered with iOS and can relaunch this process;
+/// `restoreFromAppGroup()` restarts monitoring so those posts still land.
 final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @unchecked Sendable {
     static let shared = PhoneLocationReporter()
 
-    private static let heartbeatInterval: TimeInterval = 15 * 60
+    private static let heartbeatInterval: TimeInterval = 5 * 60
     private static let foregroundMinInterval: TimeInterval = 25
     private static let movementMeters: CLLocationDistance = 500
 
@@ -43,6 +46,9 @@ final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @uncheck
     private var lastPostAt: Date?
     private var lastPostedCoordinate: CLLocationCoordinate2D?
     private var posting = false
+    private let pathMonitor = NWPathMonitor()
+    private let pathQueue = DispatchQueue(label: "yl.phone-location.path")
+    private var networkKind: String = "none"
     private static let iso8601 = ISO8601DateFormatter()
     private static let iso8601Lock = NSLock()
 
@@ -53,6 +59,23 @@ final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @uncheck
 
     private override init() {
         super.init()
+        pathMonitor.pathUpdateHandler = { [weak self] path in
+            guard let self else { return }
+            let kind: String
+            if path.usesInterfaceType(.wifi) {
+                kind = "wifi"
+            } else if path.usesInterfaceType(.cellular) {
+                kind = "cellular"
+            } else if path.status == .satisfied {
+                kind = "wifi"
+            } else {
+                kind = "none"
+            }
+            self.lock.lock()
+            self.networkKind = kind
+            self.lock.unlock()
+        }
+        pathMonitor.start(queue: pathQueue)
     }
 
     var snapshot: AgentPhoneLocation? {
@@ -186,13 +209,14 @@ final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @uncheck
     }
 
     /// `requestLocation()` is a no-op while `startUpdatingLocation()` is running, so
-    /// re-post the last fix every 15 minutes while sitting still.
+    /// re-post the last fix every 5 minutes while sitting still.
     private func postPeriodicHeartbeat() async {
         guard enabled, let token, !token.isEmpty else { return }
         guard var fix = snapshot else { return }
         fix.source = "periodic"
         fix.visitKind = nil
         fix.timestamp = Self.iso8601String(from: Date())
+        fix.device = await Self.collectDevice(network: currentNetworkKind())
         await post(fix, token: token)
     }
 
@@ -263,6 +287,7 @@ final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @uncheck
             let areas = (mark.areasOfInterest ?? []).map(Self.clip).filter { !$0.isEmpty }
             if !areas.isEmpty { fix.areasOfInterest = Array(areas.prefix(6)) }
         }
+        fix.device = await Self.collectDevice(network: currentNetworkKind())
         setLastFix(fix)
         await post(fix, token: token)
         await MainActor.run {
@@ -309,6 +334,52 @@ final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @uncheck
         return false
     }
 
+    private func currentNetworkKind() -> String {
+        lock.lock()
+        defer { lock.unlock() }
+        return networkKind
+    }
+
+    private static func collectDevice(network: String) async -> AgentPhoneDevice {
+        let battery = await MainActor.run { () -> (Int?, Bool?) in
+            let device = UIDevice.current
+            device.isBatteryMonitoringEnabled = true
+            let raw = device.batteryLevel
+            let level: Int? = raw >= 0 ? Int((raw * 100).rounded()) : nil
+            let charging: Bool?
+            switch device.batteryState {
+            case .charging, .full: charging = true
+            case .unplugged: charging = false
+            default: charging = nil
+            }
+            return (level, charging)
+        }
+        var ssid: String?
+        if let current = try? await NEHotspotNetwork.fetchCurrent() {
+            let name = current.ssid.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !name.isEmpty { ssid = String(name.prefix(64)) }
+        }
+        return AgentPhoneDevice(
+            batteryLevel: battery.0,
+            charging: battery.1,
+            lowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled,
+            network: network,
+            ssid: ssid,
+            audio: currentAudioRoute(),
+            postedAt: iso8601String(from: Date())
+        )
+    }
+
+    private static func currentAudioRoute() -> String {
+        let ports = AVAudioSession.sharedInstance().currentRoute.outputs.map(\.portType)
+        if ports.contains(.carAudio) { return "car" }
+        if ports.contains(.headphones) || ports.contains(.headsetMic) { return "headphones" }
+        if ports.contains(.bluetoothA2DP) || ports.contains(.bluetoothLE) || ports.contains(.bluetoothHFP) {
+            return "bluetooth"
+        }
+        return "speaker"
+    }
+
     private static func iso8601String(from date: Date) -> String {
         iso8601Lock.lock()
         defer { iso8601Lock.unlock() }
@@ -339,4 +410,15 @@ struct AgentPhoneLocation: Codable, Equatable {
     var postalCode: String?
     var country: String?
     var areasOfInterest: [String]?
+    var device: AgentPhoneDevice? = nil
+}
+
+struct AgentPhoneDevice: Codable, Equatable {
+    var batteryLevel: Int?
+    var charging: Bool?
+    var lowPowerMode: Bool?
+    var network: String?
+    var ssid: String?
+    var audio: String?
+    var postedAt: String?
 }

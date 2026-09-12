@@ -58,6 +58,7 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.length < 5600, `prompt length ${prompt.length}`);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.chats));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.location));
+    assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.lifeState));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.calendar));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.home));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.canvas));
@@ -219,8 +220,20 @@ describe("Personal Agent skill files", () => {
     assert.match(location, /places\.md/);
     assert.match(location, /trips\.md/);
     assert.match(location, /brain\/places/);
+    assert.match(location, /5-minute heartbeat/);
+    assert.match(location, /device/);
     assert.match(location, /Yan only/);
     assert.match(location, /1–2 sentence/);
+
+    const lifeState = await readFile(
+      join(REPO_ROOT, PERSONAL_SKILL_PATHS.lifeState),
+      "utf8"
+    );
+    assert.match(lifeState, /Yan only/);
+    assert.match(lifeState, /current\.json/);
+    assert.match(lifeState, /life-state\.js now/);
+    assert.match(lifeState, /bathroom/);
+    assert.match(lifeState, /Never spawn a cloud agent/);
 
     const widgets = await readFile(
       join(REPO_ROOT, PERSONAL_SKILL_PATHS.widgets),
@@ -383,6 +396,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /same-turn brain writes/i);
     assert.match(agent, /personal-people/);
     assert.match(agent, /personal-home/);
+    assert.match(agent, /life-state/);
     assert.match(agent, /Apple Home/);
     assert.match(agent, /named people/i);
     assert.match(agent, /brain-entity-card\.js/);

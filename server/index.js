@@ -45,6 +45,7 @@ import { startHealthTakeawaysScheduler } from "./health-takeaways-agent.js";
 import { startLocationBrainScheduler } from "./location-brain-agent.js";
 import { startHealthBrainScheduler } from "./health-brain-agent.js";
 import { startFactCheckScheduler } from "./fact-check-agent.js";
+import { startLifeStateScheduler } from "./life-state-agent.js";
 import { attachEducationEvents } from "./education-events.js";
 import {
   startAgent,
@@ -955,6 +956,7 @@ app.use((_req, res) => {
   startLocationBrainScheduler();
   startHealthBrainScheduler();
   startFactCheckScheduler();
+  startLifeStateScheduler();
   startLocalIpc();
   startIMessageAgentMentionScheduler();
   startTeamsAgentMentionScheduler();

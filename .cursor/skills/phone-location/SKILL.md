@@ -15,7 +15,7 @@ disable-model-invocation: true
 
 Read `education/you@example.com/.location.json` when you need where Yan is **now**. It is the phone’s GPS, not this Mac Studio (the Studio stays home).
 
-Typical fields: `latitude`, `longitude`, optional `accuracyMeters`, `timestamp` / `receivedAt`, `source` (`ios` / `visit` / `periodic`), motion (`speedMps`, `courseDegrees`, `altitudeMeters`), `visitKind`, and place labels. Treat a fix older than about 6 hours as stale and say so.
+Typical fields: `latitude`, `longitude`, optional `accuracyMeters`, `timestamp` / `receivedAt`, `source` (`ios` / `visit` / `periodic`), motion (`speedMps`, `courseDegrees`, `altitudeMeters`), `visitKind`, place labels, and optional `device` (`batteryLevel`, `charging`, `lowPowerMode`, `network`, `ssid`, `audio`, `postedAt`). Treat a fix older than about 6 hours as stale and say so.
 
 ## History (where Yan was / how he got there)
 
@@ -32,6 +32,6 @@ A scheduled Composer job at 01:00 (and every 4h if new points) updates the markd
 
 Do **not** scrape Find My, do **not** run Mac Shortcuts for location, and do **not** use Core Location on the Mac. Chat turns should not search Mail for receipts; that is the compose job.
 
-The **iPhone** app posts `POST /api/education/location` while Yan is signed in (When In Use, and Always if he allows background). Always: significant-change (~500m) plus visit monitoring, and a 15-minute heartbeat tagged `source: "periodic"` (raw `.location.json` + JSONL only; does not start compose/enrichment). Force-quit stops the 15-minute heartbeat until the app is opened again; significant-change and visits still relaunch the app and post. Chat maps on iPhone and iPad may use on-device GPS for the blue dot; the **iPad app does not post** to this ingest or send `phoneLocation` in agent uiContext. Chat from iPad still uses this iPhone feed on the Mac. An iPhone Shortcut can post the same URL with `Authorization: Bearer` + `LOCATION_INGEST_TOKEN` from `server/.env` if the app is not running.
+The **iPhone** app posts `POST /api/education/location` while Yan is signed in (When In Use, and Always if he allows background). Always: significant-change (~500m) plus visit monitoring, and a 5-minute heartbeat tagged `source: "periodic"` (raw `.location.json` + JSONL only; does not start compose/enrichment). The heartbeat also sends a `device` bundle (battery, charging, wifi/cellular, audio route, SSID when iOS allows). Force-quit stops the 5-minute heartbeat until the app is opened again; significant-change and visits still relaunch the app and post. Chat maps on iPhone and iPad may use on-device GPS for the blue dot; the **iPad app does not post** to this ingest or send `phoneLocation` in agent uiContext. Chat from iPad still uses this iPhone feed on the Mac. An iPhone Shortcut can post the same URL with `Authorization: Bearer` + `LOCATION_INGEST_TOKEN` from `server/.env` if the app is not running.
 
 For maps / nearby, use this lat/lng then Read `.cursor/skills/chat-widgets/SKILL.md` before emitting a map widget. Suggested places (nearby, restaurants, hangouts) need **at least 5 pins**. Every pin needs a **1–2 sentence `description`** (one full sentence at least) for the location card. Never one-word card copy like `"Italian"` or `"Cafe"`. Hours for a nearby place: official website first, then Google Maps. Never Apple Maps hours alone.

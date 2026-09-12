@@ -66,6 +66,26 @@ describe("parseLocationPayload", () => {
     assert.equal(loc.source, "periodic");
   });
 
+  it("keeps a device bundle and ignores unknown keys", () => {
+    const loc = parseLocationPayload({
+      latitude: 47.6812,
+      longitude: -122.2086,
+      junk: true,
+      device: {
+        batteryLevel: 64,
+        charging: true,
+        lowPowerMode: false,
+        network: "wifi",
+        audio: "headphones",
+        ssid: "Ziply",
+      },
+    });
+    assert.equal(loc.junk, undefined);
+    assert.equal(loc.device.batteryLevel, 64);
+    assert.equal(loc.device.audio, "headphones");
+    assert.equal(loc.device.ssid, "Ziply");
+  });
+
   it("drops invalid speed and visit kind", () => {
     const loc = parseLocationPayload({
       latitude: 30.28,

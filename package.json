@@ -9,6 +9,7 @@
     "deploy:web": "npx vercel deploy --prod --yes",
     "daily-briefing": "npm run daily-briefing --prefix server",
     "location-history": "npm run location-history --prefix server",
+    "life-state": "npm run life-state --prefix server",
     "location-enrichment": "npm run location-enrichment --prefix server",
     "canvas-sync": "npm run canvas-sync --prefix server",
     "school-mail": "npm run school-mail --prefix server",
