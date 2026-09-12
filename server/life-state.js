@@ -54,7 +54,12 @@ export function lifeStateDir(override) {
 }
 
 function clipStr(raw, max) {
-  const s = String(raw || "").trim().replace(/\s+/g, " ");
+  const s = String(raw || "")
+    .replace(/\u2014/g, ",")
+    .replace(/\u2013/g, ",")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\s+,/g, ",");
   if (!s) return "";
   return s.slice(0, max);
 }

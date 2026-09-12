@@ -74,6 +74,19 @@ describe("life-state schema", () => {
     assert.ok(LIFE_STATE_KINDS.includes("school_lunch"));
     assert.ok(LIFE_STATE_KINDS.includes("sleeping"));
   });
+
+  it("strips em dashes from activity", () => {
+    const rec = parseLifeStateRecord({
+      at: "2026-09-11T21:10:00.000Z",
+      local: "2026-09-11T14:10:00-07:00",
+      dateKey: "2026-09-11",
+      since: "2026-09-11T21:10:00.000Z",
+      continued: false,
+      ...SAMPLE,
+      activity: "on Mac Studio in office — Cursor",
+    });
+    assert.equal(rec.activity, "on Mac Studio in office, Cursor");
+  });
 });
 
 describe("completeLifeStateRecord", () => {
