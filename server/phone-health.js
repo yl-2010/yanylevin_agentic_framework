@@ -29,6 +29,8 @@ export const HEALTH_AUSTIN_UNTIL_DATE = "2026-08-26";
 export const MAX_WORKOUTS = 2000;
 export const MAX_SLEEP = 4000;
 export const MAX_SERIES = 8000;
+/** Daily briefing URGENT if the iPhone Health Shortcut has not posted in this window. */
+export const HEALTH_SHORTCUT_STALE_MS = 12 * 60 * 60 * 1000;
 const TWO_HOUR_MS = 2 * 60 * 60 * 1000;
 const TWO_HOUR_SLOP_MS = 5 * 60 * 1000;
 
@@ -912,6 +914,42 @@ export async function readHealthState(dir) {
   } catch {
     return {};
   }
+}
+
+/**
+ * Prefetch for Daily Briefing agent recap. URGENT when the iPhone Health
+ * Shortcut has not posted in 12 hours (or lastIngestAt is missing).
+ * @param {{ dir?: string, now?: Date, state?: Record<string, unknown> }} [opts]
+ */
+export async function assessHealthShortcutHeartbeat(opts = {}) {
+  const now = opts.now instanceof Date ? opts.now : new Date();
+  const state =
+    opts.state !== undefined ? opts.state : await readHealthState(opts.dir);
+  const lastIngestAt = String(state?.lastIngestAt || "").trim() || null;
+  const lastMs = lastIngestAt ? Date.parse(lastIngestAt) : NaN;
+  const ageMs = Number.isFinite(lastMs) ? now.getTime() - lastMs : null;
+  const ageHours =
+    ageMs != null ? Math.round((ageMs / 3_600_000) * 10) / 10 : null;
+  /** @type {{ code: string, detail: string }[]} */
+  const issues = [];
+  if (!lastIngestAt || !Number.isFinite(lastMs)) {
+    issues.push({
+      code: "health-shortcut-missing",
+      detail: "No Health Shortcut dump on disk. lastIngestAt is missing.",
+    });
+  } else if (ageMs >= HEALTH_SHORTCUT_STALE_MS) {
+    issues.push({
+      code: "health-shortcut-stale",
+      detail: `No Health Shortcut dump in the last 12 hours. Last ingest ${lastIngestAt} (${ageHours}h ago).`,
+    });
+  }
+  return {
+    ok: issues.length === 0,
+    at: now.toISOString(),
+    lastIngestAt,
+    ageHours,
+    issues,
+  };
 }
 
 export async function writeHealthState(state, dir) {

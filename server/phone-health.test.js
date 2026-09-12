@@ -14,6 +14,8 @@ import {
   isShortcutHealthRawFile,
   readHealthState,
   writeHealthState,
+  assessHealthShortcutHeartbeat,
+  HEALTH_SHORTCUT_STALE_MS,
   workoutKey,
   HEALTH_TIMEZONE,
   HEALTH_AUSTIN_TIMEZONE,
@@ -335,6 +337,44 @@ describe("writeHealthDump", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("assessHealthShortcutHeartbeat", () => {
+  it("is ok when lastIngestAt is within 12 hours", async () => {
+    const now = new Date("2026-09-11T22:00:00.000Z");
+    const result = await assessHealthShortcutHeartbeat({
+      now,
+      state: { lastIngestAt: "2026-09-11T13:36:06.104Z" },
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.issues.length, 0);
+    assert.equal(result.lastIngestAt, "2026-09-11T13:36:06.104Z");
+    assert.equal(result.ageHours, 8.4);
+  });
+
+  it("is urgent when lastIngestAt is older than 12 hours", async () => {
+    const now = new Date("2026-09-12T05:22:00.000Z");
+    const result = await assessHealthShortcutHeartbeat({
+      now,
+      state: { lastIngestAt: "2026-09-11T13:36:06.104Z" },
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.issues.length, 1);
+    assert.equal(result.issues[0].code, "health-shortcut-stale");
+    assert.match(result.issues[0].detail, /12 hours/);
+    assert.match(result.issues[0].detail, /2026-09-11T13:36:06.104Z/);
+    assert.ok(result.ageHours >= 12);
+    assert.equal(HEALTH_SHORTCUT_STALE_MS, 12 * 60 * 60 * 1000);
+  });
+
+  it("is urgent when lastIngestAt is missing", async () => {
+    const result = await assessHealthShortcutHeartbeat({
+      now: new Date("2026-09-11T22:00:00.000Z"),
+      state: {},
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.issues[0].code, "health-shortcut-missing");
   });
 });
 

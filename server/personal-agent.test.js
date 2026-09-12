@@ -522,6 +522,7 @@ describe("Personal Agent skill files", () => {
     assert.match(recap, /stayed off the\s+calendar/);
     assert.match(recap, /calendar-cli/);
     assert.match(recap, /lifeState\.issues/);
+    assert.match(recap, /healthShortcut\.issues/);
 
     const enrich = await readFile(
       join(REPO_ROOT, PERSONAL_SKILL_PATHS.locationEnrichment),

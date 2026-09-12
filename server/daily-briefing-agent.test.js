@@ -122,6 +122,7 @@ describe("briefing phase prompts", () => {
     assert.match(prompt, /agent-recap-2026-08-22\.json/);
     assert.match(prompt, /pipelineFinished/);
     assert.match(prompt, /lifeState\.issues/);
+    assert.match(prompt, /healthShortcut\.issues/);
     assert.match(prompt, /URGENT/);
     assert.match(prompt, /noVote/);
     assert.match(prompt, /notes\.calendar is written by synthesis before actions/);
@@ -165,6 +166,9 @@ describe("prefetchNightlyStatus", () => {
     assert.ok(parsed.lifeState && typeof parsed.lifeState === "object");
     assert.equal(typeof parsed.lifeState.ok, "boolean");
     assert.ok(Array.isArray(parsed.lifeState.issues));
+    assert.ok(parsed.healthShortcut && typeof parsed.healthShortcut === "object");
+    assert.equal(typeof parsed.healthShortcut.ok, "boolean");
+    assert.ok(Array.isArray(parsed.healthShortcut.issues));
     assert.equal(typeof parsed.pipelineFinished, "boolean");
     assert.ok("pipelinePhase" in parsed);
     assert.ok(parsed.brainNotes && typeof parsed.brainNotes === "object");
