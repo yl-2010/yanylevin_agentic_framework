@@ -14,8 +14,9 @@ disable-model-invocation: true
 
 You run after triage (digest at `/tmp/yanylevin-context-notable.md`) and the
 entity updater. Location compose, location enrichment, and health takeaways ran at 01:00;
-chat title refresh at 01:30. Daily briefing is a separate 06:00 job; do not
-compile news.
+chat title refresh at 01:30. They already had the 5-minute life-state log
+(`/tmp/yanylevin-context-life-state.json`). Daily briefing is a separate 06:00
+job; do not compile news.
 
 Model: **grok-4.6 xhigh** (effort=xhigh, fast=false).
 
@@ -52,7 +53,11 @@ A dry list of receipts and GPS stays is a failed run even if every source was op
 
 The digest first, then the entity cards phase 2 touched (entity card:
 `node server/brain-entity-card.js <slug>`), then the pages below. Raw dumps
-only when the digest is ambiguous and you need the source.
+only when the digest is ambiguous and you need the source. Yesterday's
+life-state timeline is `/tmp/yanylevin-context-life-state.json` (collapsed
+kinds, not 288 JSONL lines). Use it when the journal take needs what he was
+doing (class vs still at home, shower vs fan, computer vs sleep). Do not
+copy samples onto identity.md.
 
 ## Write
 
@@ -142,6 +147,7 @@ is when the Mail.app history fill last finished. That job deletes
 expected. Do not retry it, do not write `notes.appleMail`, do not leave a
 cursor for it. Overnight personal mail is `mailSince` plus Mail.app
 (personal-mail skill). OneNote is not a nightly source and has no cursor.
+The 5-minute life-state log has no brain cursor; do not invent `lifeStateAt`.
 
 ## Manual run
 

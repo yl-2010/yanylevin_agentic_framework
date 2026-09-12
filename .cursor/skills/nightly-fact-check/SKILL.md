@@ -29,6 +29,11 @@ Verify:
 
 Skip: generated `people/index.md`, `people/graph.md`, `brain/education/**`, chat titles, raw GPS/health JSON, news capsules, the briefing todo (it does not exist yet).
 
+Life-state: `/tmp/yanylevin-context-life-state.json` or
+`node server/life-state.js day <journalKey>`. Check claims about class, shower,
+gym, sleep, or driving against that timeline. Prefer correcting journal / places
+/ takeaways. Do not dump JSONL into cards.
+
 Find tonight's files with `git log` / `git diff` on those trees since 01:00 local, plus `git status`.
 
 ## Speaker (the 1:1 trap)

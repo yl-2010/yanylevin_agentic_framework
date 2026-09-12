@@ -17,6 +17,7 @@ import {
   LIFE_STATE_GUESS_PATH,
   LIFE_STATE_REL,
   LIFE_STATE_SNAPSHOT_PATH,
+  writeLifeStateSchedulerState,
 } from "./life-state.js";
 import { buildLifeStateSnapshot } from "./life-state-snapshot.js";
 import { YAN_EMAIL } from "./phone-location.js";
@@ -217,6 +218,10 @@ async function runLifeStateOnce({ force = false } = {}) {
     }
     if (transientFailed) {
       laterAuthRetry.schedule(dateKey);
+      await writeLifeStateSchedulerState({
+        lastStatus: "error",
+        lastError: authFailed ? "auth" : capacityFailed ? "capacity" : "error",
+      });
       return {
         ok: false,
         dateKey,
@@ -226,6 +231,7 @@ async function runLifeStateOnce({ force = false } = {}) {
     }
 
     laterAuthRetry.clear();
+    await writeLifeStateSchedulerState({ lastStatus: "ok", lastError: null });
     return {
       ok: true,
       dateKey,

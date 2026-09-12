@@ -22,6 +22,7 @@ Model: **composer-2.5** (fast=false).
 | `education/you@example.com/health/takeaways.md` | Nightly prose. Read. |
 | `education/you@example.com/health/history-patterns.md` | Archive essay. Read. First run distills this. |
 | `education/you@example.com/health/workouts.md` | Skim for mix, not every line. |
+| `/tmp/yanylevin-context-life-state.json` | Sleeping spans are the real overnight tell after 2026-08-30. Do not copy samples onto health.md. |
 | `education/you@example.com/health/raw/apple-export-*.json` | Do not open. Too large. |
 | `education/you@example.com/health/state.json` | Ingest/takeaways cursors plus your `brainHealth` object. Home timezone is America/Los_Angeles; Austin trip workouts after 2026-08-12 through 2026-08-26 use America/Chicago. |
 | `education/you@example.com/brain/schema.md` | Memory-page contract. Required. |

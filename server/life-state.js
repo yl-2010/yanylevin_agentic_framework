@@ -6,7 +6,7 @@
 import { appendFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { YAN_EMAIL } from "./phone-location.js";
+import { YAN_EMAIL, readPhoneLocation } from "./phone-location.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -14,7 +14,11 @@ export const LIFE_STATE_DIRNAME = "life-state";
 export const LIFE_STATE_REL = `education/${YAN_EMAIL}/${LIFE_STATE_DIRNAME}`;
 export const LIFE_STATE_SNAPSHOT_PATH = "/tmp/yanylevin-life-state-snapshot.json";
 export const LIFE_STATE_GUESS_PATH = "/tmp/yanylevin-life-state-guess.json";
+export const LIFE_STATE_CONTEXT_PATH = "/tmp/yanylevin-context-life-state.json";
 export const CURRENT_STALE_MS = 10 * 60 * 1000;
+export const SAMPLE_STALE_MS = 20 * 60 * 1000;
+export const GPS_HEARTBEAT_STALE_MS = 30 * 60 * 1000;
+export const GAP_URGENT_MS = 20 * 60 * 1000;
 
 export const LIFE_STATE_KINDS = [
   "sleeping",
@@ -221,6 +225,271 @@ export async function readCurrentLifeState(dir) {
   }
 }
 
+/** @param {string} [dir] */
+export async function readLifeStateSchedulerState(dir) {
+  try {
+    const raw = JSON.parse(await readFile(lifeStateStatePath(dir), "utf8"));
+    return raw && typeof raw === "object" ? raw : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Scheduler-only cursor. Does not overwrite lastAt from a successful sample.
+ * @param {Record<string, unknown>} patch
+ * @param {string} [dir]
+ */
+export async function writeLifeStateSchedulerState(patch, dir) {
+  const root = lifeStateDir(dir);
+  await mkdir(root, { recursive: true });
+  const prev = await readLifeStateSchedulerState(root);
+  const next = {
+    ...prev,
+    ...(patch && typeof patch === "object" ? patch : {}),
+    updatedAt: new Date().toISOString(),
+  };
+  await writeFile(lifeStateStatePath(root), `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  return next;
+}
+
+/**
+ * @param {string} dateKey
+ * @param {number} days
+ */
+export function addDaysToLifeStateDateKey(dateKey, days) {
+  const [y, m, d] = String(dateKey || "")
+    .split("-")
+    .map((n) => Number(n));
+  if (!y || !m || !d) return "";
+  const dt = new Date(Date.UTC(y, m - 1, d + Number(days || 0)));
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getUTCDate()).padStart(2, "0");
+  return `${dt.getUTCFullYear()}-${mm}-${dd}`;
+}
+
+/**
+ * Collapsed kind timeline for one local dateKey. Nightly jobs read this, not 288 JSONL lines.
+ * @param {string} dateKey
+ * @param {string} [dir]
+ */
+export async function summarizeLifeStateDay(dateKey, dir) {
+  const key = String(dateKey || "").trim();
+  if (!DATE_KEY_RE.test(key)) {
+    return { ok: false, dateKey: key, error: "bad dateKey", sampleCount: 0, segments: [] };
+  }
+  const root = lifeStateDir(dir);
+  const files = await listLifeStateLogFiles(root);
+  /** @type {Record<string, unknown>[]} */
+  const rows = [];
+  for (const name of files) {
+    const month = await readJsonlObjects(join(root, name));
+    for (const row of month) {
+      if (row.dateKey === key) rows.push(row);
+    }
+  }
+  rows.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  /** @type {Record<string, unknown>[]} */
+  const segments = [];
+  for (const row of rows) {
+    const last = segments[segments.length - 1];
+    if (
+      last &&
+      last.kind === row.kind &&
+      last.place === row.place &&
+      last.activity === row.activity
+    ) {
+      last.until = row.at;
+      last.localUntil = row.local;
+      last.count = Number(last.count || 1) + 1;
+      last.confidence = row.confidence;
+    } else {
+      segments.push({
+        since: row.since || row.at,
+        until: row.at,
+        local: row.local,
+        kind: row.kind,
+        activity: row.activity,
+        place: row.place,
+        placeLabel: row.placeLabel,
+        confidence: row.confidence,
+        evidence: row.evidence,
+        count: 1,
+      });
+    }
+  }
+  let maxGapMinutes = 0;
+  for (let i = 1; i < rows.length; i++) {
+    const gap = Date.parse(String(rows[i].at)) - Date.parse(String(rows[i - 1].at));
+    if (Number.isFinite(gap)) maxGapMinutes = Math.max(maxGapMinutes, Math.round(gap / 60000));
+  }
+  return {
+    ok: true,
+    dateKey: key,
+    sampleCount: rows.length,
+    maxGapMinutes,
+    firstAt: rows[0]?.at || null,
+    lastAt: rows[rows.length - 1]?.at || null,
+    segments,
+  };
+}
+
+/**
+ * Prefetch yesterday's collapsed timeline for nightly jobs.
+ * `dateKey` is the job date (tonight / early morning). Journal day is minus one.
+ * @param {{ dateKey: string, timezone?: string, dir?: string }} opts
+ */
+export async function prefetchLifeStateContext(opts) {
+  const jobKey = String(opts?.dateKey || "").trim();
+  const journalKey = addDaysToLifeStateDateKey(jobKey, -1) || jobKey;
+  const summary = await summarizeLifeStateDay(journalKey, opts?.dir);
+  const payload = {
+    at: new Date().toISOString(),
+    jobDateKey: jobKey,
+    timezone: opts?.timezone || "America/Los_Angeles",
+    ...summary,
+  };
+  await writeFile(LIFE_STATE_CONTEXT_PATH, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  return payload;
+}
+
+/**
+ * Heartbeat / 5-minute log health for Daily Briefing URGENT.
+ * @param {{ now?: Date, dir?: string }} [opts]
+ */
+export async function assessLifeStateHeartbeat(opts = {}) {
+  const now = opts.now instanceof Date ? opts.now : new Date();
+  const nowMs = now.getTime();
+  const current = await readCurrentLifeState(opts.dir);
+  const scheduler = await readLifeStateSchedulerState(opts.dir);
+  const gps =
+    opts.gps !== undefined ? opts.gps : await readPhoneLocation();
+  let snapshot = opts.snapshot;
+  if (snapshot === undefined) {
+    try {
+      snapshot = JSON.parse(await readFile(LIFE_STATE_SNAPSHOT_PATH, "utf8"));
+    } catch {
+      snapshot = null;
+    }
+  }
+
+  const windowMs = 24 * 60 * 60 * 1000;
+  const sinceMs = nowMs - windowMs;
+  const root = lifeStateDir(opts.dir);
+  const files = await listLifeStateLogFiles(root);
+  /** @type {Record<string, unknown>[]} */
+  const recent = [];
+  for (const name of files) {
+    const month = await readJsonlObjects(join(root, name));
+    for (const row of month) {
+      const t = Date.parse(String(row.at));
+      if (Number.isFinite(t) && t >= sinceMs) recent.push(row);
+    }
+  }
+  recent.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+
+  let maxGapMinutes = 0;
+  for (let i = 1; i < recent.length; i++) {
+    const gap = Date.parse(String(recent[i].at)) - Date.parse(String(recent[i - 1].at));
+    if (Number.isFinite(gap)) maxGapMinutes = Math.max(maxGapMinutes, Math.round(gap / 60000));
+  }
+  const firstAt = recent[0]?.at || null;
+  const lastAt = current?.at || recent[recent.length - 1]?.at || null;
+  const spanMs = firstAt ? nowMs - Date.parse(String(firstAt)) : 0;
+  const expectedTicks = spanMs > 0 ? Math.max(1, Math.round(spanMs / (5 * 60 * 1000))) : 0;
+  const lastAgeMinutes = lastAt ? Math.round((nowMs - Date.parse(String(lastAt))) / 60000) : null;
+
+  const gpsAt = gps?.receivedAt || gps?.timestamp || null;
+  const gpsAgeMinutes = gpsAt ? Math.round((nowMs - Date.parse(String(gpsAt))) / 60000) : null;
+  const gpsFresh =
+    gpsAgeMinutes != null && gpsAgeMinutes * 60000 < GPS_HEARTBEAT_STALE_MS;
+  const hasDevice = Boolean(gps && gps.device && typeof gps.device === "object");
+
+  /** @type {{ code: string, detail: string }[]} */
+  const issues = [];
+  if (!lastAt) {
+    issues.push({
+      code: "life-state-empty",
+      detail: "5-minute life-state log has no samples yet.",
+    });
+  } else if (lastAgeMinutes != null && lastAgeMinutes * 60000 >= SAMPLE_STALE_MS) {
+    issues.push({
+      code: "life-state-stale",
+      detail: `5-minute life-state log stopped. Last sample ${lastAgeMinutes} min ago.`,
+    });
+  }
+  if (recent.length >= 3 && maxGapMinutes >= Math.round(GAP_URGENT_MS / 60000)) {
+    issues.push({
+      code: "life-state-gap",
+      detail: `Life-state gap of ${maxGapMinutes} min in the last 24h (ticks should land about every 5 min).`,
+    });
+  }
+  if (expectedTicks >= 12 && recent.length < Math.floor(expectedTicks * 0.7)) {
+    issues.push({
+      code: "life-state-sparse",
+      detail: `Life-state wrote ${recent.length} samples in the last ${Math.round(spanMs / 3600000)}h; expected about ${expectedTicks}.`,
+    });
+  }
+  if (String(scheduler.lastStatus || "") === "error") {
+    issues.push({
+      code: "life-state-error",
+      detail: `Life-state Composer last failed: ${clipStr(scheduler.lastError || scheduler.lastStatus, 160)}.`,
+    });
+  }
+  if (gpsAgeMinutes == null) {
+    issues.push({
+      code: "gps-missing",
+      detail: "No iPhone GPS fix on disk. Heartbeat is not landing.",
+    });
+  } else if (!gpsFresh) {
+    issues.push({
+      code: "gps-stale",
+      detail: `iPhone GPS heartbeat is stale (${gpsAgeMinutes} min). 5-minute posts are not landing. iPad must not be the source.`,
+    });
+  } else if (!hasDevice) {
+    issues.push({
+      code: "device-missing",
+      detail: "iPhone GPS is fresh but has no device bundle (battery, charging, network, audio). Install the new iPhone build. iPad must not post location.",
+    });
+  }
+  if (snapshot && typeof snapshot === "object") {
+    const snapAt = Date.parse(String(snapshot.at || snapshot.clock?.at || ""));
+    const snapFresh = Number.isFinite(snapAt) && nowMs - snapAt < SAMPLE_STALE_MS;
+    if (snapFresh) {
+      if (snapshot.home && snapshot.home.ok === false) {
+        issues.push({
+          code: "home-snapshot",
+          detail: `Home snapshot failed: ${clipStr(snapshot.home.error, 120) || "ok=false"}.`,
+        });
+      }
+      if (snapshot.screenTime && snapshot.screenTime.ok === false) {
+        issues.push({
+          code: "screentime-snapshot",
+          detail: `Screen Time snapshot failed: ${clipStr(snapshot.screenTime.error, 120) || "ok=false"}.`,
+        });
+      }
+    }
+  }
+
+  return {
+    ok: issues.length === 0,
+    at: now.toISOString(),
+    lastSampleAt: lastAt,
+    lastSampleAgeMinutes: lastAgeMinutes,
+    ticksLast24h: recent.length,
+    expectedTicksLast24h: expectedTicks,
+    maxGapMinutes,
+    lastStatus: scheduler.lastStatus || null,
+    gps: {
+      ageMinutes: gpsAgeMinutes,
+      source: gps?.source || null,
+      hasDevice,
+      idiom: gps?.idiom || null,
+    },
+    issues,
+  };
+}
+
 /**
  * @param {Record<string, unknown>|null|undefined} rec
  * @param {number} [staleMs]
@@ -381,11 +650,17 @@ if (isCli) {
     if (cmd === "now") return readCurrentLifeState();
     if (cmd === "at") return readLifeStateAt(rest[0] || "");
     if (cmd === "recent") return readRecentLifeState(undefined, rest[0]);
+    if (cmd === "day") return summarizeLifeStateDay(rest[0] || "");
+    if (cmd === "health") return assessLifeStateHeartbeat();
     if (cmd === "append") {
       const guess = await readGuessInput(rest[0] || "-");
       return appendLifeStateGuess(guess);
     }
-    return { ok: false, usage: "node life-state.js now | at <iso> | recent [n] | append <file-or-json>" };
+    return {
+      ok: false,
+      usage:
+        "node life-state.js now | at <iso> | recent [n] | day <YYYY-MM-DD> | health | append <file-or-json>",
+    };
   };
   run()
     .then((r) => {

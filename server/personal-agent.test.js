@@ -222,6 +222,7 @@ describe("Personal Agent skill files", () => {
     assert.match(location, /brain\/places/);
     assert.match(location, /5-minute heartbeat/);
     assert.match(location, /device/);
+    assert.match(location, /iPad app must not/);
     assert.match(location, /Yan only/);
     assert.match(location, /1–2 sentence/);
 
@@ -233,6 +234,7 @@ describe("Personal Agent skill files", () => {
     assert.match(lifeState, /current\.json/);
     assert.match(lifeState, /life-state\.js now/);
     assert.match(lifeState, /bathroom/);
+    assert.match(lifeState, /Nightly jobs/);
     assert.match(lifeState, /Never spawn a cloud agent/);
 
     const widgets = await readFile(
@@ -439,6 +441,7 @@ describe("Personal Agent skill files", () => {
     assert.match(synthesis, /Did not write Apple Calendar/);
     assert.match(synthesis, /Phase 4 has not run yet/);
     assert.match(synthesis, /OneNote is not a nightly source/);
+    assert.match(synthesis, /life-state/);
     assert.match(synthesis, /teamsSince/);
     assert.doesNotMatch(synthesis, /memories\.md/);
 
@@ -461,6 +464,7 @@ describe("Personal Agent skill files", () => {
     assert.match(triage, /Not a source: OneNote/);
     assert.match(triage, /personal-school-teams/);
     assert.match(triage, /yanylevin-context-school-teams\.json/);
+    assert.match(triage, /yanylevin-context-life-state\.json/);
 
     const entities = await readFile(
       join(REPO_ROOT, ".cursor/skills/nightly-entities/SKILL.md"),
@@ -509,6 +513,7 @@ describe("Personal Agent skill files", () => {
     assert.match(recap, /notes\.calendar/);
     assert.match(recap, /stayed off the\s+calendar/);
     assert.match(recap, /calendar-cli/);
+    assert.match(recap, /lifeState\.issues/);
 
     const enrich = await readFile(
       join(REPO_ROOT, PERSONAL_SKILL_PATHS.locationEnrichment),

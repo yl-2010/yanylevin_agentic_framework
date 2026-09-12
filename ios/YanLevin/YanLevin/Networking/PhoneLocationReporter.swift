@@ -7,8 +7,10 @@ import SwiftUI
 import UIKit
 
 /// Last GPS fix from Yan's iPhone. Posted to the Mac API so the web Personal Agent
-/// can see it too. Only runs for Yan's account, and only on iPhone. iPad chat maps
-/// use MapKit GPS on-device and never post to this ingest.
+/// can see it too. Only runs for Yan's account, and only on iPhone (`UIUserInterfaceIdiom.phone`).
+/// iPad chat maps use MapKit GPS on-device and never post to this ingest, never start
+/// the 5-minute timer, and never send a `device` bundle. Size-class `.regular` on
+/// iPhone Max is still a phone.
 ///
 /// Always: significant-change (~500m) + visits + a 5-minute heartbeat (`periodic`).
 /// Heartbeats do not start agents; they only write the live fix, device context,
@@ -17,6 +19,9 @@ import UIKit
 /// `restoreFromAppGroup()` restarts monitoring so those posts still land.
 final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @unchecked Sendable {
     static let shared = PhoneLocationReporter()
+
+    /// Heartbeat and Mac ingest are iPhone-only. iPad must never pass this.
+    static var postsToMac: Bool { AdaptiveLayout.isPhone }
 
     private static let heartbeatInterval: TimeInterval = 5 * 60
     private static let foregroundMinInterval: TimeInterval = 25
@@ -59,6 +64,7 @@ final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @uncheck
 
     private override init() {
         super.init()
+        guard Self.postsToMac else { return }
         pathMonitor.pathUpdateHandler = { [weak self] path in
             guard let self else { return }
             let kind: String
@@ -93,15 +99,17 @@ final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @uncheck
     /// Call from app `init` so a background relaunch (force-quit + ~500m / visit)
     /// restarts monitoring before SwiftUI finishes coming up.
     func restoreFromAppGroup() {
+        guard Self.postsToMac else { return }
         guard AppGroupStore.hasFullAccess, let token = AppGroupStore.token else { return }
         sceneActive = UIApplication.shared.applicationState == .active
         attach(email: AppGroupStore.email, token: token, fullAccess: true)
     }
 
     func attach(email: String?, token: String?, fullAccess: Bool) {
-        guard AdaptiveLayout.isPhone else {
+        guard Self.postsToMac else {
             self.token = nil
             enabled = false
+            stopBackgroundTracking()
             return
         }
         let allowed =
@@ -121,6 +129,7 @@ final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @uncheck
     }
 
     func handleScenePhase(_ phase: ScenePhase) {
+        guard Self.postsToMac else { return }
         sceneActive = phase == .active
         guard enabled else { return }
         if phase == .active {
@@ -129,13 +138,13 @@ final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @uncheck
     }
 
     func refresh() {
-        guard enabled else { return }
+        guard Self.postsToMac, enabled else { return }
         startIfPossible()
         manager.requestLocation()
     }
 
     private func startIfPossible() {
-        guard enabled else { return }
+        guard Self.postsToMac, enabled else { return }
         switch manager.authorizationStatus {
         case .notDetermined:
             manager.requestWhenInUseAuthorization()
@@ -173,7 +182,7 @@ final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @uncheck
 
     private func startHeartbeatTimer() {
         let start = { [weak self] in
-            guard let self, self.heartbeatTimer == nil, self.enabled else { return }
+            guard let self, Self.postsToMac, self.heartbeatTimer == nil, self.enabled else { return }
             let timer = Timer(timeInterval: Self.heartbeatInterval, repeats: true) { [weak self] _ in
                 self?.heartbeatTick()
             }
@@ -202,7 +211,7 @@ final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @uncheck
     }
 
     private func heartbeatTick() {
-        guard enabled else { return }
+        guard Self.postsToMac, enabled else { return }
         nextFixIsPeriodic = true
         manager.requestLocation()
         Task { await self.postPeriodicHeartbeat() }
@@ -211,11 +220,12 @@ final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @uncheck
     /// `requestLocation()` is a no-op while `startUpdatingLocation()` is running, so
     /// re-post the last fix every 5 minutes while sitting still.
     private func postPeriodicHeartbeat() async {
-        guard enabled, let token, !token.isEmpty else { return }
+        guard Self.postsToMac, enabled, let token, !token.isEmpty else { return }
         guard var fix = snapshot else { return }
         fix.source = "periodic"
         fix.visitKind = nil
         fix.timestamp = Self.iso8601String(from: Date())
+        fix.idiom = "phone"
         fix.device = await Self.collectDevice(network: currentNetworkKind())
         await post(fix, token: token)
     }
@@ -256,7 +266,7 @@ final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @uncheck
         at: Date? = nil,
         source: String = "ios"
     ) async {
-        guard enabled, let token, !token.isEmpty else { return }
+        guard Self.postsToMac, enabled, let token, !token.isEmpty else { return }
         let tagged: String
         if visitKind != nil {
             tagged = "visit"
@@ -277,6 +287,7 @@ final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @uncheck
             altitudeMeters: location.verticalAccuracy >= 0 ? location.altitude : nil,
             visitKind: visitKind
         )
+        fix.idiom = "phone"
         if let marks = try? await geocoder.reverseGeocodeLocation(location), let mark = marks.first {
             fix.placeName = Self.clip(mark.name)
             fix.locality = Self.clip(mark.locality)
@@ -411,6 +422,8 @@ struct AgentPhoneLocation: Codable, Equatable {
     var country: String?
     var areasOfInterest: [String]?
     var device: AgentPhoneDevice? = nil
+    /// Always `phone` on posts from this reporter. iPad must never send this payload.
+    var idiom: String? = nil
 }
 
 struct AgentPhoneDevice: Codable, Equatable {

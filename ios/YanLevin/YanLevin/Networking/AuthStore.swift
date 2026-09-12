@@ -304,6 +304,10 @@ final class AuthStore: ObservableObject {
     }
 
     private func attachPersonalSensors(email: String?, token: String?, fullAccess: Bool) {
+        guard AdaptiveLayout.isPhone else {
+            PhoneLocationReporter.shared.attach(email: nil, token: nil, fullAccess: false)
+            return
+        }
         PhoneLocationReporter.shared.attach(email: email, token: token, fullAccess: fullAccess)
     }
 

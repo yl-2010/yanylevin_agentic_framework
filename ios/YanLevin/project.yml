@@ -65,8 +65,11 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         UIBackgroundModes:
           - location
+        "UIBackgroundModes~ipad": []
         NSLocationWhenInUseUsageDescription: "This app uses your location on chat maps. On iPhone it may also send location to the Personal Agent so it knows where you are, including when you chat from the website or iPad."
+        "NSLocationWhenInUseUsageDescription~ipad": "Yan Levin uses your location on chat maps. The iPad app does not send location to the Personal Agent and does not run a background heartbeat."
         NSLocationAlwaysAndWhenInUseUsageDescription: "This app uses your iPhone location in the background so the Personal Agent can see where you are when you chat from the web or a computer. On iPhone it also sends a location update about every 5 minutes, plus when you move a significant distance."
+        "NSLocationAlwaysAndWhenInUseUsageDescription~ipad": "Yan Levin uses location on chat maps. The iPad app does not send location to the Personal Agent and does not run a 5-minute heartbeat. That is iPhone only."
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
     entitlements:

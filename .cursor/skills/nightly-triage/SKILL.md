@@ -58,6 +58,13 @@ only phase that reads every source. You write nothing to the brain.
 - **Location**: `education/you@example.com/location/places.md` and
   `trips.md` (the 01:00 jobs already ran). Note stays/trips that are still
   vague (street-only, "residence", generic car) so phase 3 can fix them.
+- **Life state** (required): `/tmp/yanylevin-context-life-state.json`
+  (yesterday's collapsed 5-minute kinds: sleeping, showering, in_class,
+  at_gym, driving, …). Use it to say what he was doing, not only where GPS
+  sat. Fan-only bathroom is not a shower. `in_class` only counts if GPS was
+  at EPS. Do not dump every sample into the digest; summarize the day.
+  CLI: `node server/life-state.js day <yesterday>`. Skill:
+  `.cursor/skills/life-state/SKILL.md`.
 - **Health** (required): `education/you@example.com/health/takeaways.md`
   and `workouts.md` (the 01:00 Composer takeaways job already ran). Workouts,
   sleep, and recovery tells for the day. Open a `raw/*.json` dump only if

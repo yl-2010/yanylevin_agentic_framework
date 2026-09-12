@@ -35,6 +35,15 @@ Read `schema.md` and `heuristics.md` before writing a sample. Contract is the sc
 
 Do not open Mail, OneNote, Teams, Canvas, journal, or people cards for this. Do not use Apple Health sleep.
 
+## Nightly jobs
+
+Overnight agents (01:00 compose/enrichment/takeaways, 02:30 pipeline, 03:00
+brain + fact-check) treat this log as a context source. Prefetch is
+`/tmp/yanylevin-context-life-state.json` (yesterday collapsed). Or
+`node server/life-state.js day <YYYY-MM-DD>`. Read kinds, do not dump JSONL
+into identity or places.md. Do not write samples from those jobs. The 5-minute
+Composer tick is the writer.
+
 ## Scheduled tick
 
 You are a one-shot local Composer job. Snapshot is already on disk. Infer. Write one sample. Stop.

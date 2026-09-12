@@ -219,6 +219,7 @@ export function buildLocationHistoryPrompt({ dateKey, timezone, force }) {
     "Write places.md (stays) and trips.md (walk / bike / car / plane / uber / robotaxi / lyft).",
     "When merging a day, keep already-specific stay names (person's house, business, gym) for the same address. Do not revert them to a street number. Do not revert a chat-corrected bike trip back to walk. Watch cycling is one bike trip even if GPS split it into two walks. Context synthesis at 02:30 may have corrected those lines.",
     "Search Mail.app for Uber / robotaxi / Lyft receipts ONLY when a new stay is outside the Seattle metro (traveling). Skip mail entirely at home.",
+    "Also read /tmp/yanylevin-context-life-state.json if it exists, or node server/life-state.js day <yesterday>. Use the 5-minute kinds to split home stays (sleeping vs shower vs office) and to label class vs still-at-home. Do not rewrite the life-state log.",
     "Receipt wins for mode, endpoints, and duration. Do not copy fare, payment, or email bodies.",
     "Never search Mail for anyone but Yan.",
     rebuild,

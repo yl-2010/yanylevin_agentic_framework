@@ -30,6 +30,8 @@ and rare big dates on the education dashboard, even when Yan never said
   is often too eager: skip unless it clears the high bar below.
 - Allowed action classes: iMessage/Mail sends, education todo/date/project
   writes, Apple Calendar writes, repo/file work on this Mac.
+- Do not write `education/you@example.com/life-state/` samples. That log
+  is a context source for the night, not a write target.
 - Report every action taken (and every skip) in your reply; phase 5 and the
   journal rely on it.
 

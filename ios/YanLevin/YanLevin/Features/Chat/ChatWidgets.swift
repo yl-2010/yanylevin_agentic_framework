@@ -830,7 +830,7 @@ private enum ChatMapRegion {
         if let coord = map.userLocation.location?.coordinate, CLLocationCoordinate2DIsValid(coord) {
             return coord
         }
-        guard let fix = PhoneLocationReporter.shared.snapshot else { return nil }
+        guard AdaptiveLayout.isPhone, let fix = PhoneLocationReporter.shared.snapshot else { return nil }
         let coord = CLLocationCoordinate2D(latitude: fix.latitude, longitude: fix.longitude)
         return CLLocationCoordinate2DIsValid(coord) ? coord : nil
     }

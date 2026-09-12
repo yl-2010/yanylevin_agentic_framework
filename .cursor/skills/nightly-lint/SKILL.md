@@ -55,6 +55,8 @@ duplicated, and the cursors moved. You fix structure, not content.
   Fix if phase 3 missed one. `appleMailFill.lastAt` is a one-shot fill stamp,
   not a cursor. It must not move overnight. Do not create `appleMailSince`.
   A missing `/tmp/yanylevin-apple-mail-export` is expected.
+  Do not invent a `lifeStateAt` cursor. The 5-minute log is not a brain source
+  cursor.
 
 ## Anti-patterns
 

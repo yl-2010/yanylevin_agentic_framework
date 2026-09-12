@@ -6,6 +6,7 @@ import { join } from "node:path";
 import {
   LIFE_STATE_KINDS,
   appendLifeStateGuess,
+  assessLifeStateHeartbeat,
   completeLifeStateRecord,
   formatLifeStateLocal,
   isCurrentLifeStateFresh,
@@ -13,6 +14,7 @@ import {
   readCurrentLifeState,
   readLifeStateAt,
   readRecentLifeState,
+  summarizeLifeStateDay,
 } from "./life-state.js";
 
 const SAMPLE = {
@@ -163,6 +165,44 @@ describe("life-state log IO", () => {
       );
       assert.equal(log.trim().split("\n").length, 2);
       assert.equal(isCurrentLifeStateFresh(current, 50 * 365 * 24 * 3600 * 1000), true);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("collapses a day and flags a stale heartbeat", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "life-state-sum-"));
+    try {
+      await appendLifeStateGuess(SAMPLE, {
+        dir,
+        now: new Date("2026-09-11T21:10:00.000Z"),
+        timeZone: "America/Los_Angeles",
+      });
+      await appendLifeStateGuess(
+        { ...SAMPLE, activity: "in Data Science, TMAC-007" },
+        {
+          dir,
+          now: new Date("2026-09-11T21:15:00.000Z"),
+          timeZone: "America/Los_Angeles",
+        }
+      );
+      const day = await summarizeLifeStateDay("2026-09-11", dir);
+      assert.equal(day.ok, true);
+      assert.equal(day.sampleCount, 2);
+      assert.equal(day.segments.length, 1);
+      assert.equal(day.segments[0].kind, "in_class");
+      const health = await assessLifeStateHeartbeat({
+        dir,
+        now: new Date("2026-09-11T22:00:00.000Z"),
+        gps: {
+          receivedAt: "2026-09-11T21:59:00.000Z",
+          source: "periodic",
+          device: { batteryLevel: 80, network: "wifi" },
+        },
+        snapshot: null,
+      });
+      assert.equal(health.ok, false);
+      assert.ok(health.issues.some((i) => i.code === "life-state-stale"));
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

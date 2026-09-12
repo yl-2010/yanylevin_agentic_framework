@@ -37,6 +37,7 @@ describe("fact-check prompt", () => {
     assert.match(prompt, /timezoneAfter is not a boarding pass/);
     assert.match(prompt, /notes\.factCheck/);
     assert.match(prompt, /Do not compile news/);
+    assert.match(prompt, /life-state/);
     assert.match(prompt, /America\/Los_Angeles/);
     assert.match(prompt, /2026-08-26/);
   });

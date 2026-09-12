@@ -66,6 +66,7 @@ Look as far as you need. Yan only. Do not dump full threads into the markdown.
 - **Mail.app:** ride receipts, reservations, tickets. Required for every `car` trip. Details below.
 - **Contacts:** resolve names from numbers (`.cursor/skills/personal-contacts/SKILL.md`)
 - **Chat history (required):** Grep and Read `education/you@example.com/.chat-history/` for stay addresses, business/building names, trip modes, and what Yan said he was doing that day. Same rank as Calendar and iMessage. Do not skip because mail or GPS already named something. Do not paste transcripts into `places.md` / `trips.md`. `.cursor/skills/past-chats/SKILL.md`
+- **Life state (required):** `/tmp/yanylevin-context-life-state.json` or `node server/life-state.js day <date>`. Same rank as Calendar for what he was doing at a stay (`in_class`, `showering`, `at_gym`, `sleeping`). Fan-only is not a shower. Do not paste samples into the markdown. `.cursor/skills/life-state/SKILL.md`
 - **Web search:** street address → business/building. Prefer a real name over leaving the street number.
 
 ## Trip pass: Mail.app ride receipts

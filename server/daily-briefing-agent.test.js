@@ -121,6 +121,7 @@ describe("briefing phase prompts", () => {
     assert.match(prompt, new RegExp(NIGHTLY_STATUS_PATH.replace(/\//g, "\\/")));
     assert.match(prompt, /agent-recap-2026-08-22\.json/);
     assert.match(prompt, /pipelineFinished/);
+    assert.match(prompt, /lifeState\.issues/);
     assert.match(prompt, /URGENT/);
     assert.match(prompt, /noVote/);
     assert.match(prompt, /notes\.calendar is written by synthesis before actions/);
@@ -161,6 +162,9 @@ describe("prefetchNightlyStatus", () => {
     assert.ok(parsed.agents.some((a) => a.name === "context-synthesis"));
     assert.ok(parsed.agents.some((a) => a.name === "canvas-sync"));
     assert.ok(parsed.agents.some((a) => a.name === "fact-check"));
+    assert.ok(parsed.lifeState && typeof parsed.lifeState === "object");
+    assert.equal(typeof parsed.lifeState.ok, "boolean");
+    assert.ok(Array.isArray(parsed.lifeState.issues));
     assert.equal(typeof parsed.pipelineFinished, "boolean");
     assert.ok("pipelinePhase" in parsed);
     assert.ok(parsed.brainNotes && typeof parsed.brainNotes === "object");

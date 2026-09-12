@@ -67,6 +67,9 @@ for people; you are where person facts land.
 - Speaker: a fact on someone else's card still needs "Yan told them …" when
   Yan said it (`who=yan` / `fromMe=true` in the dump, or "Yan said" in the
   digest). Do not collapse that into Standing that reads as their claim.
+- Place/activity from the digest: `/tmp/yanylevin-context-life-state.json`
+  has yesterday's 5-minute kinds if a stay is thin (at_friends vs EPS vs gym).
+  Read it; do not write that log.
 
 ## Anti-patterns
 

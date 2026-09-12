@@ -146,6 +146,7 @@ export function buildHealthTakeawaysPrompt({ dateKey, timezone, force }) {
     `Today's date key: ${dateKey} (timezone ${timezone}).`,
     `Health folder: ${hist}/.`,
     "Read new shortcut raw/*.json after state.json lastTakeawaysAt, plus workouts.md and the existing takeaways.md.",
+    "Also read /tmp/yanylevin-context-life-state.json or node server/life-state.js day <yesterday>. Life-state sleeping / at_gym / on_computer is the activity clock. After 2026-08-30, Health-app sleep is parent-facing, not real; prefer life-state sleeping spans over those hours.",
     "Skip raw/apple-export-*.json. That is the compact full-history archive from Apple's XML export, too large for this pass.",
     "Write takeaways.md: short prose per day, newest day on top. Call out workouts by name, duration, and effort. Sleep as hours plus quality tells. Mention RHR/HRV/steps only when they moved.",
     "Do not dump tables of every sample. Do not invent diagnoses. This is lifestyle context, not a medical chart.",

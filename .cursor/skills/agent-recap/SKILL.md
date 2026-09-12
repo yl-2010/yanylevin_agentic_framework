@@ -44,6 +44,12 @@ Use this order. **Omit a section entirely** when it does not apply that day (do 
      or a missing `/tmp/yanylevin-apple-mail-export`. That fill is one-shot
      and not on the overnight schedule. The dump is deleted when it finishes.
      Overnight mail is `mailSince`.
+   - **Life-state / iPhone heartbeat** from prefetch `lifeState`. Any
+     `lifeState.issues[]` item is URGENT (5-minute log stopped or gapped,
+     Composer error, iPhone GPS stale or missing, GPS without a device
+     bundle, Home or Screen Time snapshot fail). Do not invent extra
+     heartbeat failures. Empty `issues` means omit this. iPad must not be
+     treated as the phone heartbeat.
    - Anything else from logs or notes that Yan must fix before things work again.
 
 2. **`Actions:`** (only when the nightly-actions phase did something)
@@ -66,7 +72,7 @@ Use this order. **Omit a section entirely** when it does not apply that day (do 
 1. `/tmp/yanylevin-nightly-status.json` (runner prefetch: per-agent `ran`, `pipelineFinished`, `pipelinePhase`, `brainNotes`, `brainCursors`, `journalExists`, `serverLogTail`, `gitCommits`).
 2. `education/you@example.com/brain/state.json` (especially `notes`, `notes.factCheck`, and `lastSynthesisDateKey`).
 3. Yesterday's journal: `brain/journal/<dateKey minus 1>.md` when it exists.
-4. `location/state.json`, `health/state.json`, `daily-briefing/chat-title-refresh-state.json` if prefetch is thin.
+4. `location/state.json`, `health/state.json`, `daily-briefing/chat-title-refresh-state.json` if prefetch is thin. `lifeState` on the prefetch is the 5-minute log + iPhone heartbeat health; do not re-scan JSONL unless an issue is unclear.
 5. `/tmp/personal-agent-server.log` tail (prefetch includes filtered lines; read more if needed).
 6. `git log` for today's `education:` commits (nightly pipeline, canvas, health, location).
 

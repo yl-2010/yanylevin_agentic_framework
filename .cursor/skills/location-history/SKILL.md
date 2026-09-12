@@ -26,6 +26,15 @@ All under `education/you@example.com/location/`:
 
 Live last-known fix (do not use as history): `education/you@example.com/.location.json`.
 
+## Life state (required context)
+
+Yesterday's collapsed 5-minute activity log:
+`/tmp/yanylevin-context-life-state.json` (written at 02:30; at 01:00 run
+`node server/life-state.js day <yesterday>` yourself). Use kinds to split a
+long home stay (sleeping vs showering vs office) and to avoid calling 8:20
+`in_class` when GPS was still home. Do not rewrite that log. Skill:
+`.cursor/skills/life-state/SKILL.md`.
+
 ## Steps
 
 1. Read `state.json` if it exists (`lastProcessedReceivedAt`). If missing, treat all JSONL as new, but still merge into existing markdown instead of wiping it.

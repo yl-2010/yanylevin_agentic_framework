@@ -202,6 +202,7 @@ export function buildFactCheckPrompt({ dateKey, timezone, journalKey, force }) {
     `Today's date key: ${dateKey} (timezone ${timezone}). Journal file is ${brain}/journal/${journalKey}.md.`,
     "Do not compile news or the Daily Briefing. Those run at 06:00 on the context you leave clean.",
     `Read git-visible overnight writes under ${brain}/, ${loc}/, ${health}/, and education dates/classes/projects/todos if phase 4 or Canvas touched them.`,
+    "Life-state source: /tmp/yanylevin-context-life-state.json or node server/life-state.js day <journalKey>. Check activity claims (in class, showering, gym, sleep) against that timeline. Do not rewrite the JSONL unless a sample is factually wrong and you are already in a same-night journal correction; prefer correcting journal/places/takeaways.",
     "Re-read iMessage with who/fromMe (never handle as speaker in a 1:1). JSON at is UTC with no Z.",
     "Mail claims (flights, refunds, bookings, 'not in mail') need Mail.app (personal-mail skill). /tmp/yanylevin-apple-mail-export only exists during a one-shot fill and is deleted after; a missing dump is expected. mailSince is new overnight mail only; search history in Mail.app. Round-trips: every leg. timezoneAfter is not a boarding pass.",
     "Do not scan OneNote. Open school-onenote.js only if a claim you are already checking is specifically about a OneNote page.",

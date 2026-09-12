@@ -40,6 +40,7 @@ describe("location enrichment prompt", () => {
     assert.match(prompt, /\.chat-history\//);
     assert.match(prompt, /past-chats/);
     assert.match(prompt, /Chat history is a required source/);
+    assert.match(prompt, /life-state/);
     assert.match(prompt, /Exchange Inbox/);
     assert.match(prompt, /tesla\.com/);
     assert.match(prompt, /INBOX/);

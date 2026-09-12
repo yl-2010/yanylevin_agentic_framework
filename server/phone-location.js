@@ -17,6 +17,19 @@ export const LOCATION_HISTORY_DIRNAME = "location";
 export const LOCATION_HISTORY_REL = `education/${YAN_EMAIL}/${LOCATION_HISTORY_DIRNAME}`;
 export const HISTORY_DEDUPE_MS = 60_000;
 
+/**
+ * iPhone only. Missing idiom (old iPhone builds / Shortcut) is allowed.
+ * `pad` / `mac` posts must not overwrite the iPhone pin.
+ * @param {unknown} raw
+ */
+export function locationIdiomAllowed(raw) {
+  if (!raw || typeof raw !== "object") return true;
+  const src = /** @type {Record<string, unknown>} */ (raw);
+  const idiom = clipStr(src.idiom ?? src.deviceIdiom, 16).toLowerCase();
+  if (!idiom) return true;
+  return idiom === "phone" || idiom === "iphone";
+}
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const MAX_PLACE = 120;
 const STALE_AFTER_MS = 6 * 60 * 60 * 1000;
@@ -174,6 +187,9 @@ export function parseLocationPayload(raw) {
   const device = parseDeviceContext(src);
   if (device) out.device = device;
 
+  const idiom = clipStr(src.idiom ?? src.deviceIdiom, 16).toLowerCase();
+  if (idiom === "phone" || idiom === "iphone") out.idiom = "phone";
+
   return out;
 }
 
@@ -216,6 +232,11 @@ export function parseDeviceContext(raw) {
  * @param {{ source?: string, path?: string, historyDir?: string }} [opts]
  */
 export async function writePhoneLocation(raw, opts = {}) {
+  if (!locationIdiomAllowed(raw)) {
+    const err = new Error("iPhone location only");
+    err.status = 403;
+    throw err;
+  }
   const parsed = parseLocationPayload(raw);
   if (!parsed) {
     const err = new Error("latitude and longitude required");

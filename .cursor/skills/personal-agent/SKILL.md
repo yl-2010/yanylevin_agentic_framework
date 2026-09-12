@@ -100,7 +100,7 @@ Live context on Express turns is authoritative for clock, class-now, the open sc
 
 ## Nightly jobs (Yan, manual)
 
-Times are in `education/you@example.com/daily-briefing/meta.json` (`nightlyAgentsLocalTime` 01:00, `chatTitleRefreshLocalTime` 01:30, `contextSynthesisLocalTime` 02:30, `brainProjectionLocalTime` 03:00, `compileLocalTime` 06:00). Fact-check starts as soon as both 03:00 agents finish, not on a 03:30 clock.
+Times are in `education/you@example.com/daily-briefing/meta.json` (`nightlyAgentsLocalTime` 01:00, `chatTitleRefreshLocalTime` 01:30, `contextSynthesisLocalTime` 02:30, `brainProjectionLocalTime` 03:00, `compileLocalTime` 06:00). Fact-check starts as soon as both 03:00 agents finish, not on a 03:30 clock. Those overnight jobs read yesterday's 5-minute life-state log (`/tmp/yanylevin-context-life-state.json` or `node server/life-state.js day`) as a context source. They do not write samples.
 
 When Yan says run location enrichment / enrich my places / run health takeaways / run context synthesis / run the nightly pipeline / update my memories / retitle chats / run location brain / project my places / run health brain / run fact check / fact-check overnight context / fill a person from iMessage / fill school Outlook / fill school Teams / fill Apple Mail, **do not** do the whole Grok/Composer pass in this chat turn. From the repo root:
 

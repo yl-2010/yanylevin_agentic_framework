@@ -14,6 +14,7 @@ import {
   readLastHistoryEntry,
   hasUnprocessedLocationPoints,
   locationLogMonthKey,
+  locationIdiomAllowed,
 } from "./phone-location.js";
 
 describe("parseLocationPayload", () => {
@@ -84,6 +85,31 @@ describe("parseLocationPayload", () => {
     assert.equal(loc.device.batteryLevel, 64);
     assert.equal(loc.device.audio, "headphones");
     assert.equal(loc.device.ssid, "Ziply");
+  });
+
+  it("keeps iPhone idiom and rejects iPad posts", async () => {
+    assert.equal(locationIdiomAllowed({ latitude: 47, longitude: -122 }), true);
+    assert.equal(locationIdiomAllowed({ idiom: "phone" }), true);
+    assert.equal(locationIdiomAllowed({ idiom: "pad" }), false);
+    const loc = parseLocationPayload({
+      latitude: 47.6812,
+      longitude: -122.2086,
+      idiom: "phone",
+    });
+    assert.equal(loc.idiom, "phone");
+    const dir = await mkdtemp(join(tmpdir(), "phone-pad-"));
+    try {
+      await assert.rejects(
+        () =>
+          writePhoneLocation(
+            { latitude: 47.6, longitude: -122.2, idiom: "pad" },
+            { path: join(dir, ".location.json") }
+          ),
+        /iPhone location only/
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it("drops invalid speed and visit kind", () => {
