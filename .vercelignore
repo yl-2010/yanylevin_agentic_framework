@@ -1,0 +1,17 @@
+# Public pages stay. Email folders, Mac API, and agent trees do not.
+# education/index.html and fitness/app.js are files, so education/*/ does not match them.
+
+education/*/
+fitness/*/
+
+server/
+ios/
+macos/
+.cursor/
+oss/
+docs/
+deploy/
+scripts/
+
+data/chat-log.md
+data/login-log.md
