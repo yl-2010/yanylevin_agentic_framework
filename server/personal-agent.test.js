@@ -293,13 +293,13 @@ describe("Personal Agent skill files", () => {
     assert.match(calendar, /zoom\.us\/webinar\/register/);
 
     const home = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.home), "utf8");
-    assert.match(home, /yl-home/);
+    assert.match(home, /HomeClaw/);
     assert.match(home, /home-cli\.js/);
-    assert.match(home, /HMHomeManager/);
+    assert.match(home, /homeclaw-cli/);
     assert.match(home, /Yan only/);
     assert.match(home, /brightness/);
     assert.match(home, /Do not install Homebridge/);
-    assert.match(home, /paid Apple Developer Program/);
+    assert.match(home, /apps\.apple\.com\/us\/app\/homeclaw/);
 
     const canvas = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.canvas), "utf8");
     assert.match(canvas, /canvas.instructure.com/);

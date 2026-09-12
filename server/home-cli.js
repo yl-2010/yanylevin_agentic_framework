@@ -1,35 +1,59 @@
 /**
- * Apple Home CLI wrapper for Yan's Personal Agent.
- * Builds macos/YLHome (Mac Catalyst + HomeKit) on first use.
+ * Apple Home via HomeClaw. The App Store menu-bar app holds HMHomeManager;
+ * this wraps homeclaw-cli over its local socket. Does not build macos/YLHome.
  */
 
 import { execFile } from "node:child_process";
-import { access, mkdtemp, readFile, rm, stat } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { access } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const SRC_DIR = join(ROOT, "macos/YLHome");
-const APP = join(SRC_DIR, "yl-home.app");
-const BIN = join(APP, "Contents/MacOS/yl-home");
-const PROJECT_YML = join(SRC_DIR, "project.yml");
-const XCODEPROJ = join(SRC_DIR, "YLHome.xcodeproj");
-const DERIVED = join(SRC_DIR, "DerivedData");
-const TEAM = "YOUR_TEAM_ID";
 
-const SRC_FILES = [
-  join(SRC_DIR, "AppDelegate.swift"),
-  join(SRC_DIR, "HomeCLI.swift"),
-  join(SRC_DIR, "Info.plist"),
-  join(SRC_DIR, "YLHome.entitlements"),
-  PROJECT_YML,
-];
+export const HOMECLAW_APP = "/Applications/HomeClaw.app";
+export const HOMECLAW_CLI_IN_APP = join(HOMECLAW_APP, "Contents/MacOS/homeclaw-cli");
+export const MAS_URL = "https://apps.apple.com/us/app/homeclaw/id6759682551?mt=12";
+export const TESTFLIGHT_URL = "https://testflight.apple.com/join/zjSnz8eK";
 
-/** @type {Promise<string>|null} */
-let compiling = null;
+const JSON_COMMANDS = new Set([
+  "status",
+  "list",
+  "get",
+  "search",
+  "scenes",
+  "get-scene",
+  "device-map",
+  "events",
+  "config",
+  "automations",
+  "triggers",
+]);
+
+const CHAR_ALIAS = {
+  lock: "lock_target_state",
+  temperature: "target_temperature",
+  target_temperature: "target_temperature",
+  heating_cooling: "target_heating_cooling",
+  position: "target_position",
+  door: "target_door_state",
+  speed: "rotation_speed",
+  color_temperature: "color_temperature",
+  hue: "hue",
+  saturation: "saturation",
+  brightness: "brightness",
+  power: "power",
+  on: "power",
+};
+
+export function missingInstallMessage() {
+  return `HomeClaw is not installed. Install from the Mac App Store (${MAS_URL}) or TestFlight (${TESTFLIGHT_URL}), launch it, grant HomeKit, leave it in the menu bar, then retry.`;
+}
+
+export function notRunningMessage() {
+  return "HomeClaw.app is installed but not running, or HomeKit was not granted. Open HomeClaw, click Allow for HomeKit, leave the menu bar icon up, then retry.";
+}
 
 async function exists(p) {
   try {
@@ -40,144 +64,220 @@ async function exists(p) {
   }
 }
 
-async function newestMtime(paths) {
-  const stats = await Promise.all(paths.map((p) => stat(p)));
-  return Math.max(...stats.map((s) => s.mtimeMs));
-}
-
-async function binNeedsBuild() {
-  if (!(await exists(BIN))) return true;
+/**
+ * @param {string} [explicit]
+ * @returns {Promise<string|null>}
+ */
+export async function findHomeclawCli(explicit = process.env.HOMECLAW_CLI) {
+  const candidates = [
+    String(explicit || "").trim(),
+    HOMECLAW_CLI_IN_APP,
+    "/opt/homebrew/bin/homeclaw-cli",
+    "/usr/local/bin/homeclaw-cli",
+    join(homedir(), "Applications/HomeClaw.app/Contents/MacOS/homeclaw-cli"),
+  ].filter(Boolean);
+  for (const p of candidates) {
+    if (await exists(p)) return p;
+  }
   try {
-    const binStat = await stat(BIN);
-    const present = [];
-    for (const p of SRC_FILES) {
-      if (await exists(p)) present.push(p);
-    }
-    if (!present.length) return true;
-    return (await newestMtime(present)) > binStat.mtimeMs;
+    const { stdout } = await execFileAsync("which", ["homeclaw-cli"], {
+      timeout: 5_000,
+    });
+    const found = String(stdout || "").trim();
+    if (found && (await exists(found))) return found;
   } catch {
-    return true;
+    /* not in PATH */
   }
+  return null;
 }
 
-function xcodegenBin() {
-  return process.env.XCODEGEN || "xcodegen";
+function aliasChar(raw) {
+  const k = String(raw || "").toLowerCase();
+  return CHAR_ALIAS[k] || k;
 }
 
-async function ensureXcodeproj() {
-  const ymlStat = await stat(PROJECT_YML);
-  if (await exists(join(XCODEPROJ, "project.pbxproj"))) {
-    const projStat = await stat(join(XCODEPROJ, "project.pbxproj"));
-    if (projStat.mtimeMs >= ymlStat.mtimeMs) return;
-  }
-  await execFileAsync(xcodegenBin(), ["generate"], {
-    cwd: SRC_DIR,
-    timeout: 60_000,
-  });
-  const plist = await readFile(join(SRC_DIR, "Info.plist"), "utf8");
-  if (!plist.includes("NSHomeKitUsageDescription")) {
-    throw new Error("xcodegen wiped NSHomeKitUsageDescription from Info.plist");
-  }
-}
-
-function builtAppPath() {
-  return join(DERIVED, "Build/Products/Release-maccatalyst/yl-home.app");
-}
-
-async function buildApp() {
-  await ensureXcodeproj();
-  try {
-    await execFileAsync(
-      "xcodebuild",
-      [
-        "-project",
-        XCODEPROJ,
-        "-scheme",
-        "YLHome",
-        "-configuration",
-        "Release",
-        "-destination",
-        "platform=macOS,arch=arm64,variant=Mac Catalyst,name=My Mac",
-        "-derivedDataPath",
-        DERIVED,
-        "-allowProvisioningUpdates",
-        "-allowProvisioningDeviceRegistration",
-        `DEVELOPMENT_TEAM=${TEAM}`,
-        "CODE_SIGN_STYLE=Automatic",
-        "CODE_SIGN_IDENTITY=Apple Development",
-        "SUPPORTS_MACCATALYST=YES",
-      ],
-      { cwd: SRC_DIR, timeout: 180_000, maxBuffer: 8 * 1024 * 1024 }
-    );
-  } catch (err) {
-    const detail = String(err.stderr || err.stdout || err.message || err);
-    if (/homekit not found/i.test(detail)) {
-      throw new Error(
-        "HomeKit entitlement is not available on this Apple Developer team (Personal Team). Enroll in the paid Apple Developer Program, enable HomeKit on com.yanylevin.yl-home, then rebuild. Same paid-team gate as Sign in with Apple and App Groups on the iOS app."
-      );
+/**
+ * Split `set NAME on brightness 40` into HomeClaw one-characteristic calls.
+ * @param {string[]} tokens after the accessory name
+ * @returns {string[][]}
+ */
+export function parseSetPairs(tokens) {
+  const pairs = [];
+  let i = 0;
+  while (i < tokens.length) {
+    const t = String(tokens[i] || "").toLowerCase();
+    if (t === "on" || t === "true") {
+      pairs.push(["power", "true"]);
+      i += 1;
+      continue;
     }
-    throw new Error(detail.slice(-2500) || "xcodebuild failed");
+    if (t === "off" || t === "false") {
+      pairs.push(["power", "false"]);
+      i += 1;
+      continue;
+    }
+    const value = tokens[i + 1];
+    if (value == null) {
+      throw new Error(`set needs a value after "${tokens[i]}"`);
+    }
+    pairs.push([aliasChar(t), String(value)]);
+    i += 2;
   }
-  const built = builtAppPath();
-  if (!(await exists(join(built, "Contents/MacOS/yl-home")))) {
-    throw new Error(`xcodebuild finished but ${built} is missing`);
-  }
-  await rm(APP, { recursive: true, force: true });
-  await execFileAsync("cp", ["-R", built, APP], { timeout: 15_000 });
+  return pairs;
 }
 
-export async function ensureHomeBin() {
-  if (!(await binNeedsBuild())) return BIN;
-  if (compiling) return compiling;
-  compiling = (async () => {
-    await buildApp();
-    return BIN;
-  })().finally(() => {
-    compiling = null;
-  });
-  return compiling;
+function wantsJson(command, args) {
+  if (args.includes("--json")) return false;
+  if (command === "automations" && args[1] === "list") return true;
+  if (command === "automations" && args[1] === "get") return true;
+  return JSON_COMMANDS.has(command);
 }
 
 /**
  * @param {string[]} args
- * @param {{ timeoutMs?: number }} [opts]
+ * @returns {string[][]}
  */
-export async function runHome(args, opts = {}) {
-  const bin = await ensureHomeBin();
-  const dir = await mkdtemp(join(tmpdir(), "yl-home-"));
-  const outFile = join(dir, "out.json");
-  try {
-    const { stdout, stderr } = await execFileAsync(bin, [...args, "--out", outFile], {
-      timeout: opts.timeoutMs || 70_000,
-      maxBuffer: 4 * 1024 * 1024,
-    }).catch(async (err) => {
-      const fromFile = await readJsonIfPresent(outFile);
-      if (fromFile) return { stdout: JSON.stringify(fromFile), stderr: String(err.stderr || "") };
-      throw err;
-    });
-    const fromFile = await readJsonIfPresent(outFile);
-    if (fromFile) return fromFile;
-    const text = String(stdout || "").trim();
-    if (!text) {
-      const err = String(stderr || "").trim();
-      throw new Error(err || "yl-home produced no output");
+function splitFlags(args) {
+  const positional = [];
+  const flags = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (String(a).startsWith("--")) {
+      flags.push(a === "--type" ? "--category" : a);
+      const next = args[i + 1];
+      if (next != null && !String(next).startsWith("--")) {
+        flags.push(next);
+        i += 1;
+      }
+    } else {
+      positional.push(a);
     }
-    const line = text.split("\n").filter(Boolean).at(-1);
-    return JSON.parse(line);
-  } finally {
-    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+  return { positional, flags };
+}
+
+export function expandHomeArgs(args) {
+  const raw = args.filter((a) => a !== "--live").map((a) => (a === "--type" ? "--category" : a));
+  if (!raw.length) return [["status"]];
+  const command = raw[0];
+  if (command === "homes") return [["status"]];
+  if (command === "rooms") {
+    const rest = raw.slice(1);
+    return [["list", ...rest]];
+  }
+  if (command === "toggle") {
+    const { positional, flags } = splitFlags(raw.slice(1));
+    const name = positional[0];
+    if (!name) throw new Error("toggle needs an accessory name");
+    return [["__toggle", name, ...flags]];
+  }
+  if (command === "set") {
+    const { positional, flags } = splitFlags(raw.slice(1));
+    const name = positional[0];
+    if (!name) throw new Error("set needs an accessory name");
+    const pairs = parseSetPairs(positional.slice(1));
+    if (!pairs.length) throw new Error("set needs a characteristic and value");
+    return pairs.map(([k, v]) => ["set", name, k, v, ...flags]);
+  }
+  return [raw];
+}
+
+async function runCli(bin, args, timeoutMs) {
+  const command = args[0];
+  const forwarded = [...args];
+  if (wantsJson(command, forwarded)) forwarded.push("--json");
+  try {
+    const { stdout, stderr } = await execFileAsync(bin, forwarded, {
+      timeout: timeoutMs,
+      maxBuffer: 8 * 1024 * 1024,
+      env: { ...process.env, OUTPUT_FORMAT: "json" },
+    });
+    return { stdout: String(stdout || ""), stderr: String(stderr || "") };
+  } catch (err) {
+    const detail = String(err.stderr || err.stdout || err.message || err);
+    if (/not running|could not connect|connection refused|socket/i.test(detail)) {
+      throw new Error(notRunningMessage());
+    }
+    const parsed = parseJson(detail) || parseJson(String(err.stdout || ""));
+    if (parsed) return { stdout: JSON.stringify(parsed), stderr: detail, parsed };
+    throw new Error(detail.slice(-2500) || "homeclaw-cli failed");
   }
 }
 
-async function readJsonIfPresent(path) {
+function parseJson(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return null;
   try {
-    const raw = await readFile(path, "utf8");
-    const text = raw.trim();
-    if (!text) return null;
-    return JSON.parse(text);
+    return JSON.parse(raw);
+  } catch {
+    /* fall through */
+  }
+  const line = raw.split("\n").filter(Boolean).at(-1);
+  if (!line) return null;
+  try {
+    return JSON.parse(line);
   } catch {
     return null;
   }
+}
+
+function powerFromGet(obj) {
+  if (!obj || typeof obj !== "object") return null;
+  const cands = [
+    obj.power,
+    obj.power_state,
+    obj.state?.power,
+    obj.state?.power_state,
+    obj.characteristics?.power,
+    obj.accessory?.power,
+  ];
+  for (const v of cands) {
+    if (v === true || v === "true" || v === "on" || v === 1 || v === "1") return true;
+    if (v === false || v === "false" || v === "off" || v === 0 || v === "0") return false;
+  }
+  if (Array.isArray(obj.characteristics)) {
+    const row = obj.characteristics.find((c) =>
+      /^(power|on)$/i.test(String(c.name || c.characteristic || c.type || ""))
+    );
+    if (row && row.value != null) return powerFromGet({ power: row.value });
+  }
+  return null;
+}
+
+/**
+ * @param {string[]} args
+ * @param {{ timeoutMs?: number, bin?: string }} [opts]
+ */
+export async function runHome(args, opts = {}) {
+  const bin = opts.bin || (await findHomeclawCli());
+  if (!bin) throw new Error(missingInstallMessage());
+  const timeoutMs = opts.timeoutMs || 70_000;
+  const batches = expandHomeArgs(args);
+  const results = [];
+  for (const batch of batches) {
+    if (batch[0] === "__toggle") {
+      const name = batch[1];
+      const got = await runCli(bin, ["get", name], timeoutMs);
+      const obj = parseJson(got.stdout);
+      const on = powerFromGet(obj);
+      if (on == null) {
+        throw new Error(
+          `toggle: could not read power for ${JSON.stringify(name)}. Use set … power true/false.`
+        );
+      }
+      const next = await runCli(
+        bin,
+        ["set", name, "power", on ? "false" : "true", ...batch.slice(2)],
+        timeoutMs
+      );
+      results.push(parseJson(next.stdout) || { ok: true, stdout: next.stdout });
+      continue;
+    }
+    const out = await runCli(bin, batch, timeoutMs);
+    results.push(parseJson(out.stdout) || { ok: true, stdout: out.stdout.trim() });
+  }
+  if (results.length === 1) return results[0];
+  return { ok: true, results };
 }
 
 const isCli =
