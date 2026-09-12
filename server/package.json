@@ -25,6 +25,7 @@
     "health-history": "node --env-file=.env health-history-agent.js",
     "brain-person-imessage": "node --env-file=.env brain-person-imessage-fill.js",
     "health-shortcut": "node --env-file=.env health-shortcut-build.js",
+    "life-state-shortcut": "node --env-file=.env life-state-shortcut-build.js",
     "health-apple-export": "node --env-file=.env health-apple-export.js",
     "context-synthesis": "node --env-file=.env context-synthesis-agent.js",
     "chat-title-refresh": "node --env-file=.env chat-title-refresh-agent.js",

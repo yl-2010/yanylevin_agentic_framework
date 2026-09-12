@@ -457,13 +457,32 @@ app.post("/api/education/location", requireYanLocationWriter, async (req, res) =
   }
 });
 
-/** Phone dock Shortcut: going_to_shower / going_to_sleep. Same bearer as location. */
-app.post("/api/education/life-state-intent", requireYanLocationWriter, async (req, res) => {
+/** Phone dock Shortcut: LOCATION_INGEST_TOKEN or HEALTH_INGEST_TOKEN, or Yan JWT. */
+function requireYanIntentWriter(req, res, next) {
+  const token = bearerToken(req);
+  if (ingestTokenMatches(token) || healthTokenMatches(token)) {
+    req.locationSource = "shortcut";
+    next();
+    return;
+  }
+  requireEducationUser(req, res, () => {
+    if (!isYanLocationUser(req.user?.email)) {
+      res.status(403).json({ ok: false, error: "forbidden" });
+      return;
+    }
+    req.locationSource = "ios";
+    next();
+  });
+}
+
+/** Phone dock Shortcut: going_to_shower / going_to_sleep. */
+app.post("/api/education/life-state-intent", requireYanIntentWriter, async (req, res) => {
   try {
     const saved = await writeLifeStateIntent(req.body);
     res.setHeader("Cache-Control", "no-store");
     res.json({
       ok: true,
+      received: "yes",
       kind: saved.kind,
       orientation: saved.orientation,
       at: saved.at,
