@@ -14,12 +14,555 @@
 				<key>UUID</key>
 				<string>68C395A0-D821-F994-CEB4-D53DB03860B0</string>
 				<key>WFCommentActionText</key>
-				<string>Yan Life State Dock. Three finished POSTs. No variables to fill.
-Shower: going_to_shower, portrait.
-Sleep: going_to_sleep, landscape.
-Plugged in: plugged_in, not shower or sleep.
-Wrap shower and sleep in your Ifs. Plugged-in is the leftover branch.
-Bedroom Boolean off can still post plugged_in. Do not run all three.</string>
+				<string>Yan Life State Dock. Four finished POST blocks. No variables to fill.
+Two identical plugged_in copies first. Put each in its leftover If branch.
+Then shower: going_to_shower, portrait.
+Then sleep: going_to_sleep, landscape.
+Bedroom Boolean off can still post plugged_in. Do not run more than one POST.</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.comment</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>UUID</key>
+				<string>4150EB31-5D0B-0E4B-6A74-870DEDAEE075</string>
+				<key>WFCommentActionText</key>
+				<string>Plugged in, not shower or sleep.</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.downloadurl</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>CustomOutputName</key>
+				<string>Plugged in POST</string>
+				<key>ShowHeaders</key>
+				<true/>
+				<key>UUID</key>
+				<string>59BCA5BB-D0C0-5D12-10FA-97B1298146F3</string>
+				<key>WFFormValues</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>WFDictionaryFieldValueItems</key>
+						<array/>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFDictionaryFieldValue</string>
+				</dict>
+				<key>WFHTTPBodyType</key>
+				<string>JSON</string>
+				<key>WFHTTPHeaders</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>WFDictionaryFieldValueItems</key>
+						<array>
+							<dict>
+								<key>WFItemType</key>
+								<integer>0</integer>
+								<key>WFKey</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>Authorization</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+								<key>WFValue</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>Bearer __LOCATION_INGEST_TOKEN__</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+							</dict>
+							<dict>
+								<key>WFItemType</key>
+								<integer>0</integer>
+								<key>WFKey</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>Content-Type</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+								<key>WFValue</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>application/json</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+							</dict>
+						</array>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFDictionaryFieldValue</string>
+				</dict>
+				<key>WFHTTPMethod</key>
+				<string>POST</string>
+				<key>WFJSONValues</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>WFDictionaryFieldValueItems</key>
+						<array>
+							<dict>
+								<key>WFItemType</key>
+								<integer>0</integer>
+								<key>WFKey</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>intent</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+								<key>WFValue</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>plugged_in</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+							</dict>
+						</array>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFDictionaryFieldValue</string>
+				</dict>
+				<key>WFURL</key>
+				<string>__LIFE_STATE_INTENT_URL__</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.detect.dictionary</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>CustomOutputName</key>
+				<string>Plugged in Response</string>
+				<key>UUID</key>
+				<string>70BF9C10-3118-1587-F8CB-7A38D64B97B3</string>
+				<key>WFInput</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>OutputName</key>
+						<string>Plugged in POST</string>
+						<key>OutputUUID</key>
+						<string>59BCA5BB-D0C0-5D12-10FA-97B1298146F3</string>
+						<key>Type</key>
+						<string>ActionOutput</string>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFTextTokenAttachment</string>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.getvalueforkey</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>CustomOutputName</key>
+				<string>Plugged in received</string>
+				<key>UUID</key>
+				<string>84B8D015-3C58-2205-1008-99591A7FDAE9</string>
+				<key>WFDictionaryKey</key>
+				<string>received</string>
+				<key>WFGetDictionaryValueType</key>
+				<string>Value</string>
+				<key>WFInput</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>OutputName</key>
+						<string>Plugged in Response</string>
+						<key>OutputUUID</key>
+						<string>70BF9C10-3118-1587-F8CB-7A38D64B97B3</string>
+						<key>Type</key>
+						<string>ActionOutput</string>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFTextTokenAttachment</string>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>43290A4E-B427-43D5-F92E-43C5C20D60C0</string>
+				<key>UUID</key>
+				<string>CFD98102-6196-2C47-02E8-4352A2D0C8F8</string>
+				<key>WFCondition</key>
+				<integer>4</integer>
+				<key>WFConditionalActionString</key>
+				<string>yes</string>
+				<key>WFControlFlowMode</key>
+				<integer>0</integer>
+				<key>WFInput</key>
+				<dict>
+					<key>Type</key>
+					<string>Variable</string>
+					<key>Variable</key>
+					<dict>
+						<key>Value</key>
+						<dict>
+							<key>Aggrandizements</key>
+							<array>
+								<dict>
+									<key>CoercionItemClass</key>
+									<string>WFStringContentItem</string>
+									<key>Type</key>
+									<string>WFCoercionVariableAggrandizement</string>
+								</dict>
+							</array>
+							<key>OutputName</key>
+							<string>Plugged in received</string>
+							<key>OutputUUID</key>
+							<string>84B8D015-3C58-2205-1008-99591A7FDAE9</string>
+							<key>Type</key>
+							<string>ActionOutput</string>
+						</dict>
+						<key>WFSerializationType</key>
+						<string>WFTextTokenAttachment</string>
+					</dict>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>43290A4E-B427-43D5-F92E-43C5C20D60C0</string>
+				<key>UUID</key>
+				<string>A045EDFE-2F94-8740-EC93-0B961FDDF163</string>
+				<key>WFControlFlowMode</key>
+				<integer>1</integer>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.notification</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>UUID</key>
+				<string>ACFF7697-E508-1093-6441-F12486B5DA55</string>
+				<key>WFNotificationActionBody</key>
+				<string>Life-state signal did not reach the Mac.</string>
+				<key>WFNotificationActionTitle</key>
+				<string>Plugged in</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>43290A4E-B427-43D5-F92E-43C5C20D60C0</string>
+				<key>UUID</key>
+				<string>A2F106AB-2535-994C-BDEA-6B8900D188E9</string>
+				<key>WFControlFlowMode</key>
+				<integer>2</integer>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.comment</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>UUID</key>
+				<string>4D82B9A9-5115-4E74-DF69-FD02AFD702A9</string>
+				<key>WFCommentActionText</key>
+				<string>Plugged in, not shower or sleep.</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.downloadurl</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>CustomOutputName</key>
+				<string>Plugged in POST</string>
+				<key>ShowHeaders</key>
+				<true/>
+				<key>UUID</key>
+				<string>C9E21E1C-D3A3-587C-FE77-F39223B5DA4C</string>
+				<key>WFFormValues</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>WFDictionaryFieldValueItems</key>
+						<array/>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFDictionaryFieldValue</string>
+				</dict>
+				<key>WFHTTPBodyType</key>
+				<string>JSON</string>
+				<key>WFHTTPHeaders</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>WFDictionaryFieldValueItems</key>
+						<array>
+							<dict>
+								<key>WFItemType</key>
+								<integer>0</integer>
+								<key>WFKey</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>Authorization</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+								<key>WFValue</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>Bearer __LOCATION_INGEST_TOKEN__</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+							</dict>
+							<dict>
+								<key>WFItemType</key>
+								<integer>0</integer>
+								<key>WFKey</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>Content-Type</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+								<key>WFValue</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>application/json</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+							</dict>
+						</array>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFDictionaryFieldValue</string>
+				</dict>
+				<key>WFHTTPMethod</key>
+				<string>POST</string>
+				<key>WFJSONValues</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>WFDictionaryFieldValueItems</key>
+						<array>
+							<dict>
+								<key>WFItemType</key>
+								<integer>0</integer>
+								<key>WFKey</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>intent</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+								<key>WFValue</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>plugged_in</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+							</dict>
+						</array>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFDictionaryFieldValue</string>
+				</dict>
+				<key>WFURL</key>
+				<string>__LIFE_STATE_INTENT_URL__</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.detect.dictionary</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>CustomOutputName</key>
+				<string>Plugged in Response</string>
+				<key>UUID</key>
+				<string>33AE5338-00C1-3F07-32F0-3A64C62794FD</string>
+				<key>WFInput</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>OutputName</key>
+						<string>Plugged in POST</string>
+						<key>OutputUUID</key>
+						<string>C9E21E1C-D3A3-587C-FE77-F39223B5DA4C</string>
+						<key>Type</key>
+						<string>ActionOutput</string>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFTextTokenAttachment</string>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.getvalueforkey</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>CustomOutputName</key>
+				<string>Plugged in received</string>
+				<key>UUID</key>
+				<string>953ECDE2-4FE9-473D-9D6D-BD08F4A702DB</string>
+				<key>WFDictionaryKey</key>
+				<string>received</string>
+				<key>WFGetDictionaryValueType</key>
+				<string>Value</string>
+				<key>WFInput</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>OutputName</key>
+						<string>Plugged in Response</string>
+						<key>OutputUUID</key>
+						<string>33AE5338-00C1-3F07-32F0-3A64C62794FD</string>
+						<key>Type</key>
+						<string>ActionOutput</string>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFTextTokenAttachment</string>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>FE38858E-7B7F-B585-2F36-013CF99B5392</string>
+				<key>UUID</key>
+				<string>6D274771-4CBD-F590-D65D-5763721C6F23</string>
+				<key>WFCondition</key>
+				<integer>4</integer>
+				<key>WFConditionalActionString</key>
+				<string>yes</string>
+				<key>WFControlFlowMode</key>
+				<integer>0</integer>
+				<key>WFInput</key>
+				<dict>
+					<key>Type</key>
+					<string>Variable</string>
+					<key>Variable</key>
+					<dict>
+						<key>Value</key>
+						<dict>
+							<key>Aggrandizements</key>
+							<array>
+								<dict>
+									<key>CoercionItemClass</key>
+									<string>WFStringContentItem</string>
+									<key>Type</key>
+									<string>WFCoercionVariableAggrandizement</string>
+								</dict>
+							</array>
+							<key>OutputName</key>
+							<string>Plugged in received</string>
+							<key>OutputUUID</key>
+							<string>953ECDE2-4FE9-473D-9D6D-BD08F4A702DB</string>
+							<key>Type</key>
+							<string>ActionOutput</string>
+						</dict>
+						<key>WFSerializationType</key>
+						<string>WFTextTokenAttachment</string>
+					</dict>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>FE38858E-7B7F-B585-2F36-013CF99B5392</string>
+				<key>UUID</key>
+				<string>99508533-7763-EF0B-B3D9-7F93B5FBCF75</string>
+				<key>WFControlFlowMode</key>
+				<integer>1</integer>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.notification</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>UUID</key>
+				<string>47806350-4EDD-28C9-DC1C-D94EF74AEAA7</string>
+				<key>WFNotificationActionBody</key>
+				<string>Life-state signal did not reach the Mac.</string>
+				<key>WFNotificationActionTitle</key>
+				<string>Plugged in</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>FE38858E-7B7F-B585-2F36-013CF99B5392</string>
+				<key>UUID</key>
+				<string>2C1BD0CF-C43E-18C2-BA26-9C8F0ECBC84B</string>
+				<key>WFControlFlowMode</key>
+				<integer>2</integer>
 			</dict>
 		</dict>
 		<dict>
@@ -188,7 +731,7 @@ Bedroom Boolean off can still post plugged_in. Do not run all three.</string>
 				<key>CustomOutputName</key>
 				<string>Shower Response</string>
 				<key>UUID</key>
-				<string>8ED5813F-12A7-2E46-3F48-3F7F91B1E14C</string>
+				<string>0203EC75-0561-A566-5FC5-2AAC1135F8A3</string>
 				<key>WFInput</key>
 				<dict>
 					<key>Value</key>
@@ -213,7 +756,7 @@ Bedroom Boolean off can still post plugged_in. Do not run all three.</string>
 				<key>CustomOutputName</key>
 				<string>Shower received</string>
 				<key>UUID</key>
-				<string>388E64AB-B72F-6383-FDFB-48905EB9878B</string>
+				<string>181FCBD2-041A-D7AF-4C8D-2DF5C3CA4B93</string>
 				<key>WFDictionaryKey</key>
 				<string>received</string>
 				<key>WFGetDictionaryValueType</key>
@@ -225,7 +768,7 @@ Bedroom Boolean off can still post plugged_in. Do not run all three.</string>
 						<key>OutputName</key>
 						<string>Shower Response</string>
 						<key>OutputUUID</key>
-						<string>8ED5813F-12A7-2E46-3F48-3F7F91B1E14C</string>
+						<string>0203EC75-0561-A566-5FC5-2AAC1135F8A3</string>
 						<key>Type</key>
 						<string>ActionOutput</string>
 					</dict>
@@ -240,9 +783,9 @@ Bedroom Boolean off can still post plugged_in. Do not run all three.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>462C3CA1-B2E6-6CEE-E56D-19DF462ACBDE</string>
+				<string>06747F20-F336-AB4C-7A84-09C2CEF353D6</string>
 				<key>UUID</key>
-				<string>364EE2FB-9A23-4114-4251-23AFFF50E0AD</string>
+				<string>469F7A88-9F1E-50F1-C596-A83615DC897C</string>
 				<key>WFCondition</key>
 				<integer>4</integer>
 				<key>WFConditionalActionString</key>
@@ -269,7 +812,7 @@ Bedroom Boolean off can still post plugged_in. Do not run all three.</string>
 							<key>OutputName</key>
 							<string>Shower received</string>
 							<key>OutputUUID</key>
-							<string>388E64AB-B72F-6383-FDFB-48905EB9878B</string>
+							<string>181FCBD2-041A-D7AF-4C8D-2DF5C3CA4B93</string>
 							<key>Type</key>
 							<string>ActionOutput</string>
 						</dict>
@@ -285,9 +828,9 @@ Bedroom Boolean off can still post plugged_in. Do not run all three.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>462C3CA1-B2E6-6CEE-E56D-19DF462ACBDE</string>
+				<string>06747F20-F336-AB4C-7A84-09C2CEF353D6</string>
 				<key>UUID</key>
-				<string>BB41847B-20F0-D57E-F122-A98921C48E1B</string>
+				<string>16C3D73D-890C-4842-2055-0EE18E45DE1A</string>
 				<key>WFControlFlowMode</key>
 				<integer>1</integer>
 			</dict>
@@ -298,7 +841,7 @@ Bedroom Boolean off can still post plugged_in. Do not run all three.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>UUID</key>
-				<string>515389F1-5E72-2D05-E824-9B41D0C009AD</string>
+				<string>86F3A58F-9159-9AD2-DA9A-1634F2994FE3</string>
 				<key>WFNotificationActionBody</key>
 				<string>Life-state signal did not reach the Mac.</string>
 				<key>WFNotificationActionTitle</key>
@@ -311,9 +854,9 @@ Bedroom Boolean off can still post plugged_in. Do not run all three.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>462C3CA1-B2E6-6CEE-E56D-19DF462ACBDE</string>
+				<string>06747F20-F336-AB4C-7A84-09C2CEF353D6</string>
 				<key>UUID</key>
-				<string>69ECF7A2-9154-A78A-0592-CC799ABA32B9</string>
+				<string>E3F09185-7D96-6170-E796-933BC57459B1</string>
 				<key>WFControlFlowMode</key>
 				<integer>2</integer>
 			</dict>
@@ -484,7 +1027,7 @@ Bedroom Boolean off can still post plugged_in. Do not run all three.</string>
 				<key>CustomOutputName</key>
 				<string>Sleep Response</string>
 				<key>UUID</key>
-				<string>BADA2CA4-B9B0-EFCF-8534-2DEE912E3BAC</string>
+				<string>C16C6625-4761-C9A4-C372-F10B2441866B</string>
 				<key>WFInput</key>
 				<dict>
 					<key>Value</key>
@@ -509,7 +1052,7 @@ Bedroom Boolean off can still post plugged_in. Do not run all three.</string>
 				<key>CustomOutputName</key>
 				<string>Sleep received</string>
 				<key>UUID</key>
-				<string>3B79D3F8-2D59-F3D5-1E80-1032A829CF03</string>
+				<string>EAD093FF-C784-B401-A5F7-B5B2FBFCA0D8</string>
 				<key>WFDictionaryKey</key>
 				<string>received</string>
 				<key>WFGetDictionaryValueType</key>
@@ -521,7 +1064,7 @@ Bedroom Boolean off can still post plugged_in. Do not run all three.</string>
 						<key>OutputName</key>
 						<string>Sleep Response</string>
 						<key>OutputUUID</key>
-						<string>BADA2CA4-B9B0-EFCF-8534-2DEE912E3BAC</string>
+						<string>C16C6625-4761-C9A4-C372-F10B2441866B</string>
 						<key>Type</key>
 						<string>ActionOutput</string>
 					</dict>
@@ -536,9 +1079,9 @@ Bedroom Boolean off can still post plugged_in. Do not run all three.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>209931A8-2322-05EB-F7E2-A67348C17E6F</string>
+				<string>063A1C5F-556B-AF1D-78B8-4C345BE29CBA</string>
 				<key>UUID</key>
-				<string>C4CAFABF-3C5F-E8C3-0066-6CD1C5778EFF</string>
+				<string>F772E62A-9AE4-B86E-46E9-9D81D96986D1</string>
 				<key>WFCondition</key>
 				<integer>4</integer>
 				<key>WFConditionalActionString</key>
@@ -565,7 +1108,7 @@ Bedroom Boolean off can still post plugged_in. Do not run all three.</string>
 							<key>OutputName</key>
 							<string>Sleep received</string>
 							<key>OutputUUID</key>
-							<string>3B79D3F8-2D59-F3D5-1E80-1032A829CF03</string>
+							<string>EAD093FF-C784-B401-A5F7-B5B2FBFCA0D8</string>
 							<key>Type</key>
 							<string>ActionOutput</string>
 						</dict>
@@ -581,9 +1124,9 @@ Bedroom Boolean off can still post plugged_in. Do not run all three.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>209931A8-2322-05EB-F7E2-A67348C17E6F</string>
+				<string>063A1C5F-556B-AF1D-78B8-4C345BE29CBA</string>
 				<key>UUID</key>
-				<string>B46C0A9F-4820-9748-44D0-AF6818407825</string>
+				<string>F61756E5-53C7-77FD-E288-B4EBA622E943</string>
 				<key>WFControlFlowMode</key>
 				<integer>1</integer>
 			</dict>
@@ -594,7 +1137,7 @@ Bedroom Boolean off can still post plugged_in. Do not run all three.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>UUID</key>
-				<string>77CEC3D6-3CC7-3E50-42C1-DAC6C4C78F6A</string>
+				<string>7F6B9E49-5083-81F8-1546-9C86684644A3</string>
 				<key>WFNotificationActionBody</key>
 				<string>Life-state signal did not reach the Mac.</string>
 				<key>WFNotificationActionTitle</key>
@@ -607,281 +1150,9 @@ Bedroom Boolean off can still post plugged_in. Do not run all three.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>209931A8-2322-05EB-F7E2-A67348C17E6F</string>
+				<string>063A1C5F-556B-AF1D-78B8-4C345BE29CBA</string>
 				<key>UUID</key>
-				<string>E9CC50C3-2A4C-45E5-8979-449893632DE3</string>
-				<key>WFControlFlowMode</key>
-				<integer>2</integer>
-			</dict>
-		</dict>
-		<dict>
-			<key>WFWorkflowActionIdentifier</key>
-			<string>is.workflow.actions.comment</string>
-			<key>WFWorkflowActionParameters</key>
-			<dict>
-				<key>UUID</key>
-				<string>1B5A4B4B-ABCE-7F7C-D31C-5320A959F282</string>
-				<key>WFCommentActionText</key>
-				<string>Plugged in, not shower or sleep.</string>
-			</dict>
-		</dict>
-		<dict>
-			<key>WFWorkflowActionIdentifier</key>
-			<string>is.workflow.actions.downloadurl</string>
-			<key>WFWorkflowActionParameters</key>
-			<dict>
-				<key>CustomOutputName</key>
-				<string>Plugged in POST</string>
-				<key>ShowHeaders</key>
-				<true/>
-				<key>UUID</key>
-				<string>47B8D0F3-B525-1EEB-118F-B1D9AB0A0D88</string>
-				<key>WFFormValues</key>
-				<dict>
-					<key>Value</key>
-					<dict>
-						<key>WFDictionaryFieldValueItems</key>
-						<array/>
-					</dict>
-					<key>WFSerializationType</key>
-					<string>WFDictionaryFieldValue</string>
-				</dict>
-				<key>WFHTTPBodyType</key>
-				<string>JSON</string>
-				<key>WFHTTPHeaders</key>
-				<dict>
-					<key>Value</key>
-					<dict>
-						<key>WFDictionaryFieldValueItems</key>
-						<array>
-							<dict>
-								<key>WFItemType</key>
-								<integer>0</integer>
-								<key>WFKey</key>
-								<dict>
-									<key>Value</key>
-									<dict>
-										<key>string</key>
-										<string>Authorization</string>
-									</dict>
-									<key>WFSerializationType</key>
-									<string>WFTextTokenString</string>
-								</dict>
-								<key>WFValue</key>
-								<dict>
-									<key>Value</key>
-									<dict>
-										<key>string</key>
-										<string>Bearer __LOCATION_INGEST_TOKEN__</string>
-									</dict>
-									<key>WFSerializationType</key>
-									<string>WFTextTokenString</string>
-								</dict>
-							</dict>
-							<dict>
-								<key>WFItemType</key>
-								<integer>0</integer>
-								<key>WFKey</key>
-								<dict>
-									<key>Value</key>
-									<dict>
-										<key>string</key>
-										<string>Content-Type</string>
-									</dict>
-									<key>WFSerializationType</key>
-									<string>WFTextTokenString</string>
-								</dict>
-								<key>WFValue</key>
-								<dict>
-									<key>Value</key>
-									<dict>
-										<key>string</key>
-										<string>application/json</string>
-									</dict>
-									<key>WFSerializationType</key>
-									<string>WFTextTokenString</string>
-								</dict>
-							</dict>
-						</array>
-					</dict>
-					<key>WFSerializationType</key>
-					<string>WFDictionaryFieldValue</string>
-				</dict>
-				<key>WFHTTPMethod</key>
-				<string>POST</string>
-				<key>WFJSONValues</key>
-				<dict>
-					<key>Value</key>
-					<dict>
-						<key>WFDictionaryFieldValueItems</key>
-						<array>
-							<dict>
-								<key>WFItemType</key>
-								<integer>0</integer>
-								<key>WFKey</key>
-								<dict>
-									<key>Value</key>
-									<dict>
-										<key>string</key>
-										<string>intent</string>
-									</dict>
-									<key>WFSerializationType</key>
-									<string>WFTextTokenString</string>
-								</dict>
-								<key>WFValue</key>
-								<dict>
-									<key>Value</key>
-									<dict>
-										<key>string</key>
-										<string>plugged_in</string>
-									</dict>
-									<key>WFSerializationType</key>
-									<string>WFTextTokenString</string>
-								</dict>
-							</dict>
-						</array>
-					</dict>
-					<key>WFSerializationType</key>
-					<string>WFDictionaryFieldValue</string>
-				</dict>
-				<key>WFURL</key>
-				<string>__LIFE_STATE_INTENT_URL__</string>
-			</dict>
-		</dict>
-		<dict>
-			<key>WFWorkflowActionIdentifier</key>
-			<string>is.workflow.actions.detect.dictionary</string>
-			<key>WFWorkflowActionParameters</key>
-			<dict>
-				<key>CustomOutputName</key>
-				<string>Plugged in Response</string>
-				<key>UUID</key>
-				<string>BBA6C36E-D428-2E2F-4EB4-CA9734D079B5</string>
-				<key>WFInput</key>
-				<dict>
-					<key>Value</key>
-					<dict>
-						<key>OutputName</key>
-						<string>Plugged in POST</string>
-						<key>OutputUUID</key>
-						<string>47B8D0F3-B525-1EEB-118F-B1D9AB0A0D88</string>
-						<key>Type</key>
-						<string>ActionOutput</string>
-					</dict>
-					<key>WFSerializationType</key>
-					<string>WFTextTokenAttachment</string>
-				</dict>
-			</dict>
-		</dict>
-		<dict>
-			<key>WFWorkflowActionIdentifier</key>
-			<string>is.workflow.actions.getvalueforkey</string>
-			<key>WFWorkflowActionParameters</key>
-			<dict>
-				<key>CustomOutputName</key>
-				<string>Plugged in received</string>
-				<key>UUID</key>
-				<string>7311BC1B-AFB0-CBCE-3AAB-8D60E38D6DB7</string>
-				<key>WFDictionaryKey</key>
-				<string>received</string>
-				<key>WFGetDictionaryValueType</key>
-				<string>Value</string>
-				<key>WFInput</key>
-				<dict>
-					<key>Value</key>
-					<dict>
-						<key>OutputName</key>
-						<string>Plugged in Response</string>
-						<key>OutputUUID</key>
-						<string>BBA6C36E-D428-2E2F-4EB4-CA9734D079B5</string>
-						<key>Type</key>
-						<string>ActionOutput</string>
-					</dict>
-					<key>WFSerializationType</key>
-					<string>WFTextTokenAttachment</string>
-				</dict>
-			</dict>
-		</dict>
-		<dict>
-			<key>WFWorkflowActionIdentifier</key>
-			<string>is.workflow.actions.conditional</string>
-			<key>WFWorkflowActionParameters</key>
-			<dict>
-				<key>GroupingIdentifier</key>
-				<string>C353E50B-A96C-216E-A64C-FD1883710A88</string>
-				<key>UUID</key>
-				<string>18EE46EC-1319-0B69-B9DB-B71A7A3A7370</string>
-				<key>WFCondition</key>
-				<integer>4</integer>
-				<key>WFConditionalActionString</key>
-				<string>yes</string>
-				<key>WFControlFlowMode</key>
-				<integer>0</integer>
-				<key>WFInput</key>
-				<dict>
-					<key>Type</key>
-					<string>Variable</string>
-					<key>Variable</key>
-					<dict>
-						<key>Value</key>
-						<dict>
-							<key>Aggrandizements</key>
-							<array>
-								<dict>
-									<key>CoercionItemClass</key>
-									<string>WFStringContentItem</string>
-									<key>Type</key>
-									<string>WFCoercionVariableAggrandizement</string>
-								</dict>
-							</array>
-							<key>OutputName</key>
-							<string>Plugged in received</string>
-							<key>OutputUUID</key>
-							<string>7311BC1B-AFB0-CBCE-3AAB-8D60E38D6DB7</string>
-							<key>Type</key>
-							<string>ActionOutput</string>
-						</dict>
-						<key>WFSerializationType</key>
-						<string>WFTextTokenAttachment</string>
-					</dict>
-				</dict>
-			</dict>
-		</dict>
-		<dict>
-			<key>WFWorkflowActionIdentifier</key>
-			<string>is.workflow.actions.conditional</string>
-			<key>WFWorkflowActionParameters</key>
-			<dict>
-				<key>GroupingIdentifier</key>
-				<string>C353E50B-A96C-216E-A64C-FD1883710A88</string>
-				<key>UUID</key>
-				<string>97653354-9748-F1D9-4410-E91B9BBF4A0F</string>
-				<key>WFControlFlowMode</key>
-				<integer>1</integer>
-			</dict>
-		</dict>
-		<dict>
-			<key>WFWorkflowActionIdentifier</key>
-			<string>is.workflow.actions.notification</string>
-			<key>WFWorkflowActionParameters</key>
-			<dict>
-				<key>UUID</key>
-				<string>7B75F748-3EE7-294C-557C-C47C9E46F9A1</string>
-				<key>WFNotificationActionBody</key>
-				<string>Life-state signal did not reach the Mac.</string>
-				<key>WFNotificationActionTitle</key>
-				<string>Plugged in</string>
-			</dict>
-		</dict>
-		<dict>
-			<key>WFWorkflowActionIdentifier</key>
-			<string>is.workflow.actions.conditional</string>
-			<key>WFWorkflowActionParameters</key>
-			<dict>
-				<key>GroupingIdentifier</key>
-				<string>C353E50B-A96C-216E-A64C-FD1883710A88</string>
-				<key>UUID</key>
-				<string>3344E715-A367-039B-ED2F-19C56CB57AAD</string>
+				<string>6C1C2B5F-DB7D-9E7D-BF71-3DDCF57FB1EC</string>
 				<key>WFControlFlowMode</key>
 				<integer>2</integer>
 			</dict>

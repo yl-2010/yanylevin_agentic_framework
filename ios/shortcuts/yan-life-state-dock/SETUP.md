@@ -10,13 +10,14 @@ Silent on success. A banner only if `received` is not `yes`.
 
 Automation: iPhone is connected to power.
 
-Three Get Contents of URL actions:
+Four Get Contents of URL blocks. The two leftover `plugged_in` copies are at the top so you can drop each into its own place in the If tree. Shower and sleep are below.
 
-1. Shower. `going_to_shower` + portrait. Portrait / Bedroom Boolean on branch.
-2. Sleep. `going_to_sleep` + landscape. Landscape / Bedroom Boolean on branch.
-3. Plugged in. `plugged_in`. Everything else (Bedroom Boolean off, or on but not the stand ritual).
+1. Plugged in (copy 1). `plugged_in`. One leftover branch (Bedroom Boolean off, or on but not the stand ritual).
+2. Plugged in (copy 2). Same POST. The other leftover branch.
+3. Shower. `going_to_shower` + portrait. Portrait / Bedroom Boolean on branch.
+4. Sleep. `going_to_sleep` + landscape. Landscape / Bedroom Boolean on branch.
 
-Do not run all three.
+Do not run more than one.
 
 ## Yan Life State Unplug
 

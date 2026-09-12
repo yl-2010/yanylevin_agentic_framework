@@ -149,7 +149,7 @@ Hook a personal automation: Is Disconnected From Power. No Ifs.</string>
 				<key>CustomOutputName</key>
 				<string>Unplug Response</string>
 				<key>UUID</key>
-				<string>00D67609-3D43-BD45-CF2C-3A30168B7603</string>
+				<string>3AB27088-AEBE-C562-1C7F-CA559763B2E4</string>
 				<key>WFInput</key>
 				<dict>
 					<key>Value</key>
@@ -174,7 +174,7 @@ Hook a personal automation: Is Disconnected From Power. No Ifs.</string>
 				<key>CustomOutputName</key>
 				<string>Unplug received</string>
 				<key>UUID</key>
-				<string>1B8F2C65-079E-F1FE-7855-F73934CD2123</string>
+				<string>DFEA7322-3CAD-6712-B319-99A05D29A516</string>
 				<key>WFDictionaryKey</key>
 				<string>received</string>
 				<key>WFGetDictionaryValueType</key>
@@ -186,7 +186,7 @@ Hook a personal automation: Is Disconnected From Power. No Ifs.</string>
 						<key>OutputName</key>
 						<string>Unplug Response</string>
 						<key>OutputUUID</key>
-						<string>00D67609-3D43-BD45-CF2C-3A30168B7603</string>
+						<string>3AB27088-AEBE-C562-1C7F-CA559763B2E4</string>
 						<key>Type</key>
 						<string>ActionOutput</string>
 					</dict>
@@ -201,9 +201,9 @@ Hook a personal automation: Is Disconnected From Power. No Ifs.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>81C5A870-2E23-84AA-7009-91E1F138EAE9</string>
+				<string>C1091F5A-42FD-0E8F-26F1-8C5D46EDF84E</string>
 				<key>UUID</key>
-				<string>90774E02-F71D-CE1F-6F8B-7B0FE88C5494</string>
+				<string>D6AD1F0B-A7AB-2750-2DAA-1C668B6AB7DD</string>
 				<key>WFCondition</key>
 				<integer>4</integer>
 				<key>WFConditionalActionString</key>
@@ -230,7 +230,7 @@ Hook a personal automation: Is Disconnected From Power. No Ifs.</string>
 							<key>OutputName</key>
 							<string>Unplug received</string>
 							<key>OutputUUID</key>
-							<string>1B8F2C65-079E-F1FE-7855-F73934CD2123</string>
+							<string>DFEA7322-3CAD-6712-B319-99A05D29A516</string>
 							<key>Type</key>
 							<string>ActionOutput</string>
 						</dict>
@@ -246,9 +246,9 @@ Hook a personal automation: Is Disconnected From Power. No Ifs.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>81C5A870-2E23-84AA-7009-91E1F138EAE9</string>
+				<string>C1091F5A-42FD-0E8F-26F1-8C5D46EDF84E</string>
 				<key>UUID</key>
-				<string>5BA337F3-CF5F-1FCD-2407-04CBA455AFD7</string>
+				<string>41BC4475-1CDA-EE61-2EE8-D9ADC56413FF</string>
 				<key>WFControlFlowMode</key>
 				<integer>1</integer>
 			</dict>
@@ -259,7 +259,7 @@ Hook a personal automation: Is Disconnected From Power. No Ifs.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>UUID</key>
-				<string>DBB17195-06EF-338B-AEEA-162748102E1D</string>
+				<string>4E942DE1-74DF-501F-248E-229804EDB6F0</string>
 				<key>WFNotificationActionBody</key>
 				<string>Life-state signal did not reach the Mac.</string>
 				<key>WFNotificationActionTitle</key>
@@ -272,9 +272,9 @@ Hook a personal automation: Is Disconnected From Power. No Ifs.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>81C5A870-2E23-84AA-7009-91E1F138EAE9</string>
+				<string>C1091F5A-42FD-0E8F-26F1-8C5D46EDF84E</string>
 				<key>UUID</key>
-				<string>33126D83-C0C7-9A78-1BB1-0A312F2B2C9E</string>
+				<string>9F67AEF7-70DD-DAD3-872C-D042D615D5FC</string>
 				<key>WFControlFlowMode</key>
 				<integer>2</integer>
 			</dict>

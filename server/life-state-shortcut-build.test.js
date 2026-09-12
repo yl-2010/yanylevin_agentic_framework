@@ -17,7 +17,7 @@ function jsonOf(action) {
 }
 
 describe("Yan life-state Shortcuts", () => {
-  it("ships three finished dock POSTs, shower sleep and plugged_in", () => {
+  it("ships two plugged_in copies first, then shower and sleep", () => {
     const wf = buildWorkflow({
       token: TOKEN_PLACEHOLDER,
       url: URL_PLACEHOLDER,
@@ -25,7 +25,7 @@ describe("Yan life-state Shortcuts", () => {
     const downloads = wf.WFWorkflowActions.filter(
       (a) => a.WFWorkflowActionIdentifier === "is.workflow.actions.downloadurl"
     );
-    assert.equal(downloads.length, 3);
+    assert.equal(downloads.length, 4);
     assert.equal(
       wf.WFWorkflowActions.some(
         (a) => a.WFWorkflowActionIdentifier === "is.workflow.actions.setvariable"
@@ -33,10 +33,13 @@ describe("Yan life-state Shortcuts", () => {
       false
     );
     assert.deepEqual(downloads.map(jsonOf), [
+      { intent: "plugged_in" },
+      { intent: "plugged_in" },
       { intent: "going_to_shower", orientation: "portrait" },
       { intent: "going_to_sleep", orientation: "landscape" },
-      { intent: "plugged_in" },
     ]);
+    const pluggedIds = downloads.slice(0, 2).map((a) => a.WFWorkflowActionParameters.UUID);
+    assert.equal(pluggedIds[0] !== pluggedIds[1], true);
     for (const download of downloads) {
       assert.equal(download.WFWorkflowActionParameters.WFHTTPMethod, "POST");
       assert.equal(download.WFWorkflowActionParameters.WFURL, URL_PLACEHOLDER);

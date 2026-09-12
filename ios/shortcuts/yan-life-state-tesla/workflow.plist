@@ -150,7 +150,7 @@ Brief Bluetooth drops are the same trip on the Mac (10 min resume).</string>
 				<key>CustomOutputName</key>
 				<string>Tesla Response</string>
 				<key>UUID</key>
-				<string>760FC49F-1740-6B02-DD4F-017FF7F370B5</string>
+				<string>506DF5FB-13AD-452B-B08F-1A829773D191</string>
 				<key>WFInput</key>
 				<dict>
 					<key>Value</key>
@@ -175,7 +175,7 @@ Brief Bluetooth drops are the same trip on the Mac (10 min resume).</string>
 				<key>CustomOutputName</key>
 				<string>Tesla received</string>
 				<key>UUID</key>
-				<string>7945965C-E328-DB25-EC2F-9FD6B2CB9935</string>
+				<string>4691CF5B-73B8-D098-8217-84774009FC75</string>
 				<key>WFDictionaryKey</key>
 				<string>received</string>
 				<key>WFGetDictionaryValueType</key>
@@ -187,7 +187,7 @@ Brief Bluetooth drops are the same trip on the Mac (10 min resume).</string>
 						<key>OutputName</key>
 						<string>Tesla Response</string>
 						<key>OutputUUID</key>
-						<string>760FC49F-1740-6B02-DD4F-017FF7F370B5</string>
+						<string>506DF5FB-13AD-452B-B08F-1A829773D191</string>
 						<key>Type</key>
 						<string>ActionOutput</string>
 					</dict>
@@ -202,9 +202,9 @@ Brief Bluetooth drops are the same trip on the Mac (10 min resume).</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>C5F61D45-37ED-DFA1-571B-6F24E4C10C53</string>
+				<string>C83B6048-B712-6B44-5218-12E225E8EBAF</string>
 				<key>UUID</key>
-				<string>36CBBE3F-9C91-8E80-7451-91EE9CEA3D11</string>
+				<string>5B3416F8-761B-7C88-2A61-E8BF8EA998D6</string>
 				<key>WFCondition</key>
 				<integer>4</integer>
 				<key>WFConditionalActionString</key>
@@ -231,7 +231,7 @@ Brief Bluetooth drops are the same trip on the Mac (10 min resume).</string>
 							<key>OutputName</key>
 							<string>Tesla received</string>
 							<key>OutputUUID</key>
-							<string>7945965C-E328-DB25-EC2F-9FD6B2CB9935</string>
+							<string>4691CF5B-73B8-D098-8217-84774009FC75</string>
 							<key>Type</key>
 							<string>ActionOutput</string>
 						</dict>
@@ -247,9 +247,9 @@ Brief Bluetooth drops are the same trip on the Mac (10 min resume).</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>C5F61D45-37ED-DFA1-571B-6F24E4C10C53</string>
+				<string>C83B6048-B712-6B44-5218-12E225E8EBAF</string>
 				<key>UUID</key>
-				<string>B84ABACB-4E8E-9BE5-2D28-68C0AA799689</string>
+				<string>4BA349EE-AE32-0D26-0825-604D8E47E3B5</string>
 				<key>WFControlFlowMode</key>
 				<integer>1</integer>
 			</dict>
@@ -260,7 +260,7 @@ Brief Bluetooth drops are the same trip on the Mac (10 min resume).</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>UUID</key>
-				<string>5FF35FE5-AF8E-FA14-7D58-3B476BD4F4C4</string>
+				<string>C3DEEE58-637D-E29B-C4E0-11C8BDF32421</string>
 				<key>WFNotificationActionBody</key>
 				<string>Life-state signal did not reach the Mac.</string>
 				<key>WFNotificationActionTitle</key>
@@ -273,9 +273,9 @@ Brief Bluetooth drops are the same trip on the Mac (10 min resume).</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>C5F61D45-37ED-DFA1-571B-6F24E4C10C53</string>
+				<string>C83B6048-B712-6B44-5218-12E225E8EBAF</string>
 				<key>UUID</key>
-				<string>988A59FA-C5EC-4E51-AD2E-598BDDCD26AD</string>
+				<string>20F78328-DF42-00FA-E115-C80FCD21143F</string>
 				<key>WFControlFlowMode</key>
 				<integer>2</integer>
 			</dict>

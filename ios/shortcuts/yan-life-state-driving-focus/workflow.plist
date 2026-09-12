@@ -150,7 +150,7 @@ Flipping to Personal Focus and back is the same trip on the Mac (15 min resume).
 				<key>CustomOutputName</key>
 				<string>Driving Focus Response</string>
 				<key>UUID</key>
-				<string>BCC8B753-A76F-88FD-2708-2630B9A67DE5</string>
+				<string>2876E8B8-60AF-67DC-6678-66DE72E35CBE</string>
 				<key>WFInput</key>
 				<dict>
 					<key>Value</key>
@@ -175,7 +175,7 @@ Flipping to Personal Focus and back is the same trip on the Mac (15 min resume).
 				<key>CustomOutputName</key>
 				<string>Driving Focus received</string>
 				<key>UUID</key>
-				<string>99155107-307A-81CC-276D-33F504A937FB</string>
+				<string>CF13792E-396F-C559-B56E-D41D8BB3FA9B</string>
 				<key>WFDictionaryKey</key>
 				<string>received</string>
 				<key>WFGetDictionaryValueType</key>
@@ -187,7 +187,7 @@ Flipping to Personal Focus and back is the same trip on the Mac (15 min resume).
 						<key>OutputName</key>
 						<string>Driving Focus Response</string>
 						<key>OutputUUID</key>
-						<string>BCC8B753-A76F-88FD-2708-2630B9A67DE5</string>
+						<string>2876E8B8-60AF-67DC-6678-66DE72E35CBE</string>
 						<key>Type</key>
 						<string>ActionOutput</string>
 					</dict>
@@ -202,9 +202,9 @@ Flipping to Personal Focus and back is the same trip on the Mac (15 min resume).
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>53441B08-FAB3-6CD6-43B9-600A7DA62084</string>
+				<string>20C7AFB1-FED8-F45C-C3BF-A0B26265ED7D</string>
 				<key>UUID</key>
-				<string>5D703E21-9962-8D67-E79D-CD743ECFA467</string>
+				<string>73DA66B0-2619-37FF-9B8E-0E6A3EA10239</string>
 				<key>WFCondition</key>
 				<integer>4</integer>
 				<key>WFConditionalActionString</key>
@@ -231,7 +231,7 @@ Flipping to Personal Focus and back is the same trip on the Mac (15 min resume).
 							<key>OutputName</key>
 							<string>Driving Focus received</string>
 							<key>OutputUUID</key>
-							<string>99155107-307A-81CC-276D-33F504A937FB</string>
+							<string>CF13792E-396F-C559-B56E-D41D8BB3FA9B</string>
 							<key>Type</key>
 							<string>ActionOutput</string>
 						</dict>
@@ -247,9 +247,9 @@ Flipping to Personal Focus and back is the same trip on the Mac (15 min resume).
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>53441B08-FAB3-6CD6-43B9-600A7DA62084</string>
+				<string>20C7AFB1-FED8-F45C-C3BF-A0B26265ED7D</string>
 				<key>UUID</key>
-				<string>2BAC0929-BD9D-DC01-5F8C-3F67D8F8743E</string>
+				<string>64285CAD-6492-BEE2-1027-7CE4E35CF415</string>
 				<key>WFControlFlowMode</key>
 				<integer>1</integer>
 			</dict>
@@ -260,7 +260,7 @@ Flipping to Personal Focus and back is the same trip on the Mac (15 min resume).
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>UUID</key>
-				<string>0812B4FB-8444-55C5-857B-E7E875F6DA02</string>
+				<string>C7F17A97-CC89-CA6F-E5F2-A3FCCBF9E617</string>
 				<key>WFNotificationActionBody</key>
 				<string>Life-state signal did not reach the Mac.</string>
 				<key>WFNotificationActionTitle</key>
@@ -273,9 +273,9 @@ Flipping to Personal Focus and back is the same trip on the Mac (15 min resume).
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>53441B08-FAB3-6CD6-43B9-600A7DA62084</string>
+				<string>20C7AFB1-FED8-F45C-C3BF-A0B26265ED7D</string>
 				<key>UUID</key>
-				<string>D60A9150-70CF-A3AD-7DE8-8AAA2654680F</string>
+				<string>23C6962E-91E9-9ABC-9625-0C968E1BABF9</string>
 				<key>WFControlFlowMode</key>
 				<integer>2</integer>
 			</dict>

@@ -30,14 +30,25 @@ export const SHORTCUT_SPECS = [
     iconGlyph: 59511,
     iconColor: 4278080147,
     comment: [
-      "Yan Life State Dock. Three finished POSTs. No variables to fill.",
-      "Shower: going_to_shower, portrait.",
-      "Sleep: going_to_sleep, landscape.",
-      "Plugged in: plugged_in, not shower or sleep.",
-      "Wrap shower and sleep in your Ifs. Plugged-in is the leftover branch.",
-      "Bedroom Boolean off can still post plugged_in. Do not run all three.",
+      "Yan Life State Dock. Four finished POST blocks. No variables to fill.",
+      "Two identical plugged_in copies first. Put each in its leftover If branch.",
+      "Then shower: going_to_shower, portrait.",
+      "Then sleep: going_to_sleep, landscape.",
+      "Bedroom Boolean off can still post plugged_in. Do not run more than one POST.",
     ],
     posts: [
+      {
+        key: "plugged-a",
+        label: "Plugged in",
+        intent: "plugged_in",
+        note: "Plugged in, not shower or sleep.",
+      },
+      {
+        key: "plugged-b",
+        label: "Plugged in",
+        intent: "plugged_in",
+        note: "Plugged in, not shower or sleep.",
+      },
       {
         key: "shower",
         label: "Shower",
@@ -51,12 +62,6 @@ export const SHORTCUT_SPECS = [
         intent: "going_to_sleep",
         orientation: "landscape",
         note: "Landscape branch.",
-      },
-      {
-        key: "plugged",
-        label: "Plugged in",
-        intent: "plugged_in",
-        note: "Plugged in, not shower or sleep.",
       },
     ],
   },
@@ -182,23 +187,23 @@ function downloadPost(id, outputName, url, token, intent, orientation) {
   };
 }
 
-function postSuccessCheck(specId, prefix, downloadId, downloadName) {
-  const responseDictId = stableUuid(specId, `${prefix}-post-dict`);
-  const receivedId = stableUuid(specId, `${prefix}-post-received`);
-  const receivedToken = actionOutput(receivedId, `${prefix} received`);
+function postSuccessCheck(specId, idPrefix, downloadId, downloadName, label) {
+  const responseDictId = stableUuid(specId, `${idPrefix}-post-dict`);
+  const receivedId = stableUuid(specId, `${idPrefix}-post-received`);
+  const receivedToken = actionOutput(receivedId, `${label} received`);
   receivedToken.Value.Aggrandizements = [
     {
       Type: "WFCoercionVariableAggrandizement",
       CoercionItemClass: "WFStringContentItem",
     },
   ];
-  const ifGroup = stableUuid(specId, `${prefix}-if-post-fail`);
+  const ifGroup = stableUuid(specId, `${idPrefix}-if-post-fail`);
   return [
     {
       WFWorkflowActionIdentifier: "is.workflow.actions.detect.dictionary",
       WFWorkflowActionParameters: {
         UUID: responseDictId,
-        CustomOutputName: `${prefix} Response`,
+        CustomOutputName: `${label} Response`,
         WFInput: actionOutput(downloadId, downloadName),
       },
     },
@@ -206,16 +211,16 @@ function postSuccessCheck(specId, prefix, downloadId, downloadName) {
       WFWorkflowActionIdentifier: "is.workflow.actions.getvalueforkey",
       WFWorkflowActionParameters: {
         UUID: receivedId,
-        CustomOutputName: `${prefix} received`,
+        CustomOutputName: `${label} received`,
         WFDictionaryKey: "received",
         WFGetDictionaryValueType: "Value",
-        WFInput: actionOutput(responseDictId, `${prefix} Response`),
+        WFInput: actionOutput(responseDictId, `${label} Response`),
       },
     },
     {
       WFWorkflowActionIdentifier: "is.workflow.actions.conditional",
       WFWorkflowActionParameters: {
-        UUID: stableUuid(specId, `${prefix}-if-post-fail-start`),
+        UUID: stableUuid(specId, `${idPrefix}-if-post-fail-start`),
         GroupingIdentifier: ifGroup,
         WFControlFlowMode: 0,
         WFCondition: 4,
@@ -229,7 +234,7 @@ function postSuccessCheck(specId, prefix, downloadId, downloadName) {
     {
       WFWorkflowActionIdentifier: "is.workflow.actions.conditional",
       WFWorkflowActionParameters: {
-        UUID: stableUuid(specId, `${prefix}-if-post-fail-otherwise`),
+        UUID: stableUuid(specId, `${idPrefix}-if-post-fail-otherwise`),
         GroupingIdentifier: ifGroup,
         WFControlFlowMode: 1,
       },
@@ -237,15 +242,15 @@ function postSuccessCheck(specId, prefix, downloadId, downloadName) {
     {
       WFWorkflowActionIdentifier: "is.workflow.actions.notification",
       WFWorkflowActionParameters: {
-        UUID: stableUuid(specId, `${prefix}-notification-fail`),
-        WFNotificationActionTitle: prefix,
+        UUID: stableUuid(specId, `${idPrefix}-notification-fail`),
+        WFNotificationActionTitle: label,
         WFNotificationActionBody: "Life-state signal did not reach the Mac.",
       },
     },
     {
       WFWorkflowActionIdentifier: "is.workflow.actions.conditional",
       WFWorkflowActionParameters: {
-        UUID: stableUuid(specId, `${prefix}-if-post-fail-end`),
+        UUID: stableUuid(specId, `${idPrefix}-if-post-fail-end`),
         GroupingIdentifier: ifGroup,
         WFControlFlowMode: 2,
       },
@@ -271,7 +276,9 @@ export function buildWorkflow(opts = {}) {
     actions.push(
       downloadPost(downloadId, outputName, url, token, post.intent, post.orientation || "")
     );
-    actions.push(...postSuccessCheck(spec.id, post.label, downloadId, outputName));
+    actions.push(
+      ...postSuccessCheck(spec.id, post.key, downloadId, outputName, post.label)
+    );
   }
   return {
     WFWorkflowActions: actions,

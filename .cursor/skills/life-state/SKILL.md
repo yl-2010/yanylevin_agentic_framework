@@ -73,7 +73,7 @@ Short, greppable, no secrets. Examples: `gps:home`, `gps:eps`, `gps:pro-club`, `
 
 `npm run life-state-shortcut` writes four Shortcuts to iCloud Drive `YanLifeState/`. Yan adds the automations. POSTs are filled.
 
-- **Yan Life State Dock** (plug in): shower, sleep, and `plugged_in` leftover. Wrap shower/sleep in Ifs.
+- **Yan Life State Dock** (plug in): two identical `plugged_in` leftover copies first, then shower and sleep. Put each leftover copy in its If branch.
 - **Yan Life State Unplug**: one POST, `unplugged`.
 - **Yan Life State Driving Focus**: one POST, `driving_focus`. Any car. 15 min resume.
 - **Yan Life State Tesla**: one POST, `tesla_bluetooth`. Tesla only. 10 min resume.
