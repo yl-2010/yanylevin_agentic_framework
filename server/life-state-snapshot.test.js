@@ -48,6 +48,7 @@ describe("rollupHome", () => {
     { display_name: "Office Desk", room: "Office", category: "lightbulb", power: true },
     { display_name: "Bath Fan", room: "Bathroom", category: "fan", power: true },
     { display_name: "Bath Lights", room: "Bathroom", category: "lightbulb", power: false },
+    { name: "Bedroom Boolean", room: "Yan’s Bedroom", category: "outlet", power: false },
   ];
 
   it("treats fan-only bathroom as not showering lights", () => {
@@ -56,6 +57,8 @@ describe("rollupHome", () => {
     assert.equal(roll.bathroomLightsOn, false);
     assert.equal(roll.bedroomLightsOn, true);
     assert.equal(roll.officeLightsOn, true);
+    assert.equal(roll.bedroomBoolean, false);
+    assert.equal(roll.lastMotionRoom, "office");
   });
 
   it("flags bathroom lights plus a recent on-event", () => {
@@ -77,6 +80,21 @@ describe("rollupHome", () => {
     assert.equal(roll.recentEvents.length, 1);
     assert.equal(roll.recentEvents[0].roomKind, "bathroom");
     assert.equal(roll.recentEvents[0].on, true);
+  });
+
+  it("reads Bedroom Boolean as last-motion, not a light", () => {
+    const off = rollupHome([
+      { name: "Bedroom Boolean", room: "Yan’s Bedroom", category: "outlet", power: false },
+    ]);
+    assert.equal(off.bedroomBoolean, false);
+    assert.equal(off.lastMotionRoom, "office");
+    assert.equal(off.bedroomLightsOn, false);
+    const on = rollupHome([
+      { name: "Bedroom Boolean", room: "Yan’s Bedroom", category: "outlet", power: true },
+    ]);
+    assert.equal(on.bedroomBoolean, true);
+    assert.equal(on.lastMotionRoom, "bedroom");
+    assert.equal(on.bedroomLightsOn, false);
   });
 });
 

@@ -25,7 +25,7 @@ education/you@example.com/life-state/
   state.json
 ```
 
-Read `schema.md` and `heuristics.md` before writing a sample. Contract is the schema. Showering needs bathroom lights (a recent on-event). Fan-only is not a shower.
+Read `schema.md` and `heuristics.md` before writing a sample. Contract is the schema. Showering needs bathroom lights (a recent on-event). Fan-only is not a shower. Snapshot `home.lastMotionRoom` is Bedroom Boolean: `bedroom` if that outlet is on, `office` if off. Fairly accurate when he is home, not a lock. He may be downstairs.
 
 ## On demand (chat)
 
@@ -59,4 +59,4 @@ Do not git commit. Do not edit any other file. Do not wander the repo.
 
 ## Evidence tokens
 
-Short, greppable, no secrets. Examples: `gps:home`, `gps:eps`, `gps:pro-club`, `gps:stale`, `speed:car`, `phone:car-audio`, `phone:charging`, `home:bath-lights`, `home:bath-fan`, `home:bedroom-on`, `home:away`, `schedule:in-class`, `schedule:lunch`, `schedule:free`, `calendar:debate`, `screen:cursor`, `screen:tiktok`, `imessage:from-me`, `gym:recent`.
+Short, greppable, no secrets. Examples: `gps:home`, `gps:eps`, `gps:pro-club`, `gps:stale`, `speed:car`, `phone:car-audio`, `phone:charging`, `home:bath-lights`, `home:bath-fan`, `home:bedroom-on`, `home:last-motion-bedroom`, `home:last-motion-office`, `home:away`, `schedule:in-class`, `schedule:lunch`, `schedule:free`, `calendar:debate`, `screen:cursor`, `screen:tiktok`, `imessage:from-me`, `gym:recent`.

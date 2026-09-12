@@ -172,6 +172,20 @@ function isFan(row, name, category) {
   return /fan/.test(category) || /\bfan\b/.test(name.toLowerCase());
 }
 
+/**
+ * Named HomeKit boolean outlets Yan uses as occupancy latches, not lights.
+ * Bedroom Boolean on = last motion in the bedroom; off = last motion in the office.
+ * @param {string} name
+ */
+export function homeBooleanKind(name) {
+  const s = String(name || "").toLowerCase();
+  if (/bedroom\s*boolean/.test(s)) return "bedroom";
+  if (/office\s*boolean/.test(s)) return "office";
+  if (/bathroom\s*boolean/.test(s)) return "bathroom";
+  if (/leaving\s*bath/.test(s)) return "leaving-bath";
+  return null;
+}
+
 function asArray(raw) {
   if (Array.isArray(raw)) return raw;
   if (!raw || typeof raw !== "object") return [];
@@ -197,12 +211,20 @@ export function rollupHome(listRaw, eventsRaw = null, sinceMs = Date.now() - HOM
     bathroom: { lightsOn: 0, lightsOff: 0, fansOn: 0, fansOff: 0 },
     other: { lightsOn: 0, lightsOff: 0, fansOn: 0, fansOff: 0 },
   };
+  /** @type {boolean|null} */
+  let bedroomBoolean = null;
   for (const row of rows) {
     const name = accessoryName(row);
     const room = accessoryRoom(row);
     const category = accessoryCategory(row);
     const on = powerOn(row);
     if (on == null) continue;
+    const flag = homeBooleanKind(name);
+    if (flag === "bedroom") {
+      bedroomBoolean = on;
+      continue;
+    }
+    if (flag) continue;
     const kind = roomKind(room, name);
     const bucket = rooms[kind] || rooms.other;
     if (isFan(row, name, category)) {
@@ -223,6 +245,7 @@ export function rollupHome(listRaw, eventsRaw = null, sinceMs = Date.now() - HOM
     const ms = Date.parse(at);
     if (!Number.isFinite(ms) || ms < sinceMs) continue;
     const name = accessoryName(ev);
+    if (homeBooleanKind(name)) continue;
     const room = accessoryRoom(ev);
     const char = clip(ev.characteristic || ev.service || ev.type || "", 40).toLowerCase();
     const value = ev.value ?? ev.state ?? ev.power;
@@ -243,6 +266,9 @@ export function rollupHome(listRaw, eventsRaw = null, sinceMs = Date.now() - HOM
     bathroomFanOn: rooms.bathroom.fansOn > 0,
     bedroomLightsOn: rooms.bedroom.lightsOn > 0,
     officeLightsOn: rooms.office.lightsOn > 0,
+    bedroomBoolean,
+    lastMotionRoom:
+      bedroomBoolean === true ? "bedroom" : bedroomBoolean === false ? "office" : null,
     recentEvents: events.slice(-12),
   };
 }
