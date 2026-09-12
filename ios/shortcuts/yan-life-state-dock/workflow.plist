@@ -12,13 +12,14 @@
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>UUID</key>
-				<string>D71E4970-F5FB-4ECF-0099-FC3CA8AB8FE9</string>
+				<string>68C395A0-D821-F994-CEB4-D53DB03860B0</string>
 				<key>WFCommentActionText</key>
-				<string>Yan Life State Dock. Two finished POSTs. No variables to fill.
-First POST is shower (going_to_shower, portrait).
-Second POST is sleep (going_to_sleep, landscape).
-Wrap each in your If. Bedroom Boolean off: post neither.
-Do not run both. Silent on success. Notifies if received is not yes.</string>
+				<string>Yan Life State Dock. Three finished POSTs. No variables to fill.
+Shower: going_to_shower, portrait.
+Sleep: going_to_sleep, landscape.
+Plugged in: plugged_in, not shower or sleep.
+Wrap shower and sleep in your Ifs. Plugged-in is the leftover branch.
+Bedroom Boolean off can still post plugged_in. Do not run all three.</string>
 			</dict>
 		</dict>
 		<dict>
@@ -27,9 +28,9 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>UUID</key>
-				<string>8415F721-76F7-579D-CD16-D46AAE9C7290</string>
+				<string>1C10A63F-EB79-F887-E9BC-0BFF2BD3F8AC</string>
 				<key>WFCommentActionText</key>
-				<string>Shower. Put this Get Contents of URL in the portrait branch.</string>
+				<string>Portrait branch.</string>
 			</dict>
 		</dict>
 		<dict>
@@ -42,7 +43,7 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 				<key>ShowHeaders</key>
 				<true/>
 				<key>UUID</key>
-				<string>9288C686-1BB2-59A7-F1CF-FC914AA15D37</string>
+				<string>7251FCDD-C9C3-6DD8-9479-345FC0BEC5D4</string>
 				<key>WFFormValues</key>
 				<dict>
 					<key>Value</key>
@@ -187,7 +188,7 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 				<key>CustomOutputName</key>
 				<string>Shower Response</string>
 				<key>UUID</key>
-				<string>9A0854A1-F597-9E47-F05E-33E27683C244</string>
+				<string>8ED5813F-12A7-2E46-3F48-3F7F91B1E14C</string>
 				<key>WFInput</key>
 				<dict>
 					<key>Value</key>
@@ -195,7 +196,7 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 						<key>OutputName</key>
 						<string>Shower POST</string>
 						<key>OutputUUID</key>
-						<string>9288C686-1BB2-59A7-F1CF-FC914AA15D37</string>
+						<string>7251FCDD-C9C3-6DD8-9479-345FC0BEC5D4</string>
 						<key>Type</key>
 						<string>ActionOutput</string>
 					</dict>
@@ -212,7 +213,7 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 				<key>CustomOutputName</key>
 				<string>Shower received</string>
 				<key>UUID</key>
-				<string>53AC9AD5-A563-2B23-0C11-EBA684334DB5</string>
+				<string>388E64AB-B72F-6383-FDFB-48905EB9878B</string>
 				<key>WFDictionaryKey</key>
 				<string>received</string>
 				<key>WFGetDictionaryValueType</key>
@@ -224,7 +225,7 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 						<key>OutputName</key>
 						<string>Shower Response</string>
 						<key>OutputUUID</key>
-						<string>9A0854A1-F597-9E47-F05E-33E27683C244</string>
+						<string>8ED5813F-12A7-2E46-3F48-3F7F91B1E14C</string>
 						<key>Type</key>
 						<string>ActionOutput</string>
 					</dict>
@@ -239,9 +240,9 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>2CA62DEE-86E4-CF5C-8981-C3411740118F</string>
+				<string>462C3CA1-B2E6-6CEE-E56D-19DF462ACBDE</string>
 				<key>UUID</key>
-				<string>CC721281-2227-97D8-BA68-A54820F55C97</string>
+				<string>364EE2FB-9A23-4114-4251-23AFFF50E0AD</string>
 				<key>WFCondition</key>
 				<integer>4</integer>
 				<key>WFConditionalActionString</key>
@@ -268,7 +269,7 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 							<key>OutputName</key>
 							<string>Shower received</string>
 							<key>OutputUUID</key>
-							<string>53AC9AD5-A563-2B23-0C11-EBA684334DB5</string>
+							<string>388E64AB-B72F-6383-FDFB-48905EB9878B</string>
 							<key>Type</key>
 							<string>ActionOutput</string>
 						</dict>
@@ -284,9 +285,9 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>2CA62DEE-86E4-CF5C-8981-C3411740118F</string>
+				<string>462C3CA1-B2E6-6CEE-E56D-19DF462ACBDE</string>
 				<key>UUID</key>
-				<string>DA447E1F-B5FA-F449-66FB-7E3F444F5CEE</string>
+				<string>BB41847B-20F0-D57E-F122-A98921C48E1B</string>
 				<key>WFControlFlowMode</key>
 				<integer>1</integer>
 			</dict>
@@ -297,11 +298,11 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>UUID</key>
-				<string>A84273D6-46ED-C77B-03A8-C271D1FD0313</string>
+				<string>515389F1-5E72-2D05-E824-9B41D0C009AD</string>
 				<key>WFNotificationActionBody</key>
-				<string>Dock intent did not reach the Mac.</string>
+				<string>Life-state signal did not reach the Mac.</string>
 				<key>WFNotificationActionTitle</key>
-				<string>Yan Life State Dock</string>
+				<string>Shower</string>
 			</dict>
 		</dict>
 		<dict>
@@ -310,9 +311,9 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>2CA62DEE-86E4-CF5C-8981-C3411740118F</string>
+				<string>462C3CA1-B2E6-6CEE-E56D-19DF462ACBDE</string>
 				<key>UUID</key>
-				<string>3CC18B4D-774A-F400-F435-3206709C7A1C</string>
+				<string>69ECF7A2-9154-A78A-0592-CC799ABA32B9</string>
 				<key>WFControlFlowMode</key>
 				<integer>2</integer>
 			</dict>
@@ -323,9 +324,9 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>UUID</key>
-				<string>1CB1BB75-BED9-24A0-18E8-88345B4D83A5</string>
+				<string>C1E803B0-851E-B0B9-7866-8FBB84547C8B</string>
 				<key>WFCommentActionText</key>
-				<string>Sleep. Put this Get Contents of URL in the landscape branch.</string>
+				<string>Landscape branch.</string>
 			</dict>
 		</dict>
 		<dict>
@@ -338,7 +339,7 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 				<key>ShowHeaders</key>
 				<true/>
 				<key>UUID</key>
-				<string>D24E8EAB-0DC1-A942-6554-4635AE503045</string>
+				<string>29AECE38-AC98-1164-0B96-91EF7635EC86</string>
 				<key>WFFormValues</key>
 				<dict>
 					<key>Value</key>
@@ -483,7 +484,7 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 				<key>CustomOutputName</key>
 				<string>Sleep Response</string>
 				<key>UUID</key>
-				<string>CBB33C75-7791-55AE-2E0D-CD50FC1B61CF</string>
+				<string>BADA2CA4-B9B0-EFCF-8534-2DEE912E3BAC</string>
 				<key>WFInput</key>
 				<dict>
 					<key>Value</key>
@@ -491,7 +492,7 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 						<key>OutputName</key>
 						<string>Sleep POST</string>
 						<key>OutputUUID</key>
-						<string>D24E8EAB-0DC1-A942-6554-4635AE503045</string>
+						<string>29AECE38-AC98-1164-0B96-91EF7635EC86</string>
 						<key>Type</key>
 						<string>ActionOutput</string>
 					</dict>
@@ -508,7 +509,7 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 				<key>CustomOutputName</key>
 				<string>Sleep received</string>
 				<key>UUID</key>
-				<string>BE9E3DFB-3097-ED15-3638-A98E32D62171</string>
+				<string>3B79D3F8-2D59-F3D5-1E80-1032A829CF03</string>
 				<key>WFDictionaryKey</key>
 				<string>received</string>
 				<key>WFGetDictionaryValueType</key>
@@ -520,7 +521,7 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 						<key>OutputName</key>
 						<string>Sleep Response</string>
 						<key>OutputUUID</key>
-						<string>CBB33C75-7791-55AE-2E0D-CD50FC1B61CF</string>
+						<string>BADA2CA4-B9B0-EFCF-8534-2DEE912E3BAC</string>
 						<key>Type</key>
 						<string>ActionOutput</string>
 					</dict>
@@ -535,9 +536,9 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>BA4EC438-2C09-81C5-200F-3E51E61089EE</string>
+				<string>209931A8-2322-05EB-F7E2-A67348C17E6F</string>
 				<key>UUID</key>
-				<string>4C74FCE5-E1E7-BE6F-66FD-5B27E2B716D4</string>
+				<string>C4CAFABF-3C5F-E8C3-0066-6CD1C5778EFF</string>
 				<key>WFCondition</key>
 				<integer>4</integer>
 				<key>WFConditionalActionString</key>
@@ -564,7 +565,7 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 							<key>OutputName</key>
 							<string>Sleep received</string>
 							<key>OutputUUID</key>
-							<string>BE9E3DFB-3097-ED15-3638-A98E32D62171</string>
+							<string>3B79D3F8-2D59-F3D5-1E80-1032A829CF03</string>
 							<key>Type</key>
 							<string>ActionOutput</string>
 						</dict>
@@ -580,9 +581,9 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>BA4EC438-2C09-81C5-200F-3E51E61089EE</string>
+				<string>209931A8-2322-05EB-F7E2-A67348C17E6F</string>
 				<key>UUID</key>
-				<string>FCE43793-80B2-31CE-8041-948AE10B8331</string>
+				<string>B46C0A9F-4820-9748-44D0-AF6818407825</string>
 				<key>WFControlFlowMode</key>
 				<integer>1</integer>
 			</dict>
@@ -593,11 +594,11 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>UUID</key>
-				<string>E5FB1692-5142-15BB-CE02-1AB02CF8AA86</string>
+				<string>77CEC3D6-3CC7-3E50-42C1-DAC6C4C78F6A</string>
 				<key>WFNotificationActionBody</key>
-				<string>Dock intent did not reach the Mac.</string>
+				<string>Life-state signal did not reach the Mac.</string>
 				<key>WFNotificationActionTitle</key>
-				<string>Yan Life State Dock</string>
+				<string>Sleep</string>
 			</dict>
 		</dict>
 		<dict>
@@ -606,9 +607,281 @@ Do not run both. Silent on success. Notifies if received is not yes.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>BA4EC438-2C09-81C5-200F-3E51E61089EE</string>
+				<string>209931A8-2322-05EB-F7E2-A67348C17E6F</string>
 				<key>UUID</key>
-				<string>AC8B2813-3BBB-E60C-7C10-859370DC270F</string>
+				<string>E9CC50C3-2A4C-45E5-8979-449893632DE3</string>
+				<key>WFControlFlowMode</key>
+				<integer>2</integer>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.comment</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>UUID</key>
+				<string>1B5A4B4B-ABCE-7F7C-D31C-5320A959F282</string>
+				<key>WFCommentActionText</key>
+				<string>Plugged in, not shower or sleep.</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.downloadurl</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>CustomOutputName</key>
+				<string>Plugged in POST</string>
+				<key>ShowHeaders</key>
+				<true/>
+				<key>UUID</key>
+				<string>47B8D0F3-B525-1EEB-118F-B1D9AB0A0D88</string>
+				<key>WFFormValues</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>WFDictionaryFieldValueItems</key>
+						<array/>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFDictionaryFieldValue</string>
+				</dict>
+				<key>WFHTTPBodyType</key>
+				<string>JSON</string>
+				<key>WFHTTPHeaders</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>WFDictionaryFieldValueItems</key>
+						<array>
+							<dict>
+								<key>WFItemType</key>
+								<integer>0</integer>
+								<key>WFKey</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>Authorization</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+								<key>WFValue</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>Bearer __LOCATION_INGEST_TOKEN__</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+							</dict>
+							<dict>
+								<key>WFItemType</key>
+								<integer>0</integer>
+								<key>WFKey</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>Content-Type</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+								<key>WFValue</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>application/json</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+							</dict>
+						</array>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFDictionaryFieldValue</string>
+				</dict>
+				<key>WFHTTPMethod</key>
+				<string>POST</string>
+				<key>WFJSONValues</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>WFDictionaryFieldValueItems</key>
+						<array>
+							<dict>
+								<key>WFItemType</key>
+								<integer>0</integer>
+								<key>WFKey</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>intent</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+								<key>WFValue</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>plugged_in</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+							</dict>
+						</array>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFDictionaryFieldValue</string>
+				</dict>
+				<key>WFURL</key>
+				<string>__LIFE_STATE_INTENT_URL__</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.detect.dictionary</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>CustomOutputName</key>
+				<string>Plugged in Response</string>
+				<key>UUID</key>
+				<string>BBA6C36E-D428-2E2F-4EB4-CA9734D079B5</string>
+				<key>WFInput</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>OutputName</key>
+						<string>Plugged in POST</string>
+						<key>OutputUUID</key>
+						<string>47B8D0F3-B525-1EEB-118F-B1D9AB0A0D88</string>
+						<key>Type</key>
+						<string>ActionOutput</string>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFTextTokenAttachment</string>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.getvalueforkey</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>CustomOutputName</key>
+				<string>Plugged in received</string>
+				<key>UUID</key>
+				<string>7311BC1B-AFB0-CBCE-3AAB-8D60E38D6DB7</string>
+				<key>WFDictionaryKey</key>
+				<string>received</string>
+				<key>WFGetDictionaryValueType</key>
+				<string>Value</string>
+				<key>WFInput</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>OutputName</key>
+						<string>Plugged in Response</string>
+						<key>OutputUUID</key>
+						<string>BBA6C36E-D428-2E2F-4EB4-CA9734D079B5</string>
+						<key>Type</key>
+						<string>ActionOutput</string>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFTextTokenAttachment</string>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>C353E50B-A96C-216E-A64C-FD1883710A88</string>
+				<key>UUID</key>
+				<string>18EE46EC-1319-0B69-B9DB-B71A7A3A7370</string>
+				<key>WFCondition</key>
+				<integer>4</integer>
+				<key>WFConditionalActionString</key>
+				<string>yes</string>
+				<key>WFControlFlowMode</key>
+				<integer>0</integer>
+				<key>WFInput</key>
+				<dict>
+					<key>Type</key>
+					<string>Variable</string>
+					<key>Variable</key>
+					<dict>
+						<key>Value</key>
+						<dict>
+							<key>Aggrandizements</key>
+							<array>
+								<dict>
+									<key>CoercionItemClass</key>
+									<string>WFStringContentItem</string>
+									<key>Type</key>
+									<string>WFCoercionVariableAggrandizement</string>
+								</dict>
+							</array>
+							<key>OutputName</key>
+							<string>Plugged in received</string>
+							<key>OutputUUID</key>
+							<string>7311BC1B-AFB0-CBCE-3AAB-8D60E38D6DB7</string>
+							<key>Type</key>
+							<string>ActionOutput</string>
+						</dict>
+						<key>WFSerializationType</key>
+						<string>WFTextTokenAttachment</string>
+					</dict>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>C353E50B-A96C-216E-A64C-FD1883710A88</string>
+				<key>UUID</key>
+				<string>97653354-9748-F1D9-4410-E91B9BBF4A0F</string>
+				<key>WFControlFlowMode</key>
+				<integer>1</integer>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.notification</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>UUID</key>
+				<string>7B75F748-3EE7-294C-557C-C47C9E46F9A1</string>
+				<key>WFNotificationActionBody</key>
+				<string>Life-state signal did not reach the Mac.</string>
+				<key>WFNotificationActionTitle</key>
+				<string>Plugged in</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>C353E50B-A96C-216E-A64C-FD1883710A88</string>
+				<key>UUID</key>
+				<string>3344E715-A367-039B-ED2F-19C56CB57AAD</string>
 				<key>WFControlFlowMode</key>
 				<integer>2</integer>
 			</dict>

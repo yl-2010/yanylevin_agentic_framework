@@ -11,7 +11,7 @@ import { briefingNow, resolveBriefingTimezone } from "./daily-briefing-agent.js"
 import { resolveNowScheduleContext } from "./education-data.js";
 import { runHome } from "./home-cli.js";
 import { recentMessages } from "./imessage-read.js";
-import { readLifeStateIntent, slimLifeStateIntent } from "./life-state-intent.js";
+import { readLifeStateRaw, slimLifeStateStore } from "./life-state-intent.js";
 import {
   LIFE_STATE_SNAPSHOT_PATH,
   formatLifeStateLocal,
@@ -569,6 +569,7 @@ export function assembleLifeStateSnapshot(parts) {
   const clock = formatLifeStateLocal(now, timeZone);
   const nowMs = now.getTime();
   const lunch = inferLunch(parts.schedule || null);
+  const phone = slimLifeStateStore(parts.phoneIntent, now);
   return {
     at: now.toISOString(),
     local: clock.local,
@@ -584,7 +585,8 @@ export function assembleLifeStateSnapshot(parts) {
     screen: summarizeScreenSessions(parts.screenSessions || [], nowMs - SCREEN_MS),
     imessageFromMe: lastFromMeMessage(parts.imessage || [], nowMs - IMESSAGE_MS),
     gym: latestGymEntry(parts.gymEntries || [], nowMs - GYM_MS),
-    phoneIntent: slimLifeStateIntent(parts.phoneIntent, now),
+    phoneIntent: phone.latest,
+    phoneSignals: phone.signals,
     previous: Array.isArray(parts.previous) ? parts.previous.slice(-3) : [],
   };
 }
@@ -644,7 +646,7 @@ export async function buildLifeStateSnapshot(opts = {}) {
     ),
     safe("gym", () => loadGymEntries()),
     safe("previous", () => readRecentLifeState(opts.dir, 3)),
-    safe("phone-intent", () => readLifeStateIntent(opts.dir, now)),
+    safe("phone-intent", () => readLifeStateRaw(opts.dir)),
   ]);
 
   const snapshot = assembleLifeStateSnapshot({

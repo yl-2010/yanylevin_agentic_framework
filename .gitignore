@@ -17,16 +17,11 @@ macos/YLHome/yl-home.app/
 macos/YLHome/DerivedData/
 macos/YLHome/YLHome.xcodeproj/
 ios/shortcuts/**/*.signed.shortcut
-ios/shortcuts/yan-health-sync/Yan Health Sync.shortcut
-ios/shortcuts/yan-health-sync/workflow.filled.json
-ios/shortcuts/yan-health-sync/workflow.filled.plist
-ios/shortcuts/yan-health-sync/workflow.filled.shortcut
-ios/shortcuts/yan-health-sync/workflow.json
-ios/shortcuts/yan-life-state-dock/Yan Life State Dock.shortcut
-ios/shortcuts/yan-life-state-dock/workflow.filled.json
-ios/shortcuts/yan-life-state-dock/workflow.filled.plist
-ios/shortcuts/yan-life-state-dock/workflow.filled.shortcut
-ios/shortcuts/yan-life-state-dock/workflow.json
+ios/shortcuts/**/*.shortcut
+ios/shortcuts/**/workflow.filled.json
+ios/shortcuts/**/workflow.filled.plist
+ios/shortcuts/**/workflow.filled.shortcut
+ios/shortcuts/**/workflow.json
 education/*/.projects-opened.json
 data/headlines-assignments.json
 

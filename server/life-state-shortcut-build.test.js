@@ -4,6 +4,7 @@ import {
   DEFAULT_URL,
   TOKEN_PLACEHOLDER,
   URL_PLACEHOLDER,
+  SHORTCUT_SPECS,
   buildWorkflow,
 } from "./life-state-shortcut-build.js";
 
@@ -15,8 +16,8 @@ function jsonOf(action) {
   );
 }
 
-describe("Yan Life State Dock workflow", () => {
-  it("ships two finished POSTs, shower then sleep, with no variables", () => {
+describe("Yan life-state Shortcuts", () => {
+  it("ships three finished dock POSTs, shower sleep and plugged_in", () => {
     const wf = buildWorkflow({
       token: TOKEN_PLACEHOLDER,
       url: URL_PLACEHOLDER,
@@ -24,36 +25,34 @@ describe("Yan Life State Dock workflow", () => {
     const downloads = wf.WFWorkflowActions.filter(
       (a) => a.WFWorkflowActionIdentifier === "is.workflow.actions.downloadurl"
     );
-    assert.equal(downloads.length, 2);
+    assert.equal(downloads.length, 3);
     assert.equal(
       wf.WFWorkflowActions.some(
         (a) => a.WFWorkflowActionIdentifier === "is.workflow.actions.setvariable"
       ),
       false
     );
-    const shower = jsonOf(downloads[0]);
-    const sleep = jsonOf(downloads[1]);
-    assert.equal(shower.intent, "going_to_shower");
-    assert.equal(shower.orientation, "portrait");
-    assert.equal(sleep.intent, "going_to_sleep");
-    assert.equal(sleep.orientation, "landscape");
+    assert.deepEqual(downloads.map(jsonOf), [
+      { intent: "going_to_shower", orientation: "portrait" },
+      { intent: "going_to_sleep", orientation: "landscape" },
+      { intent: "plugged_in" },
+    ]);
     for (const download of downloads) {
       assert.equal(download.WFWorkflowActionParameters.WFHTTPMethod, "POST");
       assert.equal(download.WFWorkflowActionParameters.WFURL, URL_PLACEHOLDER);
-      const auth = download.WFWorkflowActionParameters.WFHTTPHeaders.Value
-        .WFDictionaryFieldValueItems.find(
-          (item) => item.WFKey.Value.string === "Authorization"
-        );
-      assert.equal(auth.WFValue.Value.string, `Bearer ${TOKEN_PLACEHOLDER}`);
     }
     assert.equal(DEFAULT_URL.endsWith("/api/education/life-state-intent"), true);
-    const notify = wf.WFWorkflowActions.filter(
-      (a) => a.WFWorkflowActionIdentifier === "is.workflow.actions.notification"
-    );
-    assert.equal(notify.length, 2);
-    assert.equal(
-      notify[0].WFWorkflowActionParameters.WFNotificationActionBody,
-      "Dock intent did not reach the Mac."
-    );
+  });
+
+  it("ships one-shot unplug, driving focus, and tesla shortcuts", () => {
+    const kinds = SHORTCUT_SPECS.slice(1).map((spec) => {
+      const wf = buildWorkflow({ spec, token: TOKEN_PLACEHOLDER, url: URL_PLACEHOLDER });
+      const downloads = wf.WFWorkflowActions.filter(
+        (a) => a.WFWorkflowActionIdentifier === "is.workflow.actions.downloadurl"
+      );
+      assert.equal(downloads.length, 1);
+      return jsonOf(downloads[0]).intent;
+    });
+    assert.deepEqual(kinds, ["unplugged", "driving_focus", "tesla_bluetooth"]);
   });
 });

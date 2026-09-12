@@ -1,16 +1,35 @@
-# Yan Life State Dock
+# Life-state phone Shortcuts
 
-Two finished POSTs. Nothing to type. First is shower (`going_to_shower`, portrait). Second is sleep (`going_to_sleep`, landscape).
+Four Shortcuts. Import each from iCloud Drive → YanLifeState. You add the automations. The POSTs are already filled.
 
-Wrap each Get Contents of URL in your If. Bedroom Boolean off: post neither. Do not run both.
+Delete older copies in Shortcuts first, then Add Shortcut.
 
-## Add it (once)
+Silent on success. A banner only if `received` is not `yes`.
 
-1. Delete any older Yan Life State Dock in Shortcuts.
-2. Files → iCloud Drive → YanLifeState → Yan Life State Dock → Add Shortcut.
-3. Move the shower POST into the portrait branch, the sleep POST into the landscape branch.
-4. Hook it from the existing plug-in automation, or paste those actions into it.
+## Yan Life State Dock
 
-Silent on success. You only get a notification if `received` is not `yes`. A dead network still shows Shortcuts' own error.
+Automation: iPhone is connected to power.
 
-The Mac writes `education/you@example.com/life-state/intent.json` and kicks a life-state guess so the log does not wait five minutes.
+Three Get Contents of URL actions:
+
+1. Shower. `going_to_shower` + portrait. Portrait / Bedroom Boolean on branch.
+2. Sleep. `going_to_sleep` + landscape. Landscape / Bedroom Boolean on branch.
+3. Plugged in. `plugged_in`. Everything else (Bedroom Boolean off, or on but not the stand ritual).
+
+Do not run all three.
+
+## Yan Life State Unplug
+
+Automation: iPhone is disconnected from power. One POST, `unplugged`. No Ifs.
+
+## Yan Life State Driving Focus
+
+Automation: Driving Focus turns on. One POST, `driving_focus`.
+
+iOS also turns Driving Focus on in any car, including as a passenger. Tesla Bluetooth is how the Mac knows it is the Tesla. Flipping to Personal Focus and back is the same trip (15 minute resume). Do not treat that blip as a new drive.
+
+## Yan Life State Tesla
+
+Automation: Tesla Bluetooth connects. One POST, `tesla_bluetooth`. This is the Tesla, not any car. Brief Bluetooth drops are the same trip (10 minute resume).
+
+The Mac writes `education/you@example.com/life-state/intent.json` and kicks a life-state guess. Snapshot field `phoneSignals` is the agent datasource.

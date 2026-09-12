@@ -237,6 +237,8 @@ describe("Personal Agent skill files", () => {
     assert.match(lifeState, /lastMotionRoom/);
     assert.match(lifeState, /bathroomBoolean/);
     assert.match(lifeState, /going_to_shower/);
+    assert.match(lifeState, /plugged_in/);
+    assert.match(lifeState, /tesla_bluetooth/);
     assert.match(lifeState, /Nightly jobs/);
     assert.match(lifeState, /Never spawn a cloud agent/);
 

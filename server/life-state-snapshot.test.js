@@ -249,6 +249,7 @@ describe("assembleLifeStateSnapshot", () => {
     });
     assert.equal(snap.phoneIntent.kind, "going_to_sleep");
     assert.equal(snap.phoneIntent.orientation, "landscape");
+    assert.equal(snap.phoneSignals.going_to_sleep.kind, "going_to_sleep");
   });
 });
 

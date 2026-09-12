@@ -30,7 +30,7 @@ Read `schema.md` and `heuristics.md` before writing a sample. Contract is the sc
 
 Home latches (not lights): `home.bedroomBoolean` / `lastMotionRoom` (on = last bedroom occupancy, off = last office occupancy or he left the house), `home.bathroomBoolean` (in-bathroom latch so lights survive a long shower), `home.leavingBathBool` (back at the bathroom doorway). Occupancy sensors do not cross-contaminate except bathroom occupancy, which can also see the closet. Sitting in bed or in the shower usually will not retrigger those sensors. Office Boolean and office middle sensor are unused.
 
-Showering: Bathroom Boolean on plus a shower tell, or a fresh `phoneIntent.kind` `going_to_shower` (portrait dock). Fan-only is leftover, unless the fan just came on from that dock. Sleeping: fresh `going_to_sleep` (landscape dock) is a lock. Ignore a dock intent if Bedroom Boolean is off.
+Showering: Bathroom Boolean on plus a shower tell, or a fresh `phoneSignals.going_to_shower` (portrait dock). Fan-only is leftover, unless the fan just came on from that dock. Sleeping: fresh `going_to_sleep` is a lock. `plugged_in` is charging without that ritual. `unplugged` is the phone leaving power. Driving Focus means any car, maybe passenger. Tesla Bluetooth means the Tesla. Focus or Bluetooth blips resume the same trip. Ignore shower/sleep dock intents if Bedroom Boolean is off.
 
 ## On demand (chat)
 
@@ -64,8 +64,15 @@ Do not git commit. Do not edit any other file. Do not wander the repo.
 
 ## Evidence tokens
 
-Short, greppable, no secrets. Examples: `gps:home`, `gps:eps`, `gps:pro-club`, `gps:stale`, `speed:car`, `phone:car-audio`, `phone:charging`, `intent:going-to-shower`, `intent:going-to-sleep`, `home:bath-lights`, `home:bath-fan`, `home:bath-boolean`, `home:leaving-bath`, `home:bedroom-on`, `home:last-motion-bedroom`, `home:last-motion-office`, `home:away`, `schedule:in-class`, `schedule:lunch`, `schedule:free`, `calendar:debate`, `screen:cursor`, `screen:tiktok`, `imessage:from-me`, `gym:recent`.
+Short, greppable, no secrets. Examples: `gps:home`, `gps:eps`, `gps:pro-club`, `gps:stale`, `speed:car`, `phone:car-audio`, `phone:charging`, `intent:going-to-shower`, `intent:going-to-sleep`, `intent:plugged-in`, `intent:unplugged`, `intent:driving-focus`, `intent:tesla-bluetooth`, `home:bath-lights`, `home:bath-fan`, `home:bath-boolean`, `home:leaving-bath`, `home:bedroom-on`, `home:last-motion-bedroom`, `home:last-motion-office`, `home:away`, `schedule:in-class`, `schedule:lunch`, `schedule:free`, `calendar:debate`, `screen:cursor`, `screen:tiktok`, `imessage:from-me`, `gym:recent`.
 
-## Phone plug-in Shortcut
+## Phone Shortcuts
 
-Signed stub: `npm run life-state-shortcut` writes **Yan Life State Dock** to iCloud Drive `YanLifeState/`. Two finished POSTs, no variables. Shower is `going_to_shower` + portrait. Sleep is `going_to_sleep` + landscape. Wrap each in your If. Bedroom Boolean off: post neither. The Mac stores `life-state/intent.json` and kicks a guess so the log does not wait for the next 5-minute tick.
+`npm run life-state-shortcut` writes four Shortcuts to iCloud Drive `YanLifeState/`. Yan adds the automations. POSTs are filled.
+
+- **Yan Life State Dock** (plug in): shower, sleep, and `plugged_in` leftover. Wrap shower/sleep in Ifs.
+- **Yan Life State Unplug**: one POST, `unplugged`.
+- **Yan Life State Driving Focus**: one POST, `driving_focus`. Any car. 15 min resume.
+- **Yan Life State Tesla**: one POST, `tesla_bluetooth`. Tesla only. 10 min resume.
+
+Snapshot `phoneSignals` is the datasource. The Mac stores `life-state/intent.json` and kicks a guess.

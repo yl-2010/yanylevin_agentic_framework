@@ -475,7 +475,7 @@ function requireYanIntentWriter(req, res, next) {
   });
 }
 
-/** Phone dock Shortcut: going_to_shower / going_to_sleep. */
+/** Phone Shortcuts: dock, unplug, Driving Focus, Tesla Bluetooth. */
 app.post("/api/education/life-state-intent", requireYanIntentWriter, async (req, res) => {
   try {
     const saved = await writeLifeStateIntent(req.body);

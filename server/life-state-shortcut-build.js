@@ -1,8 +1,7 @@
 /**
- * Build and sign the iPhone "Yan Life State Dock" Shortcut.
- * POSTs going_to_shower / going_to_sleep. Yan adds orientation, Bedroom
- * Boolean, and If/Otherwise himself. Token from LOCATION_INGEST_TOKEN or
- * HEALTH_INGEST_TOKEN. people-who-know-me still imports on Yan's iPhone.
+ * Build and sign Yan's life-state Shortcuts. Token from LOCATION_INGEST_TOKEN
+ * or HEALTH_INGEST_TOKEN. people-who-know-me still imports on the iPhone.
+ * Automations (plug in, unplug, Driving Focus, Tesla Bluetooth) are added by Yan.
  */
 
 import { createHash } from "node:crypto";
@@ -16,19 +15,96 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const SOURCE_DIR = join(ROOT, "ios", "shortcuts", "yan-life-state-dock");
-const SOURCE_PLIST = join(SOURCE_DIR, "workflow.plist");
 export const TOKEN_PLACEHOLDER = "__LOCATION_INGEST_TOKEN__";
 export const URL_PLACEHOLDER = "__LIFE_STATE_INTENT_URL__";
 export const DEFAULT_URL = "https://api.yanylevin.com/api/education/life-state-intent";
-export const SHORTCUT_NAME = "Yan Life State Dock";
 const ICLOUD_DIR = join(
   homedir(),
   "Library/Mobile Documents/com~apple~CloudDocs/YanLifeState"
 );
 
-function stableUuid(name) {
-  const hex = createHash("sha256").update(`yan-life-state-dock:${name}`).digest("hex");
+export const SHORTCUT_SPECS = [
+  {
+    id: "yan-life-state-dock",
+    name: "Yan Life State Dock",
+    iconGlyph: 59511,
+    iconColor: 4278080147,
+    comment: [
+      "Yan Life State Dock. Three finished POSTs. No variables to fill.",
+      "Shower: going_to_shower, portrait.",
+      "Sleep: going_to_sleep, landscape.",
+      "Plugged in: plugged_in, not shower or sleep.",
+      "Wrap shower and sleep in your Ifs. Plugged-in is the leftover branch.",
+      "Bedroom Boolean off can still post plugged_in. Do not run all three.",
+    ],
+    posts: [
+      {
+        key: "shower",
+        label: "Shower",
+        intent: "going_to_shower",
+        orientation: "portrait",
+        note: "Portrait branch.",
+      },
+      {
+        key: "sleep",
+        label: "Sleep",
+        intent: "going_to_sleep",
+        orientation: "landscape",
+        note: "Landscape branch.",
+      },
+      {
+        key: "plugged",
+        label: "Plugged in",
+        intent: "plugged_in",
+        note: "Plugged in, not shower or sleep.",
+      },
+    ],
+  },
+  {
+    id: "yan-life-state-unplug",
+    name: "Yan Life State Unplug",
+    iconGlyph: 59512,
+    iconColor: 4282601983,
+    comment: [
+      "Yan Life State Unplug. One POST when the iPhone leaves power.",
+      "Hook a personal automation: Is Disconnected From Power. No Ifs.",
+    ],
+    posts: [{ key: "unplug", label: "Unplug", intent: "unplugged" }],
+  },
+  {
+    id: "yan-life-state-driving-focus",
+    name: "Yan Life State Driving Focus",
+    iconGlyph: 59446,
+    iconColor: 4292093695,
+    comment: [
+      "Yan Life State Driving Focus. One POST when Driving Focus turns on.",
+      "iOS also turns this on in any car, including passenger. Tesla Bluetooth is the Tesla tell.",
+      "Flipping to Personal Focus and back is the same trip on the Mac (15 min resume).",
+    ],
+    posts: [{ key: "driving", label: "Driving Focus", intent: "driving_focus" }],
+  },
+  {
+    id: "yan-life-state-tesla",
+    name: "Yan Life State Tesla",
+    iconGlyph: 59816,
+    iconColor: 4282137660,
+    comment: [
+      "Yan Life State Tesla. One POST when Tesla Bluetooth connects.",
+      "This is the Tesla, not any car. Hook: When a Bluetooth device connects.",
+      "Brief Bluetooth drops are the same trip on the Mac (10 min resume).",
+    ],
+    posts: [{ key: "tesla", label: "Tesla", intent: "tesla_bluetooth" }],
+  },
+];
+
+export const SHORTCUT_NAME = SHORTCUT_SPECS[0].name;
+
+function sourceDir(spec) {
+  return join(ROOT, "ios", "shortcuts", spec.id);
+}
+
+function stableUuid(specId, name) {
+  const hex = createHash("sha256").update(`yan-life-state:${specId}:${name}`).digest("hex");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`.toUpperCase();
 }
 
@@ -74,6 +150,8 @@ function commentAction(id, lines) {
 }
 
 function downloadPost(id, outputName, url, token, intent, orientation) {
+  const jsonItems = [dictItem("intent", intent)];
+  if (orientation) jsonItems.push(dictItem("orientation", orientation));
   return {
     WFWorkflowActionIdentifier: "is.workflow.actions.downloadurl",
     WFWorkflowActionParameters: {
@@ -93,12 +171,7 @@ function downloadPost(id, outputName, url, token, intent, orientation) {
         WFSerializationType: "WFDictionaryFieldValue",
       },
       WFJSONValues: {
-        Value: {
-          WFDictionaryFieldValueItems: [
-            dictItem("intent", intent),
-            dictItem("orientation", orientation),
-          ],
-        },
+        Value: { WFDictionaryFieldValueItems: jsonItems },
         WFSerializationType: "WFDictionaryFieldValue",
       },
       WFFormValues: {
@@ -109,9 +182,9 @@ function downloadPost(id, outputName, url, token, intent, orientation) {
   };
 }
 
-function postSuccessCheck(prefix, downloadId, downloadName) {
-  const responseDictId = stableUuid(`${prefix}-post-dict`);
-  const receivedId = stableUuid(`${prefix}-post-received`);
+function postSuccessCheck(specId, prefix, downloadId, downloadName) {
+  const responseDictId = stableUuid(specId, `${prefix}-post-dict`);
+  const receivedId = stableUuid(specId, `${prefix}-post-received`);
   const receivedToken = actionOutput(receivedId, `${prefix} received`);
   receivedToken.Value.Aggrandizements = [
     {
@@ -119,7 +192,7 @@ function postSuccessCheck(prefix, downloadId, downloadName) {
       CoercionItemClass: "WFStringContentItem",
     },
   ];
-  const ifGroup = stableUuid(`${prefix}-if-post-fail`);
+  const ifGroup = stableUuid(specId, `${prefix}-if-post-fail`);
   return [
     {
       WFWorkflowActionIdentifier: "is.workflow.actions.detect.dictionary",
@@ -142,7 +215,7 @@ function postSuccessCheck(prefix, downloadId, downloadName) {
     {
       WFWorkflowActionIdentifier: "is.workflow.actions.conditional",
       WFWorkflowActionParameters: {
-        UUID: stableUuid(`${prefix}-if-post-fail-start`),
+        UUID: stableUuid(specId, `${prefix}-if-post-fail-start`),
         GroupingIdentifier: ifGroup,
         WFControlFlowMode: 0,
         WFCondition: 4,
@@ -156,7 +229,7 @@ function postSuccessCheck(prefix, downloadId, downloadName) {
     {
       WFWorkflowActionIdentifier: "is.workflow.actions.conditional",
       WFWorkflowActionParameters: {
-        UUID: stableUuid(`${prefix}-if-post-fail-otherwise`),
+        UUID: stableUuid(specId, `${prefix}-if-post-fail-otherwise`),
         GroupingIdentifier: ifGroup,
         WFControlFlowMode: 1,
       },
@@ -164,15 +237,15 @@ function postSuccessCheck(prefix, downloadId, downloadName) {
     {
       WFWorkflowActionIdentifier: "is.workflow.actions.notification",
       WFWorkflowActionParameters: {
-        UUID: stableUuid(`${prefix}-notification-fail`),
-        WFNotificationActionTitle: SHORTCUT_NAME,
-        WFNotificationActionBody: "Dock intent did not reach the Mac.",
+        UUID: stableUuid(specId, `${prefix}-notification-fail`),
+        WFNotificationActionTitle: prefix,
+        WFNotificationActionBody: "Life-state signal did not reach the Mac.",
       },
     },
     {
       WFWorkflowActionIdentifier: "is.workflow.actions.conditional",
       WFWorkflowActionParameters: {
-        UUID: stableUuid(`${prefix}-if-post-fail-end`),
+        UUID: stableUuid(specId, `${prefix}-if-post-fail-end`),
         GroupingIdentifier: ifGroup,
         WFControlFlowMode: 2,
       },
@@ -181,40 +254,34 @@ function postSuccessCheck(prefix, downloadId, downloadName) {
 }
 
 /**
- * @param {{ token?: string, url?: string }} [opts]
+ * @param {{ token?: string, url?: string, spec?: object }} [opts]
  */
 export function buildWorkflow(opts = {}) {
+  const spec = opts.spec || SHORTCUT_SPECS[0];
   const token = opts.token || TOKEN_PLACEHOLDER;
   const url = opts.url || URL_PLACEHOLDER;
-  const showerId = stableUuid("download-shower");
-  const sleepId = stableUuid("download-sleep");
+  /** @type {object[]} */
+  const actions = [commentAction(stableUuid(spec.id, "comment"), spec.comment)];
+  for (const post of spec.posts) {
+    const downloadId = stableUuid(spec.id, `download-${post.key}`);
+    const outputName = `${post.label} POST`;
+    if (post.note) {
+      actions.push(commentAction(stableUuid(spec.id, `comment-${post.key}`), [post.note]));
+    }
+    actions.push(
+      downloadPost(downloadId, outputName, url, token, post.intent, post.orientation || "")
+    );
+    actions.push(...postSuccessCheck(spec.id, post.label, downloadId, outputName));
+  }
   return {
-    WFWorkflowActions: [
-      commentAction(stableUuid("comment"), [
-        "Yan Life State Dock. Two finished POSTs. No variables to fill.",
-        "First POST is shower (going_to_shower, portrait).",
-        "Second POST is sleep (going_to_sleep, landscape).",
-        "Wrap each in your If. Bedroom Boolean off: post neither.",
-        "Do not run both. Silent on success. Notifies if received is not yes.",
-      ]),
-      commentAction(stableUuid("comment-shower"), [
-        "Shower. Put this Get Contents of URL in the portrait branch.",
-      ]),
-      downloadPost(showerId, "Shower POST", url, token, "going_to_shower", "portrait"),
-      ...postSuccessCheck("Shower", showerId, "Shower POST"),
-      commentAction(stableUuid("comment-sleep"), [
-        "Sleep. Put this Get Contents of URL in the landscape branch.",
-      ]),
-      downloadPost(sleepId, "Sleep POST", url, token, "going_to_sleep", "landscape"),
-      ...postSuccessCheck("Sleep", sleepId, "Sleep POST"),
-    ],
+    WFWorkflowActions: actions,
     WFWorkflowClientRelease: "26.0",
     WFWorkflowClientVersion: "3607.0.5",
     WFWorkflowHasOutputFallback: false,
     WFWorkflowHasShortcutInputVariables: false,
     WFWorkflowIcon: {
-      WFWorkflowIconGlyphNumber: 59511,
-      WFWorkflowIconStartColor: 4278080147,
+      WFWorkflowIconGlyphNumber: spec.iconGlyph,
+      WFWorkflowIconStartColor: spec.iconColor,
     },
     WFWorkflowImportQuestions: [],
     WFWorkflowInputContentItemClasses: [],
@@ -252,32 +319,37 @@ export async function resolveIngestToken() {
   );
 }
 
-export async function writePlaceholderPlist() {
-  await mkdir(SOURCE_DIR, { recursive: true });
-  const jsonPath = join(SOURCE_DIR, "workflow.json");
+export async function writePlaceholderPlist(spec = SHORTCUT_SPECS[0]) {
+  const dir = sourceDir(spec);
+  await mkdir(dir, { recursive: true });
+  const jsonPath = join(dir, "workflow.json");
   const workflow = buildWorkflow({
+    spec,
     token: TOKEN_PLACEHOLDER,
     url: URL_PLACEHOLDER,
   });
   await writeFile(jsonPath, `${JSON.stringify(workflow, null, 2)}\n`, "utf8");
-  await execFileAsync("plutil", ["-convert", "xml1", jsonPath, "-o", SOURCE_PLIST]);
-  return SOURCE_PLIST;
+  const plistPath = join(dir, "workflow.plist");
+  await execFileAsync("plutil", ["-convert", "xml1", jsonPath, "-o", plistPath]);
+  return plistPath;
 }
 
 /**
- * @param {{ token?: string, url?: string, icloud?: boolean }} [opts]
+ * @param {{ spec?: object, token?: string, url?: string, icloud?: boolean }} [opts]
  */
 export async function buildAndSignShortcut(opts = {}) {
+  const spec = opts.spec || SHORTCUT_SPECS[0];
   const token = opts.token || (await resolveIngestToken());
   const url = opts.url || DEFAULT_URL;
-  await mkdir(SOURCE_DIR, { recursive: true });
-  await writePlaceholderPlist();
+  const dir = sourceDir(spec);
+  await mkdir(dir, { recursive: true });
+  await writePlaceholderPlist(spec);
 
-  const filledJson = join(SOURCE_DIR, "workflow.filled.json");
-  const filledPlist = join(SOURCE_DIR, "workflow.filled.plist");
-  const filledBinary = join(SOURCE_DIR, "workflow.filled.shortcut");
-  const signedPath = join(SOURCE_DIR, `${SHORTCUT_NAME}.shortcut`);
-  const workflow = buildWorkflow({ token, url });
+  const filledJson = join(dir, "workflow.filled.json");
+  const filledPlist = join(dir, "workflow.filled.plist");
+  const filledBinary = join(dir, "workflow.filled.shortcut");
+  const signedPath = join(dir, `${spec.name}.shortcut`);
+  const workflow = buildWorkflow({ spec, token, url });
   await writeFile(filledJson, `${JSON.stringify(workflow, null, 2)}\n`, "utf8");
   await execFileAsync("plutil", ["-convert", "xml1", filledJson, "-o", filledPlist]);
   await execFileAsync("plutil", [
@@ -300,17 +372,34 @@ export async function buildAndSignShortcut(opts = {}) {
   let icloudPath = "";
   if (opts.icloud !== false) {
     await mkdir(ICLOUD_DIR, { recursive: true });
-    icloudPath = join(ICLOUD_DIR, `${SHORTCUT_NAME}.shortcut`);
+    icloudPath = join(ICLOUD_DIR, `${spec.name}.shortcut`);
     await copyFile(signedPath, icloudPath);
-    const setupSrc = join(SOURCE_DIR, "SETUP.md");
+    const setupSrc = join(dir, "SETUP.md");
     try {
-      await copyFile(setupSrc, join(ICLOUD_DIR, "SETUP.md"));
+      await copyFile(setupSrc, join(ICLOUD_DIR, `${spec.name} SETUP.md`));
     } catch {
       /* SETUP.md written in the same run */
     }
   }
 
-  return { signedPath, icloudPath, sourcePlist: SOURCE_PLIST };
+  return { signedPath, icloudPath, specId: spec.id };
+}
+
+export async function buildAndSignAll(opts = {}) {
+  const token = opts.token || (await resolveIngestToken());
+  const url = opts.url || DEFAULT_URL;
+  const results = [];
+  for (const spec of SHORTCUT_SPECS) {
+    results.push(await buildAndSignShortcut({ ...opts, spec, token, url }));
+  }
+  const combinedSetup = join(ROOT, "ios", "shortcuts", "yan-life-state-dock", "SETUP.md");
+  try {
+    await mkdir(ICLOUD_DIR, { recursive: true });
+    await copyFile(combinedSetup, join(ICLOUD_DIR, "SETUP.md"));
+  } catch {
+    /* optional */
+  }
+  return results;
 }
 
 const isMain = (() => {
@@ -324,10 +413,12 @@ const isMain = (() => {
 })();
 
 if (isMain) {
-  buildAndSignShortcut()
-    .then((result) => {
-      console.log("[life-state-shortcut] signed", result.signedPath);
-      if (result.icloudPath) console.log("[life-state-shortcut] iCloud", result.icloudPath);
+  buildAndSignAll()
+    .then((results) => {
+      for (const result of results) {
+        console.log("[life-state-shortcut] signed", result.signedPath);
+        if (result.icloudPath) console.log("[life-state-shortcut] iCloud", result.icloudPath);
+      }
     })
     .catch((err) => {
       console.error("[life-state-shortcut] failed", err);
