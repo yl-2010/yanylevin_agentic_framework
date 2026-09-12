@@ -250,6 +250,30 @@ describe("assembleLifeStateSnapshot", () => {
     assert.equal(snap.phoneIntent.kind, "going_to_sleep");
     assert.equal(snap.phoneIntent.orientation, "landscape");
     assert.equal(snap.phoneSignals.going_to_sleep.kind, "going_to_sleep");
+    assert.deepEqual(snap.phoneSignals.recent, []);
+  });
+
+  it("keeps recent automation sends on phoneSignals.recent", () => {
+    const recent = [
+      { kind: "going_to_sleep", at: "2026-09-12T05:58:00.000Z", source: "shortcut" },
+      { kind: "unplugged", at: "2026-09-12T05:59:00.000Z", source: "shortcut" },
+    ];
+    const snap = assembleLifeStateSnapshot({
+      now: new Date("2026-09-12T06:00:00.000Z"),
+      timeZone: "America/Los_Angeles",
+      location: HOME_FIX,
+      homeList: [],
+      schedule: { isSchoolDay: false, minutes: 23 * 60 },
+      phoneIntent: {
+        kind: "unplugged",
+        source: "shortcut",
+        at: "2026-09-12T05:59:00.000Z",
+      },
+      phoneSignalRecent: recent,
+    });
+    assert.equal(snap.phoneSignals.unplugged.kind, "unplugged");
+    assert.equal(snap.phoneSignals.recent.length, 2);
+    assert.equal(snap.phoneSignals.recent[0].kind, "going_to_sleep");
   });
 });
 

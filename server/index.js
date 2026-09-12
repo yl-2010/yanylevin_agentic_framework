@@ -46,7 +46,7 @@ import { startHealthTakeawaysScheduler } from "./health-takeaways-agent.js";
 import { startLocationBrainScheduler } from "./location-brain-agent.js";
 import { startHealthBrainScheduler } from "./health-brain-agent.js";
 import { startFactCheckScheduler } from "./fact-check-agent.js";
-import { startLifeStateScheduler, runLifeState } from "./life-state-agent.js";
+import { startLifeStateScheduler } from "./life-state-agent.js";
 import { attachEducationEvents } from "./education-events.js";
 import {
   startAgent,
@@ -486,9 +486,6 @@ app.post("/api/education/life-state-intent", requireYanIntentWriter, async (req,
       kind: saved.kind,
       orientation: saved.orientation,
       at: saved.at,
-    });
-    void runLifeState({ force: true }).catch((err) => {
-      console.error("[/api/education/life-state-intent] guess", err);
     });
   } catch (err) {
     console.error("[/api/education/life-state-intent]", err);

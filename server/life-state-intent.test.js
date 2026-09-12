@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -9,6 +9,8 @@ import {
   writeLifeStateIntent,
   readLifeStateIntent,
   readLifeStateStore,
+  readRecentLifeStateSignals,
+  lifeStateSignalsLogPath,
   applyIntentToStore,
   SHOWER_INTENT_TTL_MS,
   DRIVING_FOCUS_RESUME_MS,
@@ -112,6 +114,32 @@ describe("writeLifeStateIntent", () => {
       assert.equal(read.orientation, "landscape");
       const store = await readLifeStateStore(dir, now);
       assert.equal(store.signals.going_to_sleep.kind, "going_to_sleep");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("appends each send to signals JSONL without collapsing history", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "life-state-intent-"));
+    try {
+      const t0 = new Date("2026-09-12T06:00:00.000Z");
+      await writeLifeStateIntent(
+        { intent: "going_to_sleep", orientation: "landscape" },
+        { dir, now: t0 }
+      );
+      await writeLifeStateIntent(
+        { intent: "unplugged" },
+        { dir, now: new Date(t0.getTime() + 60_000) }
+      );
+      const log = await readFile(lifeStateSignalsLogPath(dir, t0.toISOString()), "utf8");
+      const lines = log.trim().split("\n");
+      assert.equal(lines.length, 2);
+      assert.equal(JSON.parse(lines[0]).kind, "going_to_sleep");
+      assert.equal(JSON.parse(lines[1]).kind, "unplugged");
+      const recent = await readRecentLifeStateSignals(dir, new Date(t0.getTime() + 60_000));
+      assert.equal(recent.length, 2);
+      assert.equal(recent[0].kind, "going_to_sleep");
+      assert.equal(recent[1].kind, "unplugged");
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

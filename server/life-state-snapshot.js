@@ -11,7 +11,7 @@ import { briefingNow, resolveBriefingTimezone } from "./daily-briefing-agent.js"
 import { resolveNowScheduleContext } from "./education-data.js";
 import { runHome } from "./home-cli.js";
 import { recentMessages } from "./imessage-read.js";
-import { readLifeStateRaw, slimLifeStateStore } from "./life-state-intent.js";
+import { readLifeStateRaw, readRecentLifeStateSignals, slimLifeStateStore } from "./life-state-intent.js";
 import {
   LIFE_STATE_SNAPSHOT_PATH,
   formatLifeStateLocal,
@@ -586,7 +586,10 @@ export function assembleLifeStateSnapshot(parts) {
     imessageFromMe: lastFromMeMessage(parts.imessage || [], nowMs - IMESSAGE_MS),
     gym: latestGymEntry(parts.gymEntries || [], nowMs - GYM_MS),
     phoneIntent: phone.latest,
-    phoneSignals: phone.signals,
+    phoneSignals: {
+      ...phone.signals,
+      recent: Array.isArray(parts.phoneSignalRecent) ? parts.phoneSignalRecent : [],
+    },
     previous: Array.isArray(parts.previous) ? parts.previous.slice(-3) : [],
   };
 }
@@ -626,6 +629,7 @@ export async function buildLifeStateSnapshot(opts = {}) {
     gym,
     previous,
     phoneIntent,
+    phoneSignalRecent,
   ] = await Promise.all([
     safe("location", () => readPhoneLocation()),
     safe("home-list", () => runHome(["list"])),
@@ -647,6 +651,7 @@ export async function buildLifeStateSnapshot(opts = {}) {
     safe("gym", () => loadGymEntries()),
     safe("previous", () => readRecentLifeState(opts.dir, 3)),
     safe("phone-intent", () => readLifeStateRaw(opts.dir)),
+    safe("phone-signals-log", () => readRecentLifeStateSignals(opts.dir, now)),
   ]);
 
   const snapshot = assembleLifeStateSnapshot({
@@ -662,6 +667,7 @@ export async function buildLifeStateSnapshot(opts = {}) {
     imessage: imessage.ok ? imessage.value : [],
     gymEntries: gym.ok ? gym.value : [],
     phoneIntent: phoneIntent.ok ? phoneIntent.value : null,
+    phoneSignalRecent: phoneSignalRecent.ok ? phoneSignalRecent.value : [],
     previous: previous.ok ? previous.value : [],
   });
   if (!loc.ok) snapshot.location = { ok: false, error: loc.error };

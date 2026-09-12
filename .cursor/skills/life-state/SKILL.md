@@ -24,6 +24,7 @@ education/you@example.com/life-state/
   log-YYYY-MM.jsonl
   state.json
   intent.json
+  signals-YYYY-MM.jsonl
 ```
 
 Read `schema.md` and `heuristics.md` before writing a sample. Contract is the schema.
@@ -54,7 +55,7 @@ Composer tick is the writer.
 You are a one-shot local Composer job. Snapshot is already on disk. Infer. Write one sample. Stop.
 
 1. Read this skill, `schema.md`, and `heuristics.md`.
-2. Read `/tmp/yanylevin-life-state-snapshot.json`.
+2. Read `/tmp/yanylevin-life-state-snapshot.json`. Shortcut POSTs live under `phoneSignals.recent` and the by-kind keys. A POST does not write a sample. This tick does.
 3. Read last samples from the snapshot `previous` array (or `node server/life-state.js recent 3`).
 4. Pick `kind`, `activity`, `place`, `placeLabel`, `confidence`, `evidence`, optional `notes`. Set `since` / `continued` from the last sample.
 5. Write `/tmp/yanylevin-life-state-guess.json` with those fields only (no `at` / `local` / `dateKey` unless you have them; the CLI fills clock fields).
@@ -75,4 +76,4 @@ Short, greppable, no secrets. Examples: `gps:home`, `gps:eps`, `gps:pro-club`, `
 - **Yan Life State Driving Focus**: one POST, `driving_focus`. Any car. 15 min resume.
 - **Yan Life State Tesla**: one POST, `tesla_bluetooth`. Tesla only. 10 min resume.
 
-Snapshot `phoneSignals` is the datasource. The Mac stores `life-state/intent.json` and kicks a guess.
+Snapshot `phoneSignals` is the datasource. Each Shortcut POST updates `intent.json` and appends one line to `signals-YYYY-MM.jsonl`. That save does not start a 5-minute tick. The scheduled job still runs every 5 minutes and reads `phoneSignals.recent` (sends from the last 6 hours) plus the by-kind keys (`phoneSignals.going_to_sleep`, and so on).

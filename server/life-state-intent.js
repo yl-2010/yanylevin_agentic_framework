@@ -3,11 +3,14 @@
  * Written by Yan's Shortcuts (dock, unplug, Driving Focus, Tesla Bluetooth).
  */
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { lifeStateDir } from "./life-state.js";
+import { lifeStateDir, lifeStateLogMonthKey } from "./life-state.js";
 
 export const INTENT_FILENAME = "intent.json";
+export const SIGNALS_LOG_PREFIX = "signals";
+export const SIGNALS_RECENT_MS = 6 * 60 * 60 * 1000;
+export const SIGNALS_RECENT_LIMIT = 24;
 export const INTENT_KINDS = [
   "going_to_shower",
   "going_to_sleep",
@@ -115,6 +118,11 @@ export function lifeStateIntentPath(override) {
   return join(lifeStateDir(override), INTENT_FILENAME);
 }
 
+/** @param {string} [dir] @param {string} iso */
+export function lifeStateSignalsLogPath(dir, iso) {
+  return join(lifeStateDir(dir), `${SIGNALS_LOG_PREFIX}-${lifeStateLogMonthKey(iso)}.jsonl`);
+}
+
 /**
  * @param {unknown} raw
  */
@@ -203,6 +211,15 @@ export async function writeLifeStateIntent(raw, opts = {}) {
   }
   const out = applyIntentToStore(existing, parsed, now);
   await writeFile(join(dir, INTENT_FILENAME), `${JSON.stringify(out, null, 2)}\n`, "utf8");
+  try {
+    await appendFile(
+      lifeStateSignalsLogPath(opts.dir, out.latest.at),
+      `${JSON.stringify(out.latest)}\n`,
+      "utf8"
+    );
+  } catch (err) {
+    console.error("[life-state-intent] signals log", err);
+  }
   return out.latest;
 }
 
@@ -239,6 +256,64 @@ export async function readLifeStateStore(dir, now = new Date()) {
     return { latest: null, signals: {} };
   }
   return slimLifeStateStore(raw, now);
+}
+
+function signalsMonthKeys(now) {
+  const iso = now.toISOString();
+  const d = new Date(now.getTime());
+  const prev = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1));
+  return [lifeStateLogMonthKey(iso), lifeStateLogMonthKey(prev.toISOString())];
+}
+
+/**
+ * Append-only automation sends. The 5-minute tick reads these. POSTs do not start a tick.
+ * @param {string} [dir]
+ * @param {Date} [now]
+ * @param {{ sinceMs?: number, limit?: number }} [opts]
+ */
+export async function readRecentLifeStateSignals(dir, now = new Date(), opts = {}) {
+  const sinceMs = Number.isFinite(opts.sinceMs)
+    ? opts.sinceMs
+    : now.getTime() - SIGNALS_RECENT_MS;
+  const limit = Number.isFinite(opts.limit) ? opts.limit : SIGNALS_RECENT_LIMIT;
+  /** @type {object[]} */
+  const rows = [];
+  for (const month of signalsMonthKeys(now)) {
+    let text = "";
+    try {
+      text = await readFile(
+        join(lifeStateDir(dir), `${SIGNALS_LOG_PREFIX}-${month}.jsonl`),
+        "utf8"
+      );
+    } catch {
+      continue;
+    }
+    for (const line of text.split("\n")) {
+      const s = line.trim();
+      if (!s) continue;
+      try {
+        const rec = JSON.parse(s);
+        const at = Date.parse(String(rec?.at || rec?.lastAt || ""));
+        if (!Number.isFinite(at) || at < sinceMs) continue;
+        const kind = parseIntentKind(rec.kind ?? rec.intent);
+        if (!kind) continue;
+        const orientation = parseOrientation(rec.orientation);
+        /** @type {Record<string, unknown>} */
+        const row = {
+          kind,
+          at: new Date(at).toISOString(),
+          source: clip(rec.source, 24) || "shortcut",
+        };
+        if (orientation) row.orientation = orientation;
+        if (rec.resumed === true) row.resumed = true;
+        rows.push(row);
+      } catch {
+        /* skip bad line */
+      }
+    }
+  }
+  rows.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  return rows.slice(-limit);
 }
 
 /**

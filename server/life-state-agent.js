@@ -1,6 +1,7 @@
 /**
  * Every 5 minutes: snapshot Yan's signals, then Composer 2.5 guesses life state.
  * Local Cursor SDK one-shot. Yan only. Does not git-commit.
+ * Shortcut POSTs save to signals JSONL. They do not call this.
  */
 
 import { open, readFile, rm, stat } from "node:fs/promises";
