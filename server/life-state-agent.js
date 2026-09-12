@@ -1,7 +1,8 @@
 /**
- * Every 5 minutes: snapshot Yan's signals, then Composer 2.5 guesses life state.
- * Local Cursor SDK one-shot. Yan only. Does not git-commit.
+ * Clock :00/:05/:10/… snapshots Yan's signals, then Composer 2.5 guesses
+ * life state. Local Cursor SDK one-shot. Yan only. Does not git-commit.
  * Shortcut POSTs save to signals JSONL. They do not call this.
+ * A 2-minute run still leaves the next start on the following round 5.
  */
 
 import { open, readFile, rm, stat } from "node:fs/promises";
@@ -32,7 +33,7 @@ const META_PATH = join(
   "daily-briefing",
   "meta.json"
 );
-const INTERVAL_MS = 5 * 60 * 1000;
+export const LIFE_STATE_INTERVAL_MS = 5 * 60 * 1000;
 const LOCK_STALE_MS = 8 * 60 * 1000;
 
 export const LIFE_STATE_MODEL_SPEC = {
@@ -106,6 +107,22 @@ async function readMeta() {
 
 export function lifeStateModelSpec() {
   return modelSelection(LIFE_STATE_MODEL_SPEC);
+}
+
+/**
+ * Delay until the next clock-aligned 5-minute mark (:00, :05, :10, …).
+ * Never 0: if `nowMs` is already on a mark, wait a full interval.
+ * @param {number} [nowMs]
+ */
+export function msUntilNextLifeStateTick(nowMs = Date.now()) {
+  const t = Number(nowMs);
+  const n = Number.isFinite(t) ? t : Date.now();
+  const remainder =
+    ((n % LIFE_STATE_INTERVAL_MS) + LIFE_STATE_INTERVAL_MS) %
+    LIFE_STATE_INTERVAL_MS;
+  return remainder === 0
+    ? LIFE_STATE_INTERVAL_MS
+    : LIFE_STATE_INTERVAL_MS - remainder;
 }
 
 export function buildLifeStatePrompt({ dateKey, timezone, snapshotPath }) {
@@ -246,10 +263,10 @@ async function runLifeStateOnce({ force = false } = {}) {
 
 function armTimer() {
   if (timer) clearTimeout(timer);
-  const delay = INTERVAL_MS;
+  const delay = msUntilNextLifeStateTick();
   const when = new Date(Date.now() + delay);
   console.log(
-    `[life-state] next guess ${when.toISOString()} (in ${Math.round(delay / 60000)} min)`
+    `[life-state] next guess ${when.toISOString()} (in ${Math.round(delay / 1000)}s)`
   );
   timer = setTimeout(() => {
     runLifeState()

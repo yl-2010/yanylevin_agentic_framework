@@ -48,11 +48,13 @@ brain + fact-check) treat this log as a context source. Prefetch is
 `/tmp/yanylevin-context-life-state.json` (yesterday collapsed). Or
 `node server/life-state.js day <YYYY-MM-DD>`. Read kinds, do not dump JSONL
 into identity or places.md. Do not write samples from those jobs. The 5-minute
-Composer tick is the writer.
+Composer tick is the writer. That tick starts on the clock
+(:00, :05, :10, …). A slow run does not slide the next start.
 
 ## Scheduled tick
 
-You are a one-shot local Composer job. Snapshot is already on disk. Infer. Write one sample. Stop.
+You are a one-shot local Composer job. This tick started on a 5-minute
+clock mark. Snapshot is already on disk. Infer. Write one sample. Stop.
 
 1. Read this skill, `schema.md`, and `heuristics.md`.
 2. Read `/tmp/yanylevin-life-state-snapshot.json`. Shortcut POSTs live under `phoneSignals.recent` and the by-kind keys. A POST does not write a sample. This tick does.
@@ -76,4 +78,4 @@ Short, greppable, no secrets. Examples: `gps:home`, `gps:eps`, `gps:pro-club`, `
 - **Yan Life State Driving Focus**: one POST, `driving_focus`. Any car. 15 min resume.
 - **Yan Life State Tesla**: one POST, `tesla_bluetooth`. Tesla only. 10 min resume.
 
-Snapshot `phoneSignals` is the datasource. Each Shortcut POST updates `intent.json` and appends one line to `signals-YYYY-MM.jsonl`. That save does not start a 5-minute tick. The scheduled job still runs every 5 minutes and reads `phoneSignals.recent` (sends from the last 6 hours) plus the by-kind keys (`phoneSignals.going_to_sleep`, and so on).
+Snapshot `phoneSignals` is the datasource. Each Shortcut POST updates `intent.json` and appends one line to `signals-YYYY-MM.jsonl`. That save does not start a 5-minute tick. The scheduled job still starts on the clock (:00, :05, :10, …) and reads `phoneSignals.recent` (sends from the last 6 hours) plus the by-kind keys (`phoneSignals.going_to_sleep`, and so on).

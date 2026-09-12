@@ -421,7 +421,7 @@ export async function assessLifeStateHeartbeat(opts = {}) {
   if (recent.length >= 3 && maxGapMinutes >= Math.round(GAP_URGENT_MS / 60000)) {
     issues.push({
       code: "life-state-gap",
-      detail: `Life-state gap of ${maxGapMinutes} min in the last 24h (ticks should land about every 5 min).`,
+      detail: `Life-state gap of ${maxGapMinutes} min in the last 24h (ticks should start on :00/:05/:10).`,
     });
   }
   if (expectedTicks >= 12 && recent.length < Math.floor(expectedTicks * 0.7)) {

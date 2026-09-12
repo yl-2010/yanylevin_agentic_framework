@@ -32,4 +32,4 @@ iOS also turns Driving Focus on in any car, including as a passenger. Tesla Blue
 
 Automation: Tesla Bluetooth connects. One POST, `tesla_bluetooth`. This is the Tesla, not any car. Brief Bluetooth drops are the same trip (10 minute resume).
 
-The Mac writes `education/you@example.com/life-state/intent.json` and appends the send to `signals-YYYY-MM.jsonl`. That does not start a 5-minute guess. The scheduled tick still runs every 5 minutes and reads those sends. Snapshot field `phoneSignals` is the agent datasource (`recent` plus by-kind keys).
+The Mac writes `education/you@example.com/life-state/intent.json` and appends the send to `signals-YYYY-MM.jsonl`. That does not start a 5-minute guess. The scheduled tick still starts on the clock (:00, :05, :10, …) and reads those sends. Snapshot field `phoneSignals` is the agent datasource (`recent` plus by-kind keys).
