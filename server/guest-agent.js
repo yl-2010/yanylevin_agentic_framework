@@ -9,6 +9,7 @@ import { listEntities } from "./brain-lib.js";
 import { contactMatchesQuery } from "./contacts-read.js";
 import {
   applyAgentSentFooter,
+  isClassOf2028Thread,
   isGradeWideThread,
   normalizeIMessageOrigin,
   replyTargetForMessage,
@@ -30,6 +31,19 @@ export const GROK_DAILY = {
   "example-friend": 2,
   "example-neighbor": 2,
 };
+
+/** Teams Class of 2028 only. Yan is fromMe and never hits this. */
+export const TEAMS_CLASS_OF_2028_ALLOW_SLUGS = new Set([
+  "alex-rivera",
+  "example-friend",
+  "example-neighbor",
+]);
+
+export const TEAMS_CLASS_OF_2028_ALLOW_GIVEN = new Set([
+  "prasham",
+  "jeffery",
+  "everette",
+]);
 
 export const GUEST_COMPOSER_SPEC = {
   id: "composer-2.5",
@@ -365,6 +379,18 @@ export function isTeamsOneOnOne(message) {
   return String(message?.chatType || "").trim().toLowerCase() === "oneonone";
 }
 
+export function isTeamsClassOf2028Chat(message) {
+  if (!message || typeof message !== "object") return false;
+  if (isTeamsOneOnOne(message)) return false;
+  return isClassOf2028Thread(message.chat);
+}
+
+export function isAllowedTeamsClassOf2028Caller(slug, fromName) {
+  if (TEAMS_CLASS_OF_2028_ALLOW_SLUGS.has(String(slug || "").trim())) return true;
+  const given = givenNameOf(fromName).toLowerCase();
+  return TEAMS_CLASS_OF_2028_ALLOW_GIVEN.has(given);
+}
+
 function viewerLabels(raw) {
   if (!Array.isArray(raw)) return [];
   /** @type {string[]} */
@@ -545,6 +571,13 @@ export async function evaluateGuestMention(opts) {
   });
   const slug = person ? personSlug(person) : "";
   const displayName = displayGivenName({ person, contact, fromName });
+  if (
+    platform === "teams" &&
+    isTeamsClassOf2028Chat(message) &&
+    !isAllowedTeamsClassOf2028Caller(slug, fromName)
+  ) {
+    return { action: "ignore" };
+  }
   const personKey = quotaKeyFor(handle, slug);
   if (!personKey) return { action: "ignore" };
 

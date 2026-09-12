@@ -101,14 +101,16 @@ The first user bubble is that Teams message. A reply that only quotes a
 message with `@agent` does not count. The new text itself has to contain
 `@agent`.
 
-Anyone can call `@agent` in a 1:1 or any group chat, including the giant
-Class of 2028 grade chat. Same 5 Composer turns per Pacific clock hour as
-iMessage (counted separately). Guest threads show in Yan's app/website
-history as `From Name on Teams:` then a blank line then their text. Live
-context says they called, not Yan. Same tools; closeness decides what to
-share and what work to do. Reversible favors for close people are fine.
-Never irreversible Mac deletes or overwrites for a guest. A group reply
-is visible to everyone in that chat, so a private 1:1 answer does not
+Anyone can call `@agent` in a 1:1 or any group chat except the Class of 2028
+Teams grade chat. In that one chat, only Yan, Alex, Example Friend, and Example Neighbor
+can `@agent`. Anyone else typing `@agent` / `@Agent` there is ignored: no
+session, no reply, no rate-limit text. iMessage is unchanged. Same 5 Composer
+turns per Pacific clock hour as iMessage (counted separately). Guest threads
+show in Yan's app/website history as `From Name on Teams:` then a blank line
+then their text. Live context says they called, not Yan. Same tools; closeness
+decides what to share and what work to do. Reversible favors for close people
+are fine. Never irreversible Mac deletes or overwrites for a guest. A group
+reply is visible to everyone in that chat, so a private 1:1 answer does not
 belong there. Class of 2028: the whole grade sees it. Do not give out
 confidential information (private calendar, live location, mail, iMessage,
 health, grades, family, private brain facts, other people's personal

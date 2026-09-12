@@ -22,6 +22,8 @@ import {
   resolvePerson,
   describeGuestAudience,
   takeGuestSlot,
+  isTeamsClassOf2028Chat,
+  isAllowedTeamsClassOf2028Caller,
 } from "./guest-agent.js";
 
 const PRASHAM = {
@@ -175,6 +177,27 @@ describe("guest-agent helpers", () => {
       }).kind,
       "dm"
     );
+    assert.equal(
+      isTeamsClassOf2028Chat({ chat: "Class of 2028", chatType: "group" }),
+      true
+    );
+    assert.equal(
+      isTeamsClassOf2028Chat({ chat: "EPS Class of 2028", chatType: "group" }),
+      true
+    );
+    assert.equal(
+      isTeamsClassOf2028Chat({ chat: "Class of 2028", chatType: "oneOnOne" }),
+      false
+    );
+    assert.equal(
+      isTeamsClassOf2028Chat({ chat: "JYPE", chatType: "group" }),
+      false
+    );
+    assert.equal(isAllowedTeamsClassOf2028Caller("alex-rivera", ""), true);
+    assert.equal(isAllowedTeamsClassOf2028Caller("example-friend", ""), true);
+    assert.equal(isAllowedTeamsClassOf2028Caller("example-neighbor", ""), true);
+    assert.equal(isAllowedTeamsClassOf2028Caller("", "Example Friend"), true);
+    assert.equal(isAllowedTeamsClassOf2028Caller("", "Sam Classmate"), false);
   });
 });
 
@@ -400,7 +423,7 @@ describe("evaluateGuestMention", () => {
     );
   });
 
-  it("allows any Teams 1:1 and any Teams group, including Class of 2028", async () => {
+  it("allows any Teams 1:1 and other Teams groups; Class of 2028 is allowlisted", async () => {
     const dir = await mkdtemp(join(tmpdir(), "guest-eval-"));
     const statePath = join(dir, "limits.json");
     const stranger = await evaluateGuestMention({
@@ -419,6 +442,24 @@ describe("evaluateGuestMention", () => {
     assert.equal(stranger.action, "start");
     assert.equal(stranger.caller.model.id, "composer-2.5");
 
+    const otherGroup = await evaluateGuestMention({
+      platform: "teams",
+      message: {
+        fromMe: false,
+        from: "Sam Classmate",
+        fromEmail: "sam@school.example",
+        chat: "JYPE",
+        chatType: "group",
+        text: "@agent hi",
+      },
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(otherGroup.action, "start");
+    assert.equal(otherGroup.caller.audience.kind, "group");
+    assert.equal(otherGroup.caller.audience.threadLabel, "JYPE");
+
     const groupStranger = await evaluateGuestMention({
       platform: "teams",
       message: {
@@ -433,11 +474,7 @@ describe("evaluateGuestMention", () => {
       now: FIVE_PM,
       statePath,
     });
-    assert.equal(groupStranger.action, "start");
-    assert.equal(groupStranger.caller.model.id, "composer-2.5");
-    assert.equal(groupStranger.caller.audience.kind, "group");
-    assert.equal(groupStranger.caller.audience.threadLabel, "Class of 2028");
-    assert.equal(groupStranger.caller.audience.gradeWide, true);
+    assert.equal(groupStranger.action, "ignore");
 
     const groupPrasham = await evaluateGuestMention({
       platform: "teams",
@@ -463,6 +500,93 @@ describe("evaluateGuestMention", () => {
       "Alex Rivera",
       "Sam Classmate",
     ]);
+
+    const groupExample Friend = await evaluateGuestMention({
+      platform: "teams",
+      message: {
+        fromMe: false,
+        from: "Example Friend",
+        chat: "Class of 2028",
+        chatType: "group",
+        text: "@Agent ping",
+      },
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(groupExample Friend.action, "start");
+    assert.equal(groupExample Friend.caller.slug, "example-friend");
+
+    const groupExample Neighbor = await evaluateGuestMention({
+      platform: "teams",
+      message: {
+        fromMe: false,
+        from: "Example Neighbor",
+        fromEmail: "edeng@school.example",
+        chat: "Class of 2028",
+        chatType: "group",
+        text: "@AGENT hi",
+      },
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(groupExample Neighbor.action, "start");
+    assert.equal(groupExample Neighbor.caller.slug, "example-neighbor");
+  });
+
+  it("leaves iMessage Class of 2028 groups alone and does not burn Teams quota on ignores", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "guest-eval-"));
+    const statePath = join(dir, "limits.json");
+    const imessageGroup = await evaluateGuestMention({
+      platform: "imessage",
+      message: {
+        fromMe: false,
+        handle: "+15555550999",
+        chatId: "chat2028",
+        chat: "Class of 2028",
+        text: "@agent hi",
+      },
+      contacts: [contact("Sam", "+15555550999")],
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(imessageGroup.action, "start");
+
+    const blocked = {
+      platform: "teams",
+      message: {
+        fromMe: false,
+        from: "Sam Classmate",
+        fromEmail: "sam@school.example",
+        chat: "Class of 2028",
+        chatType: "group",
+        text: "@agent hi",
+      },
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    };
+    assert.equal((await evaluateGuestMention(blocked)).action, "ignore");
+    assert.equal((await evaluateGuestMention(blocked)).action, "ignore");
+
+    const laterDm = await evaluateGuestMention({
+      platform: "teams",
+      message: {
+        fromMe: false,
+        from: "Sam Classmate",
+        fromEmail: "sam@school.example",
+        chat: "Sam",
+        chatType: "oneOnOne",
+        text: "@agent hi",
+      },
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(laterDm.action, "start");
+    assert.equal(laterDm.caller.audience.kind, "dm");
   });
 
   it("does not treat Yan fromMe as a guest", async () => {

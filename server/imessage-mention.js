@@ -21,6 +21,11 @@ export function isGradeWideThread(threadLabel) {
   return /\bclass of 20\d{2}\b/i.test(String(threadLabel || ""));
 }
 
+/** The Class of 2028 Teams grade chat only, not other years. */
+export function isClassOf2028Thread(threadLabel) {
+  return /\bclass of 2028\b/i.test(String(threadLabel || ""));
+}
+
 /** JYPE on iMessage or Teams. Guests may post here from any calling chat. */
 export function isJypeThread(threadLabel) {
   return /\bjype\b/i.test(String(threadLabel || ""));

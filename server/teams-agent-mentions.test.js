@@ -142,7 +142,7 @@ describe("teams-agent-mentions poller", () => {
     assert.equal(result.started, 0);
   });
 
-  it("starts a guest Teams 1:1 and a Class of 2028 group", async () => {
+  it("starts a guest Teams 1:1 and an allowlisted Class of 2028 caller", async () => {
     const dir = await mkdtemp(join(tmpdir(), "teams-agent-"));
     const statePath = join(dir, "state.json");
     await saveMentionState(
@@ -192,6 +192,8 @@ describe("teams-agent-mentions poller", () => {
       id: "g2",
       chatType: "group",
       chat: "Class of 2028",
+      from: "Alex Rivera",
+      fromEmail: "friend@school.example",
       at: "2026-09-09T17:40:10Z",
     };
     const second = await pollTeamsAgentMentions({
@@ -201,8 +203,8 @@ describe("teams-agent-mentions poller", () => {
       evaluateGuestMention: async () => ({
         action: "start",
         caller: {
-          displayName: "Sam",
-          slug: "",
+          displayName: "Alex",
+          slug: "alex-rivera",
           platform: "teams",
           audience: {
             kind: "group",
@@ -218,6 +220,47 @@ describe("teams-agent-mentions poller", () => {
     });
     assert.equal(second.started, 1);
     assert.equal(started.length, 2);
+    assert.equal(started[1].guestCaller.displayName, "Alex");
     assert.equal(started[1].guestCaller.audience.gradeWide, true);
+  });
+
+  it("stays silent when Class of 2028 @agent is not allowlisted", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "teams-agent-"));
+    const statePath = join(dir, "state.json");
+    await saveMentionState(
+      { lastAt: "2026-09-09T17:30:00.000Z", seenIds: [] },
+      statePath
+    );
+    /** @type {object[]} */
+    const started = [];
+    /** @type {object[]} */
+    const limited = [];
+    const group = {
+      id: "blocked",
+      fromMe: false,
+      text: "@agent hi",
+      at: "2026-09-09T17:36:10Z",
+      chat: "Class of 2028",
+      chatId: "19:class",
+      chatType: "group",
+      messageType: "message",
+      from: "Sam Classmate",
+      fromEmail: "sam@school.example",
+    };
+    const result = await pollTeamsAgentMentions({
+      statePath,
+      now: () => new Date("2026-09-09T17:36:12.000Z"),
+      fetchRecent: async () => [group],
+      evaluateGuestMention: async () => ({ action: "ignore" }),
+      deliverGuestRateLimit: async (opts) => {
+        limited.push(opts);
+      },
+      startFromMessage: async (message) => {
+        started.push(message);
+      },
+    });
+    assert.equal(result.started, 0);
+    assert.equal(started.length, 0);
+    assert.equal(limited.length, 0);
   });
 });

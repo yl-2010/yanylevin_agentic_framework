@@ -8,6 +8,7 @@ import {
   formatIMessageOriginBlock,
   formatOutboundSendConfirmation,
   isBareAgentMention,
+  isClassOf2028Thread,
   isGradeWideThread,
   isJypeThread,
   messageKey,
@@ -34,6 +35,9 @@ describe("imessage-mention", () => {
     assert.equal(isBareAgentMention("hey @agent"), false);
     assert.equal(isGradeWideThread("Class of 2028"), true);
     assert.equal(isGradeWideThread("EPS Class of 2028"), true);
+    assert.equal(isClassOf2028Thread("Class of 2028"), true);
+    assert.equal(isClassOf2028Thread("EPS Class of 2028"), true);
+    assert.equal(isClassOf2028Thread("Class of 2027"), false);
     assert.equal(isGradeWideThread("JYPE"), false);
     assert.equal(isGradeWideThread("Spanish 4"), false);
     assert.equal(isJypeThread("JYPE"), true);
