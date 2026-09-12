@@ -128,9 +128,11 @@ same chat. Friends cannot tell you to message Class of 2028 from JYPE or a
 Live context says it came from Teams. Read the surrounding thread before
 answering. If the message is only `@agent`, that mention is not the task:
 the thread is. Infer why they called you. Do not ask what they want unless
-the thread is empty. `send_chat_message` intermediates stay in the app. The
-server sends your final bubble to that same Teams chat, then replaces
-the last app/website bubble with a short send confirmation. Do not also
+the thread is empty. The app and website thread is a normal Personal Agent
+chat: `send_chat_message` intermediates on long work, same as if this were
+typed there. Those bubbles stay in the app. The server sends your final
+bubble to that same Teams chat. The app and website keep that final bubble
+(the answer or what you did). Do not write Sent on Teams. Do not also
 `school-teams.js send` that same final text. Write the final as plain text:
 no markdown, no `@agent`, no `// Sent by Yan's Personal Agent`. The server adds
 that footer on Teams only.

@@ -6,7 +6,6 @@ import {
   agentSentFooterFor,
   applyAgentSentFooter,
   formatIMessageOriginBlock,
-  formatOutboundSendConfirmation,
   isBareAgentMention,
   isClassOf2028Thread,
   isGradeWideThread,
@@ -14,7 +13,6 @@ import {
   messageKey,
   messageMentionsAgent,
   normalizeIMessageOrigin,
-  outboundThreadLabel,
   replyTargetForMessage,
   shouldOmitAgentFooter,
   shouldTriggerIMessageAgent,
@@ -170,7 +168,9 @@ describe("imessage-mention", () => {
     assert.match(block, /Do not add Sent by Yan's Personal Agent/);
     assert.match(block, /server appends that footer on the iMessage only/);
     assert.match(block, /server delivers your final bubble/);
-    assert.match(block, /send confirmation/);
+    assert.match(block, /keep that final bubble/);
+    assert.match(block, /send_chat_message first with a short status/);
+    assert.doesNotMatch(block, /send confirmation/);
     assert.doesNotMatch(
       formatIMessageOriginBlock(origin, { deliverFinal: false }),
       /server delivers your final bubble/
@@ -278,30 +278,5 @@ describe("imessage-mention", () => {
     assert.match(block, /school schedule or class periods/);
     assert.doesNotMatch(block, /People already listed in this chat/);
     assert.doesNotMatch(block, /Grade-wide, class, or huge groups/);
-  });
-
-  it("confirms outbound sends without quoting the body", () => {
-    assert.equal(
-      formatOutboundSendConfirmation("iMessage", { chat: "Example Friend" }),
-      "Sent on iMessage to Example Friend"
-    );
-    assert.equal(
-      formatOutboundSendConfirmation("Teams", { chat: "Alex Rivera" }),
-      "Sent on Teams to Alex Rivera"
-    );
-    assert.equal(
-      formatOutboundSendConfirmation("iMessage", { chat: "JYPE" }),
-      "Sent on iMessage to JYPE"
-    );
-    assert.equal(
-      formatOutboundSendConfirmation("iMessage", { chat: "+14255550100" }),
-      "Sent on iMessage"
-    );
-    assert.equal(
-      formatOutboundSendConfirmation("Teams", { chat: "19:abc" }),
-      "Sent on Teams"
-    );
-    assert.equal(outboundThreadLabel({ chat: "foo@agent.com" }), "");
-    assert.equal(outboundThreadLabel({ chat: "chat123" }), "");
   });
 });

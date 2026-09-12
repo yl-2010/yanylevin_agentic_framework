@@ -23,7 +23,6 @@ import {
   publishQueuedEducationNavigate,
   deliverIMessageFinalReply,
   deliverTeamsFinalReply,
-  replaceLastAssistantContent,
 } from "./personal-agent.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -277,7 +276,7 @@ describe("Personal Agent skill files", () => {
     assert.match(schoolTeams, /\/\/ Sent by Yan's Personal Agent/);
     assert.match(schoolTeams, /JYPE \(iMessage or Teams\)/);
     assert.match(schoolTeams, /@agent/);
-    assert.match(schoolTeams, /send confirmation/);
+    assert.match(schoolTeams, /keep that final bubble/);
     assert.match(schoolTeams, /class channel/);
     assert.match(schoolTeams, /Anyone can call/);
     assert.match(schoolTeams, /except the Class of 2028/);
@@ -324,7 +323,7 @@ describe("Personal Agent skill files", () => {
     assert.match(imessage, /only `@agent`/);
     assert.match(imessage, /Apple Contacts/);
     assert.match(imessage, /From Name on iMessage/);
-    assert.match(imessage, /send confirmation/);
+    assert.match(imessage, /keep that final bubble/);
     assert.match(imessage, /never put it in Personal Agent app or website bubbles/);
     assert.match(imessage, /JYPE \(iMessage or Teams\)/);
     assert.match(imessage, /\/\/ Sent by Yan's Personal Agent/);
@@ -360,7 +359,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /Teams @agent/);
     assert.match(agent, /except the Class of 2028 Teams grade chat/);
     assert.match(agent, /only Yan, Alex, Example Friend, and Example Neighbor/);
-    assert.match(agent, /send confirmation/);
+    assert.match(agent, /keep that final bubble/);
     assert.match(agent, /fromMe/);
     assert.match(agent, /only `@agent`/);
     assert.match(agent, /Apple Contacts/);
@@ -780,25 +779,6 @@ describe("Teams final reply delivery", () => {
     assert.equal(empty.skipped, "empty");
     const missing = await deliverTeamsFinalReply({}, "On it");
     assert.equal(missing.skipped, "no-target");
-  });
-});
-
-describe("replaceLastAssistantContent", () => {
-  it("swaps the last assistant bubble for a send confirmation", () => {
-    const session = {
-      messages: [
-        stampMessage("user", "@agent"),
-        stampMessage("assistant", "Nothing after Spanish, heading home after 3"),
-      ],
-    };
-    assert.equal(
-      replaceLastAssistantContent(session, "Sent on iMessage to Alex"),
-      true
-    );
-    assert.equal(session.messages[1].content, "Sent on iMessage to Alex");
-    assert.equal(session.messages[1].endOfTurn, true);
-    assert.equal(session.messages[0].content, "@agent");
-    assert.equal(replaceLastAssistantContent({ messages: [] }, "Sent on Teams"), false);
   });
 });
 

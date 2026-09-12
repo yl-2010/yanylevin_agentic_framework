@@ -32,7 +32,6 @@ import { sendIMessage } from "./imessage-send.js";
 import {
   applyAgentSentFooter,
   formatIMessageOriginBlock,
-  formatOutboundSendConfirmation,
   normalizeIMessageOrigin,
   stripAgentSentFooter,
 } from "./imessage-mention.js";
@@ -640,7 +639,7 @@ function sendChatMessageTool(sid, session) {
   return {
     send_chat_message: {
       description:
-        "Send a user-visible chat bubble immediately without ending the turn. For longer agentic work (education writes, widgets, scanning lots of data): first a short status, then more whenever new info, a change, or a useful update appears. The turn still ends with your final reply (usually Done). Do not call for a normal short answer.",
+        "Send a user-visible chat bubble immediately without ending the turn. App and website only; never iMessage or Teams. For longer agentic work (education writes, widgets, scanning lots of data): first a short status, then more whenever new info, a change, or a useful update appears, including when this turn started from @agent on iMessage or Teams. The turn still ends with your final reply (usually Done). Do not call for a normal short answer.",
       inputSchema: {
         type: "object",
         properties: {
@@ -747,57 +746,27 @@ export async function deliverTeamsFinalReply(origin, content) {
 }
 
 /**
- * Swap the last assistant bubble after an outbound @agent send.
- * @param {Session|undefined|null} session
- * @param {string} content
- */
-export function replaceLastAssistantContent(session, content) {
-  const last = Array.isArray(session?.messages)
-    ? session.messages[session.messages.length - 1]
-    : null;
-  if (!last || last.role !== "assistant") return false;
-  last.content = stripAgentSentFooter(content);
-  last.endOfTurn = true;
-  return true;
-}
-
-function outboundDeliverySucceeded(result) {
-  return Boolean(result && result.ok === true && !result.skipped);
-}
-
-/**
- * First-turn @agent: send the final to iMessage/Teams, then put a confirmation
- * in the app so the website does not repeat the outbound text.
+ * First-turn @agent: send the final to iMessage/Teams. App and website keep
+ * that bubble, plus any send_chat_message updates from the same turn.
  * @param {Session} session
- * @param {string} sid
  * @param {string} content
  * @param {TurnOpts} opts
  */
-async function confirmOutboundDelivery(session, sid, content, opts) {
+async function confirmOutboundDelivery(session, content, opts) {
   const imessage = Boolean(opts?.imessageDeliverFinal);
   const teams = Boolean(opts?.teamsDeliverFinal);
-  if (!imessage && !teams) return content;
+  if (!imessage && !teams) return;
 
-  const channel = imessage ? "iMessage" : "Teams";
   const origin = imessage ? session.imessageOrigin : session.teamsOrigin;
-  let result;
   try {
-    result = imessage
-      ? await deliverIMessageFinalReply(origin, content)
-      : await deliverTeamsFinalReply(origin, content);
+    if (imessage) await deliverIMessageFinalReply(origin, content);
+    else await deliverTeamsFinalReply(origin, content);
   } catch (err) {
     console.error(
       `[personal-agent] ${imessage ? "imessage" : "teams"} reply`,
       err
     );
-    return content;
   }
-  if (!outboundDeliverySucceeded(result)) return content;
-  const confirmation = formatOutboundSendConfirmation(channel, origin);
-  if (replaceLastAssistantContent(session, confirmation)) {
-    persistSessionHistory(sid, session);
-  }
-  return confirmation;
 }
 
 /**
@@ -1880,18 +1849,12 @@ async function executeAgentTurn(sid, session, opts) {
       session.replayUiTranscript = false;
     }
     const finishedStatus = result?.status === "error" ? "error" : "idle";
-    let visibleContent = content;
     if (finishedStatus === "idle") {
-      visibleContent = await confirmOutboundDelivery(
-        session,
-        sid,
-        content,
-        opts
-      );
+      await confirmOutboundDelivery(session, content, opts);
     }
     releaseTurnRun(session);
     session.lastResult = {
-      content: visibleContent,
+      content,
       widgets: parsed.widgets,
       status: result?.status || "finished",
       model: outcome.model?.id || model.id,

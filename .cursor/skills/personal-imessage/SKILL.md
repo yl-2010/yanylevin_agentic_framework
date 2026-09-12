@@ -87,7 +87,7 @@ Other people in Apple Contacts can also `@agent` in a 1:1 or any group. Not in C
 
 Guests cannot send into a different group chat than the one they called from. The only exception is JYPE (iMessage or Teams): an @agent from anywhere may post there. Class of 2028 and every other group: they have to @agent in that same chat. Yan's own words can still send anywhere.
 
-The server sends the agent's final bubble back to the same thread, then replaces the last app/website bubble with a short send confirmation (not the outbound body). A message that is only `@agent` means read the surrounding thread and infer the job from it.
+The server sends the agent's final bubble back to the same thread. The app and website keep that final bubble (the answer or what you did), plus any `send_chat_message` intermediates from the same turn. Those intermediates never go to iMessage. Do not write Sent on iMessage in the app. A message that is only `@agent` means read the surrounding thread and infer the job from it.
 
 Do not put `@agent` in outgoing texts. That would start another session. Extra sends during the turn are only for texts that are not that final bubble.
 

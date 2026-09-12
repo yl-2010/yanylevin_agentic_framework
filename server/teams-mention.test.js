@@ -65,7 +65,9 @@ describe("teams-mention trigger", () => {
     assert.match(block, /school-teams\.js thread/);
     assert.match(block, /Do not add \/\/ Sent by Yan's Personal Agent/);
     assert.match(block, /Do not also school-teams send/);
-    assert.match(block, /send confirmation/);
+    assert.match(block, /keep that final bubble/);
+    assert.match(block, /send_chat_message first with a short status/);
+    assert.doesNotMatch(block, /send confirmation/);
     const later = formatTeamsOriginBlock(origin, { deliverFinal: false });
     assert.match(later, /Later app turns do not auto-post/);
     const guest = formatTeamsOriginBlock(origin, {

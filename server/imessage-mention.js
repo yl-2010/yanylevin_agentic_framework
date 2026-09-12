@@ -178,34 +178,6 @@ export function applyAgentSentFooter(text, origin) {
   return `${body}\n\n${agentSentFooterFor(origin)}`;
 }
 
-/**
- * Display name for an iMessage or Teams thread. Skip phones, emails, and ids.
- * @param {object|null|undefined} origin
- */
-export function outboundThreadLabel(origin) {
-  const chat = String(origin?.chat || "").trim();
-  if (!chat) return "";
-  if (chat.startsWith("+")) return "";
-  if (chat.includes("@")) return "";
-  if (/^chat\d+$/i.test(chat)) return "";
-  if (/^19:/i.test(chat)) return "";
-  if (/^[0-9a-f-]{20,}$/i.test(chat)) return "";
-  return clip(chat, 80);
-}
-
-/**
- * App/website last bubble after an @agent final is delivered outbound.
- * One sentence, no period. Does not quote the sent body.
- * @param {string} channel
- * @param {object|null|undefined} origin
- */
-export function formatOutboundSendConfirmation(channel, origin) {
-  const where = String(channel || "").trim() || "iMessage";
-  const label = outboundThreadLabel(origin);
-  if (!label) return `Sent on ${where}`;
-  return `Sent on ${where} to ${label}`;
-}
-
 export function guestCallerLines(guestCaller, platform) {
   const guest = guestCaller && typeof guestCaller === "object" ? guestCaller : null;
   const name = String(guest?.displayName || "").trim();
@@ -298,11 +270,12 @@ export function formatIMessageOriginBlock(origin, opts = {}) {
   }
   lines.push(
     `Read the surrounding thread before answering: curl -sS --unix-socket /tmp/personal-agent-local.sock "http://localhost/imessage/thread?person=${threadQ}&limit=${threadLimit}" (iMessage skill).`,
-    "Write the final bubble as the text that should land in that iMessage (plain text, no markdown, no @agent). Do not add Sent by Yan's Personal Agent. The server appends that footer on the iMessage only, never in the app or website thread. Intermediate send_chat_message bubbles stay in the Personal Agent app only."
+    "The app and website thread is a normal Personal Agent chat. On long work, call send_chat_message first with a short status, then again when something new happens, the same as if this were typed in the app. Those bubbles stay in the app and website only. They are never sent to iMessage.",
+    "Write the final bubble as the text that should land in that iMessage (plain text, no markdown, no @agent). The app and website keep that final bubble as the end of the turn (the answer or what you did). Do not write Sent on iMessage. Do not add Sent by Yan's Personal Agent. The server appends that footer on the iMessage only, never in the app or website thread."
   );
   if (opts.deliverFinal !== false) {
     lines.push(
-      "The server delivers your final bubble to that same iMessage chat, then replaces the last app/website bubble with a short send confirmation (not the outbound body). Do not also sendIMessage that same final text. Write the final as the iMessage, not the confirmation."
+      "The server delivers your final bubble to that same iMessage chat. Do not also sendIMessage that same final text."
     );
   } else {
     lines.push(
