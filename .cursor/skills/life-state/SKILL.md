@@ -31,7 +31,7 @@ Read `schema.md` and `heuristics.md` before writing a sample. Contract is the sc
 
 Home latches (not lights): `home.bedroomBoolean` / `lastMotionRoom` (on = last bedroom occupancy, off = last office occupancy or he left the house), `home.bathroomBoolean` (in-bathroom latch so lights survive a long shower), `home.leavingBathBool` (back at the bathroom doorway). Occupancy sensors do not cross-contaminate except bathroom occupancy, which can also see the closet. Sitting in bed or in the shower usually will not retrigger those sensors. Office Boolean and office middle sensor are unused.
 
-Showering: Bathroom Boolean on plus a shower tell, or a fresh `phoneSignals.going_to_shower` (portrait dock). Fan-only is leftover, unless the fan just came on from that dock. Sleeping: fresh `going_to_sleep` is a lock. `plugged_in` is charging without that ritual. `unplugged` is the phone leaving power. Driving Focus means any car, maybe passenger. Tesla Bluetooth means the Tesla. Focus or Bluetooth blips resume the same trip. Ignore shower/sleep dock intents if Bedroom Boolean is off.
+Showering: Bathroom Boolean on plus a shower tell, or a fresh `phoneSignals.going_to_shower` if one arrived. Fan-only is leftover, unless the fan just came on from that dock. Sleeping: a fresh `going_to_sleep` is a strong tell when it arrived. Phone automations are extra, not required. iOS often skips them when the phone is locked, so a real shower, sleep, unplug, or drive with nothing in `phoneSignals` is normal. Do not wait for a POST. Do not treat a quiet `recent` log as proof he skipped it. `plugged_in` is charging without the stand ritual. `unplugged` is the phone leaving power. Driving Focus means any car, maybe passenger. Tesla Bluetooth means the Tesla. Focus or Bluetooth blips resume the same trip. Ignore shower/sleep dock intents if Bedroom Boolean is off.
 
 ## On demand (chat)
 
@@ -57,7 +57,7 @@ You are a one-shot local Composer job. This tick started on a 5-minute
 clock mark. Snapshot is already on disk. Infer. Write one sample. Stop.
 
 1. Read this skill, `schema.md`, and `heuristics.md`.
-2. Read `/tmp/yanylevin-life-state-snapshot.json`. Shortcut POSTs live under `phoneSignals.recent` and the by-kind keys. A POST does not write a sample. This tick does.
+2. Read `/tmp/yanylevin-life-state-snapshot.json`. Shortcut POSTs live under `phoneSignals.recent` and the by-kind keys. They are extra. Missing them is normal (locked phone). A POST does not write a sample. This tick does.
 3. Read last samples from the snapshot `previous` array (or `node server/life-state.js recent 3`).
 4. Pick `kind`, `activity`, `place`, `placeLabel`, `confidence`, `evidence`, optional `notes`. Set `since` / `continued` from the last sample.
 5. Write `/tmp/yanylevin-life-state-guess.json` with those fields only (no `at` / `local` / `dateKey` unless you have them; the CLI fills clock fields).
@@ -78,4 +78,4 @@ Short, greppable, no secrets. Examples: `gps:home`, `gps:eps`, `gps:pro-club`, `
 - **Yan Life State Driving Focus**: one POST, `driving_focus`. Any car. 15 min resume.
 - **Yan Life State Tesla**: one POST, `tesla_bluetooth`. Tesla only. 10 min resume.
 
-Snapshot `phoneSignals` is the datasource. Each Shortcut POST updates `intent.json` and appends one line to `signals-YYYY-MM.jsonl`. That save does not start a 5-minute tick. The scheduled job still starts on the clock (:00, :05, :10, …) and reads `phoneSignals.recent` (sends from the last 6 hours) plus the by-kind keys (`phoneSignals.going_to_sleep`, and so on).
+Snapshot `phoneSignals` is extra, not required. Each Shortcut POST updates `intent.json` and appends one line to `signals-YYYY-MM.jsonl`. That save does not start a 5-minute tick. The scheduled job still starts on the clock (:00, :05, :10, …) and reads `phoneSignals.recent` (sends from the last 6 hours) plus the by-kind keys (`phoneSignals.going_to_sleep`, and so on). Automations commonly fail while the iPhone is locked. Guess from Home, GPS, schedule, and screens even when `recent` is empty.
