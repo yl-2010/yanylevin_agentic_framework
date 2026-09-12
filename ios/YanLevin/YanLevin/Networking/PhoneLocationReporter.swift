@@ -366,7 +366,7 @@ final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @uncheck
             return (level, charging)
         }
         var ssid: String?
-        if let current = try? await NEHotspotNetwork.fetchCurrent() {
+        if let current = await NEHotspotNetwork.fetchCurrent() {
             let name = current.ssid.trimmingCharacters(in: .whitespacesAndNewlines)
             if !name.isEmpty { ssid = String(name.prefix(64)) }
         }
