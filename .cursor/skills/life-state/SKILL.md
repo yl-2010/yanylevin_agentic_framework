@@ -68,4 +68,4 @@ Short, greppable, no secrets. Examples: `gps:home`, `gps:eps`, `gps:pro-club`, `
 
 ## Phone plug-in Shortcut
 
-Signed stub: `npm run life-state-shortcut` writes **Yan Life State Dock** to iCloud Drive `YanLifeState/`. Import that, then add Get Device Orientation, Bedroom Boolean, and Ifs. Only POST when Bedroom Boolean is on. Portrait → `going_to_shower`. Landscape → `going_to_sleep`. The POST is already wired: `https://api.yanylevin.com/api/education/life-state-intent` with the location/Health bearer. The Mac stores `life-state/intent.json` and kicks a guess so the log does not wait for the next 5-minute tick.
+Signed stub: `npm run life-state-shortcut` writes **Yan Life State Dock** to iCloud Drive `YanLifeState/`. Two finished POSTs, no variables. Shower is `going_to_shower` + portrait. Sleep is `going_to_sleep` + landscape. Wrap each in your If. Bedroom Boolean off: post neither. The Mac stores `life-state/intent.json` and kicks a guess so the log does not wait for the next 5-minute tick.

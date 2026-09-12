@@ -14,56 +14,22 @@
 				<key>UUID</key>
 				<string>D71E4970-F5FB-4ECF-0099-FC3CA8AB8FE9</string>
 				<key>WFCommentActionText</key>
-				<string>Yan Life State Dock. POSTs phone-dock intent to the Mac 5-minute log.
-Stub. Add Get Device Orientation and Bedroom Boolean yourself.
-Only POST when Bedroom Boolean is on.
-Portrait: Intent going_to_shower, Orientation portrait.
-Landscape: Intent going_to_sleep, Orientation landscape.
-Replace the two Set Variable actions, or wrap this POST in your Ifs.
-Hook from the existing plug-in automation, or paste these last actions into it.
-Silent on success. Notifies only if received is not yes.</string>
+				<string>Yan Life State Dock. Two finished POSTs. No variables to fill.
+First POST is shower (going_to_shower, portrait).
+Second POST is sleep (going_to_sleep, landscape).
+Wrap each in your If. Bedroom Boolean off: post neither.
+Do not run both. Silent on success. Notifies if received is not yes.</string>
 			</dict>
 		</dict>
 		<dict>
 			<key>WFWorkflowActionIdentifier</key>
-			<string>is.workflow.actions.setvariable</string>
+			<string>is.workflow.actions.comment</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>UUID</key>
-				<string>CD311E47-A399-A92C-1A1E-6F977078066F</string>
-				<key>WFInput</key>
-				<dict>
-					<key>Value</key>
-					<dict>
-						<key>string</key>
-						<string>going_to_shower</string>
-					</dict>
-					<key>WFSerializationType</key>
-					<string>WFTextTokenString</string>
-				</dict>
-				<key>WFVariableName</key>
-				<string>Intent</string>
-			</dict>
-		</dict>
-		<dict>
-			<key>WFWorkflowActionIdentifier</key>
-			<string>is.workflow.actions.setvariable</string>
-			<key>WFWorkflowActionParameters</key>
-			<dict>
-				<key>UUID</key>
-				<string>B1ED4F7A-C65B-A27C-DC7A-B20B00238D27</string>
-				<key>WFInput</key>
-				<dict>
-					<key>Value</key>
-					<dict>
-						<key>string</key>
-						<string>portrait</string>
-					</dict>
-					<key>WFSerializationType</key>
-					<string>WFTextTokenString</string>
-				</dict>
-				<key>WFVariableName</key>
-				<string>Orientation</string>
+				<string>8415F721-76F7-579D-CD16-D46AAE9C7290</string>
+				<key>WFCommentActionText</key>
+				<string>Shower. Put this Get Contents of URL in the portrait branch.</string>
 			</dict>
 		</dict>
 		<dict>
@@ -72,11 +38,11 @@ Silent on success. Notifies only if received is not yes.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>CustomOutputName</key>
-				<string>Dock POST</string>
+				<string>Shower POST</string>
 				<key>ShowHeaders</key>
 				<true/>
 				<key>UUID</key>
-				<string>293B62D9-0C75-4DBC-7B73-FD82EB449462</string>
+				<string>9288C686-1BB2-59A7-F1CF-FC914AA15D37</string>
 				<key>WFFormValues</key>
 				<dict>
 					<key>Value</key>
@@ -173,13 +139,11 @@ Silent on success. Notifies only if received is not yes.</string>
 								<dict>
 									<key>Value</key>
 									<dict>
-										<key>Type</key>
-										<string>Variable</string>
-										<key>VariableName</key>
-										<string>Intent</string>
+										<key>string</key>
+										<string>going_to_shower</string>
 									</dict>
 									<key>WFSerializationType</key>
-									<string>WFTextTokenAttachment</string>
+									<string>WFTextTokenString</string>
 								</dict>
 							</dict>
 							<dict>
@@ -199,13 +163,11 @@ Silent on success. Notifies only if received is not yes.</string>
 								<dict>
 									<key>Value</key>
 									<dict>
-										<key>Type</key>
-										<string>Variable</string>
-										<key>VariableName</key>
-										<string>Orientation</string>
+										<key>string</key>
+										<string>portrait</string>
 									</dict>
 									<key>WFSerializationType</key>
-									<string>WFTextTokenAttachment</string>
+									<string>WFTextTokenString</string>
 								</dict>
 							</dict>
 						</array>
@@ -223,17 +185,17 @@ Silent on success. Notifies only if received is not yes.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>CustomOutputName</key>
-				<string>Dock Response</string>
+				<string>Shower Response</string>
 				<key>UUID</key>
-				<string>39C5C57C-7D70-E0F2-F733-83499DE31912</string>
+				<string>9A0854A1-F597-9E47-F05E-33E27683C244</string>
 				<key>WFInput</key>
 				<dict>
 					<key>Value</key>
 					<dict>
 						<key>OutputName</key>
-						<string>Dock POST</string>
+						<string>Shower POST</string>
 						<key>OutputUUID</key>
-						<string>293B62D9-0C75-4DBC-7B73-FD82EB449462</string>
+						<string>9288C686-1BB2-59A7-F1CF-FC914AA15D37</string>
 						<key>Type</key>
 						<string>ActionOutput</string>
 					</dict>
@@ -248,9 +210,9 @@ Silent on success. Notifies only if received is not yes.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>CustomOutputName</key>
-				<string>Dock received</string>
+				<string>Shower received</string>
 				<key>UUID</key>
-				<string>4F8C5FD7-23C5-4FAC-FA33-66AC4164912A</string>
+				<string>53AC9AD5-A563-2B23-0C11-EBA684334DB5</string>
 				<key>WFDictionaryKey</key>
 				<string>received</string>
 				<key>WFGetDictionaryValueType</key>
@@ -260,9 +222,9 @@ Silent on success. Notifies only if received is not yes.</string>
 					<key>Value</key>
 					<dict>
 						<key>OutputName</key>
-						<string>Dock Response</string>
+						<string>Shower Response</string>
 						<key>OutputUUID</key>
-						<string>39C5C57C-7D70-E0F2-F733-83499DE31912</string>
+						<string>9A0854A1-F597-9E47-F05E-33E27683C244</string>
 						<key>Type</key>
 						<string>ActionOutput</string>
 					</dict>
@@ -277,9 +239,9 @@ Silent on success. Notifies only if received is not yes.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>2041F597-952D-00D2-D368-3ACDAD212A0E</string>
+				<string>2CA62DEE-86E4-CF5C-8981-C3411740118F</string>
 				<key>UUID</key>
-				<string>E57D643A-5BC3-61CC-8438-34FCB1DA27B3</string>
+				<string>CC721281-2227-97D8-BA68-A54820F55C97</string>
 				<key>WFCondition</key>
 				<integer>4</integer>
 				<key>WFConditionalActionString</key>
@@ -304,9 +266,9 @@ Silent on success. Notifies only if received is not yes.</string>
 								</dict>
 							</array>
 							<key>OutputName</key>
-							<string>Dock received</string>
+							<string>Shower received</string>
 							<key>OutputUUID</key>
-							<string>4F8C5FD7-23C5-4FAC-FA33-66AC4164912A</string>
+							<string>53AC9AD5-A563-2B23-0C11-EBA684334DB5</string>
 							<key>Type</key>
 							<string>ActionOutput</string>
 						</dict>
@@ -322,9 +284,9 @@ Silent on success. Notifies only if received is not yes.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>2041F597-952D-00D2-D368-3ACDAD212A0E</string>
+				<string>2CA62DEE-86E4-CF5C-8981-C3411740118F</string>
 				<key>UUID</key>
-				<string>18FC7E67-392D-D9EE-7455-01E6F8DDB46F</string>
+				<string>DA447E1F-B5FA-F449-66FB-7E3F444F5CEE</string>
 				<key>WFControlFlowMode</key>
 				<integer>1</integer>
 			</dict>
@@ -335,7 +297,7 @@ Silent on success. Notifies only if received is not yes.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>UUID</key>
-				<string>FA453B58-55CE-A8A5-BCE4-DE0A94295DA7</string>
+				<string>A84273D6-46ED-C77B-03A8-C271D1FD0313</string>
 				<key>WFNotificationActionBody</key>
 				<string>Dock intent did not reach the Mac.</string>
 				<key>WFNotificationActionTitle</key>
@@ -348,9 +310,305 @@ Silent on success. Notifies only if received is not yes.</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>GroupingIdentifier</key>
-				<string>2041F597-952D-00D2-D368-3ACDAD212A0E</string>
+				<string>2CA62DEE-86E4-CF5C-8981-C3411740118F</string>
 				<key>UUID</key>
-				<string>C8C8AF17-276D-D406-0EF5-F0370C0577D0</string>
+				<string>3CC18B4D-774A-F400-F435-3206709C7A1C</string>
+				<key>WFControlFlowMode</key>
+				<integer>2</integer>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.comment</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>UUID</key>
+				<string>1CB1BB75-BED9-24A0-18E8-88345B4D83A5</string>
+				<key>WFCommentActionText</key>
+				<string>Sleep. Put this Get Contents of URL in the landscape branch.</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.downloadurl</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>CustomOutputName</key>
+				<string>Sleep POST</string>
+				<key>ShowHeaders</key>
+				<true/>
+				<key>UUID</key>
+				<string>D24E8EAB-0DC1-A942-6554-4635AE503045</string>
+				<key>WFFormValues</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>WFDictionaryFieldValueItems</key>
+						<array/>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFDictionaryFieldValue</string>
+				</dict>
+				<key>WFHTTPBodyType</key>
+				<string>JSON</string>
+				<key>WFHTTPHeaders</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>WFDictionaryFieldValueItems</key>
+						<array>
+							<dict>
+								<key>WFItemType</key>
+								<integer>0</integer>
+								<key>WFKey</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>Authorization</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+								<key>WFValue</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>Bearer __LOCATION_INGEST_TOKEN__</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+							</dict>
+							<dict>
+								<key>WFItemType</key>
+								<integer>0</integer>
+								<key>WFKey</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>Content-Type</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+								<key>WFValue</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>application/json</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+							</dict>
+						</array>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFDictionaryFieldValue</string>
+				</dict>
+				<key>WFHTTPMethod</key>
+				<string>POST</string>
+				<key>WFJSONValues</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>WFDictionaryFieldValueItems</key>
+						<array>
+							<dict>
+								<key>WFItemType</key>
+								<integer>0</integer>
+								<key>WFKey</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>intent</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+								<key>WFValue</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>going_to_sleep</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+							</dict>
+							<dict>
+								<key>WFItemType</key>
+								<integer>0</integer>
+								<key>WFKey</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>orientation</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+								<key>WFValue</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>string</key>
+										<string>landscape</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+							</dict>
+						</array>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFDictionaryFieldValue</string>
+				</dict>
+				<key>WFURL</key>
+				<string>__LIFE_STATE_INTENT_URL__</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.detect.dictionary</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>CustomOutputName</key>
+				<string>Sleep Response</string>
+				<key>UUID</key>
+				<string>CBB33C75-7791-55AE-2E0D-CD50FC1B61CF</string>
+				<key>WFInput</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>OutputName</key>
+						<string>Sleep POST</string>
+						<key>OutputUUID</key>
+						<string>D24E8EAB-0DC1-A942-6554-4635AE503045</string>
+						<key>Type</key>
+						<string>ActionOutput</string>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFTextTokenAttachment</string>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.getvalueforkey</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>CustomOutputName</key>
+				<string>Sleep received</string>
+				<key>UUID</key>
+				<string>BE9E3DFB-3097-ED15-3638-A98E32D62171</string>
+				<key>WFDictionaryKey</key>
+				<string>received</string>
+				<key>WFGetDictionaryValueType</key>
+				<string>Value</string>
+				<key>WFInput</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>OutputName</key>
+						<string>Sleep Response</string>
+						<key>OutputUUID</key>
+						<string>CBB33C75-7791-55AE-2E0D-CD50FC1B61CF</string>
+						<key>Type</key>
+						<string>ActionOutput</string>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFTextTokenAttachment</string>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>BA4EC438-2C09-81C5-200F-3E51E61089EE</string>
+				<key>UUID</key>
+				<string>4C74FCE5-E1E7-BE6F-66FD-5B27E2B716D4</string>
+				<key>WFCondition</key>
+				<integer>4</integer>
+				<key>WFConditionalActionString</key>
+				<string>yes</string>
+				<key>WFControlFlowMode</key>
+				<integer>0</integer>
+				<key>WFInput</key>
+				<dict>
+					<key>Type</key>
+					<string>Variable</string>
+					<key>Variable</key>
+					<dict>
+						<key>Value</key>
+						<dict>
+							<key>Aggrandizements</key>
+							<array>
+								<dict>
+									<key>CoercionItemClass</key>
+									<string>WFStringContentItem</string>
+									<key>Type</key>
+									<string>WFCoercionVariableAggrandizement</string>
+								</dict>
+							</array>
+							<key>OutputName</key>
+							<string>Sleep received</string>
+							<key>OutputUUID</key>
+							<string>BE9E3DFB-3097-ED15-3638-A98E32D62171</string>
+							<key>Type</key>
+							<string>ActionOutput</string>
+						</dict>
+						<key>WFSerializationType</key>
+						<string>WFTextTokenAttachment</string>
+					</dict>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>BA4EC438-2C09-81C5-200F-3E51E61089EE</string>
+				<key>UUID</key>
+				<string>FCE43793-80B2-31CE-8041-948AE10B8331</string>
+				<key>WFControlFlowMode</key>
+				<integer>1</integer>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.notification</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>UUID</key>
+				<string>E5FB1692-5142-15BB-CE02-1AB02CF8AA86</string>
+				<key>WFNotificationActionBody</key>
+				<string>Dock intent did not reach the Mac.</string>
+				<key>WFNotificationActionTitle</key>
+				<string>Yan Life State Dock</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>BA4EC438-2C09-81C5-200F-3E51E61089EE</string>
+				<key>UUID</key>
+				<string>AC8B2813-3BBB-E60C-7C10-859370DC270F</string>
 				<key>WFControlFlowMode</key>
 				<integer>2</integer>
 			</dict>

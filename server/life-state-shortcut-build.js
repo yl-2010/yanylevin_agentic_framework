@@ -43,16 +43,6 @@ function actionOutput(uuid, name) {
   };
 }
 
-function namedVariable(name) {
-  return {
-    Value: {
-      Type: "Variable",
-      VariableName: name,
-    },
-    WFSerializationType: "WFTextTokenAttachment",
-  };
-}
-
 function textToken(string) {
   return {
     Value: { string },
@@ -73,57 +63,22 @@ function dictItem(key, value, itemType = 0) {
   return item;
 }
 
-function setVariableText(id, name, string) {
+function commentAction(id, lines) {
   return {
-    WFWorkflowActionIdentifier: "is.workflow.actions.setvariable",
+    WFWorkflowActionIdentifier: "is.workflow.actions.comment",
     WFWorkflowActionParameters: {
       UUID: id,
-      WFVariableName: name,
-      WFInput: textToken(string),
+      WFCommentActionText: lines.join("\n"),
     },
   };
 }
 
-/**
- * @param {{ token?: string, url?: string }} [opts]
- */
-export function buildWorkflow(opts = {}) {
-  const token = opts.token || TOKEN_PLACEHOLDER;
-  const url = opts.url || URL_PLACEHOLDER;
-  /** @type {object[]} */
-  const actions = [];
-
-  actions.push({
-    WFWorkflowActionIdentifier: "is.workflow.actions.comment",
-    WFWorkflowActionParameters: {
-      UUID: stableUuid("comment"),
-      WFCommentActionText: [
-        "Yan Life State Dock. POSTs phone-dock intent to the Mac 5-minute log.",
-        "Stub. Add Get Device Orientation and Bedroom Boolean yourself.",
-        "Only POST when Bedroom Boolean is on.",
-        "Portrait: Intent going_to_shower, Orientation portrait.",
-        "Landscape: Intent going_to_sleep, Orientation landscape.",
-        "Replace the two Set Variable actions, or wrap this POST in your Ifs.",
-        "Hook from the existing plug-in automation, or paste these last actions into it.",
-        "Silent on success. Notifies only if received is not yes.",
-      ].join("\n"),
-    },
-  });
-
-  actions.push(setVariableText(stableUuid("var-intent"), "Intent", "going_to_shower"));
-  actions.push(setVariableText(stableUuid("var-orientation"), "Orientation", "portrait"));
-
-  const jsonItems = [
-    dictItem("intent", namedVariable("Intent")),
-    dictItem("orientation", namedVariable("Orientation")),
-  ];
-
-  const downloadId = stableUuid("download");
-  actions.push({
+function downloadPost(id, outputName, url, token, intent, orientation) {
+  return {
     WFWorkflowActionIdentifier: "is.workflow.actions.downloadurl",
     WFWorkflowActionParameters: {
-      UUID: downloadId,
-      CustomOutputName: "Dock POST",
+      UUID: id,
+      CustomOutputName: outputName,
       ShowHeaders: true,
       WFHTTPMethod: "POST",
       WFHTTPBodyType: "JSON",
@@ -138,7 +93,12 @@ export function buildWorkflow(opts = {}) {
         WFSerializationType: "WFDictionaryFieldValue",
       },
       WFJSONValues: {
-        Value: { WFDictionaryFieldValueItems: jsonItems },
+        Value: {
+          WFDictionaryFieldValueItems: [
+            dictItem("intent", intent),
+            dictItem("orientation", orientation),
+          ],
+        },
         WFSerializationType: "WFDictionaryFieldValue",
       },
       WFFormValues: {
@@ -146,79 +106,108 @@ export function buildWorkflow(opts = {}) {
         WFSerializationType: "WFDictionaryFieldValue",
       },
     },
-  });
+  };
+}
 
-  const responseDictId = stableUuid("post-dict");
-  actions.push({
-    WFWorkflowActionIdentifier: "is.workflow.actions.detect.dictionary",
-    WFWorkflowActionParameters: {
-      UUID: responseDictId,
-      CustomOutputName: "Dock Response",
-      WFInput: actionOutput(downloadId, "Dock POST"),
-    },
-  });
-
-  const receivedId = stableUuid("post-received");
-  const receivedToken = actionOutput(receivedId, "Dock received");
+function postSuccessCheck(prefix, downloadId, downloadName) {
+  const responseDictId = stableUuid(`${prefix}-post-dict`);
+  const receivedId = stableUuid(`${prefix}-post-received`);
+  const receivedToken = actionOutput(receivedId, `${prefix} received`);
   receivedToken.Value.Aggrandizements = [
     {
       Type: "WFCoercionVariableAggrandizement",
       CoercionItemClass: "WFStringContentItem",
     },
   ];
-  actions.push({
-    WFWorkflowActionIdentifier: "is.workflow.actions.getvalueforkey",
-    WFWorkflowActionParameters: {
-      UUID: receivedId,
-      CustomOutputName: "Dock received",
-      WFDictionaryKey: "received",
-      WFGetDictionaryValueType: "Value",
-      WFInput: actionOutput(responseDictId, "Dock Response"),
-    },
-  });
-
-  const ifGroup = stableUuid("if-post-fail");
-  actions.push({
-    WFWorkflowActionIdentifier: "is.workflow.actions.conditional",
-    WFWorkflowActionParameters: {
-      UUID: stableUuid("if-post-fail-start"),
-      GroupingIdentifier: ifGroup,
-      WFControlFlowMode: 0,
-      WFCondition: 4,
-      WFConditionalActionString: "yes",
-      WFInput: {
-        Type: "Variable",
-        Variable: receivedToken,
+  const ifGroup = stableUuid(`${prefix}-if-post-fail`);
+  return [
+    {
+      WFWorkflowActionIdentifier: "is.workflow.actions.detect.dictionary",
+      WFWorkflowActionParameters: {
+        UUID: responseDictId,
+        CustomOutputName: `${prefix} Response`,
+        WFInput: actionOutput(downloadId, downloadName),
       },
     },
-  });
-  actions.push({
-    WFWorkflowActionIdentifier: "is.workflow.actions.conditional",
-    WFWorkflowActionParameters: {
-      UUID: stableUuid("if-post-fail-otherwise"),
-      GroupingIdentifier: ifGroup,
-      WFControlFlowMode: 1,
+    {
+      WFWorkflowActionIdentifier: "is.workflow.actions.getvalueforkey",
+      WFWorkflowActionParameters: {
+        UUID: receivedId,
+        CustomOutputName: `${prefix} received`,
+        WFDictionaryKey: "received",
+        WFGetDictionaryValueType: "Value",
+        WFInput: actionOutput(responseDictId, `${prefix} Response`),
+      },
     },
-  });
-  actions.push({
-    WFWorkflowActionIdentifier: "is.workflow.actions.notification",
-    WFWorkflowActionParameters: {
-      UUID: stableUuid("notification-fail"),
-      WFNotificationActionTitle: SHORTCUT_NAME,
-      WFNotificationActionBody: "Dock intent did not reach the Mac.",
+    {
+      WFWorkflowActionIdentifier: "is.workflow.actions.conditional",
+      WFWorkflowActionParameters: {
+        UUID: stableUuid(`${prefix}-if-post-fail-start`),
+        GroupingIdentifier: ifGroup,
+        WFControlFlowMode: 0,
+        WFCondition: 4,
+        WFConditionalActionString: "yes",
+        WFInput: {
+          Type: "Variable",
+          Variable: receivedToken,
+        },
+      },
     },
-  });
-  actions.push({
-    WFWorkflowActionIdentifier: "is.workflow.actions.conditional",
-    WFWorkflowActionParameters: {
-      UUID: stableUuid("if-post-fail-end"),
-      GroupingIdentifier: ifGroup,
-      WFControlFlowMode: 2,
+    {
+      WFWorkflowActionIdentifier: "is.workflow.actions.conditional",
+      WFWorkflowActionParameters: {
+        UUID: stableUuid(`${prefix}-if-post-fail-otherwise`),
+        GroupingIdentifier: ifGroup,
+        WFControlFlowMode: 1,
+      },
     },
-  });
+    {
+      WFWorkflowActionIdentifier: "is.workflow.actions.notification",
+      WFWorkflowActionParameters: {
+        UUID: stableUuid(`${prefix}-notification-fail`),
+        WFNotificationActionTitle: SHORTCUT_NAME,
+        WFNotificationActionBody: "Dock intent did not reach the Mac.",
+      },
+    },
+    {
+      WFWorkflowActionIdentifier: "is.workflow.actions.conditional",
+      WFWorkflowActionParameters: {
+        UUID: stableUuid(`${prefix}-if-post-fail-end`),
+        GroupingIdentifier: ifGroup,
+        WFControlFlowMode: 2,
+      },
+    },
+  ];
+}
 
+/**
+ * @param {{ token?: string, url?: string }} [opts]
+ */
+export function buildWorkflow(opts = {}) {
+  const token = opts.token || TOKEN_PLACEHOLDER;
+  const url = opts.url || URL_PLACEHOLDER;
+  const showerId = stableUuid("download-shower");
+  const sleepId = stableUuid("download-sleep");
   return {
-    WFWorkflowActions: actions,
+    WFWorkflowActions: [
+      commentAction(stableUuid("comment"), [
+        "Yan Life State Dock. Two finished POSTs. No variables to fill.",
+        "First POST is shower (going_to_shower, portrait).",
+        "Second POST is sleep (going_to_sleep, landscape).",
+        "Wrap each in your If. Bedroom Boolean off: post neither.",
+        "Do not run both. Silent on success. Notifies if received is not yes.",
+      ]),
+      commentAction(stableUuid("comment-shower"), [
+        "Shower. Put this Get Contents of URL in the portrait branch.",
+      ]),
+      downloadPost(showerId, "Shower POST", url, token, "going_to_shower", "portrait"),
+      ...postSuccessCheck("Shower", showerId, "Shower POST"),
+      commentAction(stableUuid("comment-sleep"), [
+        "Sleep. Put this Get Contents of URL in the landscape branch.",
+      ]),
+      downloadPost(sleepId, "Sleep POST", url, token, "going_to_sleep", "landscape"),
+      ...postSuccessCheck("Sleep", sleepId, "Sleep POST"),
+    ],
     WFWorkflowClientRelease: "26.0",
     WFWorkflowClientVersion: "3607.0.5",
     WFWorkflowHasOutputFallback: false,
