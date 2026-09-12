@@ -13,6 +13,9 @@ node_modules/
 macos/YLCalendar/yl-calendar
 macos/YLCalendar/yl-calendar.app/
 macos/YLCalendar/.build/
+macos/YLHome/yl-home.app/
+macos/YLHome/DerivedData/
+macos/YLHome/YLHome.xcodeproj/
 ios/shortcuts/**/*.signed.shortcut
 ios/shortcuts/yan-health-sync/Yan Health Sync.shortcut
 ios/shortcuts/yan-health-sync/workflow.filled.json

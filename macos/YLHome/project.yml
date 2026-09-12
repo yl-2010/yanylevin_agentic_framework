@@ -1,0 +1,52 @@
+name: YLHome
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: "YOUR_TEAM_ID"
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "Apple Development"
+    SUPPORTS_MACCATALYST: "YES"
+    DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER: "NO"
+    TARGETED_DEVICE_FAMILY: "2"
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+targets:
+  YLHome:
+    type: application
+    platform: iOS
+    sources:
+      - path: .
+        includes:
+          - "*.swift"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.yanylevin.yl-home
+        PRODUCT_NAME: yl-home
+        INFOPLIST_FILE: Info.plist
+        CODE_SIGN_ENTITLEMENTS: YLHome.entitlements
+        SUPPORTS_MACCATALYST: "YES"
+        DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER: "NO"
+        TARGETED_DEVICE_FAMILY: "2"
+        GENERATE_INFOPLIST_FILE: "NO"
+        LD_RUNPATH_SEARCH_PATHS:
+          - "$(inherited)"
+          - "@executable_path/Frameworks"
+    entitlements:
+      path: YLHome.entitlements
+      properties:
+        com.apple.developer.homekit: true
+    scheme:
+      gatherCoverageData: false
+schemes:
+  YLHome:
+    build:
+      targets:
+        YLHome: all
+    run:
+      config: Release
+    archive:
+      config: Release

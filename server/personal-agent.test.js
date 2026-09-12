@@ -60,6 +60,7 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.chats));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.location));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.calendar));
+    assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.home));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.canvas));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.imessage));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.screentime));
@@ -292,6 +293,15 @@ describe("Personal Agent skill files", () => {
     assert.match(calendar, /--url/);
     assert.match(calendar, /zoom\.us\/webinar\/register/);
 
+    const home = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.home), "utf8");
+    assert.match(home, /yl-home/);
+    assert.match(home, /home-cli\.js/);
+    assert.match(home, /HMHomeManager/);
+    assert.match(home, /Yan only/);
+    assert.match(home, /brightness/);
+    assert.match(home, /Do not install Homebridge/);
+    assert.match(home, /paid Apple Developer Program/);
+
     const canvas = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.canvas), "utf8");
     assert.match(canvas, /canvas.instructure.com/);
     assert.match(canvas, /canvasLink/);
@@ -373,6 +383,8 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /identity\.md/);
     assert.match(agent, /same-turn brain writes/i);
     assert.match(agent, /personal-people/);
+    assert.match(agent, /personal-home/);
+    assert.match(agent, /Apple Home/);
     assert.match(agent, /named people/i);
     assert.match(agent, /brain-entity-card\.js/);
     assert.match(agent, /Aliases live on the card/);
