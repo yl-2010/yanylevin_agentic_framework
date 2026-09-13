@@ -255,9 +255,11 @@ enum EducationScheduleHelper {
         return nil
     }
 
-    /// End of the meeting that gates Completed on the class page.
-    /// Due during this class → that period's end. Otherwise the next meeting
-    /// of this class after the due datetime. Nil → move immediately.
+    /// When a checked-off class todo moves to Completed.
+    /// Due before/during this class on a meeting day → that period's end.
+    /// Due after class that same day → the due time.
+    /// Not a meeting day → end of this class's next meeting after the due date.
+    /// Nil → move immediately.
     static func classTodoArchiveAt(
         todo: EducationTodo,
         cls: EducationClass,
@@ -286,16 +288,17 @@ enum EducationScheduleHelper {
                 query: query,
                 activeClassIdsByDate: activeClassIdsByDate
             ),
-               let start = meeting.startMin,
-               let end = meeting.endMin,
-               dueMinutes >= start,
-               dueMinutes < end
+               let end = meeting.endMin
             {
-                return meetingEndDate(day: day, endMin: end)
+                if dueMinutes < end {
+                    return meetingEndDate(day: day, endMin: end)
+                }
+                return meetingEndDate(day: day, endMin: dueMinutes)
             }
         }
 
         for _ in 0..<120 {
+            day = addDays(day, 1)
             if isSchoolDay(day, query: query),
                let meeting = classMeeting(
                 cls,
@@ -305,15 +308,8 @@ enum EducationScheduleHelper {
                ),
                let end = meeting.endMin
             {
-                let isDueDay = dateKey(day) == dueKey
-                if !isDueDay {
-                    return meetingEndDate(day: day, endMin: end)
-                }
-                if let start = meeting.startMin, start > dueMinutes {
-                    return meetingEndDate(day: day, endMin: end)
-                }
+                return meetingEndDate(day: day, endMin: end)
             }
-            day = addDays(day, 1)
         }
         return nil
     }

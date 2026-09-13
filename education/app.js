@@ -1588,9 +1588,11 @@
   }
 
   /**
-   * End of the meeting that gates Completed on the class page.
-   * Due during this class → that period's end. Otherwise the next meeting
-   * of this class after the due datetime. Null → move immediately.
+   * When a checked-off class todo moves to Completed.
+   * Due before/during this class on a meeting day → that period's end.
+   * Due after class that same day → the due time.
+   * Not a meeting day → end of this class's next meeting after the due date.
+   * Null → move immediately.
    */
   function classTodoArchiveMeeting(todo, cls, schedule) {
     const dueDay = ymdPartsFromKey(todo?.dueDate);
@@ -1600,30 +1602,20 @@
 
     if (isSchoolDay(dueDay, schedule)) {
       const sameDay = classMeetingOnDay(cls, dueDay, schedule);
-      if (
-        sameDay &&
-        sameDay.startMin != null &&
-        sameDay.endMin != null &&
-        dueMinutes >= sameDay.startMin &&
-        dueMinutes < sameDay.endMin
-      ) {
-        return { dateKey: dateKeyOf(dueDay), endMin: sameDay.endMin };
+      if (sameDay && sameDay.endMin != null) {
+        if (dueMinutes < sameDay.endMin) {
+          return { dateKey: dateKeyOf(dueDay), endMin: sameDay.endMin };
+        }
+        return { dateKey: dateKeyOf(dueDay), endMin: dueMinutes };
       }
     }
 
-    let day = { ...dueDay };
+    let day = addDays(dueDay.y, dueDay.m, dueDay.day, 1);
     for (let i = 0; i < 120; i++) {
       if (isSchoolDay(day, schedule)) {
         const meeting = classMeetingOnDay(cls, day, schedule);
         if (meeting && meeting.endMin != null) {
-          const isDueDay =
-            day.y === dueDay.y && day.m === dueDay.m && day.day === dueDay.day;
-          if (
-            !isDueDay ||
-            (meeting.startMin != null && meeting.startMin > dueMinutes)
-          ) {
-            return { dateKey: dateKeyOf(day), endMin: meeting.endMin };
-          }
+          return { dateKey: dateKeyOf(day), endMin: meeting.endMin };
         }
       }
       day = addDays(day.y, day.m, day.day, 1);
