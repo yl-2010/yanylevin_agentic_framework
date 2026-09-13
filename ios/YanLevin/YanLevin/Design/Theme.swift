@@ -7,14 +7,12 @@ enum YLTheme {
     static let lightFg = Color(red: 0x14 / 255, green: 0x18 / 255, blue: 0x1D / 255)
     static let lightMuted = Color(red: 0x5A / 255, green: 0x64 / 255, blue: 0x70 / 255)
     static let lightAccent = Color(red: 0x1B / 255, green: 0x7D / 255, blue: 0x8A / 255)
-    static let lightGrade = Color(red: 0x25 / 255, green: 0x63 / 255, blue: 0xEB / 255)
 
     static let darkBg0 = Color(red: 0x0B / 255, green: 0x0E / 255, blue: 0x11 / 255)
     static let darkBg1 = Color(red: 0x0F / 255, green: 0x14 / 255, blue: 0x1A / 255)
     static let darkFg = Color(red: 0xE9 / 255, green: 0xEE / 255, blue: 0xF2 / 255)
     static let darkMuted = Color(red: 0x98 / 255, green: 0xA2 / 255, blue: 0xAD / 255)
     static let darkAccent = Color(red: 0x71 / 255, green: 0xC4 / 255, blue: 0xC2 / 255)
-    static let darkGrade = Color(red: 0x60 / 255, green: 0xA5 / 255, blue: 0xFA / 255)
 
     /// Website chat send tint (`--chat-orange`).
     static let chatOrange = Color(red: 0xFD / 255, green: 0x58 / 255, blue: 0x02 / 255)
@@ -38,10 +36,6 @@ enum YLTheme {
 
     static func accent(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? darkAccent : lightAccent
-    }
-
-    static func grade(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? darkGrade : lightGrade
     }
 
     static func chatSend(_ scheme: ColorScheme) -> Color {

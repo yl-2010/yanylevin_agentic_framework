@@ -362,7 +362,7 @@ struct EducationView: View {
             if !dayClass.cls.scoreLabel.isEmpty {
                 Text(dayClass.cls.scoreLabel)
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(YLTheme.grade(colorScheme))
+                    .foregroundStyle(YLTheme.accent(colorScheme))
                     .monospacedDigit()
             }
         }
@@ -1369,7 +1369,7 @@ private struct CanvasToolbarButton: View {
                 } else {
                     Text(scoreLabel)
                         .font(.system(size: scoreLabel.count > 6 ? 9 : 11, weight: .bold))
-                        .foregroundStyle(YLTheme.grade(colorScheme))
+                        .foregroundStyle(YLTheme.accent(colorScheme))
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -1613,7 +1613,7 @@ private struct EducationDateItemRow: View {
             if let todo = item.todoValue, !todo.scoreLabel.isEmpty {
                 Text(todo.scoreLabel)
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(YLTheme.grade(colorScheme))
+                    .foregroundStyle(YLTheme.accent(colorScheme))
                     .monospacedDigit()
                     .strikethrough(false)
                     .padding(.top, 2)
@@ -1987,7 +1987,7 @@ private struct EducationTodoRow: View {
             if !todo.scoreLabel.isEmpty {
                 Text(todo.scoreLabel)
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(YLTheme.grade(colorScheme))
+                    .foregroundStyle(YLTheme.accent(colorScheme))
                     .monospacedDigit()
                     .strikethrough(false)
                     .padding(.top, 3)

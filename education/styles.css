@@ -4,7 +4,6 @@
   --fg: #14181d;
   --muted: #5a6470;
   --accent: #1b7d8a;
-  --grade: #2563eb;
   --hairline: rgba(20, 24, 29, 0.12);
   --panel-bg: rgba(255, 255, 255, 0.5);
   --panel-brd: rgba(255, 255, 255, 0.6);
@@ -65,7 +64,6 @@
     --fg: #e9eef2;
     --muted: #98a2ad;
     --accent: #71c4c2;
-    --grade: #60a5fa;
     --hairline: rgba(233, 238, 242, 0.12);
     --panel-bg: rgba(26, 31, 37, 0.45);
     --panel-brd: rgba(255, 255, 255, 0.1);
@@ -92,7 +90,6 @@ html[data-resolved-theme="dark"] {
   --fg: #e9eef2;
   --muted: #98a2ad;
   --accent: #71c4c2;
-  --grade: #60a5fa;
   --hairline: rgba(233, 238, 242, 0.12);
   --panel-bg: rgba(26, 31, 37, 0.45);
   --panel-brd: rgba(255, 255, 255, 0.1);
@@ -1107,7 +1104,7 @@ html[data-resolved-theme="light"] .edu-filter.is-on {
   flex-shrink: 0;
   font-size: var(--text-caption);
   font-weight: 700;
-  color: var(--grade);
+  color: var(--accent);
   letter-spacing: -0.02em;
 }
 
@@ -1125,7 +1122,7 @@ html[data-resolved-theme="light"] .edu-filter.is-on {
 }
 
 .edu-canvas-orb--score {
-  color: var(--grade);
+  color: var(--accent);
 }
 
 .edu-canvas-orb-score {

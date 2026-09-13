@@ -241,7 +241,7 @@ struct TodoWidgetView: View {
                     if !todo.scoreLabel.isEmpty {
                         Text(todo.scoreLabel)
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(WidgetTheme.grade)
+                            .foregroundStyle(WidgetTheme.accent)
                             .strikethrough(false)
                     }
                 }
@@ -359,7 +359,7 @@ struct TodoWidgetView: View {
                         if !todo.scoreLabel.isEmpty {
                             Text(todo.scoreLabel)
                                 .font(.caption2.weight(.bold))
-                                .foregroundStyle(WidgetTheme.grade)
+                                .foregroundStyle(WidgetTheme.accent)
                                 .strikethrough(false)
                         }
                     }
