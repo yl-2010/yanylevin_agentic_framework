@@ -821,7 +821,7 @@ final class EducationStore: ObservableObject {
         }
     }
 
-    func load(token: String) async {
+    func load(token: String, animated: Bool = false) async {
         let showLoading = tree == nil
         if showLoading { isLoading = true }
         if errorText != nil { errorText = nil }
@@ -848,7 +848,13 @@ final class EducationStore: ObservableObject {
             let stable = Self.stableEducationPayload(data)
             if lastEducationData != stable {
                 lastEducationData = stable
-                tree = res
+                if animated {
+                    withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+                        tree = res
+                    }
+                } else {
+                    tree = res
+                }
                 AppGroupStore.cacheEducationData(data)
                 treeEpoch += 1
             }
@@ -883,7 +889,7 @@ final class EducationStore: ObservableObject {
                 bearer: token,
                 query: query
             )
-            await load(token: token)
+            await load(token: token, animated: true)
         } catch {
             errorText = error.localizedDescription
         }

@@ -359,6 +359,12 @@ struct EducationView: View {
                 .font(.body.weight(.semibold))
                 .foregroundStyle(YLTheme.fg(colorScheme))
             Spacer(minLength: 0)
+            if !dayClass.cls.scoreLabel.isEmpty {
+                Text(dayClass.cls.scoreLabel)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(YLTheme.grade(colorScheme))
+                    .monospacedDigit()
+            }
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 8)
@@ -573,7 +579,7 @@ struct ClassDetailView: View {
         .toolbar {
             if let url = liveClass.canvasURL {
                 ToolbarItem(placement: .topBarTrailing) {
-                    CanvasToolbarButton(webURL: url)
+                    CanvasToolbarButton(webURL: url, scoreLabel: liveClass.scoreLabel)
                 }
             }
         }
@@ -1284,7 +1290,7 @@ struct TodoDetailView: View {
         .toolbar {
             if let url = liveTodo.canvasURL {
                 ToolbarItem(placement: .topBarTrailing) {
-                    CanvasToolbarButton(webURL: url)
+                    CanvasToolbarButton(webURL: url, scoreLabel: liveTodo.scoreLabel)
                 }
             }
         }
@@ -1345,25 +1351,38 @@ struct TodoDetailView: View {
 /// Opens Canvas Student (`canvas-courses://`) when installed, otherwise Safari.
 private struct CanvasToolbarButton: View {
     let webURL: URL
+    var scoreLabel: String = ""
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Button {
             open()
         } label: {
-            Image("CanvasMark")
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 18, height: 18)
-                .foregroundStyle(YLTheme.fg(colorScheme))
-                .frame(width: 36, height: 36)
-                .contentShape(Circle())
-                .modifier(CanvasToolbarChrome())
+            Group {
+                if scoreLabel.isEmpty {
+                    Image("CanvasMark")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 18, height: 18)
+                        .foregroundStyle(YLTheme.fg(colorScheme))
+                } else {
+                    Text(scoreLabel)
+                        .font(.system(size: scoreLabel.count > 6 ? 9 : 11, weight: .bold))
+                        .foregroundStyle(YLTheme.grade(colorScheme))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .padding(.horizontal, 2)
+                }
+            }
+            .frame(width: 36, height: 36)
+            .contentShape(Circle())
+            .modifier(CanvasToolbarChrome())
         }
         .buttonStyle(.plain)
         .ylHapticOnTap()
-        .accessibilityLabel("Open in Canvas")
+        .accessibilityLabel(scoreLabel.isEmpty ? "Open in Canvas" : "Open in Canvas, \(scoreLabel)")
     }
 
     private func open() {
@@ -1447,6 +1466,7 @@ private struct EducationTodoPanel: View {
                             )
                         }
                     }
+                    .animation(.spring(response: 0.42, dampingFraction: 0.86), value: todos.map(\.id))
                 }
             }
         }
@@ -1561,32 +1581,42 @@ private struct EducationDateItemRow: View {
 
     private var rowLabel: some View {
         let when = NaturalWhen.format(date: item.date, time: item.time, use24Hour: use24Hour)
-        return VStack(alignment: .leading, spacing: 4) {
-            if let todo = item.todoValue {
-                EducationTodoTitle(todo: todo, font: .body.weight(.semibold))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                Text(item.name)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(YLTheme.fg(colorScheme))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+        return HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                if let todo = item.todoValue {
+                    EducationTodoTitle(todo: todo, font: .body.weight(.semibold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text(item.name)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(YLTheme.fg(colorScheme))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
 
-            HStack(spacing: 8) {
-                if let className = item.className, !className.isEmpty {
-                    Text(className)
-                        .font(.caption)
-                        .foregroundStyle(YLTheme.muted(colorScheme))
-                } else if let projectName = item.projectName, !projectName.isEmpty {
-                    Text(projectName)
-                        .font(.caption)
-                        .foregroundStyle(YLTheme.muted(colorScheme))
+                HStack(spacing: 8) {
+                    if let className = item.className, !className.isEmpty {
+                        Text(className)
+                            .font(.caption)
+                            .foregroundStyle(YLTheme.muted(colorScheme))
+                    } else if let projectName = item.projectName, !projectName.isEmpty {
+                        Text(projectName)
+                            .font(.caption)
+                            .foregroundStyle(YLTheme.muted(colorScheme))
+                    }
+                    if !when.isEmpty {
+                        Text(when)
+                            .font(.caption)
+                            .foregroundStyle(YLTheme.muted(colorScheme))
+                    }
                 }
-                if !when.isEmpty {
-                    Text(when)
-                        .font(.caption)
-                        .foregroundStyle(YLTheme.muted(colorScheme))
-                }
+            }
+            if let todo = item.todoValue, !todo.scoreLabel.isEmpty {
+                Text(todo.scoreLabel)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(YLTheme.grade(colorScheme))
+                    .monospacedDigit()
+                    .strikethrough(false)
+                    .padding(.top, 2)
             }
         }
         .padding(.vertical, 8)
@@ -1953,6 +1983,15 @@ private struct EducationTodoRow: View {
             }
             .buttonStyle(.plain)
             .ylHapticNavigation()
+
+            if !todo.scoreLabel.isEmpty {
+                Text(todo.scoreLabel)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(YLTheme.grade(colorScheme))
+                    .monospacedDigit()
+                    .strikethrough(false)
+                    .padding(.top, 3)
+            }
         }
         .padding(.vertical, 8)
     }

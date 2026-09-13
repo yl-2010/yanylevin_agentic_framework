@@ -109,12 +109,35 @@
     }
   }
 
-  function canvasOrbHtml(rawLink) {
+  function canvasOrbHtml(rawLink, scoreLabel) {
     const href = normalizeCanvasLink(rawLink);
     if (!href) return "";
-    return `<div class="edu-canvas-slot"><a class="corner circle edu-canvas-orb" data-liquid-glass="circle" data-filter-id="lg-edu-canvas" href="${escapeHtml(
+    const label = String(scoreLabel || "").trim();
+    const inner = label
+      ? `<span class="edu-canvas-orb-score">${escapeHtml(label)}</span>`
+      : CANVAS_ICON_SVG;
+    const aria = label ? `Open in Canvas, ${label}` : "Open in Canvas";
+    return `<div class="edu-canvas-slot"><a class="corner circle edu-canvas-orb${
+      label ? " edu-canvas-orb--score" : ""
+    }" data-liquid-glass="circle" data-filter-id="lg-edu-canvas" href="${escapeHtml(
       href
-    )}" target="_blank" rel="noopener noreferrer" aria-label="Open in Canvas">${CANVAS_ICON_SVG}</a></div>`;
+    )}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(
+      aria
+    )}">${inner}</a></div>`;
+  }
+
+  function todoScoreLabel(t) {
+    return String(t?.canvasWork?.display || "").trim();
+  }
+
+  function classScoreLabel(cls) {
+    return String(cls?.canvasScoreLabel || "").trim();
+  }
+
+  function scoreHtml(label) {
+    const text = String(label || "").trim();
+    if (!text) return "";
+    return `<span class="edu-score">${escapeHtml(text)}</span>`;
   }
 
   /** Course gradebook from a Canvas assignment/syllabus/course URL. */
@@ -1262,6 +1285,7 @@
         isMA,
         tag: todoTagKey(t),
         href: todoHref(t),
+        canvasWork: t.canvasWork || null,
       });
     });
     return out;
@@ -1463,6 +1487,7 @@
         <span class="edu-name">${taggedNameHtml(tag, t.name || t.id)}</span>
         ${klass}${due}
       </a>
+      ${scoreHtml(todoScoreLabel(t))}
     </li>`;
   }
 
@@ -1512,6 +1537,8 @@
             classId: item.classId || null,
             projectId: item.projectId || null,
           });
+    const score =
+      item.source === "todo" ? scoreHtml(todoScoreLabel(item)) : "";
     return `<li class="edu-row">
       <a class="edu-row-link" href="${escapeHtml(href)}" data-date-item-source="${escapeHtml(
       item.source || "date"
@@ -1519,6 +1546,7 @@
         <span class="edu-name">${nameHtml}</span>
         ${klass}${when}
       </a>
+      ${score}
     </li>`;
   }
 
@@ -1543,6 +1571,7 @@
       <a class="edu-row-link" href="${href}">
         <span class="edu-tag edu-period">${escapeHtml(m.period)}</span>
         <span class="edu-name">${escapeHtml(classScheduleName(m.class))}</span>
+        ${scoreHtml(classScoreLabel(m.class))}
       </a>
     </li>`;
   }
@@ -1870,8 +1899,8 @@
     )})" d="${EDU_BACK_PATH}"/></svg><span class="edu-back-glass" aria-hidden="true"></span></a>`;
   }
 
-  function detailShell(backHref, title, bodyHtml, filterId, { canvasLink = "", filesHtml = "", titleHtml = "" } = {}) {
-    const canvas = canvasOrbHtml(canvasLink);
+  function detailShell(backHref, title, bodyHtml, filterId, { canvasLink = "", filesHtml = "", titleHtml = "", canvasScore = "" } = {}) {
+    const canvas = canvasOrbHtml(canvasLink, canvasScore);
     return `
       <header class="edu-hero edu-hero--detail${canvas ? " edu-hero--detail-canvas" : ""}">
         <div class="edu-hero-lead">
@@ -1969,7 +1998,7 @@
       : "";
     const name = escapeHtml(classScheduleName(cls));
     const classDesc = String(cls.description || "").trim();
-    const canvas = canvasOrbHtml(classCanvasLink(cls));
+    const canvas = canvasOrbHtml(classCanvasLink(cls), classScoreLabel(cls));
 
     appEl.innerHTML = `
       <header class="edu-hero edu-hero--detail${canvas ? " edu-hero--detail-canvas" : ""}">
@@ -2204,6 +2233,7 @@
       canvasLink: t.canvasLink,
       filesHtml: fileTiles,
       titleHtml: taggedNameHtml(tag, t.name || t.id),
+      canvasScore: todoScoreLabel(t),
     });
   }
 
@@ -2396,6 +2426,31 @@
     return `${idSel}:not([data-todo-class-id]):not([data-todo-project-id])`;
   }
 
+  function prefersReducedMotion() {
+    return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+  }
+
+  function animateTodoRowMove(row, destList, todo, isDone) {
+    const first = prefersReducedMotion() ? null : row.getBoundingClientRect();
+    insertTodoRowSorted(destList, row, todo, isDone);
+    if (!first) return;
+    const last = row.getBoundingClientRect();
+    const dx = first.left - last.left;
+    const dy = first.top - last.top;
+    if (!dx && !dy) return;
+    row.classList.add("is-todo-animating");
+    row.style.transform = `translate(${dx}px, ${dy}px)`;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        row.style.transform = "";
+      });
+    });
+    window.setTimeout(() => {
+      row.classList.remove("is-todo-animating");
+      row.style.transform = "";
+    }, 500);
+  }
+
   /**
    * Update only the affected todo UI — no page rebuild, no entrance animation.
    * @returns {boolean} whether a DOM patch was applied
@@ -2448,12 +2503,11 @@
     const targetList = ensurePanelList(targetPanel);
 
     if (row.parentElement !== targetList) {
-      row.remove();
-      insertTodoRowSorted(targetList, row, todo, !stayOpen);
+      animateTodoRowMove(row, targetList, todo, !stayOpen);
       syncTodoDaySeparators(openPanel.querySelector(":scope > .edu-list"));
       markPanelEmptyIfNeeded(sourcePanel);
       if (!todoExpanded) {
-        render({ scroll: "keep" });
+        window.setTimeout(() => render({ scroll: "keep" }), 520);
         return true;
       }
     }

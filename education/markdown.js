@@ -29,6 +29,29 @@
     return String(url || "").replace(/[),.;:!?]+$/g, "");
   }
 
+  function katexApi() {
+    if (typeof globalThis !== "undefined" && globalThis.katex) return globalThis.katex;
+    if (typeof window !== "undefined" && window.katex) return window.katex;
+    return null;
+  }
+
+  function renderMath(tex, display) {
+    const src = String(tex || "").trim();
+    const api = katexApi();
+    const cls = display ? "md-math md-math--display" : "md-math";
+    if (api) {
+      try {
+        return `<span class="${cls}">${api.renderToString(src, {
+          throwOnError: false,
+          displayMode: Boolean(display),
+        })}</span>`;
+      } catch {
+        /* fall through */
+      }
+    }
+    return `<span class="${cls}">${escapeHtml(src)}</span>`;
+  }
+
   /**
    * @param {string} raw
    * @param {{ footnoteOrder: string[], footnoteIds: Set<string> }} ctx
@@ -46,6 +69,13 @@
     s = s.replace(/`([^`]+)`/g, (_, code) =>
       hold(`<code>${escapeHtml(code)}</code>`)
     );
+
+    s = s.replace(/\$\$([\s\S]+?)\$\$/g, (_, tex) => hold(renderMath(tex, true)));
+    s = s.replace(/(^|[^$0-9])\$([^$\n]+?)\$(?![$0-9])/g, (m, pre, tex) => {
+      const inner = String(tex);
+      if (!inner.trim() || /^\s|\s$/.test(inner)) return m;
+      return pre + hold(renderMath(inner, false));
+    });
 
     s = s.replace(/!\[([^\]]*)\]\(((?:[^()\s]|\([^)]*\))+)(?:\s+"[^"]*")?\)/g, (_, alt, url) => {
       const href = safeUrl(url);

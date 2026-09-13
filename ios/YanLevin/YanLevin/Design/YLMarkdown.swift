@@ -120,6 +120,46 @@ enum YLMarkdown {
                 }
             }
 
+            if rest.hasPrefix("$$"),
+               let end = findClose(raw, from: raw.index(i, offsetBy: 2), mark: "$$")
+            {
+                let tex = String(raw[raw.index(i, offsetBy: 2)..<end])
+                var run = AttributedString(tex)
+                run.font = font.italic().monospaced()
+                run.foregroundColor = fg
+                result.append(run)
+                i = raw.index(end, offsetBy: 2)
+                continue
+            }
+
+            if rest.hasPrefix("$"),
+               !rest.hasPrefix("$$"),
+               let after = Optional(raw.index(after: i)),
+               after < raw.endIndex,
+               !raw[after].isNumber,
+               let end = findClose(raw, from: after, mark: "$"),
+               end != after
+            {
+                let next = raw.index(after: end)
+                if next < raw.endIndex, raw[next].isNumber {
+                    appendText(String(raw[i]))
+                    i = raw.index(after: i)
+                    continue
+                }
+                let tex = String(raw[after..<end])
+                if tex.first?.isWhitespace == true || tex.last?.isWhitespace == true {
+                    appendText(String(raw[i]))
+                    i = raw.index(after: i)
+                    continue
+                }
+                var run = AttributedString(tex)
+                run.font = font.italic().monospaced()
+                run.foregroundColor = fg
+                result.append(run)
+                i = raw.index(after: end)
+                continue
+            }
+
             if rest.hasPrefix("***"),
                let end = findClose(raw, from: raw.index(i, offsetBy: 3), mark: "***")
             {

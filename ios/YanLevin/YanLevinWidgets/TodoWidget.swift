@@ -238,6 +238,12 @@ struct TodoWidgetView: View {
                         .strikethrough(completed, color: WidgetTheme.muted)
                         .lineLimit(1)
                     Spacer(minLength: 0)
+                    if !todo.scoreLabel.isEmpty {
+                        Text(todo.scoreLabel)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(WidgetTheme.grade)
+                            .strikethrough(false)
+                    }
                 }
                 .contentShape(Rectangle())
             }
@@ -349,6 +355,13 @@ struct TodoWidgetView: View {
                             .foregroundStyle(completed ? WidgetTheme.muted : WidgetTheme.fg)
                             .strikethrough(completed, color: WidgetTheme.muted)
                             .lineLimit(1)
+                        Spacer(minLength: 0)
+                        if !todo.scoreLabel.isEmpty {
+                            Text(todo.scoreLabel)
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(WidgetTheme.grade)
+                                .strikethrough(false)
+                        }
                     }
                     if showMeta {
                         HStack(spacing: 6) {

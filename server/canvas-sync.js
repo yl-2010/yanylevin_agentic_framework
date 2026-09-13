@@ -319,15 +319,41 @@ async function canvasGetAll(base, token, path) {
   return out;
 }
 
-function courseGrade(course) {
-  const enrollments = Array.isArray(course?.enrollments) ? course.enrollments : [];
-  const grades = enrollments[0]?.grades || enrollments[0] || {};
-  return clip(
-    grades.current_grade ||
-      grades.final_grade ||
-      (grades.current_score != null ? String(grades.current_score) : ""),
-    24
+function firstStudentEnrollment(course, extra = null) {
+  const listed = Array.isArray(course?.enrollments) ? course.enrollments : [];
+  const student = listed.find((e) =>
+    String(e?.type || e?.role || "").toLowerCase().includes("student")
   );
+  return extra || student || listed[0] || null;
+}
+
+function courseScores(course, extraEnrollment = null) {
+  const enrollment = firstStudentEnrollment(course, extraEnrollment) || {};
+  const grades =
+    enrollment.grades && typeof enrollment.grades === "object"
+      ? enrollment.grades
+      : enrollment;
+  const currentScore = Number(
+    grades.current_score ??
+      grades.final_score ??
+      enrollment.computed_current_score ??
+      enrollment.computed_final_score ??
+      enrollment.current_period_computed_current_score ??
+      course?.current_score
+  );
+  const letter =
+    grades.current_grade ||
+    grades.final_grade ||
+    enrollment.computed_current_grade ||
+    enrollment.computed_final_grade ||
+    "";
+  return {
+    grade: clip(
+      letter || (Number.isFinite(currentScore) ? String(currentScore) : ""),
+      24
+    ),
+    currentScore: Number.isFinite(currentScore) ? currentScore : null,
+  };
 }
 
 function assignmentRow(item, course, timeZone) {
@@ -343,6 +369,15 @@ function assignmentRow(item, course, timeZone) {
     ? item.submission_types.map((t) => clip(t, 40)).filter(Boolean)
     : [];
   const points = Number(item?.points_possible);
+  const sub =
+    item?.submission && typeof item.submission === "object"
+      ? item.submission
+      : null;
+  const score = Number(sub?.score ?? sub?.entered_score ?? sub?.published_score);
+  const gradeText = String(sub?.grade || sub?.entered_grade || "");
+  const pctFromGrade = /%$/.test(gradeText)
+    ? Number(gradeText.replace(/%$/, ""))
+    : NaN;
   return {
     id: item?.id ?? null,
     courseId: course?.id ?? item?.course_id ?? null,
@@ -353,6 +388,13 @@ function assignmentRow(item, course, timeZone) {
     dueTime: local.dueTime,
     htmlUrl: clip(item?.html_url, 400),
     points: Number.isFinite(points) ? points : null,
+    pointsPossible: Number.isFinite(points) ? points : null,
+    score: Number.isFinite(score) ? score : null,
+    percent: Number.isFinite(pctFromGrade) ? pctFromGrade : null,
+    grade: clip(gradeText, 24),
+    submittedAt: sub?.submitted_at || "",
+    workflowState: clip(sub?.workflow_state, 24),
+    excused: Boolean(sub?.excused),
     types,
     description: stripHtml(item?.description, 1500),
   };
@@ -536,7 +578,8 @@ async function writeLastAgentSync(dir, payload) {
 
 /**
  * Pull dashboard-matching courses, then their assignments, syllabi, and events.
- * Prior-year / extra enrollments are listed by Canvas but not stored. No submission/done.
+ * Prior-year / extra enrollments are listed by Canvas but not stored. Does not
+ * copy Canvas done state onto education todos. Submissions are for scores only.
  * @param {{ dir?: string, timeZone?: string }} [opts]
  */
 export async function fetchCanvasSnapshot(opts = {}) {
@@ -552,12 +595,29 @@ export async function fetchCanvasSnapshot(opts = {}) {
   const coursesRaw = await canvasGetAll(
     base,
     token,
-    `/api/v1/courses?enrollment_state=current_and_future&per_page=50&include[]=total_scores&include[]=current_grading_period_scores`
+    `/api/v1/courses?enrollment_state=current_and_future&per_page=50&include[]=enrollments&include[]=total_scores&include[]=current_grading_period_scores`
   );
   const visible = coursesRaw.filter((c) => c && !c.access_restricted_by_date);
   const classNames = await listDashboardClassNames();
   const { keep: courses, skip } = selectDashboardCanvasCourses(visible, classNames);
   const courseById = new Map(courses.map((c) => [c.id, c]));
+  /** @type {Map<number, object>} */
+  const enrollmentByCourse = new Map();
+  try {
+    const ownEnrollments = await canvasGetAll(
+      base,
+      token,
+      `/api/v1/users/self/enrollments?state[]=active&state[]=invited&per_page=50`
+    );
+    for (const row of ownEnrollments) {
+      const id = Number(row?.course_id);
+      if (Number.isFinite(id) && !enrollmentByCourse.has(id)) {
+        enrollmentByCourse.set(id, row);
+      }
+    }
+  } catch (err) {
+    console.error("[canvas-sync] enrollments", err);
+  }
 
   for (const course of courses) {
     try {
@@ -581,7 +641,7 @@ export async function fetchCanvasSnapshot(opts = {}) {
       const rows = await canvasGetAll(
         base,
         token,
-        `/api/v1/courses/${course.id}/assignments?per_page=50&order_by=due_at`
+        `/api/v1/courses/${course.id}/assignments?per_page=50&order_by=due_at&include[]=submission`
       );
       for (const item of rows) {
         const row = assignmentRow(item, course, timeZone);
@@ -621,15 +681,19 @@ export async function fetchCanvasSnapshot(opts = {}) {
     timezone: timeZone,
     dateKey,
     skippedCourseCount: skip.length,
-    courses: courses.map((c) => ({
-      id: c.id,
-      name: clip(c.name, 120),
-      courseCode: clip(c.course_code, 40),
-      htmlUrl: `${base}/courses/${c.id}`,
-      syllabusUrl: `${base}/courses/${c.id}/assignments/syllabus`,
-      grade: courseGrade(c),
-      syllabus: stripHtml(c.syllabus_body, 8000),
-    })),
+    courses: courses.map((c) => {
+      const scores = courseScores(c, enrollmentByCourse.get(Number(c.id)));
+      return {
+        id: c.id,
+        name: clip(c.name, 120),
+        courseCode: clip(c.course_code, 40),
+        htmlUrl: `${base}/courses/${c.id}`,
+        syllabusUrl: `${base}/courses/${c.id}/assignments/syllabus`,
+        grade: scores.grade,
+        currentScore: scores.currentScore,
+        syllabus: stripHtml(c.syllabus_body, 8000),
+      };
+    }),
     assignments,
     events,
   };

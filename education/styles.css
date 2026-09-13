@@ -4,6 +4,7 @@
   --fg: #14181d;
   --muted: #5a6470;
   --accent: #1b7d8a;
+  --grade: #2563eb;
   --hairline: rgba(20, 24, 29, 0.12);
   --panel-bg: rgba(255, 255, 255, 0.5);
   --panel-brd: rgba(255, 255, 255, 0.6);
@@ -64,6 +65,7 @@
     --fg: #e9eef2;
     --muted: #98a2ad;
     --accent: #71c4c2;
+    --grade: #60a5fa;
     --hairline: rgba(233, 238, 242, 0.12);
     --panel-bg: rgba(26, 31, 37, 0.45);
     --panel-brd: rgba(255, 255, 255, 0.1);
@@ -90,6 +92,7 @@ html[data-resolved-theme="dark"] {
   --fg: #e9eef2;
   --muted: #98a2ad;
   --accent: #71c4c2;
+  --grade: #60a5fa;
   --hairline: rgba(233, 238, 242, 0.12);
   --panel-bg: rgba(26, 31, 37, 0.45);
   --panel-brd: rgba(255, 255, 255, 0.1);
@@ -1020,7 +1023,8 @@ html[data-resolved-theme="light"] .edu-filter.is-on {
 }
 
 .edu-row.edu-todo,
-.edu-row.edu-class-row {
+.edu-row.edu-class-row,
+.edu-row:has(.edu-score) {
   align-items: center;
 }
 
@@ -1096,6 +1100,67 @@ html[data-resolved-theme="light"] .edu-filter.is-on {
   opacity: 0.55;
   text-decoration: line-through;
   text-decoration-thickness: 1px;
+}
+
+.edu-score {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: var(--text-caption);
+  font-weight: 700;
+  color: var(--grade);
+  letter-spacing: -0.02em;
+}
+
+.edu-todo.is-done .edu-score,
+.edu-todo.is-done .edu-row-link .edu-score {
+  opacity: 1;
+  text-decoration: none;
+}
+
+.edu-todo.is-todo-animating {
+  z-index: 4;
+  pointer-events: none;
+  transition: transform 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.edu-canvas-orb--score {
+  color: var(--grade);
+}
+
+.edu-canvas-orb-score {
+  display: block;
+  max-width: calc(var(--corner-orb) - 8px);
+  padding: 0 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  text-align: center;
+}
+
+.md-math {
+  font-style: italic;
+  color: inherit;
+}
+
+.md-math .katex,
+.md-math .katex * {
+  color: inherit;
+}
+
+.md-math .katex {
+  font-size: 1.05em;
+}
+
+.md-math--display {
+  display: block;
+  margin: 0.55rem 0;
+  overflow-x: auto;
+}
+
+.md-math--display .katex-display {
+  margin: 0;
 }
 
 .edu-class-row.is-current {

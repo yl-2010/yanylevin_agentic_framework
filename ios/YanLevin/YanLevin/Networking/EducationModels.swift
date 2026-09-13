@@ -142,6 +142,8 @@ struct EducationClass: Decodable, Identifiable, Hashable {
     let detail: String?
     /// Optional Canvas gradebook URL — toolbar button only when set (or derived).
     let canvasLink: String?
+    /// Course percent from the Canvas snapshot, already formatted (`94.25%`).
+    let canvasScoreLabel: String?
     let files: [EducationContextFile]?
     let todos: [EducationTodo]?
     /// Todos with hiddenFromHome. Class pages merge these; home lists ignore them.
@@ -149,7 +151,7 @@ struct EducationClass: Decodable, Identifiable, Hashable {
     let dates: [EducationDate]?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, teacher, room, period, freePeriod, canvasLink, files, todos, classOnlyTodos, dates
+        case id, name, teacher, room, period, freePeriod, canvasLink, canvasScoreLabel, files, todos, classOnlyTodos, dates
         case detail = "description"
     }
 
@@ -171,6 +173,10 @@ struct EducationClass: Decodable, Identifiable, Hashable {
 
     var descriptionText: String {
         (detail ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var scoreLabel: String {
+        (canvasScoreLabel ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Schedule rows: period tag + this name ("Free Period").
@@ -212,6 +218,15 @@ struct EducationProject: Decodable, Identifiable, Hashable {
     }
 }
 
+struct EducationCanvasWork: Decodable, Hashable {
+    let display: String
+    let graded: Bool?
+
+    var label: String {
+        display.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
 struct EducationTodo: Decodable, Identifiable, Hashable {
     /// Folder id under todos/ (not globally unique across classes/projects).
     let todoId: String
@@ -233,6 +248,7 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
     let hiddenFromHome: Bool?
     /// Optional Canvas LMS assignment/page URL — toolbar button only when set.
     let canvasLink: String?
+    let canvasWork: EducationCanvasWork?
     let classId: String?
     let projectId: String?
     let detail: String?
@@ -244,7 +260,7 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case todoId = "id"
-        case name, title, tag, type, dueDate, dueTime, due, done, completedAt, createdAt, showInDates, hiddenFromHome, canvasLink, classId, projectId, notes, files, kind, capsules, citations
+        case name, title, tag, type, dueDate, dueTime, due, done, completedAt, createdAt, showInDates, hiddenFromHome, canvasLink, canvasWork, classId, projectId, notes, files, kind, capsules, citations
         case detail = "description"
     }
 
@@ -299,6 +315,10 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
 
     /// Normalized http(s) Canvas URL, if present.
     var canvasURL: URL? { CanvasLMS.webURL(from: canvasLink) }
+
+    var scoreLabel: String {
+        (canvasWork?.label ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     var dueDateValue: String? {
         if let dueDate, !dueDate.isEmpty { return dueDate }
@@ -370,6 +390,7 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
             showInDates: showInDates,
             hiddenFromHome: hiddenFromHome,
             canvasLink: canvasLink,
+            canvasWork: canvasWork,
             classId: classId,
             projectId: projectId,
             detail: detail,
@@ -398,6 +419,7 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
             showInDates: showInDates,
             hiddenFromHome: hiddenFromHome,
             canvasLink: canvasLink,
+            canvasWork: canvasWork,
             classId: classId,
             projectId: projectId,
             detail: detail,

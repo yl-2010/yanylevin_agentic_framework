@@ -8,6 +8,7 @@ import { readdir, readFile, writeFile, stat } from "node:fs/promises";
 import { dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gitAddCommitPush } from "./git-publish.js";
+import { attachCanvasGrades } from "./canvas-grades.js";
 import {
   canonicalizeEmail,
   isFullAccessEmail,
@@ -1419,7 +1420,7 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
     }
   }
 
-  return {
+  const tree = {
     email: canonicalizeEmail(email),
     meta,
     schedule: includeFixtures ? schedule : publicSchedule(schedule),
@@ -1431,6 +1432,24 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
       ? {}
       : { activeClassIdsByDate, todayKey, ...(nowContext ? { nowContext } : {}) }),
   };
+
+  if (!includeFixtures) {
+    try {
+      const snapPath = join(root, ".canvas", "snapshot.json");
+      const mapPath = join(root, ".canvas", "course-map.json");
+      const snapRaw = await readFile(snapPath, "utf8").catch(() => "");
+      if (snapRaw) {
+        const snapshot = JSON.parse(snapRaw);
+        const mapRaw = await readFile(mapPath, "utf8").catch(() => "");
+        const courseMap = mapRaw ? JSON.parse(mapRaw) : null;
+        attachCanvasGrades(tree, snapshot, courseMap);
+      }
+    } catch (err) {
+      console.error("[education-data] canvas grades", err);
+    }
+  }
+
+  return tree;
 }
 
 function isSafeObjectId(id) {

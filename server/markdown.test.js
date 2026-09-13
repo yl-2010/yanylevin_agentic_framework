@@ -63,6 +63,25 @@ describe("YLMarkdown.render", () => {
     assert.match(html, /Footnote body/);
   });
 
+  it("keeps $10 and $20 as money, not math", () => {
+    const html = render("It costs $10 and $20 today.");
+    assert.match(html, /\$10/);
+    assert.match(html, /\$20/);
+    assert.doesNotMatch(html, /md-math/);
+  });
+
+  it("renders $x^2$ as math without turning the caret into superscript", () => {
+    const html = render("Area is $x^2$ plus E=mc^2^.");
+    assert.match(html, /<span class="md-math">x\^2<\/span>/);
+    assert.match(html, /<sup>2<\/sup>/);
+  });
+
+  it("leaves math inside code fences alone", () => {
+    const html = render("```\n$x^2$\n```");
+    assert.match(html, /<pre><code>/);
+    assert.doesNotMatch(html, /md-math/);
+  });
+
   it("renders headings, lists, fences, and tables", () => {
     const html = render(
       [
