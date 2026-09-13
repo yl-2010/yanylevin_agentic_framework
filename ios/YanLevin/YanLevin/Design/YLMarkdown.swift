@@ -64,6 +64,41 @@ enum YLMarkdown {
         return cache
     }()
 
+    /// Same `$...$` / `$$...$$` rules as `education/markdown.js`. Code stays literal.
+    static func containsMath(_ source: String) -> Bool {
+        var s = source.replacingOccurrences(of: "\r\n", with: "\n")
+        if let fence = try? NSRegularExpression(pattern: "```[\\s\\S]*?```") {
+            s = fence.stringByReplacingMatches(
+                in: s,
+                range: NSRange(s.startIndex..., in: s),
+                withTemplate: " "
+            )
+        }
+        if let code = try? NSRegularExpression(pattern: "`[^`]+`") {
+            s = code.stringByReplacingMatches(
+                in: s,
+                range: NSRange(s.startIndex..., in: s),
+                withTemplate: " "
+            )
+        }
+        if s.range(of: #"\$\$[\s\S]+?\$\$"#, options: .regularExpression) != nil {
+            return true
+        }
+        guard let inline = try? NSRegularExpression(
+            pattern: #"(^|[^$0-9])\$([^$\n]+?)\$(?![$0-9])"#,
+            options: .anchorsMatchLines
+        ) else { return false }
+        let ns = s as NSString
+        let matches = inline.matches(in: s, range: NSRange(location: 0, length: ns.length))
+        for match in matches where match.numberOfRanges >= 3 {
+            let inner = ns.substring(with: match.range(at: 2))
+            if inner.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { continue }
+            if inner.first?.isWhitespace == true || inner.last?.isWhitespace == true { continue }
+            return true
+        }
+        return false
+    }
+
     static func parse(_ source: String) -> (Parsed, NoteContext) {
         let key = source as NSString
         if let cached = parseCache.object(forKey: key) {
@@ -118,46 +153,6 @@ enum YLMarkdown {
                     i = raw.index(after: end)
                     continue
                 }
-            }
-
-            if rest.hasPrefix("$$"),
-               let end = findClose(raw, from: raw.index(i, offsetBy: 2), mark: "$$")
-            {
-                let tex = String(raw[raw.index(i, offsetBy: 2)..<end])
-                var run = AttributedString(tex)
-                run.font = font.italic().monospaced()
-                run.foregroundColor = fg
-                result.append(run)
-                i = raw.index(end, offsetBy: 2)
-                continue
-            }
-
-            if rest.hasPrefix("$"),
-               !rest.hasPrefix("$$"),
-               let after = Optional(raw.index(after: i)),
-               after < raw.endIndex,
-               !raw[after].isNumber,
-               let end = findClose(raw, from: after, mark: "$"),
-               end != after
-            {
-                let next = raw.index(after: end)
-                if next < raw.endIndex, raw[next].isNumber {
-                    appendText(String(raw[i]))
-                    i = raw.index(after: i)
-                    continue
-                }
-                let tex = String(raw[after..<end])
-                if tex.first?.isWhitespace == true || tex.last?.isWhitespace == true {
-                    appendText(String(raw[i]))
-                    i = raw.index(after: i)
-                    continue
-                }
-                var run = AttributedString(tex)
-                run.font = font.italic().monospaced()
-                run.foregroundColor = fg
-                result.append(run)
-                i = raw.index(after: end)
-                continue
             }
 
             if rest.hasPrefix("***"),
@@ -571,19 +566,27 @@ struct YLMarkdownText: View, Equatable {
     }
 
     var body: some View {
-        let parsed = YLMarkdown.parse(source)
         let resolved = scheme ?? colorScheme
-        MarkdownBlocksView(
-            blocks: parsed.0.blocks,
-            footnotes: parsed.0.footnotes,
-            notes: parsed.1,
-            font: baseFont,
-            fg: YLTheme.fg(resolved),
-            muted: YLTheme.muted(resolved),
-            accent: YLTheme.accent(resolved),
-            showFootnotes: true
-        )
-        .tint(YLTheme.accent(resolved))
+        let fg = YLTheme.fg(resolved)
+        let accent = YLTheme.accent(resolved)
+        Group {
+            if YLMarkdown.containsMath(source) {
+                YLWebMarkdownText(source: source, fg: fg, accent: accent)
+            } else {
+                let parsed = YLMarkdown.parse(source)
+                MarkdownBlocksView(
+                    blocks: parsed.0.blocks,
+                    footnotes: parsed.0.footnotes,
+                    notes: parsed.1,
+                    font: baseFont,
+                    fg: fg,
+                    muted: YLTheme.muted(resolved),
+                    accent: accent,
+                    showFootnotes: true
+                )
+            }
+        }
+        .tint(accent)
     }
 }
 

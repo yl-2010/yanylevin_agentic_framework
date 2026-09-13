@@ -31,6 +31,9 @@ targets:
       - path: "YanLevin/My Logo.icon"
       - path: YanLevin/Resources/Logo
         buildPhase: resources
+      - path: YanLevin/Resources/Katex
+        type: folder
+        buildPhase: resources
     info:
       path: YanLevin/Info.plist
       properties:
