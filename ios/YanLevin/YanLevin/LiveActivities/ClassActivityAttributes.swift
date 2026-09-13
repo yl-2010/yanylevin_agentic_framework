@@ -7,6 +7,7 @@ struct ClassActivityAssignment: Codable, Hashable {
     var tag: String
     var name: String
     var done: Bool?
+    var scoreLabel: String = ""
 }
 
 struct ClassActivityAttributes: ActivityAttributes {
@@ -20,6 +21,7 @@ struct ClassActivityAttributes: ActivityAttributes {
         var end: String
         var startDate: Date?
         var endDate: Date?
+        var scoreLabel: String = ""
         var assignments: [ClassActivityAssignment]
         var overflowCount: Int
     }

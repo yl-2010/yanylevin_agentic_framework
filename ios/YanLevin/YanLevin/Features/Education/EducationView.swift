@@ -210,6 +210,7 @@ struct EducationView: View {
                     ForEach(done) { todo in
                         todoRow(todo, showClass: true)
                     }
+                    .animation(.spring(response: 0.42, dampingFraction: 0.86), value: done.map(\.id))
                 }
             }
         }
@@ -713,6 +714,7 @@ struct ClassDetailView: View {
                         onToggleDone: { toggleDone(todo) }
                     )
                 }
+                .animation(.spring(response: 0.42, dampingFraction: 0.86), value: doneClassTodos.map(\.id))
             }
         }
     }
@@ -950,6 +952,7 @@ struct ProjectDetailView: View {
                         onToggleDone: { toggleDone(todo) }
                     )
                 }
+                .animation(.spring(response: 0.42, dampingFraction: 0.86), value: done.map(\.id))
             }
         }
     }

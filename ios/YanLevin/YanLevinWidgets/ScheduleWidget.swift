@@ -118,6 +118,12 @@ struct ScheduleWidgetView: View {
                             .foregroundStyle(WidgetTheme.fg)
                             .lineLimit(1)
                         Spacer(minLength: 0)
+                        if !item.dayClass.cls.scoreLabel.isEmpty {
+                            Text(item.dayClass.cls.scoreLabel)
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(WidgetTheme.accent)
+                                .monospacedDigit()
+                        }
                         if showTime, let start = item.dayClass.start {
                             Text(formatTime(start))
                                 .font(.caption2)
@@ -173,6 +179,12 @@ struct ScheduleWidgetView: View {
                                     .foregroundStyle(WidgetTheme.fg)
                                     .lineLimit(1)
                                 Spacer(minLength: 0)
+                                if !dayClass.cls.scoreLabel.isEmpty {
+                                    Text(dayClass.cls.scoreLabel)
+                                        .font(.caption2.weight(.bold))
+                                        .foregroundStyle(WidgetTheme.accent)
+                                        .monospacedDigit()
+                                }
                                 if let start = dayClass.start {
                                     Text(formatTime(start))
                                         .font(.caption2)

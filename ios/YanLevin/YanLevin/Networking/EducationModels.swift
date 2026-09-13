@@ -195,6 +195,24 @@ struct EducationClass: Decodable, Identifiable, Hashable {
         }
         return displayName
     }
+
+    func mappingTodos(_ transform: (EducationTodo) -> EducationTodo) -> EducationClass {
+        EducationClass(
+            id: id,
+            name: name,
+            teacher: teacher,
+            room: room,
+            period: period,
+            freePeriod: freePeriod,
+            detail: detail,
+            canvasLink: canvasLink,
+            canvasScoreLabel: canvasScoreLabel,
+            files: files,
+            todos: todos?.map(transform),
+            classOnlyTodos: classOnlyTodos?.map(transform),
+            dates: dates
+        )
+    }
 }
 
 struct EducationProject: Decodable, Identifiable, Hashable {
@@ -216,15 +234,34 @@ struct EducationProject: Decodable, Identifiable, Hashable {
     var descriptionText: String {
         (detail ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    func mappingTodos(_ transform: (EducationTodo) -> EducationTodo) -> EducationProject {
+        EducationProject(
+            id: id,
+            name: name,
+            order: order,
+            detail: detail,
+            files: files,
+            todos: todos?.map(transform),
+            dates: dates
+        )
+    }
 }
 
 struct EducationCanvasWork: Decodable, Hashable {
     let display: String
     let graded: Bool?
 
-    var label: String {
-        display.trimmingCharacters(in: .whitespacesAndNewlines)
+    enum CodingKeys: String, CodingKey { case display, graded }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        display = (try c.decodeIfPresent(String.self, forKey: .display) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        graded = try c.decodeIfPresent(Bool.self, forKey: .graded)
     }
+
+    var label: String { display }
 }
 
 struct EducationTodo: Decodable, Identifiable, Hashable {
@@ -371,6 +408,13 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
     var isDailyBriefing: Bool {
         if kind == "dailyBriefing" { return true }
         return !(capsules ?? []).isEmpty
+    }
+
+    func withDone(_ done: Bool, completedAt: String?) -> EducationTodo {
+        var copy = self
+        copy.done = done
+        copy.completedAt = completedAt
+        return copy
     }
 
     func withClassId(_ classId: String) -> EducationTodo {

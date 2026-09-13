@@ -68,13 +68,15 @@ final class LiveActivityCoordinator {
             end: dayClass.end ?? "",
             startDate: startDate,
             endDate: endDate,
+            scoreLabel: dayClass.cls.scoreLabel,
             assignments: items.map {
                 ClassActivityAssignment(
                     todoId: $0.todoId,
                     classId: $0.classId,
                     tag: $0.filterTagKey,
                     name: $0.displayName,
-                    done: $0.done == true
+                    done: $0.done == true,
+                    scoreLabel: $0.scoreLabel
                 )
             },
             overflowCount: overflow

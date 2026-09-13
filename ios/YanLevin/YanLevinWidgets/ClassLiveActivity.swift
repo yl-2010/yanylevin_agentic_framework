@@ -62,6 +62,12 @@ private struct ClassLiveActivityBody: View {
                     .foregroundStyle(YLTheme.fg(colorScheme))
                     .lineLimit(1)
                     .layoutPriority(1)
+                if !state.scoreLabel.isEmpty {
+                    Text(state.scoreLabel)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(LiveActivityPalette.accent(colorScheme))
+                        .monospacedDigit()
+                }
                 Spacer(minLength: 8)
                 ClassLiveActivityTimer(state: state, compact: false)
             }
@@ -77,11 +83,19 @@ private struct ClassLiveActivityIslandBottom: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(state.className)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(LiveActivityPalette.islandFg)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(state.className)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(LiveActivityPalette.islandFg)
+                    .lineLimit(1)
+                if !state.scoreLabel.isEmpty {
+                    Text(state.scoreLabel)
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(LiveActivityPalette.islandAccent)
+                        .monospacedDigit()
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             ClassLiveActivityAssignments(state: state, island: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -182,6 +196,7 @@ private struct ClassLiveActivityAssignments: View {
                                 tag: item.tag,
                                 name: EducationTodo.stripTagPrefix(item.name),
                                 done: item.done == true,
+                                scoreLabel: item.scoreLabel,
                                 island: island
                             )
                         }
@@ -203,16 +218,27 @@ private struct ClassLiveActivityAssignmentTile: View {
     let tag: String
     let name: String
     var done: Bool
+    var scoreLabel: String
     var island: Bool
 
     private var tileHeight: CGFloat { island ? 54 : 58 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(tag)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(island ? YLTheme.darkAccent : YLTheme.accent(colorScheme))
-                .strikethrough(done, color: island ? LiveActivityPalette.islandMuted : YLTheme.muted(colorScheme))
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(tag)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(island ? YLTheme.darkAccent : YLTheme.accent(colorScheme))
+                    .strikethrough(done, color: island ? LiveActivityPalette.islandMuted : YLTheme.muted(colorScheme))
+                Spacer(minLength: 0)
+                if !scoreLabel.isEmpty {
+                    Text(scoreLabel)
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(island ? YLTheme.darkAccent : YLTheme.accent(colorScheme))
+                        .monospacedDigit()
+                        .strikethrough(false)
+                }
+            }
             Text(name)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(island ? LiveActivityPalette.islandFg : YLTheme.fg(colorScheme))
@@ -232,6 +258,6 @@ private struct ClassLiveActivityAssignmentTile: View {
                 )
         )
         .opacity(done ? 0.72 : 1)
-        .accessibilityLabel("\(tag) \(name)")
+        .accessibilityLabel(scoreLabel.isEmpty ? "\(tag) \(name)" : "\(tag) \(name) \(scoreLabel)")
     }
 }

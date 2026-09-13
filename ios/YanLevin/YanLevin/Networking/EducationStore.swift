@@ -878,6 +878,9 @@ final class EducationStore: ObservableObject {
         projectId: String? = nil,
         token: String
     ) async {
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+            applyLocalTodoDone(id: id, classId: classId, projectId: projectId, done: done)
+        }
         do {
             var query: [URLQueryItem] = []
             if let classId, !classId.isEmpty {
@@ -893,10 +896,53 @@ final class EducationStore: ObservableObject {
                 bearer: token,
                 query: query
             )
-            await load(token: token, animated: true)
+            await load(token: token)
         } catch {
             errorText = error.localizedDescription
+            await load(token: token)
         }
+    }
+
+    private func applyLocalTodoDone(
+        id: String,
+        classId: String?,
+        projectId: String?,
+        done: Bool
+    ) {
+        guard let tree else { return }
+        let stamp = done ? ISO8601DateFormatter().string(from: Date()) : nil
+        func mapTodo(_ t: EducationTodo) -> EducationTodo {
+            t.todoId == id ? t.withDone(done, completedAt: stamp) : t
+        }
+        let classKey = classId ?? ""
+        let projectKey = projectId ?? ""
+        let classes = tree.classes?.map { cls -> EducationClass in
+            guard !classKey.isEmpty, cls.id == classKey else { return cls }
+            return cls.mappingTodos(mapTodo)
+        }
+        let projects = tree.projects?.map { project -> EducationProject in
+            guard !projectKey.isEmpty, project.id == projectKey else { return project }
+            return project.mappingTodos(mapTodo)
+        }
+        let userTodos: [EducationTodo]? = {
+            if !classKey.isEmpty || !projectKey.isEmpty { return tree.todos }
+            return tree.todos?.map(mapTodo)
+        }()
+        self.tree = EducationTreeResponse(
+            ok: tree.ok,
+            email: tree.email,
+            meta: tree.meta,
+            schedule: tree.schedule,
+            classes: classes,
+            projects: projects,
+            todos: userTodos,
+            dates: tree.dates,
+            todayKey: tree.todayKey,
+            activeClassIdsByDate: tree.activeClassIdsByDate,
+            nowContext: tree.nowContext,
+            error: tree.error
+        )
+        treeEpoch += 1
     }
 
     func markProjectOpened(id: String, token: String?) async {
