@@ -1,7 +1,7 @@
 ---
 name: health-takeaways
 description: >-
-  Scheduled Composer job at 01:00: turn Yan's Apple Health dumps into
+  Scheduled Grok 4.6 high job at 01:00: turn Yan's Apple Health dumps into
   takeaways.md. Yan only. Not live "how did I sleep" chat — that is
   personal-health.
 disable-model-invocation: true
@@ -15,7 +15,7 @@ You are a one-shot local Cursor agent. Read new Health dumps, write prose takeaw
 
 Local calendar days and clock times are America/Los_Angeles (Seattle), except 2026-08-13 through 2026-08-26, which are America/Chicago (Austin).
 
-Model: **composer-2.5** (fast=false).
+Model: **grok-4.6 high** (effort=high, fast=false).
 
 ## Files
 

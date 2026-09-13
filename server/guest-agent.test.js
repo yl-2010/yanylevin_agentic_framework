@@ -4,7 +4,10 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  FRIEND_HOURLY_LIMIT,
+  GROK_DAILY,
   GUEST_COMPOSER_SPEC,
+  GUEST_FRIEND_COMPOSER_SPEC,
   GUEST_GROK_SPEC,
   HOURLY_LIMIT,
   contactHasHandle,
@@ -262,12 +265,12 @@ describe("guest-agent limits", () => {
     assert.equal(teams.useGrok, true);
   });
 
-  it("gives Alex 4 Grok turns a day then Composer, and resets at midnight PT", async () => {
+  it("gives Alex 8 Grok turns a day then Composer, and resets at midnight PT", async () => {
     const dir = await mkdtemp(join(tmpdir(), "guest-limit-"));
     const statePath = join(dir, "limits.json");
     /** @type {boolean[]} */
     const grok = [];
-    for (let i = 0; i < 5; i += 1) {
+    for (let i = 0; i < 9; i += 1) {
       const slot = await takeGuestSlot({
         platform: "imessage",
         personKey: "alex-rivera",
@@ -277,7 +280,17 @@ describe("guest-agent limits", () => {
       });
       grok.push(slot.useGrok);
     }
-    assert.deepEqual(grok, [true, true, true, true, false]);
+    assert.deepEqual(grok, [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+    ]);
     const next = await takeGuestSlot({
       platform: "imessage",
       personKey: "alex-rivera",
@@ -288,40 +301,54 @@ describe("guest-agent limits", () => {
     assert.equal(next.useGrok, true);
   });
 
-  it("gives Example Friend and Example Neighbor 2 Grok turns a day", async () => {
+  it("gives Example Friend and Example Neighbor 4 Grok turns a day", async () => {
     const dir = await mkdtemp(join(tmpdir(), "guest-limit-"));
     const statePath = join(dir, "limits.json");
-    const first = await takeGuestSlot({
-      platform: "teams",
-      personKey: "example-friend",
-      slug: "example-friend",
-      now: FIVE_PM,
-      statePath,
-    });
-    const second = await takeGuestSlot({
-      platform: "teams",
-      personKey: "example-friend",
-      slug: "example-friend",
-      now: FIVE_PM,
-      statePath,
-    });
-    const third = await takeGuestSlot({
-      platform: "teams",
-      personKey: "example-friend",
-      slug: "example-friend",
-      now: FIVE_PM,
-      statePath,
-    });
-    assert.equal(first.useGrok, true);
-    assert.equal(second.useGrok, true);
-    assert.equal(third.useGrok, false);
+    /** @type {boolean[]} */
+    const grok = [];
+    for (let i = 0; i < 5; i += 1) {
+      const slot = await takeGuestSlot({
+        platform: "teams",
+        personKey: "example-friend",
+        slug: "example-friend",
+        now: FIVE_PM,
+        statePath,
+      });
+      grok.push(slot.useGrok);
+    }
+    assert.deepEqual(grok, [true, true, true, true, false]);
+    assert.equal(GROK_DAILY["example-neighbor"], 4);
     assert.equal(GUEST_GROK_SPEC.id, "grok-4.6");
     assert.equal(
       GUEST_GROK_SPEC.params.find((p) => p.id === "fast")?.value,
-      "false"
+      "true"
     );
     assert.equal(GUEST_COMPOSER_SPEC.id, "composer-2.5");
     assert.equal(GUEST_COMPOSER_SPEC.params[0].value, "false");
+    assert.equal(GUEST_FRIEND_COMPOSER_SPEC.params[0].value, "true");
+  });
+
+  it("gives Alex, Example Friend, and Example Neighbor 10 turns per clock hour", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "guest-limit-"));
+    const statePath = join(dir, "limits.json");
+    for (let i = 0; i < FRIEND_HOURLY_LIMIT; i += 1) {
+      const slot = await takeGuestSlot({
+        platform: "imessage",
+        personKey: "alex-rivera",
+        slug: "alex-rivera",
+        now: FIVE_PM,
+        statePath,
+      });
+      assert.equal(slot.overHourly, false);
+    }
+    const blocked = await takeGuestSlot({
+      platform: "imessage",
+      personKey: "alex-rivera",
+      slug: "alex-rivera",
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(blocked.overHourly, true);
   });
 });
 
@@ -388,6 +415,10 @@ describe("evaluateGuestMention", () => {
     assert.equal(decision.caller.slug, "alex-rivera");
     assert.equal(decision.caller.model.id, "grok-4.6");
     assert.equal(
+      decision.caller.model.params.find((p) => p.id === "fast")?.value,
+      "true"
+    );
+    assert.equal(
       formatGuestUserBubble({
         name: decision.caller.displayName,
         platform: platformLabel(decision.platform),
@@ -395,6 +426,29 @@ describe("evaluateGuestMention", () => {
       }),
       "From Alex on iMessage:\n\n@agent is yan free this afternoon"
     );
+  });
+
+  it("uses Composer Fast for Alex after the daily Grok cap", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "guest-eval-"));
+    const statePath = join(dir, "limits.json");
+    const base = {
+      platform: "imessage",
+      message: {
+        fromMe: false,
+        handle: "+15555550111",
+        text: "@agent hi",
+      },
+      contacts: [contact("Alex", "+15555550111")],
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    };
+    for (let i = 0; i < GROK_DAILY["alex-rivera"]; i += 1) {
+      assert.equal((await evaluateGuestMention(base)).caller.model.id, "grok-4.6");
+    }
+    const composer = await evaluateGuestMention(base);
+    assert.equal(composer.caller.model.id, "composer-2.5");
+    assert.equal(composer.caller.model.params[0].value, "true");
   });
 
   it("sends a programmatic rate-limit action after 5 in the hour", async () => {

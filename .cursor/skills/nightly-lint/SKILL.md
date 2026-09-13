@@ -2,7 +2,7 @@
 name: nightly-lint
 description: >-
   Phase 5 of Yan's nightly pipeline: structure police for the brain. Schema
-  check, dedup scan, cursor verification. Composer 2.5, fast off. Yan only.
+  check, dedup scan, cursor verification. Grok 4.6 high, fast off. Yan only.
 disable-model-invocation: true
 ---
 

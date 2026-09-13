@@ -18,11 +18,14 @@ const META = {
 };
 
 describe("location history model", () => {
-  it("uses composer-2.5 with Fast off", () => {
-    assert.equal(LOCATION_HISTORY_MODEL_SPEC.id, "composer-2.5");
+  it("uses grok-4.6 high with Fast off", () => {
+    assert.equal(LOCATION_HISTORY_MODEL_SPEC.id, "grok-4.6");
     const spec = locationHistoryModelSpec();
-    assert.equal(spec.id, "composer-2.5");
-    assert.deepEqual(spec.params, [{ id: "fast", value: "false" }]);
+    assert.equal(spec.id, "grok-4.6");
+    assert.deepEqual(spec.params, [
+      { id: "effort", value: "high" },
+      { id: "fast", value: "false" },
+    ]);
     assert.doesNotMatch(spec.id, /fast/);
   });
 });

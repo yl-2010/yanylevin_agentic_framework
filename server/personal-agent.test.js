@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import {
   PERSONAL_SKILL_PATHS,
   UNSLOP_SKILL_PATH,
+  ATTACHMENT_MODEL_SPEC,
+  DEFAULT_MODEL_SPEC,
   EMPTY_TURN_REPLY,
   formatLiveContextBlock,
   buildYanLiveAppendix,
@@ -27,6 +29,21 @@ import {
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const YAN = "you@example.com";
+
+describe("Personal Agent models", () => {
+  it("uses grok-4.6 high Fast for text and attachments", () => {
+    assert.equal(DEFAULT_MODEL_SPEC.id, "grok-4.6");
+    assert.deepEqual(DEFAULT_MODEL_SPEC.params, [
+      { id: "effort", value: "high" },
+      { id: "fast", value: "true" },
+    ]);
+    assert.equal(ATTACHMENT_MODEL_SPEC.id, "grok-4.6");
+    assert.deepEqual(ATTACHMENT_MODEL_SPEC.params, [
+      { id: "effort", value: "high" },
+      { id: "fast", value: "true" },
+    ]);
+  });
+});
 
 describe("Personal Agent system prompt", () => {
   it("stays slim and points at on-demand files instead of dumping recipes", () => {
@@ -542,7 +559,7 @@ describe("Personal Agent skill files", () => {
       "utf8"
     );
     assert.match(locationBrain, /brain\/places/);
-    assert.match(locationBrain, /composer-2\.5/);
+    assert.match(locationBrain, /grok-4\.6 high/);
     assert.match(locationBrain, /\[GPS\]/);
     assert.match(locationBrain, /Never spawn a cloud agent/);
 
@@ -551,7 +568,7 @@ describe("Personal Agent skill files", () => {
       "utf8"
     );
     assert.match(healthBrain, /brain\/health\.md/);
-    assert.match(healthBrain, /composer-2\.5/);
+    assert.match(healthBrain, /grok-4\.6 high/);
     assert.match(healthBrain, /history-patterns\.md/);
     assert.match(healthBrain, /Never spawn a cloud agent/);
 

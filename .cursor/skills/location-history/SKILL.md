@@ -1,7 +1,7 @@
 ---
 name: location-history
 description: >-
-  Scheduled Composer job: turn Yan's GPS JSONL into stays and trips
+  Scheduled Grok 4.6 high job: turn Yan's GPS JSONL into stays and trips
   (walk / bike / car / plane / uber / robotaxi). Yan only. Not for live "where
   am I" chat — that is phone-location.
 disable-model-invocation: true
@@ -12,6 +12,8 @@ disable-model-invocation: true
 **Gate:** this job is Yan (`you@example.com`).  Never spawn a cloud agent.
 
 You are a one-shot local Cursor agent. Read new GPS points, compose coherent stays and trips, write markdown, update the cursor, stop.
+
+Model: **grok-4.6 high** (effort=high, fast=false). Also the every-4h compose when new GPS has landed.
 
 ## Files
 

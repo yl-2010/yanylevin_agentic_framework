@@ -13,7 +13,7 @@ disable-model-invocation: true
 
 You run **after** the location-history compose job has written `places.md` and `trips.md`. Do not re-cluster GPS. Read those markdown files (and `state.json`, live `.location.json`, raw JSONL only if a stay is unnamed) and figure out what was actually going on.
 
-Model: **grok-4.6 high** (effort=high, fast=false).
+Model: **grok-4.6 xhigh** (effort=xhigh, fast=false).
 
 Places and trips are **two equal passes**. A good `places.md` does not finish the job. If `trips.md` still says generic `car`, you are not done.
 

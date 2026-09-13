@@ -1,8 +1,8 @@
 /**
  * Morning Daily Briefing: 3-phase local Cursor SDK pipeline.
  *   1. news        Grok 4.6 xhigh  draft news capsules
- *   2. agent-recap Grok 4.6 high   overnight agent recap card
- *   3. unslop      Composer 2.5    unslop + write todo.json + taste.md
+ *   2. agent-recap Grok 4.6 xhigh  overnight agent recap card
+ *   3. unslop      Grok 4.6 high   unslop + write todo.json + taste.md
  * Yan only.
  */
 
@@ -81,14 +81,17 @@ export const BRIEFING_NEWS_MODEL_SPEC = {
 export const AGENT_RECAP_MODEL_SPEC = {
   id: process.env.CURSOR_AGENT_RECAP_MODEL || "grok-4.6",
   params: [
-    { id: "effort", value: "high" },
+    { id: "effort", value: "xhigh" },
     { id: "fast", value: "false" },
   ],
 };
 
 export const BRIEFING_UNSLOP_MODEL_SPEC = {
-  id: process.env.CURSOR_BRIEFING_UNSLOP_MODEL || "composer-2.5",
-  params: [{ id: "fast", value: "false" }],
+  id: process.env.CURSOR_BRIEFING_UNSLOP_MODEL || "grok-4.6",
+  params: [
+    { id: "effort", value: "high" },
+    { id: "fast", value: "false" },
+  ],
 };
 
 export const DEFAULT_NIGHTLY_HM = "01:00";

@@ -8,7 +8,7 @@ description: >-
 
 # Agent recap
 
-Yan-only (`education/you@example.com/`). Local Cursor agent, never cloud. Model: **grok-4.6 high** (effort=high, fast=false).
+Yan-only (`education/you@example.com/`). Local Cursor agent, never cloud. Model: **grok-4.6 xhigh** (effort=xhigh, fast=false).
 
 Phase 2 of the morning pipeline (`server/daily-briefing-agent.js`), after the news draft and before unslop.
 

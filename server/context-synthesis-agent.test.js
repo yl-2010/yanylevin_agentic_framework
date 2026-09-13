@@ -58,9 +58,10 @@ describe("context synthesis model", () => {
 });
 
 describe("people enrich model", () => {
-  it("uses composer-2.5 with Fast off", () => {
-    assert.equal(PEOPLE_ENRICH_MODEL_SPEC.id, "composer-2.5");
+  it("uses grok-4.6 high with Fast off", () => {
+    assert.equal(PEOPLE_ENRICH_MODEL_SPEC.id, "grok-4.6");
     assert.deepEqual(peopleEnrichModelSpec().params, [
+      { id: "effort", value: "high" },
       { id: "fast", value: "false" },
     ]);
   });
@@ -255,10 +256,10 @@ describe("nightly phase prompts", () => {
     assert.ok(NIGHTLY_GIT_PATHS.includes("server"));
   });
 
-  it("uses grok-4.6 high for the actions phase", () => {
+  it("uses grok-4.6 xhigh for the actions phase", () => {
     assert.equal(NIGHTLY_ACTIONS_MODEL_SPEC.id, "grok-4.6");
     assert.deepEqual(NIGHTLY_ACTIONS_MODEL_SPEC.params, [
-      { id: "effort", value: "high" },
+      { id: "effort", value: "xhigh" },
       { id: "fast", value: "false" },
     ]);
   });

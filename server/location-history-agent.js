@@ -1,5 +1,5 @@
 /**
- * Compose Yan's GPS JSONL into stays + trips (Composer 2.5, Fast off).
+ * Compose Yan's GPS JSONL into stays + trips (Grok 4.6 high, Fast off).
  * Local Cursor SDK one-shot. Yan only. Does not git-commit location files.
  */
 
@@ -39,8 +39,11 @@ const INTERVAL_MS = 4 * 60 * 60 * 1000;
 const LOCK_STALE_MS = 45 * 60 * 1000;
 
 export const LOCATION_HISTORY_MODEL_SPEC = {
-  id: process.env.CURSOR_LOCATION_HISTORY_MODEL || "composer-2.5",
-  params: [{ id: "fast", value: "false" }],
+  id: process.env.CURSOR_LOCATION_HISTORY_MODEL || "grok-4.6",
+  params: [
+    { id: "effort", value: "high" },
+    { id: "fast", value: "false" },
+  ],
 };
 
 /** @type {Promise<unknown>|null} */

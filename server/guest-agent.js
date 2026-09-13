@@ -22,15 +22,27 @@ import { normalizeTeamsOrigin } from "./teams-mention.js";
 export const GUEST_LIMITS_PATH = "/tmp/yanylevin-guest-agent-limits.json";
 export const GUEST_TZ = "America/Los_Angeles";
 export const HOURLY_LIMIT = 5;
+export const FRIEND_HOURLY_LIMIT = 10;
 export const CONTACTS_TTL_MS = 60_000;
 export const PEOPLE_TTL_MS = 60_000;
 
 /** First remaining Grok turns per Pacific day, per platform. Then Composer. */
 export const GROK_DAILY = {
-  "alex-rivera": 4,
-  "example-friend": 2,
-  "example-neighbor": 2,
+  "alex-rivera": 8,
+  "example-friend": 4,
+  "example-neighbor": 4,
 };
+
+export const HOURLY_BY_SLUG = {
+  "alex-rivera": FRIEND_HOURLY_LIMIT,
+  "example-friend": FRIEND_HOURLY_LIMIT,
+  "example-neighbor": FRIEND_HOURLY_LIMIT,
+};
+
+export function hourlyLimitForSlug(slug) {
+  const n = Number(HOURLY_BY_SLUG[String(slug || "")]);
+  return n > 0 ? n : HOURLY_LIMIT;
+}
 
 /** Teams Class of 2028 only. Yan is fromMe and never hits this. */
 export const TEAMS_CLASS_OF_2028_ALLOW_SLUGS = new Set([
@@ -50,11 +62,16 @@ export const GUEST_COMPOSER_SPEC = {
   params: [{ id: "fast", value: "false" }],
 };
 
+export const GUEST_FRIEND_COMPOSER_SPEC = {
+  id: "composer-2.5",
+  params: [{ id: "fast", value: "true" }],
+};
+
 export const GUEST_GROK_SPEC = {
   id: "grok-4.6",
   params: [
     { id: "effort", value: "high" },
-    { id: "fast", value: "false" },
+    { id: "fast", value: "true" },
   ],
 };
 
@@ -353,7 +370,8 @@ export async function takeGuestSlot(opts) {
     row.dayKey = day;
     row.grokCount = 0;
   }
-  if (row.hourCount >= HOURLY_LIMIT) {
+  const hourCap = hourlyLimitForSlug(slug);
+  if (row.hourCount >= hourCap) {
     bag[personKey] = row;
     await saveLimitState(state, path);
     return { overHourly: true, useGrok: false, hourCount: row.hourCount };
@@ -492,16 +510,20 @@ function getCachedPeople(deps = {}) {
   return rows;
 }
 
-function guestModelSpec(useGrok) {
-  return useGrok
-    ? {
-        id: GUEST_GROK_SPEC.id,
-        params: GUEST_GROK_SPEC.params.map((p) => ({ ...p })),
-      }
-    : {
-        id: GUEST_COMPOSER_SPEC.id,
-        params: GUEST_COMPOSER_SPEC.params.map((p) => ({ ...p })),
-      };
+function guestModelSpec(useGrok, slug) {
+  if (useGrok) {
+    return {
+      id: GUEST_GROK_SPEC.id,
+      params: GUEST_GROK_SPEC.params.map((p) => ({ ...p })),
+    };
+  }
+  const spec = GROK_DAILY[String(slug || "")]
+    ? GUEST_FRIEND_COMPOSER_SPEC
+    : GUEST_COMPOSER_SPEC;
+  return {
+    id: spec.id,
+    params: spec.params.map((p) => ({ ...p })),
+  };
 }
 
 /**
@@ -607,7 +629,7 @@ export async function evaluateGuestMention(opts) {
       handle,
       inContacts,
       audience: describeGuestAudience(platform, message),
-      model: guestModelSpec(Boolean(slot.useGrok)),
+      model: guestModelSpec(Boolean(slot.useGrok), slug),
     },
   };
 }

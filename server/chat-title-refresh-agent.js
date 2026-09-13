@@ -1,5 +1,5 @@
 /**
- * Nightly Composer 2.5 (Fast off): retitle Personal Agent chats from the
+ * Nightly Grok 4.6 high (Fast off): retitle Personal Agent chats from the
  * full transcript. 01:30 local, 30 minutes after the first nightly round.
  * --backfill covers every thread before local today.
  */
@@ -46,8 +46,11 @@ export const CHAT_TITLE_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 export const CHAT_TITLE_REFRESH_BATCH_SIZE = 36;
 
 export const CHAT_TITLE_REFRESH_MODEL_SPEC = {
-  id: process.env.CURSOR_CHAT_TITLE_REFRESH_MODEL || "composer-2.5",
-  params: [{ id: "fast", value: "false" }],
+  id: process.env.CURSOR_CHAT_TITLE_REFRESH_MODEL || "grok-4.6",
+  params: [
+    { id: "effort", value: "high" },
+    { id: "fast", value: "false" },
+  ],
 };
 
 export const CHAT_TITLE_REFRESH_EMAILS = [...FULL_ACCESS_EMAILS].sort();

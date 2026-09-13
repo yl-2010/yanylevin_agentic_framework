@@ -1,5 +1,5 @@
 /**
- * Nightly Grok 4.6 high pass: enrich places.md / trips.md with what Yan
+ * Nightly Grok 4.6 xhigh pass: enrich places.md / trips.md with what Yan
  * was doing at each stay (business, building, trip mode). Yan only.
  * Chained after the 01:00 location compose. Does not git-commit location files.
  */
@@ -46,7 +46,7 @@ const COMPOSE_POLL_MS = 5000;
 export const LOCATION_ENRICHMENT_MODEL_SPEC = {
   id: process.env.CURSOR_LOCATION_ENRICHMENT_MODEL || "grok-4.6",
   params: [
-    { id: "effort", value: "high" },
+    { id: "effort", value: "xhigh" },
     { id: "fast", value: "false" },
   ],
 };

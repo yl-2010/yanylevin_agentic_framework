@@ -155,7 +155,7 @@ export const EMPTY_TURN_REPLY = "Done";
 
 /**
  * Personal Agent ModelSelection from an env id.
- * grok-4.6 → high, not fast. composer-* → Composer Fast.
+ * grok-4.6 → high Fast. composer-* → Composer Fast.
  * Text-only and attachments are separate specs so text-only can go back
  * to Composer later without moving attachment turns.
  * @param {string|undefined} envId
@@ -169,19 +169,19 @@ function personalModelSpec(envId, fallbackId) {
     ? [{ id: "fast", value: "true" }]
     : [
         { id: "effort", value: "high" },
-        { id: "fast", value: "false" },
+        { id: "fast", value: "true" },
       ];
   return { id, params };
 }
 
-/** Text-only Personal Agent. Default grok-4.6 high; Composer Fast via CURSOR_PERSONAL_MODEL. */
-const DEFAULT_MODEL_SPEC = personalModelSpec(
+/** Text-only Personal Agent. Default grok-4.6 high Fast; Composer Fast via CURSOR_PERSONAL_MODEL. */
+export const DEFAULT_MODEL_SPEC = personalModelSpec(
   process.env.CURSOR_PERSONAL_MODEL || process.env.CURSOR_EDUCATION_MODEL,
   "grok-4.6"
 );
 
-/** Attachment / image Personal Agent — grok-4.6 high, independent of text-only. */
-const ATTACHMENT_MODEL_SPEC = personalModelSpec(
+/** Attachment / image Personal Agent — grok-4.6 high Fast, independent of text-only. */
+export const ATTACHMENT_MODEL_SPEC = personalModelSpec(
   process.env.CURSOR_PERSONAL_ATTACHMENT_MODEL ||
     process.env.CURSOR_EDUCATION_ATTACHMENT_MODEL,
   "grok-4.6"

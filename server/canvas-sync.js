@@ -1,5 +1,5 @@
 /**
- * Canvas LMS fetch + nightly dashboard sync agent (Grok 4.6 high).
+ * Canvas LMS fetch + nightly dashboard sync agent (Grok 4.6 xhigh).
  * Token from server/.env (never commit). Writes
  * education/you@example.com/.canvas/ then a local agent maps
  * assignments onto existing education classes. Does not sync done state.
@@ -41,7 +41,7 @@ const SKILL_PATH = ".cursor/skills/personal-canvas/SKILL.md";
 export const CANVAS_SYNC_MODEL_SPEC = {
   id: process.env.CURSOR_CANVAS_SYNC_MODEL || "grok-4.6",
   params: [
-    { id: "effort", value: "high" },
+    { id: "effort", value: "xhigh" },
     { id: "fast", value: "false" },
   ],
 };

@@ -13,7 +13,7 @@ disable-model-invocation: true
 
 EPS Canvas is `https://canvas.instructure.com`. A student API token lives in `server/.env` (`CANVAS_ACCESS_TOKEN`). Never print or commit the token.
 
-This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how dashboard classes line up with Canvas courses, then write education todos/dates. Model for the nightly job: **grok-4.6 high** (effort=high, fast=false).
+This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how dashboard classes line up with Canvas courses, then write education todos/dates. Model for the nightly job: **grok-4.6 xhigh** (effort=xhigh, fast=false).
 
 ## When to run
 

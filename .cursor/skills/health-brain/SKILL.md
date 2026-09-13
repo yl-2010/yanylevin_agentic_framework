@@ -1,7 +1,7 @@
 ---
 name: health-brain
 description: >-
-  03:00 Composer job: project standing Apple Health facts into
+  03:00 Grok 4.6 high job: project standing Apple Health facts into
   brain/health.md. Yan only. Not live "how did I sleep" chat, not
   the 01:00 takeaways job.
 disable-model-invocation: true
@@ -13,7 +13,7 @@ disable-model-invocation: true
 
 You run after 02:30 synthesis and after the location-brain job. Distill standing body facts. Do not write a daily log.
 
-Model: **composer-2.5** (fast=false).
+Model: **grok-4.6 high** (effort=high, fast=false).
 
 ## Files
 

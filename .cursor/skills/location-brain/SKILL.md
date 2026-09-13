@@ -1,7 +1,7 @@
 ---
 name: location-brain
 description: >-
-  03:00 Composer job: project named GPS stays into brain/places cards.
+  03:00 Grok 4.6 high job: project named GPS stays into brain/places cards.
   Yan only. Not live "where am I" chat, not GPS compose/enrichment.
 disable-model-invocation: true
 ---
@@ -12,7 +12,7 @@ disable-model-invocation: true
 
 You run after 02:30 synthesis has finished naming stays. Do not re-cluster GPS. Do not rewrite `location/places.md` or `trips.md`. Read those files and upsert durable place cards.
 
-Model: **composer-2.5** (fast=false).
+Model: **grok-4.6 high** (effort=high, fast=false).
 
 ## Files
 

@@ -65,17 +65,18 @@ describe("briefing model specs", () => {
     ]);
   });
 
-  it("agent recap uses grok-4.6 high", () => {
+  it("agent recap uses grok-4.6 xhigh", () => {
     assert.equal(AGENT_RECAP_MODEL_SPEC.id, "grok-4.6");
     assert.deepEqual(AGENT_RECAP_MODEL_SPEC.params, [
-      { id: "effort", value: "high" },
+      { id: "effort", value: "xhigh" },
       { id: "fast", value: "false" },
     ]);
   });
 
-  it("unslop uses composer-2.5 fast off", () => {
-    assert.equal(BRIEFING_UNSLOP_MODEL_SPEC.id, "composer-2.5");
+  it("unslop uses grok-4.6 high", () => {
+    assert.equal(BRIEFING_UNSLOP_MODEL_SPEC.id, "grok-4.6");
     assert.deepEqual(BRIEFING_UNSLOP_MODEL_SPEC.params, [
+      { id: "effort", value: "high" },
       { id: "fast", value: "false" },
     ]);
   });

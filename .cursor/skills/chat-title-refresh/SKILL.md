@@ -1,7 +1,7 @@
 ---
 name: chat-title-refresh
 description: >-
-  Nightly Composer 2.5 job: retitle Personal Agent chats from the full
+  Nightly Grok 4.6 high job: retitle Personal Agent chats from the full
   transcript in short keyword style for the narrow past-chats list.
   Also used for a one-shot historical backfill. Not live first-message titles.
 disable-model-invocation: true
@@ -11,7 +11,7 @@ disable-model-invocation: true
 
 **Gate:** local Cursor agent only. Never spawn a cloud agent. Only rewrite `title:` lines in listed `education/<email>/.chat-history/<sessionId>.md` files. Do not edit messages, widgets, or other users' folders that were not listed.
 
-Model: **composer-2.5** (fast=false).
+Model: **grok-4.6 high** (effort=high, fast=false).
 
 You run **after** the 01:00 nightly agents. Default slot is **01:30** (`chatTitleRefreshLocalTime` in `education/you@example.com/daily-briefing/meta.json`). Context synthesis is later (02:30). Daily briefing is 06:00.
 
