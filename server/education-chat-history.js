@@ -375,6 +375,11 @@ export async function markChatHistoryRead(opts) {
   if (!email || !sessionId) return null;
   const at = isoOrNow(opts?.at);
   const map = await loadChatLastReadMap(opts);
+  const prev = Date.parse(String(map[sessionId] || ""));
+  const next = Date.parse(at);
+  if (Number.isFinite(prev) && Number.isFinite(next) && prev >= next) {
+    return map[sessionId];
+  }
   map[sessionId] = at;
   await writeChatLastReadMap({ ...opts, email, map });
   return at;
@@ -434,6 +439,7 @@ export function applyChatWorkingStatus(chats, workingIds) {
  *   root?: string,
  *   title?: string,
  *   visibility?: string,
+ *   markRead?: boolean,
  * }} opts
  */
 export async function persistChatHistory(opts) {
@@ -466,14 +472,23 @@ export async function persistChatHistory(opts) {
   }
 
   const updatedAt = new Date().toISOString();
-  await rememberChatHistoryReadOnPersist({
-    email,
-    sessionId,
-    isNew,
-    previousUpdated,
-    updatedAt,
-    root: opts?.root,
-  });
+  if (opts?.markRead) {
+    await markChatHistoryRead({
+      email,
+      sessionId,
+      at: updatedAt,
+      root: opts?.root,
+    });
+  } else {
+    await rememberChatHistoryReadOnPersist({
+      email,
+      sessionId,
+      isNew,
+      previousUpdated,
+      updatedAt,
+      root: opts?.root,
+    });
+  }
 
   const markdown = formatChatHistoryMarkdown({
     email,

@@ -697,10 +697,11 @@ function persistSessionHistory(sid, session) {
   const snap = snapshotMessages(session);
   const userTurns = snap.filter((m) => m.role === "user").length;
   const hasAssistant = snap.some((m) => m.role === "assistant");
-  persistChatHistory({
+  return persistChatHistory({
     email: session.email,
     sessionId: sid,
     messages: snap,
+    markRead: shouldKeepChatHistoryRead(session, snap),
   })
     .then(() => {
       // Wait for the first assistant bubble so the title agent is not
@@ -783,6 +784,18 @@ export function sessionHasBackgroundWork(session) {
   if (!session) return false;
   if (session.status === "running") return true;
   return queuedTurnCount(session) > 0;
+}
+
+/**
+ * Teams/iMessage @agent first turn: keep the history row read after the
+ * reply lands. Working still shows. Later app turns use unread as usual.
+ * @param {Session|undefined|null} session
+ * @param {{ role?: string }[]|undefined} messages
+ */
+export function shouldKeepChatHistoryRead(session, messages) {
+  if (!session?.imessageOrigin && !session?.teamsOrigin) return false;
+  const userTurns = (messages || []).filter((m) => m.role === "user").length;
+  return userTurns <= 1;
 }
 
 /**
@@ -1860,7 +1873,7 @@ async function executeAgentTurn(sid, session, opts) {
       const last = session.messages[session.messages.length - 1];
       if (last && last.role === "assistant") last.endOfTurn = true;
     }
-    persistSessionHistory(sid, session);
+    await persistSessionHistory(sid, session);
     session.lastUsedAt = Date.now();
     if (String(result?.status || "").toLowerCase() !== "error") {
       session.replayUiTranscript = false;
@@ -1927,7 +1940,7 @@ async function executeAgentTurn(sid, session, opts) {
     session.messages.push(
       stampMessage("assistant", fallback, undefined, { endOfTurn: true })
     );
-    persistSessionHistory(sid, session);
+    await persistSessionHistory(sid, session);
     session.lastUsedAt = Date.now();
     releaseTurnRun(session);
     session.lastResult = {

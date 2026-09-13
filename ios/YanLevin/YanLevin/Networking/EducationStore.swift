@@ -738,7 +738,11 @@ final class EducationStore: ObservableObject {
                 }
             } else if chatHistory[i].working {
                 chatHistory[i].working = false
-                chatHistory[i].unread = true
+                // Unread comes from the server list. iMessage/Teams @agent
+                // first turns stay read; in-app turns still show unread.
+                if let token = liveToken, !chatHistory.isEmpty {
+                    Task { await loadChatList(token: token) }
+                }
             }
         }
         LiveActivityCoordinator.shared.scheduleSync()

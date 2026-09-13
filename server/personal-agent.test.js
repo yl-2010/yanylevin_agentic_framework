@@ -14,6 +14,7 @@ import {
   isTruthyFlag,
   resolveIncomingTurnMode,
   sessionHasBackgroundWork,
+  shouldKeepChatHistoryRead,
   shouldAppendEndOfTurn,
   snapshotMessages,
   stampMessage,
@@ -600,6 +601,26 @@ describe("sessionHasBackgroundWork", () => {
     assert.equal(sessionHasBackgroundWork({ status: "idle", turnQueue: [] }), false);
     assert.equal(sessionHasBackgroundWork({ status: "idle" }), false);
     assert.equal(sessionHasBackgroundWork(null), false);
+  });
+});
+
+describe("shouldKeepChatHistoryRead", () => {
+  const user = [{ role: "user", content: "@agent ping" }];
+  const firstTurn = [
+    { role: "user", content: "@agent ping" },
+    { role: "assistant", content: "done" },
+  ];
+  const followUp = [
+    ...firstTurn,
+    { role: "user", content: "and then?" },
+  ];
+
+  it("keeps iMessage and Teams @agent first turns read", () => {
+    assert.equal(shouldKeepChatHistoryRead({ imessageOrigin: { to: "x" } }, user), true);
+    assert.equal(shouldKeepChatHistoryRead({ teamsOrigin: { chatId: "x" } }, firstTurn), true);
+    assert.equal(shouldKeepChatHistoryRead({ imessageOrigin: { to: "x" } }, followUp), false);
+    assert.equal(shouldKeepChatHistoryRead({}, firstTurn), false);
+    assert.equal(shouldKeepChatHistoryRead(null, firstTurn), false);
   });
 });
 

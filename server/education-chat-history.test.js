@@ -536,6 +536,56 @@ describe("persist/list", () => {
     }
   });
 
+  it("does not rewind lastRead to an older timestamp", async () => {
+    const root = await mkdtemp(join(tmpdir(), "edu-chat-hist-"));
+    try {
+      const newer = await markChatHistoryRead({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        at: "2026-09-13T20:00:00.000Z",
+      });
+      const older = await markChatHistoryRead({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        at: "2026-09-13T19:00:00.000Z",
+      });
+      assert.equal(newer, "2026-09-13T20:00:00.000Z");
+      assert.equal(older, "2026-09-13T20:00:00.000Z");
+      const map = await loadChatLastReadMap({ root, email: EMAIL });
+      assert.equal(map[SID], "2026-09-13T20:00:00.000Z");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("stays read when persist asks to markRead", async () => {
+    const root = await mkdtemp(join(tmpdir(), "edu-chat-hist-"));
+    try {
+      await persistChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        messages: [{ role: "user", content: "@agent ping" }],
+      });
+      await persistChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        markRead: true,
+        messages: [
+          { role: "user", content: "@agent ping" },
+          { role: "assistant", content: "done" },
+        ],
+      });
+      const listed = await listChatHistory({ root, email: EMAIL });
+      assert.equal(listed[0].unread, false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("clears unread when working", () => {
     const rows = applyChatWorkingStatus(
       [
