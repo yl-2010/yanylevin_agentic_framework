@@ -23,7 +23,7 @@ import {
   persistChatHistory,
   sanitizeSessionId,
 } from "./education-chat-history.js";
-import { enqueueChatTitle } from "./chat-title.js";
+import { enqueueChatTitle, isStubChatTitle } from "./chat-title.js";
 import {
   formatWidgetsAsFences,
   parseAgentReply,
@@ -696,13 +696,19 @@ async function cancelActiveRun(session) {
 function persistSessionHistory(sid, session) {
   const snap = snapshotMessages(session);
   const userTurns = snap.filter((m) => m.role === "user").length;
+  const hasAssistant = snap.some((m) => m.role === "assistant");
   persistChatHistory({
     email: session.email,
     sessionId: sid,
     messages: snap,
   })
     .then(() => {
-      if (userTurns === 1) enqueueChatTitle({ email: session.email, sessionId: sid });
+      // Wait for the first assistant bubble so the title agent is not
+      // racing the live Grok turn (Teams @agent was getting the truncated
+      // first message as the title).
+      if (userTurns === 1 && hasAssistant) {
+        enqueueChatTitle({ email: session.email, sessionId: sid });
+      }
     })
     .catch((err) => {
       console.error("[personal-agent] chat-history", err);
@@ -1539,7 +1545,10 @@ export async function listAgentChats(email) {
     }
   }
   for (const row of chats) {
-    if (!row?.title && row?.sessionId) {
+    if (
+      row?.sessionId &&
+      (!row.title || isStubChatTitle(row.title, row.preview))
+    ) {
       enqueueChatTitle({ email: normalized, sessionId: row.sessionId });
     }
   }
@@ -1664,7 +1673,13 @@ export async function resumeAgent(sessionId, email) {
   });
   activeByEmail.set(normalized, sid);
   await markChatHistoryRead({ email: normalized, sessionId: sid });
-  if (!loaded.title) enqueueChatTitle({ email: normalized, sessionId: sid });
+  const firstUser =
+    loaded.messages?.find((m) => m.role === "user")?.content ||
+    loaded.preview ||
+    "";
+  if (!loaded.title || isStubChatTitle(loaded.title, firstUser)) {
+    enqueueChatTitle({ email: normalized, sessionId: sid });
+  }
   notifyEducationClients(normalized, "change", {
     source: "agent",
     sessionId: sid,
