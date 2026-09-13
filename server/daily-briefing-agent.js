@@ -645,7 +645,7 @@ export function buildAgentRecapPrompt({ dateKey, timezone }) {
     `Read ${NIGHTLY_STATUS_PATH} first, then dig as the skill says (brain/state.json notes, journal, git log, server log tail).`,
     "notes.calendar is written by synthesis before actions. It is not a record of calendar creates. List Apple Calendar before saying an event stayed off.",
     `pipelineFinished false or lastPipelinePhase not finished means actions/lint did not complete. Put that under URGENT.`,
-    "lifeState.issues is URGENT. Each issue is a 5-minute log or iPhone heartbeat failure (stale GPS, missing device bundle, Composer error, Home/Screen Time snapshot fail). Copy the detail. Empty issues means omit. iPad is not the phone heartbeat.",
+    "lifeState.issues is URGENT. Copy the detail (5-minute log fail, no GPS on disk, missing device bundle, Composer error, Home/Screen Time snapshot fail). Empty issues means omit. iPad is not the phone heartbeat. Do not invent a stale-GPS failure. An old pin while Yan stayed put is expected: iOS only wakes the iPhone app on a ~500m move, a visit, or opening the app. Location compose skip no-new-points is the same, not URGENT.",
     "healthShortcut.issues is URGENT. Each issue is a missing or stale iPhone Health Shortcut dump (none in the last 12 hours). Copy the detail. Empty issues means omit. This is the Shortcut POST, not a health-takeaways skip.",
     `Write only ${recap} as JSON:`,
     '{ "id": "agent-recap", "title": "Agent Recap", "category": "other", "noVote": true, "vote": null, "body": "..." }',

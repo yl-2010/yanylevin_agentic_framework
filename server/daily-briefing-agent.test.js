@@ -126,6 +126,8 @@ describe("briefing phase prompts", () => {
     assert.match(prompt, /healthShortcut\.issues/);
     assert.match(prompt, /URGENT/);
     assert.match(prompt, /noVote/);
+    assert.match(prompt, /stayed put is expected/);
+    assert.match(prompt, /no-new-points/);
     assert.match(prompt, /notes\.calendar is written by synthesis before actions/);
     assert.match(prompt, /List Apple Calendar before saying an event stayed off/);
   });

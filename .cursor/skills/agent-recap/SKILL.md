@@ -44,12 +44,18 @@ Use this order. **Omit a section entirely** when it does not apply that day (do 
      or a missing `/tmp/yanylevin-apple-mail-export`. That fill is one-shot
      and not on the overnight schedule. The dump is deleted when it finishes.
      Overnight mail is `mailSince`.
-   - **Life-state / iPhone heartbeat** from prefetch `lifeState`. Any
-     `lifeState.issues[]` item is URGENT (5-minute log stopped or gapped,
-     Composer error, iPhone GPS stale or missing, GPS without a device
-     bundle, Home or Screen Time snapshot fail). Do not invent extra
-     heartbeat failures. Empty `issues` means omit this. iPad must not be
-     treated as the phone heartbeat.
+   - **Life-state / iPhone heartbeat** from prefetch `lifeState`. Copy
+     `lifeState.issues[]` as URGENT (5-minute log stopped or gapped,
+     Composer error, no iPhone GPS on disk, GPS without a device
+     bundle, Home or Screen Time snapshot fail). Empty `issues` means omit
+     this. iPad must not be treated as the phone heartbeat.
+   - Do not invent a GPS heartbeat failure, and do not put an old pin
+     under URGENT. Sitting still (home overnight, a day in one building)
+     does not post again until iOS wakes the iPhone app on a significant
+     move (~500m), a visit, or he opens the app. The 5-minute `periodic`
+     timer only runs while that process is alive. Force-quit also pauses
+     it until he opens the app. Location compose skipping overnight with
+     `no-new-points` is the same thing, not URGENT.
    - **Health Shortcut dump** from prefetch `healthShortcut`. Any
      `healthShortcut.issues[]` item is URGENT (no iPhone Shortcut POST in
      the last 12 hours, or `lastIngestAt` missing). Copy the detail. Empty

@@ -238,6 +238,7 @@ describe("Personal Agent skill files", () => {
     assert.match(location, /trips\.md/);
     assert.match(location, /brain\/places/);
     assert.match(location, /5-minute heartbeat/);
+    assert.match(location, /Sitting still/);
     assert.match(location, /device/);
     assert.match(location, /iPad app must not/);
     assert.match(location, /Yan only/);
@@ -542,6 +543,8 @@ describe("Personal Agent skill files", () => {
     assert.match(recap, /calendar-cli/);
     assert.match(recap, /lifeState\.issues/);
     assert.match(recap, /healthShortcut\.issues/);
+    assert.match(recap, /Sitting still/);
+    assert.match(recap, /no-new-points/);
 
     const enrich = await readFile(
       join(REPO_ROOT, PERSONAL_SKILL_PATHS.locationEnrichment),

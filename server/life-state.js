@@ -17,6 +17,7 @@ export const LIFE_STATE_GUESS_PATH = "/tmp/yanylevin-life-state-guess.json";
 export const LIFE_STATE_CONTEXT_PATH = "/tmp/yanylevin-context-life-state.json";
 export const CURRENT_STALE_MS = 10 * 60 * 1000;
 export const SAMPLE_STALE_MS = 20 * 60 * 1000;
+/** Age of a live GPS ping that should still carry a device bundle. Sitting still is not an issue. */
 export const GPS_HEARTBEAT_STALE_MS = 30 * 60 * 1000;
 export const GAP_URGENT_MS = 20 * 60 * 1000;
 
@@ -355,6 +356,8 @@ export async function prefetchLifeStateContext(opts) {
 
 /**
  * Heartbeat / 5-minute log health for Daily Briefing URGENT.
+ * An old iPhone GPS pin while Yan stayed put is expected (iOS only wakes
+ * on a ~500m move, a visit, or opening the app). Do not put that in issues.
  * @param {{ now?: Date, dir?: string }} [opts]
  */
 export async function assessLifeStateHeartbeat(opts = {}) {
@@ -441,12 +444,7 @@ export async function assessLifeStateHeartbeat(opts = {}) {
       code: "gps-missing",
       detail: "No iPhone GPS fix on disk. Heartbeat is not landing.",
     });
-  } else if (!gpsFresh) {
-    issues.push({
-      code: "gps-stale",
-      detail: `iPhone GPS heartbeat is stale (${gpsAgeMinutes} min). 5-minute posts are not landing. iPad must not be the source.`,
-    });
-  } else if (!hasDevice) {
+  } else if (gpsFresh && !hasDevice) {
     issues.push({
       code: "device-missing",
       detail: "iPhone GPS is fresh but has no device bundle (battery, charging, network, audio). Install the new iPhone build. iPad must not post location.",

@@ -207,6 +207,56 @@ describe("life-state log IO", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("does not flag sitting-still iPhone GPS as an issue", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "life-state-gps-still-"));
+    try {
+      await appendLifeStateGuess(SAMPLE, {
+        dir,
+        now: new Date("2026-09-13T12:55:00.000Z"),
+        timeZone: "America/Los_Angeles",
+      });
+      const health = await assessLifeStateHeartbeat({
+        dir,
+        now: new Date("2026-09-13T13:00:00.000Z"),
+        gps: {
+          receivedAt: "2026-09-13T04:39:00.000Z",
+          source: "periodic",
+          device: { batteryLevel: 65, network: "wifi" },
+        },
+        snapshot: null,
+      });
+      assert.equal(
+        health.issues.some((i) => i.code === "gps-stale"),
+        false
+      );
+      assert.ok(health.gps.ageMinutes > 30);
+      assert.equal(health.ok, true);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("still flags missing iPhone GPS", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "life-state-gps-miss-"));
+    try {
+      await appendLifeStateGuess(SAMPLE, {
+        dir,
+        now: new Date("2026-09-13T12:55:00.000Z"),
+        timeZone: "America/Los_Angeles",
+      });
+      const health = await assessLifeStateHeartbeat({
+        dir,
+        now: new Date("2026-09-13T13:00:00.000Z"),
+        gps: null,
+        snapshot: null,
+      });
+      assert.equal(health.ok, false);
+      assert.ok(health.issues.some((i) => i.code === "gps-missing"));
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("formatLifeStateLocal", () => {
