@@ -43,6 +43,7 @@ import {
 } from "./teams-mention.js";
 import {
   formatGuestUserBubble,
+  guestRunModels,
   platformLabel,
 } from "./guest-agent.js";
 import {
@@ -1469,13 +1470,37 @@ async function stageAttachments(session, sessionId, attachments) {
   return files;
 }
 
+function guestAgentCreateOpts(guest) {
+  const run = guestRunModels(guest);
+  if (!run.preferred) return {};
+  return {
+    model: run.preferred,
+    fallbackModel: run.fallback || AUTO_MODEL_SELECTION,
+  };
+}
+
+function guestTurnModelSpec(session, hasSessionFiles) {
+  const guestFirstTurn =
+    Boolean(session.guestCaller?.model) &&
+    (Boolean(session.imessageDeliverFinal) || Boolean(session.teamsDeliverFinal));
+  const run = guestRunModels(session.guestCaller);
+  if (guestFirstTurn && run.preferred) return run.preferred;
+  return hasSessionFiles ? ATTACHMENT_MODEL_SPEC : DEFAULT_MODEL_SPEC;
+}
+
+function guestTurnFallback(session) {
+  return guestRunModels(session.guestCaller).fallback || AUTO_MODEL_SELECTION;
+}
+
 /**
  * @returns {Promise<any>}
  */
-async function createPersonalCursorAgent() {
+async function createPersonalCursorAgent(opts = {}) {
   await reloadCursorApiKeyFromEnv();
   const apiKey = requireKey();
-  const model = await resolveModelSelection(apiKey, DEFAULT_MODEL_SPEC);
+  const preferred = opts.model || DEFAULT_MODEL_SPEC;
+  const fallback = opts.fallbackModel || AUTO_MODEL_SELECTION;
+  const model = await resolveModelSelection(apiKey, preferred);
 
   /** @type {any} */
   let agent = null;
@@ -1483,7 +1508,7 @@ async function createPersonalCursorAgent() {
     prefix: "personal-agent-create",
     preferredModel: model,
     delaysMs: INTERACTIVE_MODEL_DELAYS_MS,
-    fallbackModel: AUTO_MODEL_SELECTION,
+    fallbackModel: fallback,
     fallbackDelaysMs: INTERACTIVE_FALLBACK_DELAYS_MS,
     laterDelaysMs: [],
     run: async (currentModel) => {
@@ -1500,7 +1525,9 @@ async function createPersonalCursorAgent() {
     throw err;
   }
   if (outcome.usedFallback) {
-    console.warn("[personal-agent] created session on auto after grok create failed");
+    console.warn(
+      `[personal-agent] created session on ${outcome.model?.id || "auto"} after preferred create failed`
+    );
   }
   return agent;
 }
@@ -1508,7 +1535,7 @@ async function createPersonalCursorAgent() {
 /**
  * @param {string} email
  */
-export async function startAgent(email) {
+export async function startAgent(email, opts = {}) {
   const normalized = canonicalizeEmail(email);
   if (!isEducationUser(normalized)) {
     const err = new Error("forbidden");
@@ -1516,7 +1543,7 @@ export async function startAgent(email) {
     throw err;
   }
 
-  const agent = await createPersonalCursorAgent();
+  const agent = await createPersonalCursorAgent(opts);
 
   const id =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -1575,7 +1602,7 @@ export async function startAgentFromIMessageMention(message) {
     err.status = 400;
     throw err;
   }
-  const started = await startAgent(YAN_EMAIL);
+  const started = await startAgent(YAN_EMAIL, guestAgentCreateOpts(guest));
   const session = sessions.get(started.sessionId);
   if (!session) {
     const err = new Error("session not found");
@@ -1612,7 +1639,7 @@ export async function startAgentFromTeamsMention(message) {
     err.status = 400;
     throw err;
   }
-  const started = await startAgent(YAN_EMAIL);
+  const started = await startAgent(YAN_EMAIL, guestAgentCreateOpts(guest));
   const session = sessions.get(started.sessionId);
   if (!session) {
     const err = new Error("session not found");
@@ -1848,7 +1875,7 @@ async function executeAgentTurn(sid, session, opts) {
       prefix: "personal-agent",
       preferredModel: model,
       delaysMs: INTERACTIVE_MODEL_DELAYS_MS,
-      fallbackModel: AUTO_MODEL_SELECTION,
+      fallbackModel: guestTurnFallback(session),
       fallbackDelaysMs: INTERACTIVE_FALLBACK_DELAYS_MS,
       laterDelaysMs: [],
       shouldAbort: () =>
@@ -2146,18 +2173,11 @@ export async function messageAgent(
   }
 
   const apiKey = requireKey();
-  const guestFirstTurn =
-    Boolean(session.guestCaller?.model) &&
-    (Boolean(session.imessageDeliverFinal) || Boolean(session.teamsDeliverFinal));
   let model;
   try {
     model = await resolveModelSelection(
       apiKey,
-      guestFirstTurn
-        ? session.guestCaller.model
-        : hasSessionFiles
-          ? ATTACHMENT_MODEL_SPEC
-          : DEFAULT_MODEL_SPEC
+      guestTurnModelSpec(session, hasSessionFiles)
     );
   } catch (err) {
     if (claimedIdleSlot) session.status = "idle";

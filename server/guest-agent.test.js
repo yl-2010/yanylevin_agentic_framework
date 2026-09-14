@@ -17,7 +17,9 @@ import {
   formatGuestUserBubble,
   formatRateLimitMessage,
   formatRetryAt,
+  guestRunModels,
   hourKey,
+  isFriendGuest,
   phonesMatch,
   platformLabel,
   quotaKeyFor,
@@ -27,6 +29,7 @@ import {
   takeGuestSlot,
   isTeamsClassOf2028Chat,
   isAllowedTeamsClassOf2028Caller,
+  withFast,
 } from "./guest-agent.js";
 
 const PRASHAM = {
@@ -351,6 +354,30 @@ describe("guest-agent limits", () => {
     });
     assert.equal(blocked.overHourly, true);
   });
+
+  it("forces Fast on Grok and Composer for the three friends", () => {
+    assert.equal(isFriendGuest("example-friend", ""), true);
+    assert.equal(isFriendGuest("", "Example Neighbor"), true);
+    assert.equal(isFriendGuest("", "Sam"), false);
+    const grok = withFast({
+      id: "grok-4.6",
+      params: [
+        { id: "effort", value: "high" },
+        { id: "fast", value: "false" },
+      ],
+    });
+    assert.equal(grok.params.find((p) => p.id === "fast")?.value, "true");
+    assert.equal(grok.params.find((p) => p.id === "effort")?.value, "high");
+    const run = guestRunModels({
+      slug: "alex-rivera",
+      displayName: "Alex",
+      model: GUEST_GROK_SPEC,
+    });
+    assert.equal(run.preferred.id, "grok-4.6");
+    assert.equal(run.preferred.params.find((p) => p.id === "fast")?.value, "true");
+    assert.equal(run.fallback.id, "composer-2.5");
+    assert.equal(run.fallback.params.find((p) => p.id === "fast")?.value, "true");
+  });
 });
 
 describe("evaluateGuestMention", () => {
@@ -450,6 +477,28 @@ describe("evaluateGuestMention", () => {
     const composer = await evaluateGuestMention(base);
     assert.equal(composer.caller.model.id, "composer-2.5");
     assert.equal(composer.caller.model.params[0].value, "true");
+  });
+
+  it("keeps Fast on for Example Friend even without a people-card slug", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "guest-eval-"));
+    const decision = await evaluateGuestMention({
+      platform: "imessage",
+      message: {
+        fromMe: false,
+        handle: "+15555550998",
+        text: "@agent hi",
+      },
+      contacts: [contact("Example Friend", "+15555550998")],
+      people: [],
+      now: FIVE_PM,
+      statePath: join(dir, "limits.json"),
+    });
+    assert.equal(decision.action, "start");
+    assert.equal(decision.caller.model.id, "composer-2.5");
+    assert.equal(
+      decision.caller.model.params.find((p) => p.id === "fast")?.value,
+      "true"
+    );
   });
 
   it("sends a programmatic rate-limit action after 5 in the hour", async () => {

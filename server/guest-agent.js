@@ -75,6 +75,30 @@ export const GUEST_GROK_SPEC = {
   ],
 };
 
+/** @param {{ id?: string, params?: { id: string, value: string }[] }|null|undefined} spec */
+export function copyModelSpec(spec) {
+  return {
+    id: String(spec?.id || ""),
+    params: (spec?.params || []).map((p) => ({
+      id: String(p.id),
+      value: String(p.value),
+    })),
+  };
+}
+
+/** Fast on, keep other params (effort, etc.). */
+export function withFast(spec) {
+  const next = copyModelSpec(spec);
+  next.params = next.params.filter((p) => p.id !== "fast");
+  next.params.push({ id: "fast", value: "true" });
+  return next;
+}
+
+export function isFriendGuest(slug, name = "") {
+  if (HOURLY_BY_SLUG[String(slug || "")]) return true;
+  return TEAMS_CLASS_OF_2028_ALLOW_GIVEN.has(givenNameOf(name).toLowerCase());
+}
+
 const PLATFORMS = ["imessage", "teams"];
 
 /** @type {{ at: number, rows: object[]|null }} */
@@ -510,19 +534,24 @@ function getCachedPeople(deps = {}) {
   return rows;
 }
 
-function guestModelSpec(useGrok, slug) {
-  if (useGrok) {
-    return {
-      id: GUEST_GROK_SPEC.id,
-      params: GUEST_GROK_SPEC.params.map((p) => ({ ...p })),
-    };
-  }
-  const spec = GROK_DAILY[String(slug || "")]
-    ? GUEST_FRIEND_COMPOSER_SPEC
-    : GUEST_COMPOSER_SPEC;
+function guestModelSpec(useGrok, slug, name) {
+  const friend = isFriendGuest(slug, name);
+  if (useGrok && friend) return withFast(GUEST_GROK_SPEC);
+  if (friend) return withFast(GUEST_FRIEND_COMPOSER_SPEC);
+  return copyModelSpec(GUEST_COMPOSER_SPEC);
+}
+
+/** Preferred + fallback for a guest @agent turn. Friends stay Fast if Grok fails. */
+export function guestRunModels(caller) {
+  const friend = isFriendGuest(caller?.slug, caller?.displayName);
+  const preferred = caller?.model
+    ? friend
+      ? withFast(caller.model)
+      : copyModelSpec(caller.model)
+    : null;
   return {
-    id: spec.id,
-    params: spec.params.map((p) => ({ ...p })),
+    preferred,
+    fallback: friend ? withFast(GUEST_FRIEND_COMPOSER_SPEC) : null,
   };
 }
 
@@ -629,7 +658,7 @@ export async function evaluateGuestMention(opts) {
       handle,
       inContacts,
       audience: describeGuestAudience(platform, message),
-      model: guestModelSpec(Boolean(slot.useGrok), slug),
+      model: guestModelSpec(Boolean(slot.useGrok), slug, displayName),
     },
   };
 }
