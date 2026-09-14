@@ -21,12 +21,12 @@ Typical fields: `latitude`, `longitude`, optional `accuracyMeters`, `timestamp` 
 
 Do **not** dump history into every turn. When the question is about today, yesterday, a trip, “where was I”, or “how did I get here”, read these files first:
 
-- `education/you@example.com/location/places.md` — stays with arrive/leave/dwell (enriched overnight with business/building/activity when known)
+- `education/you@example.com/location/places.md` — stays with arrive/leave/dwell (enriched overnight with business/building name when known; not indoor activity)
 - `education/you@example.com/location/trips.md` — walk / bike / car / driven / plane / uber / robotaxi / lyft paths
 
 Only open `log-YYYY-MM.jsonl` if the markdown is missing or the question needs raw coordinates. Do not invent a timeline from `.location.json` alone.
 
-A scheduled Grok 4.6 high job at 01:00 (and every 4h if new points) updates the markdown from the JSONL (and Mail.app ride receipts when traveling). A separate Grok 4.6 xhigh job at 01:00, after compose, enriches those lines with what Yan was doing. Context synthesis at 02:30 may rewrite a stay or trip when it infers more (whose house, robotaxi not car). At 03:00 a Grok 4.6 high job projects named stays into durable `education/you@example.com/brain/places/` cards. If markdown is behind the live fix, say the history may be a few hours stale.
+A scheduled Grok 4.6 high job at 01:00 (and every 4h if new points) updates the markdown from the JSONL (and Mail.app ride receipts when traveling). A separate Grok 4.6 xhigh job at 01:00, after compose, names businesses/buildings and trip modes. Indoor activity stays in life-state. Context synthesis at 02:30 may rewrite a stay or trip when it infers more (whose house, robotaxi not car), still as an address, not a room tour. At 03:00 a Grok 4.6 high job projects named stays into durable `education/you@example.com/brain/places/` cards. If markdown is behind the live fix, say the history may be a few hours stale.
 
 ## Do not
 

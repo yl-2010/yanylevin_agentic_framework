@@ -100,6 +100,7 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /appleMailFill\.lastAt/);
     assert.match(prompt, /missing dump as failed ingest/);
     assert.match(prompt, /yanylevin-context-life-state\.json/);
+    assert.match(prompt, /digest only, not places\.md/);
     assert.match(prompt, /health takeaways\.md and workouts\.md/);
     assert.match(prompt, /Do not open OneNote/);
     assert.match(prompt, /Calendar plans/);
@@ -157,6 +158,8 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /location\/places\.md|places\.md and trips\.md/);
     assert.match(prompt, /Apple Health dump/);
     assert.match(prompt, /Life-state for yesterday/);
+    assert.match(prompt, /Do not copy the JSONL into identity or location\/places\.md/);
+    assert.match(prompt, /Indoor activity stays in life-state/);
     assert.match(prompt, /Do not copy agent behavior instructions/);
     assert.match(prompt, /Do not scan OneNote/);
     assert.match(prompt, /SOUL\.md/);

@@ -1,9 +1,9 @@
 ---
 name: location-enrichment
 description: >-
-  Nightly Grok 4.6 job: turn vague GPS stays/trips into what Yan was
-  actually doing (business, building, activity, trip mode). Yan only.
-  Not for live "where am I" chat.
+  Nightly Grok 4.6 job: turn vague GPS stays/trips into named
+  businesses/buildings and trip mode. Not indoor activity (that is
+  life-state). Yan only. Not for live "where am I" chat.
 disable-model-invocation: true
 ---
 
@@ -11,7 +11,7 @@ disable-model-invocation: true
 
 **Gate:** this job is Yan (`you@example.com`).  Never spawn a cloud agent.
 
-You run **after** the location-history compose job has written `places.md` and `trips.md`. Do not re-cluster GPS. Read those markdown files (and `state.json`, live `.location.json`, raw JSONL only if a stay is unnamed) and figure out what was actually going on.
+You run **after** the location-history compose job has written `places.md` and `trips.md`. Do not re-cluster GPS. Read those markdown files (and `state.json`, live `.location.json`, raw JSONL only if a stay is unnamed) and name the place and the trip mode. Do not write what Yan was doing inside the place.
 
 Model: **grok-4.6 xhigh** (effort=xhigh, fast=false).
 
@@ -34,13 +34,11 @@ Live last-known fix: `education/you@example.com/.location.json` (do not treat as
 
 ## What "enriched" means
 
-A stay is still vague if it is only a street address, a neighborhood, or a pin with no business/building/activity. After you finish, each stay should say:
+A stay is still vague if it is only a street address, a neighborhood, or a pin with no business/building name. After you finish, each stay should say **where** (business, building, campus, home, someone's house, airport, park, or "unknown street" if you truly cannot tell) plus arrive/leave/dwell.
 
-- **Where:** business, building, campus, home, someone's house, airport, park, or "unknown street" if you truly cannot tell
-- **What:** short activity when you have evidence (dinner, class, hanging out, gym, flight, overnight, working)
-- **Who/how** only when it is clear (friend drove, Uber, family)
+Do **not** add what happened inside that address: rooms (bedroom, office, bathroom, kitchen), apps, class periods, gym machines, shower/sleep, ping lists, who he texted. That is life-state. One home stay stays one home stay. One EPS stay stays one EPS stay. GPS identity notes are fine ("GPS named PetSmart; Yan was at Trader Joe's"). Campus drop vs pickup pins (Sports Court) are still addresses.
 
-The 02:30 context-synthesis job may rewrite these files later when it infers more (whose house, why he was there). Leave those corrections in place on the next 01:00 run. Do not revert a specific name back to a street.
+The 02:30 context-synthesis job may rewrite these files later when it infers more (whose house, gym not street, robotaxi not car). Leave those name/mode corrections in place on the next 01:00 run. Do not revert a specific name back to a street. Do not fill the stay with life-state.
 
 ### Trips (required)
 
@@ -65,8 +63,8 @@ Look as far as you need. Yan only. Do not dump full threads into the markdown.
 - **iMessage:** `node server/imessage-read.js search "…"` / `thread "Name"` (see `.cursor/skills/personal-imessage/SKILL.md`)
 - **Mail.app:** ride receipts, reservations, tickets. Required for every `car` trip. Details below.
 - **Contacts:** resolve names from numbers (`.cursor/skills/personal-contacts/SKILL.md`)
-- **Chat history (required):** Grep and Read `education/you@example.com/.chat-history/` for stay addresses, business/building names, trip modes, and what Yan said he was doing that day. Same rank as Calendar and iMessage. Do not skip because mail or GPS already named something. Do not paste transcripts into `places.md` / `trips.md`. `.cursor/skills/past-chats/SKILL.md`
-- **Life state (required):** `/tmp/yanylevin-context-life-state.json` or `node server/life-state.js day <date>`. Same rank as Calendar for what he was doing at a stay (`in_class`, `showering`, `at_gym`, `sleeping`). Fan-only is not a shower. Do not paste samples into the markdown. `.cursor/skills/life-state/SKILL.md`
+- **Chat history (required):** Grep and Read `education/you@example.com/.chat-history/` for stay addresses, business/building names, and trip modes. Same rank as Calendar and iMessage. Do not skip because mail or GPS already named something. Do not paste transcripts or indoor activity into `places.md` / `trips.md`. `.cursor/skills/past-chats/SKILL.md`
+- **Life state (required):** `/tmp/yanylevin-context-life-state.json` or `node server/life-state.js day <date>`. Use it to name the place (home vs still at EPS, gym vs street). Do **not** copy kinds, rooms, apps, class periods, or gym sets into `places.md`. Fan-only is not a shower. `.cursor/skills/life-state/SKILL.md`
 - **Web search:** street address → business/building. Prefer a real name over leaving the street number.
 
 ## Trip pass: Mail.app ride receipts
@@ -148,11 +146,13 @@ If several Tesla receipts share one calendar day, read each body and match each 
 ```markdown
 # Places
 
+Name, address, arrive/leave. What happened inside a place is life-state, not here.
+
 ## 2026-08-16
 
-- **Leon Street Flats** (2302 Leon St, West Campus, Austin, TX) — 18:28–23:30 (5h 2m) — Airbnb overnight
-- **Austin Bouldering Project** (979 Springdale Rd, Govalle, Austin, TX) — 15:58–18:17 (2h 19m) — climbing
-- **Milos's house** (5403 Roosevelt Ave, Brentwood, Austin, TX) — 14:40–15:44 (1h 4m) — estore work
+- **Leon Street Flats** (2302 Leon St, West Campus, Austin, TX) — 18:28–23:30 (5h 2m)
+- **Austin Bouldering Project** (979 Springdale Rd, Govalle, Austin, TX) — 15:58–18:17 (2h 19m)
+- **Milos's house** (5403 Roosevelt Ave, Brentwood, Austin, TX) — 14:40–15:44 (1h 4m)
 ```
 
 `trips.md`:
@@ -170,8 +170,8 @@ Keep lines short. Real names. No coordinates unless the place is unknown. No far
 
 ## Heuristics
 
-- Calendar title at that hour usually wins for "what".
-- A Personal Agent chat that names a place, house, or activity around that hour can win for where/what.
+- Calendar title at that hour usually wins for **where** (EPS, PRO Club, Founders Hall), not for class periods or gym sets.
+- A Personal Agent chat that names a place or house around that hour can win for where.
 - Tesla / Waymo / Zoox / Uber / Lyft receipt wins for mode. Tesla Robotaxi → `robotaxi`, not `car` and not `uber`.
 - Texts like "on my way" / "I'll pick you up" → `driven`. Chat mentions of the same ride count as evidence too.
 - Airport + city jump already in trips.md as `plane` — add airline/flight only if a ticket/email says so.
@@ -180,4 +180,4 @@ Keep lines short. Real names. No coordinates unless the place is unknown. No far
 
 ## Do not
 
-Do not git-commit. Do not spawn a nested agent. Do not touch Alex's files. Do not send mail or iMessage. Do not skip the trip/mail pass because places already look enriched. Do not skip chat history because Calendar, Mail, or GPS already ran.
+Do not git-commit. Do not spawn a nested agent. Do not touch Alex's files. Do not send mail or iMessage. Do not skip the trip/mail pass because places already look enriched. Do not skip chat history because Calendar, Mail, or GPS already ran. Do not dump life-state (rooms, apps, classes, sleep, shower, gym sets) into `places.md`.

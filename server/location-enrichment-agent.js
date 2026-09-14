@@ -1,7 +1,8 @@
 /**
- * Nightly Grok 4.6 xhigh pass: enrich places.md / trips.md with what Yan
- * was doing at each stay (business, building, trip mode). Yan only.
- * Chained after the 01:00 location compose. Does not git-commit location files.
+ * Nightly Grok 4.6 xhigh pass: enrich places.md / trips.md with named
+ * businesses/buildings and trip mode. Indoor activity stays in life-state.
+ * Yan only. Chained after the 01:00 location compose. Does not git-commit
+ * location files.
  */
 
 import { open, readFile, rm, stat } from "node:fs/promises";
@@ -147,7 +148,7 @@ export function buildLocationEnrichmentPrompt({ dateKey, timezone, force }) {
   const hist = LOCATION_HISTORY_REL;
   const rebuild = force
     ? "Force: re-enrich even entries you already filled in. Re-check every generic car trip against Mail.app. Prefer correcting vague lines; do not wipe older days."
-    : "Only enrich stays/trips that are still vague (street-only, generic car, missing activity) or newer than enrichment.lastEnrichmentAt. First run: backfill the last 14 days.";
+    : "Only enrich stays/trips that are still vague (street-only, generic car, missing business/building name) or newer than enrichment.lastEnrichmentAt. First run: backfill the last 14 days.";
   return [
     "Follow the location-enrichment skill (.cursor/skills/location-enrichment/SKILL.md).",
     "Enrich Yan's composed places.md and trips.md. Yan only (you@example.com).",
@@ -156,9 +157,9 @@ export function buildLocationEnrichmentPrompt({ dateKey, timezone, force }) {
     `History folder: ${hist}/.`,
     "places.md and trips.md were just composed (or are current). Do not re-cluster GPS.",
     "Two equal passes: stays AND trips. A finished places.md does not finish the job.",
-    "For each unenriched stay: identify the business/building, what Yan was doing, and supporting context from iMessage, Mail.app, Calendar, contacts, chat history, the 5-minute life-state log, and web search for the address.",
-    "Life-state: /tmp/yanylevin-context-life-state.json or node server/life-state.js day <date>. Same rank as Calendar for what he was doing at a stay (in_class, showering, at_gym, sleeping). Do not paste samples into places.md.",
-    "Chat history is a required source, same rank as Calendar and iMessage. Grep and Read education/you@example.com/.chat-history/ for stay addresses, business names, trip modes, and what Yan said he was doing. Follow .cursor/skills/past-chats/SKILL.md. Do not skip this source. Do not paste transcripts into places.md or trips.md.",
+    "For each unenriched stay: identify the business/building from iMessage, Mail.app, Calendar, contacts, chat history, the 5-minute life-state log, and web search for the address. places.md is name, address, arrive/leave only.",
+    "Life-state: /tmp/yanylevin-context-life-state.json or node server/life-state.js day <date>. Use it to name home vs EPS vs gym. Do not paste samples, rooms, apps, class periods, gym sets, shower, or sleep into places.md. Indoor activity stays in life-state.",
+    "Chat history is a required source, same rank as Calendar and iMessage. Grep and Read education/you@example.com/.chat-history/ for stay addresses, business names, and trip modes. Follow .cursor/skills/past-chats/SKILL.md. Do not skip this source. Do not paste transcripts into places.md or trips.md.",
     "trips.md is unfinished if any line is still **car** or **rideshare**. That is the compose GPS default, not a conclusion.",
     "Trip pass is required. Before keeping car, search Mail.app (see the skill) for ride receipts covering those local dates. Also grep chat history for robotaxi / Uber / pickup / flight mentions on those dates.",
     "Exchange Inbox first (mailbox Inbox of account Exchange): Tesla Robotaxi receipts (subject contains Robotaxi, sender tesla.com) and Uber (subject contains trip with / sender uber.com), plus Waymo, Lyft, Zoox. One needle per osascript; use a 14-day date cutoff.",

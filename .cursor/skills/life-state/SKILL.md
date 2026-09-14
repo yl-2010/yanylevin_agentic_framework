@@ -47,7 +47,9 @@ Overnight agents (01:00 compose/enrichment/takeaways, 02:30 pipeline, 03:00
 brain + fact-check) treat this log as a context source. Prefetch is
 `/tmp/yanylevin-context-life-state.json` (yesterday collapsed). Or
 `node server/life-state.js day <YYYY-MM-DD>`. Read kinds, do not dump JSONL
-into identity or places.md. Do not write samples from those jobs. The 5-minute
+into identity or places.md. Indoor activity (rooms, apps, class periods,
+gym sets, shower, sleep) lives only in this log. Location `places.md` is
+the address. Do not write samples from those jobs. The 5-minute
 Composer tick is the writer. That tick starts on the clock
 (:00, :05, :10, …). A slow run does not slide the next start.
 

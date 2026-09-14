@@ -83,7 +83,7 @@ Read `education/you@example.com/brain/schema.md` first.
 | Dated event already on a timeline | Same card, below `<!-- timeline -->` | Append `- YYYY-MM-DD \| correction [source]`. Do not edit or delete old rows. |
 | Tonight's journal | `journal/<dateKey minus 1>.md` | Same-night edit is allowed (the 02:30 pass just wrote it). |
 | Older journals | leave them | Note the miss on identity/Standing. |
-| Named stay / trip | `location/places.md` / `trips.md` | Rewrite the line. Keep arrive/leave/dwell. |
+| Named stay / trip | `location/places.md` / `trips.md` | Rewrite the line for the **place or mode**. Keep arrive/leave/dwell. Name, address, times only. If a stay already has rooms, apps, class periods, gym sets, shower, or sleep, strip that. Indoor activity belongs in life-state (and tonight's journal if it matters). |
 | Health standing | `brain/health.md` | Rewrite the compiled bullet. Do not dump takeaways. |
 
 Then `node server/brain-graph.js` if frontmatter changed (the wrapper also runs it).

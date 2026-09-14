@@ -45,6 +45,7 @@ describe("location history prompt", () => {
     assert.match(prompt, /ONLY when a new stay is outside/);
     assert.match(prompt, /Skip mail entirely at home/);
     assert.match(prompt, /life-state/);
+    assert.match(prompt, /Do not split a home stay/);
     assert.match(prompt, /already-specific stay names/);
     assert.doesNotMatch(prompt, /light search at home/);
     assert.doesNotMatch(prompt, /Do not git add/);

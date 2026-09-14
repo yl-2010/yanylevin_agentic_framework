@@ -32,9 +32,11 @@ Live last-known fix (do not use as history): `education/you@example.com/.locatio
 
 Yesterday's collapsed 5-minute activity log:
 `/tmp/yanylevin-context-life-state.json` (written at 02:30; at 01:00 run
-`node server/life-state.js day <yesterday>` yourself). Use kinds to split a
-long home stay (sleeping vs showering vs office) and to avoid calling 8:20
-`in_class` when GPS was still home. Do not rewrite that log. Skill:
+`node server/life-state.js day <yesterday>` yourself). Use kinds to name
+the place (home vs still at EPS) and to avoid calling 8:20 `in_class` when
+GPS was still home. Do **not** split a long home stay into sleeping vs
+showering vs office. Do not copy rooms, apps, class periods, or gym sets
+into `places.md`. Do not rewrite that log. Skill:
 `.cursor/skills/life-state/SKILL.md`.
 
 ## Steps
@@ -76,6 +78,8 @@ long home stay (sleeping vs showering vs office) and to avoid calling 8:20
 ```markdown
 # Places
 
+Name, address, arrive/leave. What happened inside a place is life-state, not here.
+
 ## 2026-08-16
 
 - **The University of Texas at Austin** (Austin, TX) — 11:20–14:05 (2h 45m)
@@ -94,7 +98,7 @@ long home stay (sleeping vs showering vs office) and to avoid calling 8:20
 - **plane** 16:10–19:05 — AUS → SEA (phone off in flight)
 ```
 
-Keep lines short. Real place names. No coordinates in the markdown unless the place is unknown. No fares.
+Keep lines short. Real place names. No coordinates in the markdown unless the place is unknown. No fares. No indoor activity (rooms, apps, classes, gym sets). That is life-state.
 
 ## Heuristics
 
@@ -103,3 +107,4 @@ Keep lines short. Real place names. No coordinates in the markdown unless the pl
 - Speed ~1–2 m/s → walk unless Apple Health has an overlapping cycling workout, then **bike**. ~10–30 m/s → car/rideshare; hundreds of km/h equivalent or a city jump → plane.
 - Receipt vs GPS mismatch: keep both facts if needed ("uber per receipt; GPS sparse").
 - Do not invent stays for missing hours at home overnight unless a visit says so; a quiet night is one stay.
+- Do not split one GPS stay into indoor rooms. Home overnight is one line even if he showered, slept, and worked.

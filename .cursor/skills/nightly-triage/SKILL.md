@@ -62,12 +62,14 @@ only phase that reads every source. You write nothing to the brain.
   asked or decided. Skip Task subagents. Required even if quiet.
 - **Location**: `education/you@example.com/location/places.md` and
   `trips.md` (the 01:00 jobs already ran). Note stays/trips that are still
-  vague (street-only, "residence", generic car) so phase 3 can fix them.
+  vague (street-only, "residence", generic car) so phase 3 can **name** them.
+  Do not ask phase 3 to dump life-state into those lines.
 - **Life state** (required): `/tmp/yanylevin-context-life-state.json`
   (yesterday's collapsed 5-minute kinds: sleeping, showering, in_class,
-  at_gym, driving, …). Use it to say what he was doing, not only where GPS
-  sat. Fan-only bathroom is not a shower. `in_class` only counts if GPS was
-  at EPS. Do not dump every sample into the digest; summarize the day.
+  at_gym, driving, …). Use it in the digest for what he was doing, not only
+  where GPS sat. Fan-only bathroom is not a shower. `in_class` only counts
+  if GPS was at EPS. Do not dump every sample into the digest; summarize the
+  day. Do not copy rooms/apps/classes into `places.md`.
   CLI: `node server/life-state.js day <yesterday>`. Skill:
   `.cursor/skills/life-state/SKILL.md`.
 - **Health** (required): `education/you@example.com/health/takeaways.md`

@@ -57,7 +57,8 @@ only when the digest is ambiguous and you need the source. Yesterday's
 life-state timeline is `/tmp/yanylevin-context-life-state.json` (collapsed
 kinds, not 288 JSONL lines). Use it when the journal take needs what he was
 doing (class vs still at home, shower vs fan, computer vs sleep). Do not
-copy samples onto identity.md.
+copy samples onto identity.md. Do not copy them onto `location/places.md`
+either. That file is the address.
 
 ## Write
 
@@ -88,14 +89,18 @@ Duolingo day-counts) into identity pages. Agent behavior stays in `SOUL.md` and
 
 ## Location write-back
 
-If a new inference changes what a stay or trip actually was, rewrite the
+If a new inference changes **which place or trip mode** a stay was, rewrite the
 matching lines in `education/you@example.com/location/places.md` and
-`trips.md`. Street-only, "residence", "hanging out", and generic `car` are
-unfinished when you now know the house, gym, library, or robotaxi. Keep
-arrive/leave/dwell and the markdown shape from
-`.cursor/skills/location-enrichment/SKILL.md`. Do not re-cluster GPS, wipe
-older days, or invent stays. One corrected name is enough
-(`**Milos's house** (5403 Roosevelt Ave, Brentwood, Austin, TX) — estore work`).
+`trips.md`. Street-only, "residence", and generic `car` are unfinished when
+you now know the house, gym, library, or robotaxi. Keep arrive/leave/dwell
+and the markdown shape from `.cursor/skills/location-enrichment/SKILL.md`
+(name, address, times). Do not re-cluster GPS, wipe older days, or invent
+stays. One corrected name is enough
+(`**Milos's house** (5403 Roosevelt Ave, Brentwood, Austin, TX) — 14:40–15:44 (1h 4m)`).
+
+Do **not** copy life-state into those lines. Rooms, apps, class periods, gym
+sets, shower, and sleep stay in the life-state log (and the journal take if
+they matter). One home stay stays one home stay.
 
 ## Trust rules
 

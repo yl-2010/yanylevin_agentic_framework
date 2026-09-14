@@ -41,6 +41,8 @@ describe("location enrichment prompt", () => {
     assert.match(prompt, /past-chats/);
     assert.match(prompt, /Chat history is a required source/);
     assert.match(prompt, /life-state/);
+    assert.match(prompt, /Indoor activity stays in life-state/);
+    assert.match(prompt, /places\.md is name, address, arrive\/leave only/);
     assert.match(prompt, /Exchange Inbox/);
     assert.match(prompt, /tesla\.com/);
     assert.match(prompt, /INBOX/);

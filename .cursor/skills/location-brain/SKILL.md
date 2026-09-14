@@ -20,7 +20,7 @@ Model: **grok-4.6 high** (effort=high, fast=false).
 |------|------|
 | `education/you@example.com/location/places.md` | Named stays. Read. Newest day on top. |
 | `education/you@example.com/location/trips.md` | Only if a stay name is ambiguous. |
-| `/tmp/yanylevin-context-life-state.json` | Yesterday's 5-minute kinds. Use for activity on the stay fact (`in_class`, `at_gym`). Do not write this tree. |
+| `/tmp/yanylevin-context-life-state.json` | Yesterday's 5-minute kinds. Confirm he was at that place (`at_gym`, `in_class`). Stay fact is the visit, not rooms/apps. Do not write this tree. Do not edit `places.md`. |
 | `education/you@example.com/location/state.json` | Compose/enrichment cursors plus your `brainPlaces` object. |
 | `education/you@example.com/brain/schema.md` | Frontmatter and timeline contract. Required. |
 | `education/you@example.com/brain/places/<slug>.md` | Your only write target. |

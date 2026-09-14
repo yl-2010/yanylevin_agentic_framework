@@ -148,7 +148,7 @@ export function buildLocationBrainPrompt({ dateKey, timezone, force }) {
     "Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} (timezone ${timezone}).`,
     `Read ${hist}/places.md (trips.md only if a stay name is ambiguous). Read ${brain}/schema.md and existing ${brain}/places/.`,
-    "Also read /tmp/yanylevin-context-life-state.json or node server/life-state.js day for yesterday. Use kinds (in_class, at_gym, at_friends) when writing the stay fact. Do not write the life-state tree.",
+    "Also read /tmp/yanylevin-context-life-state.json or node server/life-state.js day for yesterday. Use kinds (in_class, at_gym, at_friends) to confirm he was at that place. Stay fact is the visit, not rooms or apps. Do not write the life-state tree. Do not copy indoor activity back into places.md.",
     `Write only ${brain}/places/<slug>.md. Do not edit places.md, trips.md, identity, people cards, or journal.`,
     "Match existing cards by name, alias, or address before creating. Leon Street Flats, Milos's house, and the 30th Airbnb already exist.",
     "Create a card when a stay has a real name (someone's house, lodging, gym, named campus building) and it already has a card, appears on 2+ distinct days in the lookback, or is lodging / a person's house / a gym Yan uses.",

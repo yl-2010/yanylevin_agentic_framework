@@ -36,6 +36,7 @@ describe("location brain prompt", () => {
     assert.match(prompt, /brain\/places/);
     assert.match(prompt, /places\.md/);
     assert.match(prompt, /life-state/);
+    assert.match(prompt, /Stay fact is the visit/);
     assert.match(prompt, /schema\.md/);
     assert.match(prompt, /\[GPS\]/);
     assert.match(prompt, /Do not edit places\.md/);
