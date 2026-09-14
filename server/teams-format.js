@@ -148,7 +148,9 @@ function renderParagraph(text) {
     .map((line) => renderInline(line));
   const inner = lines.join("<br>");
   if (FOOTER_RE.test(String(text).trim())) {
-    return `<p><em>${inner}</em></p>`;
+    // Adjacent <p> tags look like one Enter on desktop. A nbsp line is the
+    // extra blank iMessage gets from \n\n before the signature.
+    return `<p>&nbsp;</p><p><em>${inner}</em></p>`;
   }
   return `<p>${inner}</p>`;
 }

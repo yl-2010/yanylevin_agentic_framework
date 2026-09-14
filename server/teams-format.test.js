@@ -67,13 +67,13 @@ describe("markdownToTeamsHtml", () => {
     assert.equal(html, "<pre><code>const x = 1;</code></pre>");
   });
 
-  it("italicizes the Teams agent footer as its own paragraph", () => {
+  it("puts a blank line before the italic Teams agent footer", () => {
     const html = markdownToTeamsHtml(
       "On it\n\n// Sent by Yan's Personal Agent"
     );
     assert.equal(
       html,
-      "<p>On it</p><p><em>// Sent by Yan's Personal Agent</em></p>"
+      "<p>On it</p><p>&nbsp;</p><p><em>// Sent by Yan's Personal Agent</em></p>"
     );
   });
 });
