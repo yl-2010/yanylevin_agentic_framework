@@ -22,15 +22,15 @@ import { normalizeTeamsOrigin } from "./teams-mention.js";
 export const GUEST_LIMITS_PATH = "/tmp/yanylevin-guest-agent-limits.json";
 export const GUEST_TZ = "America/Los_Angeles";
 export const HOURLY_LIMIT = 5;
-export const FRIEND_HOURLY_LIMIT = 10;
+export const FRIEND_HOURLY_LIMIT = 20;
 export const CONTACTS_TTL_MS = 60_000;
 export const PEOPLE_TTL_MS = 60_000;
 
 /** First remaining Grok turns per Pacific day, per platform. Then Composer. */
 export const GROK_DAILY = {
-  "alex-rivera": 8,
-  "example-friend": 4,
-  "example-neighbor": 4,
+  "alex-rivera": 16,
+  "example-friend": 8,
+  "example-neighbor": 8,
 };
 
 export const HOURLY_BY_SLUG = {
