@@ -27,6 +27,9 @@ import {
   relativeChatAge,
   sanitizeChatTitle,
   sanitizeChatVisibility,
+  sanitizeChatEphemeral,
+  chatHistoryIsEphemeralHidden,
+  EPHEMERAL_HIDE_MS,
   sanitizeSessionId,
 } from "./education-chat-history.js";
 
@@ -77,7 +80,9 @@ describe("format/parse markdown", () => {
     assert.equal(meta.started, "2026-08-15T18:00:00.000Z");
     assert.equal(meta.preview, "add the calc HW");
     assert.equal(meta.visibility, "showing");
+    assert.equal(meta.ephemeral, false);
     assert.match(md, /^visibility: showing$/m);
+    assert.doesNotMatch(md, /^ephemeral:/m);
     assert.match(md, /## User — 2026-08-15T18:00:00.000Z/);
     assert.match(md, /Added HW due Fri\./);
   });
@@ -110,6 +115,35 @@ describe("format/parse markdown", () => {
     });
     assert.match(md, /^visibility: hidden$/m);
     assert.equal(parseChatHistoryMeta(md).visibility, "hidden");
+  });
+
+  it("round-trips ephemeral @agent threads", () => {
+    const md = formatChatHistoryMarkdown({
+      email: EMAIL,
+      sessionId: SID,
+      ephemeral: true,
+      messages: [{ role: "user", content: "@agent ping" }],
+    });
+    assert.match(md, /^ephemeral: true$/m);
+    assert.equal(parseChatHistoryMeta(md).ephemeral, true);
+  });
+
+  it("treats a missing ephemeral line as permanent", () => {
+    const meta = parseChatHistoryMeta(
+      [
+        "# Personal Agent chat",
+        `session: ${SID}`,
+        `email: ${EMAIL}`,
+        "started: 2026-08-15T18:00:00.000Z",
+        "updated: 2026-08-15T18:05:00.000Z",
+        "visibility: showing",
+        "",
+        "## User — 2026-08-15T18:00:00.000Z",
+        "@agent ping",
+        "",
+      ].join("\n")
+    );
+    assert.equal(meta.ephemeral, false);
   });
 
   it("round-trips a title with spaces", () => {
@@ -458,6 +492,120 @@ describe("persist/list", () => {
     }
   });
 
+  it("omits idle ephemeral @agent threads after 10 minutes", async () => {
+    const root = await mkdtemp(join(tmpdir(), "edu-chat-hist-"));
+    const keepSid = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    const finished = "2026-08-15T18:00:00.000Z";
+    try {
+      await persistChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        ephemeral: true,
+        messages: [
+          { role: "user", content: "@agent ping", at: finished },
+          { role: "assistant", content: "pong", at: finished },
+        ],
+      });
+      const rel = chatHistoryFileRel(EMAIL, SID);
+      const abs = join(root, rel);
+      const text = await readFile(abs, "utf8");
+      await writeFile(
+        abs,
+        text.replace(/^updated: .+$/m, `updated: ${finished}`),
+        "utf8"
+      );
+
+      await persistChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: keepSid,
+        messages: [{ role: "user", content: "typed in the app" }],
+      });
+
+      const stillFresh = await listChatHistory({
+        root,
+        email: EMAIL,
+        now: new Date("2026-08-15T18:09:00.000Z"),
+      });
+      assert.equal(stillFresh.length, 2);
+      assert.ok(stillFresh.some((row) => row.sessionId === SID));
+
+      const expired = await listChatHistory({
+        root,
+        email: EMAIL,
+        now: new Date("2026-08-15T18:10:00.000Z"),
+      });
+      assert.equal(expired.length, 1);
+      assert.equal(expired[0].sessionId, keepSid);
+
+      const working = await listChatHistory({
+        root,
+        email: EMAIL,
+        now: new Date("2026-08-15T18:30:00.000Z"),
+        workingIds: new Set([SID]),
+      });
+      assert.equal(working.length, 2);
+
+      await persistChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        ephemeral: false,
+        messages: [
+          { role: "user", content: "@agent ping" },
+          { role: "assistant", content: "pong" },
+          { role: "user", content: "keep this" },
+        ],
+      });
+      const pinned = await listChatHistory({
+        root,
+        email: EMAIL,
+        now: new Date("2026-08-15T19:00:00.000Z"),
+      });
+      assert.equal(pinned.length, 2);
+      assert.ok(pinned.some((row) => row.sessionId === SID));
+      const loaded = await loadChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+      });
+      assert.equal(loaded?.ephemeral, false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps ephemeral on later persists unless cleared", async () => {
+    const root = await mkdtemp(join(tmpdir(), "edu-chat-hist-"));
+    try {
+      await persistChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        ephemeral: true,
+        messages: [{ role: "user", content: "@agent ping" }],
+      });
+      await persistChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        messages: [
+          { role: "user", content: "@agent ping" },
+          { role: "assistant", content: "pong" },
+        ],
+      });
+      const loaded = await loadChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+      });
+      assert.equal(loaded?.ephemeral, true);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("treats missing lastRead as read until a later persist snapshots it", async () => {
     const root = await mkdtemp(join(tmpdir(), "edu-chat-hist-"));
     const older = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
@@ -626,6 +774,28 @@ describe("titles", () => {
     assert.equal(sanitizeChatVisibility("SHOWING"), "showing");
     assert.equal(sanitizeChatVisibility("hidden"), "hidden");
     assert.equal(sanitizeChatVisibility("nope"), "showing");
+  });
+
+  it("treats only explicit true as ephemeral", () => {
+    assert.equal(sanitizeChatEphemeral(""), false);
+    assert.equal(sanitizeChatEphemeral("true"), true);
+    assert.equal(sanitizeChatEphemeral("TRUE"), true);
+    assert.equal(sanitizeChatEphemeral("false"), false);
+    assert.equal(EPHEMERAL_HIDE_MS, 10 * 60 * 1000);
+    assert.equal(
+      chatHistoryIsEphemeralHidden(
+        { sessionId: SID, ephemeral: true, updated: "2026-08-15T18:00:00.000Z" },
+        new Date("2026-08-15T18:09:59.000Z")
+      ),
+      false
+    );
+    assert.equal(
+      chatHistoryIsEphemeralHidden(
+        { sessionId: SID, ephemeral: true, updated: "2026-08-15T18:00:00.000Z" },
+        new Date("2026-08-15T18:10:00.000Z")
+      ),
+      true
+    );
   });
 });
 

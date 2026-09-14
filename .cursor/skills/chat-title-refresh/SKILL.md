@@ -37,6 +37,6 @@ Examples:
 
 1. Use only the file list in the prompt (path + current title). Do not glob `.chat-history/`.
 2. For each listed file: Read the full markdown. Infer a title from the entire User/Assistant conversation, not the first message alone.
-3. Rewrite only the `title: …` line (add it after `updated:` if missing). Keep session, email, started, updated, visibility, and every `## User` / `## Assistant` block unchanged.
+3. Rewrite only the `title: …` line (add it after `updated:` if missing). Keep session, email, started, updated, visibility, ephemeral, and every `## User` / `## Assistant` block unchanged.
 4. If the thread is empty or only "hi" with no topic, a tiny keyword (`hi`) is fine. Do not invent a topic that is not in the transcript.
 5. Stop when every listed file has a keyword title. Do not git commit (the Node wrapper does that).

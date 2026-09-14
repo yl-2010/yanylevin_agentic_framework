@@ -232,7 +232,7 @@ export function buildChatTitleRefreshPrompt({
     `Today's date key: ${dateKey} (timezone ${timezone}). Batch ${batch} of ${batchCount}.`,
     window,
     CHAT_TITLE_STYLE,
-    "Read each listed file. Rewrite only the title: line. Keep visibility. Do not change messages. Do not glob .chat-history/. Do not git commit.",
+    "Read each listed file. Rewrite only the title: line. Keep visibility and ephemeral. Do not change messages. Do not glob .chat-history/. Do not git commit.",
     "Listed chats:",
     lines.join("\n") || "(none)",
   ].join("\n");

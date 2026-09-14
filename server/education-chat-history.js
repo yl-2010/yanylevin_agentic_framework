@@ -18,6 +18,8 @@ export const TITLE_MAX = 40;
 const PREVIEW_MAX = 80;
 const RECENT_LIMIT = 12;
 const LIST_MAX = 500;
+/** iMessage/Teams @agent threads drop from the UI list this long after the last persist. */
+export const EPHEMERAL_HIDE_MS = 10 * 60 * 1000;
 
 /**
  * @param {string} email
@@ -117,6 +119,37 @@ export function sanitizeChatVisibility(raw) {
 }
 
 /**
+ * iMessage/Teams @agent threads. Missing or unknown values are permanent.
+ * @param {unknown} raw
+ * @returns {boolean}
+ */
+export function sanitizeChatEphemeral(raw) {
+  const s = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+  return s === "true" || s === "yes" || s === "1";
+}
+
+/**
+ * Hide an @agent thread from the UI list once the reply has sat idle.
+ * Working sessions stay listed. Talking from web/iOS clears ephemeral.
+ * @param {{ sessionId?: string, ephemeral?: boolean, updated?: string }|null|undefined} row
+ * @param {Date} [now]
+ * @param {Iterable<string>|Set<string>|undefined} workingIds
+ */
+export function chatHistoryIsEphemeralHidden(row, now = new Date(), workingIds) {
+  if (!row?.ephemeral) return false;
+  const sid = String(row.sessionId || "");
+  const working =
+    workingIds instanceof Set ? workingIds : new Set(workingIds || []);
+  if (sid && working.has(sid)) return false;
+  const updated = Date.parse(String(row.updated || ""));
+  if (!Number.isFinite(updated)) return false;
+  const t = now instanceof Date ? now.getTime() : Date.now();
+  return t - updated >= EPHEMERAL_HIDE_MS;
+}
+
+/**
  * @param {{
  *   email: string,
  *   sessionId: string,
@@ -125,6 +158,7 @@ export function sanitizeChatVisibility(raw) {
  *   updatedAt?: string,
  *   title?: string,
  *   visibility?: string,
+ *   ephemeral?: boolean,
  * }} opts
  */
 export function formatChatHistoryMarkdown(opts) {
@@ -137,6 +171,7 @@ export function formatChatHistoryMarkdown(opts) {
   );
   const title = sanitizeChatTitle(opts?.title);
   const visibility = sanitizeChatVisibility(opts?.visibility);
+  const ephemeral = sanitizeChatEphemeral(opts?.ephemeral);
   /** @type {string[]} */
   const lines = [
     "# Personal Agent chat",
@@ -147,6 +182,7 @@ export function formatChatHistoryMarkdown(opts) {
   ];
   if (title) lines.push(`title: ${title}`);
   lines.push(`visibility: ${visibility}`);
+  if (ephemeral) lines.push("ephemeral: true");
   lines.push("");
   for (const m of messages) {
     if (!m || (m.role !== "user" && m.role !== "assistant")) continue;
@@ -173,6 +209,7 @@ export function formatChatHistoryMarkdown(opts) {
  *   updated: string,
  *   title: string,
  *   visibility: 'showing'|'hidden',
+ *   ephemeral: boolean,
  *   preview: string,
  * }}
  */
@@ -199,6 +236,7 @@ export function parseChatHistoryMeta(markdown) {
     updated: field("updated"),
     title: sanitizeChatTitle(titleMatch ? titleMatch[1] : ""),
     visibility: sanitizeChatVisibility(field("visibility")),
+    ephemeral: sanitizeChatEphemeral(field("ephemeral")),
     preview,
   };
 }
@@ -439,6 +477,7 @@ export function applyChatWorkingStatus(chats, workingIds) {
  *   root?: string,
  *   title?: string,
  *   visibility?: string,
+ *   ephemeral?: boolean,
  *   markRead?: boolean,
  * }} opts
  */
@@ -458,6 +497,14 @@ export async function persistChatHistory(opts) {
   let visibility = requestedVisibility
     ? sanitizeChatVisibility(requestedVisibility)
     : "";
+  let ephemeral = null;
+  if (
+    opts &&
+    Object.prototype.hasOwnProperty.call(opts, "ephemeral") &&
+    opts.ephemeral != null
+  ) {
+    ephemeral = sanitizeChatEphemeral(opts.ephemeral);
+  }
   let previousUpdated = "";
   let isNew = false;
   try {
@@ -467,11 +514,19 @@ export async function persistChatHistory(opts) {
     previousUpdated = meta.updated;
     if (!title) title = meta.title;
     if (!visibility) visibility = meta.visibility;
+    if (ephemeral == null) ephemeral = meta.ephemeral;
   } catch {
     isNew = true;
   }
 
-  const updatedAt = new Date().toISOString();
+  const updatedAtRaw = new Date();
+  let updatedAt = updatedAtRaw.toISOString();
+  if (previousUpdated) {
+    const prev = Date.parse(previousUpdated);
+    if (Number.isFinite(prev) && updatedAtRaw.getTime() <= prev) {
+      updatedAt = new Date(prev + 1).toISOString();
+    }
+  }
   if (opts?.markRead) {
     await markChatHistoryRead({
       email,
@@ -498,6 +553,7 @@ export async function persistChatHistory(opts) {
     updatedAt,
     title,
     visibility: visibility || "showing",
+    ephemeral: Boolean(ephemeral),
   });
   await writeFile(abs, markdown, "utf8");
   return rel;
@@ -587,6 +643,7 @@ export async function patchChatHistoryVisibility(opts) {
  *   sessionId: string,
  *   title: string,
  *   visibility: 'showing'|'hidden',
+ *   ephemeral: boolean,
  *   started: string,
  *   updated: string,
  *   preview: string,
@@ -613,6 +670,7 @@ export async function loadChatHistory(opts) {
     sessionId,
     title: meta.title,
     visibility: meta.visibility,
+    ephemeral: meta.ephemeral,
     started: meta.started,
     updated: meta.updated,
     preview: meta.preview,
@@ -646,6 +704,7 @@ async function readChatHistoryRows(opts) {
    *   sessionId: string,
    *   title: string,
    *   visibility: 'showing'|'hidden',
+   *   ephemeral: boolean,
    *   updated: string,
    *   preview: string,
    *   started: string,
@@ -664,6 +723,7 @@ async function readChatHistoryRows(opts) {
         sessionId,
         title: meta.title,
         visibility: meta.visibility,
+        ephemeral: meta.ephemeral,
         updated: meta.updated || new Date(st.mtimeMs).toISOString(),
         preview: meta.preview,
         started: meta.started,
@@ -743,14 +803,22 @@ export async function listRecentChatHistory(opts) {
  *   excludeSessionId?: string,
  *   limit?: number,
  *   root?: string,
+ *   now?: Date,
+ *   workingIds?: Iterable<string>|Set<string>,
  * }} opts
  */
 export async function listChatHistory(opts) {
   const limit = Math.max(1, Math.min(LIST_MAX, Number(opts?.limit) || LIST_MAX));
   const rows = await readChatHistoryRows(opts);
   const lastRead = await loadChatLastReadMap(opts);
+  const now = opts?.now instanceof Date ? opts.now : new Date();
+  const workingIds =
+    opts?.workingIds instanceof Set
+      ? opts.workingIds
+      : new Set(opts?.workingIds || []);
   return rows
     .filter((row) => row.visibility !== "hidden")
+    .filter((row) => !chatHistoryIsEphemeralHidden(row, now, workingIds))
     .slice(0, limit)
     .map(({ sessionId, title, updated, preview, started }) => ({
       sessionId,

@@ -15,6 +15,9 @@ import {
   resolveIncomingTurnMode,
   sessionHasBackgroundWork,
   shouldKeepChatHistoryRead,
+  isUiChatClient,
+  shouldPersistChatEphemeral,
+  pinEphemeralChatIfUiClient,
   shouldAppendEndOfTurn,
   snapshotMessages,
   stampMessage,
@@ -401,6 +404,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /except the Class of 2028 Teams grade chat/);
     assert.match(agent, /only Yan, Alex, Example Friend, and Example Neighbor/);
     assert.match(agent, /keep that final bubble/);
+    assert.match(agent, /10 minutes after the reply finishes/);
     assert.match(agent, /fromMe/);
     assert.match(agent, /only `@agent`/);
     assert.match(agent, /Apple Contacts/);
@@ -625,6 +629,35 @@ describe("shouldKeepChatHistoryRead", () => {
     assert.equal(shouldKeepChatHistoryRead({ imessageOrigin: { to: "x" } }, followUp), false);
     assert.equal(shouldKeepChatHistoryRead({}, firstTurn), false);
     assert.equal(shouldKeepChatHistoryRead(null, firstTurn), false);
+  });
+});
+
+describe("ephemeral @agent chats", () => {
+  it("marks iMessage and Teams origin chats ephemeral until the app talks", () => {
+    assert.equal(shouldPersistChatEphemeral({ imessageOrigin: { to: "x" } }), true);
+    assert.equal(shouldPersistChatEphemeral({ teamsOrigin: { chatId: "x" } }), true);
+    assert.equal(
+      shouldPersistChatEphemeral({
+        imessageOrigin: { to: "x" },
+        ephemeralPinned: true,
+      }),
+      false
+    );
+    assert.equal(shouldPersistChatEphemeral({}), null);
+    assert.equal(shouldPersistChatEphemeral(null), null);
+  });
+
+  it("pins when the follow-up is from web or iOS, not iMessage or Teams", () => {
+    assert.equal(isUiChatClient({ client: "web" }), true);
+    assert.equal(isUiChatClient({ client: "ios" }), true);
+    assert.equal(isUiChatClient({ client: "imessage" }), false);
+    assert.equal(isUiChatClient({ client: "teams" }), false);
+    const session = { imessageOrigin: { to: "x" }, ephemeralPinned: false };
+    assert.equal(pinEphemeralChatIfUiClient(session, { client: "imessage" }, "sid"), false);
+    assert.equal(session.ephemeralPinned, false);
+    assert.equal(pinEphemeralChatIfUiClient(session, { client: "web" }, "sid"), true);
+    assert.equal(session.ephemeralPinned, true);
+    assert.equal(shouldPersistChatEphemeral(session), false);
   });
 });
 

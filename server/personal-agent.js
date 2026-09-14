@@ -22,6 +22,7 @@ import {
   markChatHistoryRead,
   persistChatHistory,
   sanitizeSessionId,
+  EPHEMERAL_HIDE_MS,
 } from "./education-chat-history.js";
 import { enqueueChatTitle, isStubChatTitle } from "./chat-title.js";
 import {
@@ -105,8 +106,12 @@ const PA_ERROR_REPLY =
  *   teamsOrigin?: object|null,
  *   teamsDeliverFinal?: boolean,
  *   guestCaller?: object|null,
+ *   ephemeralPinned?: boolean,
  * }} Session
  */
+
+/** @type {Map<string, ReturnType<typeof setTimeout>>} */
+const ephemeralHideTimers = new Map();
 
 /**
  * One-shot education SPA / iOS stack target. Not stored in chat history.
@@ -579,6 +584,39 @@ function notifyTurnFinished(session, sid, extra) {
   };
   if (navigate) payload.navigate = navigate;
   notifyEducationClients(session.email, "change", payload);
+  scheduleEphemeralHideNotify(sid, session, extra?.status);
+}
+
+function clearEphemeralHideTimer(sid) {
+  const t = ephemeralHideTimers.get(sid);
+  if (t) {
+    clearTimeout(t);
+    ephemeralHideTimers.delete(sid);
+  }
+}
+
+/**
+ * SSE/poll so an open history drawer drops the row at 10 minutes.
+ * List filtering still uses the file's `updated` time if the process restarts.
+ * @param {string} sid
+ * @param {Session} session
+ * @param {unknown} status
+ */
+function scheduleEphemeralHideNotify(sid, session, status) {
+  clearEphemeralHideTimer(sid);
+  if (shouldPersistChatEphemeral(session) !== true) return;
+  if (String(status || "") === "running") return;
+  const t = setTimeout(() => {
+    ephemeralHideTimers.delete(sid);
+    if (session.ephemeralPinned) return;
+    notifyEducationClients(session.email, "change", {
+      source: "agent",
+      sessionId: sid,
+      status: "idle",
+    });
+  }, EPHEMERAL_HIDE_MS);
+  if (typeof t.unref === "function") t.unref();
+  ephemeralHideTimers.set(sid, t);
 }
 
 /**
@@ -697,12 +735,22 @@ function persistSessionHistory(sid, session) {
   const snap = snapshotMessages(session);
   const userTurns = snap.filter((m) => m.role === "user").length;
   const hasAssistant = snap.some((m) => m.role === "assistant");
-  return persistChatHistory({
+  const ephemeral = shouldPersistChatEphemeral(session);
+  /** @type {{
+   *   email: string,
+   *   sessionId: string,
+   *   messages: ReturnType<typeof snapshotMessages>,
+   *   markRead: boolean,
+   *   ephemeral?: boolean,
+   * }} */
+  const opts = {
     email: session.email,
     sessionId: sid,
     messages: snap,
     markRead: shouldKeepChatHistoryRead(session, snap),
-  })
+  };
+  if (ephemeral != null) opts.ephemeral = ephemeral;
+  return persistChatHistory(opts)
     .then(() => {
       // Wait for the first assistant bubble so the title agent is not
       // racing the live Grok turn (Teams @agent was getting the truncated
@@ -796,6 +844,43 @@ export function shouldKeepChatHistoryRead(session, messages) {
   if (!session?.imessageOrigin && !session?.teamsOrigin) return false;
   const userTurns = (messages || []).filter((m) => m.role === "user").length;
   return userTurns <= 1;
+}
+
+/**
+ * Web and iOS Personal Agent clients. iMessage/Teams @agent is not this.
+ * @param {Record<string, unknown>|null|undefined} uiContext
+ */
+export function isUiChatClient(uiContext) {
+  const client = String(uiContext?.client || "")
+    .trim()
+    .toLowerCase();
+  return client === "web" || client === "ios";
+}
+
+/**
+ * true = mark the transcript ephemeral, false = pin it, null = leave the file as-is.
+ * @param {Session|undefined|null} session
+ * @returns {boolean|null}
+ */
+export function shouldPersistChatEphemeral(session) {
+  if (!session) return null;
+  if (session.ephemeralPinned) return false;
+  if (session.imessageOrigin || session.teamsOrigin) return true;
+  return null;
+}
+
+/**
+ * A follow-up typed in the app cancels the 10-minute hide.
+ * @param {Session|undefined|null} session
+ * @param {Record<string, unknown>|null|undefined} uiContext
+ * @param {string} [sessionId]
+ */
+export function pinEphemeralChatIfUiClient(session, uiContext, sessionId) {
+  if (!session || !isUiChatClient(uiContext)) return false;
+  session.ephemeralPinned = true;
+  const sid = String(sessionId || "").trim();
+  if (sid) clearEphemeralHideTimer(sid);
+  return true;
 }
 
 /**
@@ -1461,6 +1546,7 @@ export async function startAgent(email) {
     teamsOrigin: null,
     teamsDeliverFinal: false,
     guestCaller: null,
+    ephemeralPinned: false,
   });
   activeByEmail.set(normalized, id);
 
@@ -1469,7 +1555,8 @@ export async function startAgent(email) {
 
 /**
  * New Personal Agent thread whose first user message is an iMessage that
- * mentioned @agent. Shows up in the app/website like any other chat.
+ * mentioned @agent. Listed in the app/website for 10 minutes after the
+ * reply finishes, then dropped unless Yan continues from web or iOS.
  * @param {object} message
  */
 export async function startAgentFromIMessageMention(message) {
@@ -1505,7 +1592,8 @@ export async function startAgentFromIMessageMention(message) {
 
 /**
  * New Personal Agent thread whose first user message is a Teams chat that
- * mentioned @agent. Shows up in the app/website like any other chat.
+ * mentioned @agent. Same 10-minute UI hide as iMessage @agent unless Yan
+ * continues from web or iOS.
  * @param {object} message
  */
 export async function startAgentFromTeamsMention(message) {
@@ -1550,13 +1638,13 @@ export async function listAgentChats(email) {
     err.status = 403;
     throw err;
   }
-  const chats = await listChatHistory({ email: normalized });
   const workingIds = new Set();
   for (const [sid, session] of sessions) {
     if (session?.email === normalized && sessionHasBackgroundWork(session)) {
       workingIds.add(sid);
     }
   }
+  const chats = await listChatHistory({ email: normalized, workingIds });
   for (const row of chats) {
     if (
       row?.sessionId &&
@@ -1683,6 +1771,12 @@ export async function resumeAgent(sessionId, email) {
     runPromise: null,
     turnQueue: [],
     replayUiTranscript: true,
+    imessageOrigin: null,
+    imessageDeliverFinal: false,
+    teamsOrigin: null,
+    teamsDeliverFinal: false,
+    guestCaller: null,
+    ephemeralPinned: !loaded.ephemeral,
   });
   activeByEmail.set(normalized, sid);
   await markChatHistoryRead({ email: normalized, sessionId: sid });
@@ -2006,6 +2100,8 @@ export async function messageAgent(
     err.status = 403;
     throw err;
   }
+
+  pinEphemeralChatIfUiClient(session, uiContext, sid);
 
   if (!Array.isArray(session.turnQueue)) session.turnQueue = [];
   if (!Array.isArray(session.uploads)) session.uploads = [];
@@ -2332,7 +2428,10 @@ export async function getRunningAgents(email) {
     });
   }
   live.sort((a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0));
-  const chats = live.length ? await listChatHistory({ email: normalized }) : [];
+  const workingIds = new Set(live.map((row) => row.sessionId));
+  const chats = live.length
+    ? await listChatHistory({ email: normalized, workingIds })
+    : [];
   const titleById = new Map(
     (chats || []).map((row) => [
       String(row.sessionId || ""),
