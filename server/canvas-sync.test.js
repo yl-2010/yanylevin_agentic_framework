@@ -16,6 +16,7 @@ import {
 import {
   contextSynthesisHm,
   chatTitleRefreshHm,
+  lifeStateCleanupHm,
   nightlyAgentsHm,
   brainProjectionHm,
 } from "./daily-briefing-agent.js";
@@ -137,6 +138,10 @@ describe("shared nightly clocks", () => {
       "01:30"
     );
     assert.equal(
+      lifeStateCleanupHm({ lifeStateCleanupLocalTime: "01:30" }),
+      "01:30"
+    );
+    assert.equal(
       contextSynthesisHm({ contextSynthesisLocalTime: "02:30" }),
       "02:30"
     );
@@ -146,6 +151,7 @@ describe("shared nightly clocks", () => {
     );
     assert.equal(nightlyAgentsHm({}), "01:00");
     assert.equal(chatTitleRefreshHm({}), "01:30");
+    assert.equal(lifeStateCleanupHm({}), "01:30");
     assert.equal(contextSynthesisHm({}), "02:30");
     assert.equal(brainProjectionHm({}), "03:00");
     assert.equal(nightlyAgentsHm({ nightlyAgentsLocalTime: "nope" }), "01:00");

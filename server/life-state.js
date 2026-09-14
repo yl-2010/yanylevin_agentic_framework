@@ -15,6 +15,13 @@ export const LIFE_STATE_REL = `education/${YAN_EMAIL}/${LIFE_STATE_DIRNAME}`;
 export const LIFE_STATE_SNAPSHOT_PATH = "/tmp/yanylevin-life-state-snapshot.json";
 export const LIFE_STATE_GUESS_PATH = "/tmp/yanylevin-life-state-guess.json";
 export const LIFE_STATE_CONTEXT_PATH = "/tmp/yanylevin-context-life-state.json";
+export const LIFE_STATE_CLEANUP_DAY_PATH =
+  "/tmp/yanylevin-life-state-cleanup-day.json";
+export const LIFE_STATE_CLEANUP_PATCH_PATH =
+  "/tmp/yanylevin-life-state-cleanup.json";
+export const LIFE_STATE_CLEANUP_MODEL = "grok-4.6";
+export const LIFE_STATE_CLEANUP_EVIDENCE = "cleanup:corrected";
+export const LIFE_STATE_CLEANUP_STATE = "cleanup-state.json";
 export const CURRENT_STALE_MS = 10 * 60 * 1000;
 export const SAMPLE_STALE_MS = 20 * 60 * 1000;
 /** Age of a live GPS ping that should still carry a device bundle. Sitting still is not an issue. */
@@ -269,6 +276,218 @@ export function addDaysToLifeStateDateKey(dateKey, days) {
   return `${dt.getUTCFullYear()}-${mm}-${dd}`;
 }
 
+/** @param {string} [dir] */
+export function lifeStateCleanupStatePath(dir) {
+  return join(lifeStateDir(dir), LIFE_STATE_CLEANUP_STATE);
+}
+
+/**
+ * Full samples for one local dateKey, oldest first.
+ * @param {string} dateKey
+ * @param {string} [dir]
+ */
+export async function readLifeStateDay(dateKey, dir) {
+  const key = String(dateKey || "").trim();
+  if (!DATE_KEY_RE.test(key)) return [];
+  const all = await readAllLifeStateRecords(dir);
+  return all.filter((row) => row.dateKey === key);
+}
+
+/**
+ * Recalculate `since` / `continued` along a chronological sequence.
+ * @param {Record<string, unknown>[]} rows
+ * @param {Record<string, unknown>|null} [previous]
+ */
+export function relinkLifeStateSequence(rows, previous = null) {
+  const list = Array.isArray(rows) ? rows : [];
+  /** @type {Record<string, unknown>[]} */
+  const out = [];
+  let prev = previous && typeof previous === "object" ? previous : null;
+  for (const row of list) {
+    const sameKind = Boolean(prev && prev.kind === row.kind);
+    const parsed = parseLifeStateRecord({
+      ...row,
+      since: sameKind ? prev.since : row.at,
+      continued: sameKind,
+    });
+    if (!parsed) {
+      const err = new Error(`invalid life-state record at ${row?.at || "?"}`);
+      err.status = 400;
+      throw err;
+    }
+    out.push(parsed);
+    prev = parsed;
+  }
+  return out;
+}
+
+/**
+ * @param {unknown[]} tokens
+ * @param {boolean} [mark]
+ */
+function withCleanupEvidence(tokens, mark) {
+  const evidence = (Array.isArray(tokens) ? tokens : [])
+    .map((t) => clipStr(t, 48).toLowerCase())
+    .filter((t) => EVIDENCE_RE.test(t));
+  if (!mark) return evidence.slice(0, 12);
+  if (!evidence.includes(LIFE_STATE_CLEANUP_EVIDENCE)) {
+    if (evidence.length >= 12) evidence.pop();
+    evidence.push(LIFE_STATE_CLEANUP_EVIDENCE);
+  }
+  return evidence.slice(0, 12);
+}
+
+function lifeStateSampleChanged(before, after) {
+  if (!before || !after) return true;
+  return (
+    before.kind !== after.kind ||
+    before.activity !== after.activity ||
+    before.place !== after.place ||
+    before.placeLabel !== after.placeLabel ||
+    (before.notes || "") !== (after.notes || "")
+  );
+}
+
+/**
+ * Replace yesterday's samples in place. Same `at` / `local` / `dateKey`.
+ * Does not invent or drop ticks.
+ * @param {string} dateKey
+ * @param {unknown} corrections
+ * @param {{ dir?: string }} [opts]
+ */
+export async function rewriteLifeStateDay(dateKey, corrections, opts = {}) {
+  const key = String(dateKey || "").trim();
+  if (!DATE_KEY_RE.test(key)) {
+    const err = new Error("bad dateKey");
+    err.status = 400;
+    throw err;
+  }
+  const dir = lifeStateDir(opts.dir);
+  const all = await readAllLifeStateRecords(dir);
+  const day = all.filter((row) => row.dateKey === key);
+  const others = all.filter((row) => row.dateKey !== key);
+  if (!day.length) {
+    return { ok: false, dateKey: key, error: "no samples", sampleCount: 0, corrected: 0 };
+  }
+
+  const patchList = Array.isArray(corrections)
+    ? corrections
+    : Array.isArray(corrections?.corrections)
+      ? corrections.corrections
+      : [];
+  if (!patchList.length) {
+    return { ok: true, dateKey: key, sampleCount: day.length, corrected: 0 };
+  }
+
+  const byAt = new Map(day.map((row) => [row.at, row]));
+  let corrected = 0;
+  for (const patch of patchList) {
+    if (!patch || typeof patch !== "object") continue;
+    const atMs = Date.parse(String(patch.at || ""));
+    if (!Number.isFinite(atMs)) {
+      const err = new Error("correction missing at");
+      err.status = 400;
+      throw err;
+    }
+    const at = new Date(atMs).toISOString();
+    const existing = byAt.get(at);
+    if (!existing) {
+      const err = new Error(`no sample at ${at} for ${key}`);
+      err.status = 400;
+      throw err;
+    }
+    const src = /** @type {Record<string, unknown>} */ (patch);
+    const mergedGuess = parseLifeStateRecord({
+      ...existing,
+      kind: src.kind ?? existing.kind,
+      activity: src.activity ?? existing.activity,
+      place: src.place ?? existing.place,
+      placeLabel: src.placeLabel ?? existing.placeLabel,
+      confidence: src.confidence ?? existing.confidence,
+      notes: src.notes !== undefined ? src.notes : existing.notes,
+      at: existing.at,
+      local: existing.local,
+      dateKey: existing.dateKey,
+      since: existing.since,
+      continued: existing.continued,
+      model: existing.model,
+      evidence: existing.evidence,
+    });
+    if (!mergedGuess) {
+      const err = new Error(`invalid correction at ${at}`);
+      err.status = 400;
+      throw err;
+    }
+    const changed = lifeStateSampleChanged(existing, mergedGuess);
+    const merged = parseLifeStateRecord({
+      ...mergedGuess,
+      model: changed ? LIFE_STATE_CLEANUP_MODEL : existing.model,
+      evidence: withCleanupEvidence(
+        Array.isArray(src.evidence) ? src.evidence : existing.evidence,
+        changed
+      ),
+    });
+    if (!merged) {
+      const err = new Error(`invalid correction at ${at}`);
+      err.status = 400;
+      throw err;
+    }
+    if (changed) corrected += 1;
+    byAt.set(at, merged);
+  }
+
+  const dayNext = day.map((row) => byAt.get(row.at));
+  const firstAt = String(day[0].at);
+  const previous =
+    [...others].reverse().find((row) => String(row.at) < firstAt) || null;
+  const relinked = relinkLifeStateSequence(dayNext, previous);
+  const mergedAll = [...others, ...relinked].sort((a, b) =>
+    String(a.at).localeCompare(String(b.at))
+  );
+  await mkdir(dir, { recursive: true });
+  await writeLifeStateMonthLogs(dir, mergedAll);
+
+  const current = await readCurrentLifeState(dir);
+  if (current) {
+    const updated = relinked.find((row) => row.at === current.at);
+    if (updated) {
+      await writeFile(
+        currentLifeStatePath(dir),
+        `${JSON.stringify(updated, null, 2)}\n`,
+        "utf8"
+      );
+    }
+  }
+
+  return {
+    ok: true,
+    dateKey: key,
+    sampleCount: relinked.length,
+    corrected,
+  };
+}
+
+/**
+ * Dump yesterday's samples + collapsed segments for the cleanup agent.
+ * @param {string} dateKey
+ * @param {string} [dir]
+ */
+export async function dumpLifeStateCleanupDay(dateKey, dir) {
+  const summary = await summarizeLifeStateDay(dateKey, dir);
+  const samples = await readLifeStateDay(dateKey, dir);
+  const payload = {
+    at: new Date().toISOString(),
+    ...summary,
+    samples,
+  };
+  await writeFile(
+    LIFE_STATE_CLEANUP_DAY_PATH,
+    `${JSON.stringify(payload, null, 2)}\n`,
+    "utf8"
+  );
+  return payload;
+}
+
 /**
  * Collapsed kind timeline for one local dateKey. Nightly jobs read this, not 288 JSONL lines.
  * @param {string} dateKey
@@ -279,17 +498,7 @@ export async function summarizeLifeStateDay(dateKey, dir) {
   if (!DATE_KEY_RE.test(key)) {
     return { ok: false, dateKey: key, error: "bad dateKey", sampleCount: 0, segments: [] };
   }
-  const root = lifeStateDir(dir);
-  const files = await listLifeStateLogFiles(root);
-  /** @type {Record<string, unknown>[]} */
-  const rows = [];
-  for (const name of files) {
-    const month = await readJsonlObjects(join(root, name));
-    for (const row of month) {
-      if (row.dateKey === key) rows.push(row);
-    }
-  }
-  rows.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  const rows = await readLifeStateDay(key, dir);
   /** @type {Record<string, unknown>[]} */
   const segments = [];
   for (const row of rows) {
@@ -531,6 +740,38 @@ async function readJsonlObjects(file) {
   return out;
 }
 
+/** @param {string} [dir] */
+async function readAllLifeStateRecords(dir) {
+  const root = lifeStateDir(dir);
+  const files = await listLifeStateLogFiles(root);
+  /** @type {Record<string, unknown>[]} */
+  const rows = [];
+  for (const name of files) {
+    rows.push(...(await readJsonlObjects(join(root, name))));
+  }
+  rows.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  return rows;
+}
+
+/**
+ * @param {string} dir
+ * @param {Record<string, unknown>[]} records
+ */
+async function writeLifeStateMonthLogs(dir, records) {
+  /** @type {Map<string, Record<string, unknown>[]>} */
+  const byMonth = new Map();
+  for (const row of records) {
+    const month = lifeStateLogMonthKey(String(row.at));
+    const list = byMonth.get(month) || [];
+    list.push(row);
+    byMonth.set(month, list);
+  }
+  for (const [month, rows] of byMonth) {
+    const body = `${rows.map((r) => JSON.stringify(r)).join("\n")}\n`;
+    await writeFile(lifeStateLogPath(dir, month), body, "utf8");
+  }
+}
+
 /**
  * @param {string} [dir]
  * @param {number} [limit]
@@ -635,7 +876,7 @@ async function readGuessInput(arg) {
     for await (const c of process.stdin) chunks.push(c);
     return JSON.parse(Buffer.concat(chunks).toString("utf8") || "null");
   }
-  if (raw.startsWith("{")) return JSON.parse(raw);
+  if (raw.startsWith("{") || raw.startsWith("[")) return JSON.parse(raw);
   return JSON.parse(await readFile(raw, "utf8"));
 }
 
@@ -649,15 +890,20 @@ if (isCli) {
     if (cmd === "at") return readLifeStateAt(rest[0] || "");
     if (cmd === "recent") return readRecentLifeState(undefined, rest[0]);
     if (cmd === "day") return summarizeLifeStateDay(rest[0] || "");
+    if (cmd === "samples") return readLifeStateDay(rest[0] || "");
     if (cmd === "health") return assessLifeStateHeartbeat();
     if (cmd === "append") {
       const guess = await readGuessInput(rest[0] || "-");
       return appendLifeStateGuess(guess);
     }
+    if (cmd === "rewrite-day") {
+      const patch = await readGuessInput(rest[1] || "-");
+      return rewriteLifeStateDay(rest[0] || "", patch);
+    }
     return {
       ok: false,
       usage:
-        "node life-state.js now | at <iso> | recent [n] | day <YYYY-MM-DD> | health | append <file-or-json>",
+        "node life-state.js now | at <iso> | recent [n] | day <YYYY-MM-DD> | samples <YYYY-MM-DD> | health | append <file-or-json> | rewrite-day <YYYY-MM-DD> <file-or-json>",
     };
   };
   run()

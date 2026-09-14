@@ -95,20 +95,22 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | School Teams fill (manual, one-shot) | `.cursor/skills/brain-school-teams/SKILL.md` |
 | Apple Mail fill (manual, one-shot) | `.cursor/skills/brain-apple-mail/SKILL.md` |
 | Chat title refresh (manual / backfill) | `.cursor/skills/chat-title-refresh/SKILL.md` |
+| Life-state cleanup (manual) | `.cursor/skills/life-state-cleanup/SKILL.md` |
 
 Live context on Express turns is authoritative for clock, class-now, the open screen, and (Yan) today’s Apple Calendar plus a Canvas due-soon count. Trust it. Mail, iMessage, Screen Time, Contacts, OneNote, Teams, and Apple Home stay on-demand files (Teams is also a nightly dump). OneNote is not a nightly default source: open it only when Yan asks, or when a job already names a specific notebook or page. Named-people lookup above still opens `brain/people/`. Other `education/<email>/` files only when the question needs that data.
 
 ## Nightly jobs (Yan, manual)
 
-Times are in `education/you@example.com/daily-briefing/meta.json` (`nightlyAgentsLocalTime` 01:00, `chatTitleRefreshLocalTime` 01:30, `contextSynthesisLocalTime` 02:30, `brainProjectionLocalTime` 03:00, `compileLocalTime` 06:00). Fact-check starts as soon as both 03:00 agents finish, not on a 03:30 clock. Those overnight jobs read yesterday's 5-minute life-state log (`/tmp/yanylevin-context-life-state.json` or `node server/life-state.js day`) as a context source. They do not write samples.
+Times are in `education/you@example.com/daily-briefing/meta.json` (`nightlyAgentsLocalTime` 01:00, `chatTitleRefreshLocalTime` 01:30, `lifeStateCleanupLocalTime` 01:30, `contextSynthesisLocalTime` 02:30, `brainProjectionLocalTime` 03:00, `compileLocalTime` 06:00). Fact-check starts as soon as both 03:00 agents finish, not on a 03:30 clock. Those overnight jobs read yesterday's 5-minute life-state log (`/tmp/yanylevin-context-life-state.json` or `node server/life-state.js day`) as a context source. They do not write samples. The 01:30 life-state cleanup job is the exception: it rewrites yesterday's JSONL.
 
-When Yan says run location enrichment / enrich my places / run health takeaways / run context synthesis / run the nightly pipeline / update my memories / retitle chats / run location brain / project my places / run health brain / run fact check / fact-check overnight context / fill a person from iMessage / fill school Outlook / fill school Teams / fill Apple Mail, **do not** do the whole Grok/Composer pass in this chat turn. From the repo root:
+When Yan says run location enrichment / enrich my places / run health takeaways / run context synthesis / run the nightly pipeline / update my memories / retitle chats / clean life-state logs / run life-state cleanup / run location brain / project my places / run health brain / run fact check / fact-check overnight context / fill a person from iMessage / fill school Outlook / fill school Teams / fill Apple Mail, **do not** do the whole Grok/Composer pass in this chat turn. From the repo root:
 
 ```bash
 node --env-file=server/.env server/location-enrichment-agent.js --force
 node --env-file=server/.env server/health-takeaways-agent.js --force
 node --env-file=server/.env server/chat-title-refresh-agent.js --force
 node --env-file=server/.env server/chat-title-refresh-agent.js --backfill
+node --env-file=server/.env server/life-state-cleanup-agent.js --force
 node --env-file=server/.env server/context-synthesis-agent.js --force   # 5-phase nightly pipeline
 node --env-file=server/.env server/context-synthesis-agent.js --resume-from=lint
 node --env-file=server/.env server/location-brain-agent.js --force

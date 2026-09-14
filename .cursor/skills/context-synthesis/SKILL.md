@@ -14,8 +14,8 @@ disable-model-invocation: true
 
 You run after triage (digest at `/tmp/yanylevin-context-notable.md`) and the
 entity updater. Location compose, location enrichment, and health takeaways ran at 01:00;
-chat title refresh at 01:30. They already had the 5-minute life-state log
-(`/tmp/yanylevin-context-life-state.json`). Daily briefing is a separate 06:00
+chat title refresh and life-state cleanup at 01:30. They already had the 5-minute life-state log
+(`/tmp/yanylevin-context-life-state.json`), cleaned. Daily briefing is a separate 06:00
 job; do not compile news.
 
 Model: **grok-4.6 xhigh** (effort=xhigh, fast=false).

@@ -160,12 +160,13 @@ describe("prefetchNightlyStatus", () => {
     assert.equal(parsed.timezone, "America/Chicago");
     assert.equal(parsed.journalKey, addDaysToDateKey(dateKey, -1));
     assert.ok(Array.isArray(parsed.agents));
-    assert.equal(parsed.agents.length, 9);
+    assert.equal(parsed.agents.length, 10);
     assert.ok(parsed.agents.every((a) => typeof a.name === "string"));
     assert.ok(parsed.agents.every((a) => typeof a.ran === "boolean"));
     assert.ok(parsed.agents.some((a) => a.name === "context-synthesis"));
     assert.ok(parsed.agents.some((a) => a.name === "canvas-sync"));
     assert.ok(parsed.agents.some((a) => a.name === "fact-check"));
+    assert.ok(parsed.agents.some((a) => a.name === "life-state-cleanup"));
     assert.ok(parsed.lifeState && typeof parsed.lifeState === "object");
     assert.equal(typeof parsed.lifeState.ok, "boolean");
     assert.ok(Array.isArray(parsed.lifeState.issues));

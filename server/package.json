@@ -10,6 +10,7 @@
     "daily-briefing": "node --env-file=.env daily-briefing-agent.js",
     "location-history": "node --env-file=.env location-history-agent.js",
     "life-state": "node --env-file=.env life-state-agent.js",
+    "life-state-cleanup": "node --env-file=.env life-state-cleanup-agent.js",
     "location-enrichment": "node --env-file=.env location-enrichment-agent.js",
     "canvas-sync": "node --env-file=.env canvas-sync.js",
     "school-mail": "node school-mail.js",

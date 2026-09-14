@@ -64,6 +64,12 @@
           model: "Grok 4.6 high",
           kind: "clock",
         },
+        {
+          id: "life-state-cleanup",
+          name: "Life-state cleanup",
+          model: "Grok 4.6 xhigh",
+          kind: "clock",
+        },
       ],
     },
     {

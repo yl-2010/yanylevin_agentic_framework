@@ -259,6 +259,7 @@ describe("Personal Agent skill files", () => {
     assert.match(lifeState, /plugged_in/);
     assert.match(lifeState, /tesla_bluetooth/);
     assert.match(lifeState, /Nightly jobs/);
+    assert.match(lifeState, /life-state-cleanup/);
     assert.match(lifeState, /Never spawn a cloud agent/);
 
     const widgets = await readFile(
@@ -438,6 +439,8 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /brainProjectionLocalTime/);
     assert.match(agent, /Fact-check starts as soon as both 03:00 agents finish/);
     assert.match(agent, /fact-check-agent\.js/);
+    assert.match(agent, /lifeStateCleanupLocalTime/);
+    assert.match(agent, /life-state-cleanup-agent\.js/);
 
     const brain = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.brain), "utf8");
     assert.match(brain, /Frontmatter contract/);
@@ -546,6 +549,7 @@ describe("Personal Agent skill files", () => {
     assert.match(recap, /healthShortcut\.issues/);
     assert.match(recap, /Sitting still/);
     assert.match(recap, /no-new-points/);
+    assert.match(recap, /life-state cleanup/);
 
     const enrich = await readFile(
       join(REPO_ROOT, PERSONAL_SKILL_PATHS.locationEnrichment),

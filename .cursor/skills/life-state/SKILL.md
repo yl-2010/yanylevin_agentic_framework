@@ -25,6 +25,7 @@ education/you@example.com/life-state/
   state.json
   intent.json
   signals-YYYY-MM.jsonl
+  cleanup-state.json
 ```
 
 Read `schema.md` and `heuristics.md` before writing a sample. Contract is the schema.
@@ -43,15 +44,21 @@ Do not open Mail, OneNote, Teams, Canvas, journal, or people cards for this. Do 
 
 ## Nightly jobs
 
-Overnight agents (01:00 compose/enrichment/takeaways, 02:30 pipeline, 03:00
-brain + fact-check) treat this log as a context source. Prefetch is
-`/tmp/yanylevin-context-life-state.json` (yesterday collapsed). Or
-`node server/life-state.js day <YYYY-MM-DD>`. Read kinds, do not dump JSONL
-into identity or places.md. Indoor activity (rooms, apps, class periods,
-gym sets, shower, sleep) lives only in this log. Location `places.md` is
-the address. Do not write samples from those jobs. The 5-minute
-Composer tick is the writer. That tick starts on the clock
-(:00, :05, :10, …). A slow run does not slide the next start.
+Overnight agents (01:00 compose/enrichment/takeaways, 01:30 chat titles +
+life-state cleanup, 02:30 pipeline, 03:00 brain + fact-check) treat this log
+as a context source. Prefetch is `/tmp/yanylevin-context-life-state.json`
+(yesterday collapsed). Or `node server/life-state.js day <YYYY-MM-DD>`. Read
+kinds, do not dump JSONL into identity or places.md. Indoor activity (rooms,
+apps, class periods, gym sets, shower, sleep) lives only in this log.
+Location `places.md` is the address. Do not write samples from the 01:00 /
+02:30 / 03:00 jobs. The 5-minute Composer tick is the live writer. That tick
+starts on the clock (:00, :05, :10, …). A slow run does not slide the next
+start.
+
+The **01:30 life-state cleanup** job is the other writer. It rewrites
+yesterday's samples in place when Screen Time, iMessage, Teams, Calendar,
+location, or neighbors prove a tick was wrong. Follow
+`.cursor/skills/life-state-cleanup/SKILL.md` when that job runs.
 
 ## Scheduled tick
 

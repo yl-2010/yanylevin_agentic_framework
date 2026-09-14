@@ -95,7 +95,7 @@ All scheduled jobs **except** the daily briefing itself:
 | Slot | Jobs |
 |------|------|
 | 01:00 | Location compose, location enrichment, health takeaways, canvas sync |
-| 01:30 | Chat title refresh |
+| 01:30 | Chat title refresh, life-state cleanup |
 | 02:30 | Context synthesis pipeline (triage, entities, synthesis, actions, lint) |
 | 03:00 | Location brain projection, health brain projection, then fact-check (Grok 4.6 xhigh) as soon as both finish. URGENT if fact-check did not run. Mention `notes.factCheck` corrections in the recap; do not re-verify facts. |
 

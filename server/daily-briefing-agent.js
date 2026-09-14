@@ -96,6 +96,7 @@ export const BRIEFING_UNSLOP_MODEL_SPEC = {
 
 export const DEFAULT_NIGHTLY_HM = "01:00";
 export const DEFAULT_CHAT_TITLE_REFRESH_HM = "01:30";
+export const DEFAULT_LIFE_STATE_CLEANUP_HM = "01:30";
 export const DEFAULT_SYNTHESIS_HM = "02:30";
 export const DEFAULT_BRAIN_PROJECTION_HM = "03:00";
 export const DEFAULT_COMPILE_HM = "06:00";
@@ -107,6 +108,7 @@ const SERVER_LOG_PREFIXES = [
   "[location-",
   "[health-",
   "[chat-title-refresh]",
+  "[life-state-cleanup]",
   "[fact-check]",
 ];
 
@@ -295,6 +297,13 @@ export function chatTitleRefreshHm(meta) {
   return clockHm(meta?.chatTitleRefreshLocalTime, DEFAULT_CHAT_TITLE_REFRESH_HM);
 }
 
+export function lifeStateCleanupHm(meta) {
+  return clockHm(
+    meta?.lifeStateCleanupLocalTime,
+    DEFAULT_LIFE_STATE_CLEANUP_HM
+  );
+}
+
 export function contextSynthesisHm(meta) {
   return clockHm(meta?.contextSynthesisLocalTime, DEFAULT_SYNTHESIS_HM);
 }
@@ -426,6 +435,7 @@ export async function prefetchNightlyStatus(dateKey, timezone) {
   );
   const { enrichmentRanOn } = await import("./location-enrichment-agent.js");
   const { refreshRanOn } = await import("./chat-title-refresh-agent.js");
+  const { cleanupRanOn } = await import("./life-state-cleanup-agent.js");
   const { healthBrainRanOn } = await import("./health-brain-agent.js");
   const { locationBrainRanOn } = await import("./location-brain-agent.js");
   const { factCheckRanOn } = await import("./fact-check-agent.js");
@@ -476,6 +486,7 @@ export async function prefetchNightlyStatus(dateKey, timezone) {
     String(healthState?.lastTakeawaysDateKey || "") === String(dateKey);
   const canvasRan = await canvasSyncRanOn(dateKey);
   const chatRefreshRan = await refreshRanOn(dateKey);
+  const lifeStateCleanupRan = await cleanupRanOn(dateKey);
   const synthesisRan = await synthesisRanOn(dateKey);
   const pipelineFinished = await pipelineFinishedOn(dateKey);
   const locationBrainRan = await locationBrainRanOn(dateKey);
@@ -519,6 +530,12 @@ export async function prefetchNightlyStatus(dateKey, timezone) {
       expected: true,
       ran: chatRefreshRan,
       detail: chatRefreshRan ? "refreshed today" : "not refreshed today",
+    },
+    {
+      name: "life-state-cleanup",
+      expected: true,
+      ran: lifeStateCleanupRan,
+      detail: lifeStateCleanupRan ? "cleaned today" : "not cleaned today",
     },
     {
       name: "context-synthesis",

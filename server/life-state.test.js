@@ -14,6 +14,9 @@ import {
   readCurrentLifeState,
   readLifeStateAt,
   readRecentLifeState,
+  readLifeStateDay,
+  relinkLifeStateSequence,
+  rewriteLifeStateDay,
   summarizeLifeStateDay,
 } from "./life-state.js";
 
@@ -256,6 +259,152 @@ describe("life-state log IO", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("life-state rewrite-day", () => {
+  const awake = {
+    kind: "on_computer",
+    activity: "on Mac Studio in office",
+    place: "kirkland-home",
+    placeLabel: "Home",
+    confidence: 0.9,
+    evidence: ["gps:home", "screen:cursor"],
+    model: "composer-2.5",
+  };
+
+  it("fixes a flicker sleeping tick and relinks continued", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "life-state-rewrite-"));
+    try {
+      await appendLifeStateGuess(awake, {
+        dir,
+        now: new Date("2026-09-13T07:00:00.000Z"),
+        timeZone: "America/Los_Angeles",
+      });
+      const mid = await appendLifeStateGuess(
+        {
+          ...awake,
+          kind: "sleeping",
+          activity: "asleep in bed",
+          evidence: ["gps:home", "home:bedroom-on"],
+        },
+        {
+          dir,
+          now: new Date("2026-09-13T07:05:00.000Z"),
+          timeZone: "America/Los_Angeles",
+        }
+      );
+      await appendLifeStateGuess(awake, {
+        dir,
+        now: new Date("2026-09-13T07:10:00.000Z"),
+        timeZone: "America/Los_Angeles",
+      });
+      const other = await appendLifeStateGuess(SAMPLE, {
+        dir,
+        now: new Date("2026-09-12T21:10:00.000Z"),
+        timeZone: "America/Los_Angeles",
+      });
+      const result = await rewriteLifeStateDay(
+        "2026-09-13",
+        {
+          corrections: [
+            {
+              at: mid.at,
+              kind: "on_computer",
+              activity: "on Mac Studio in office, still awake",
+              place: "kirkland-home",
+              placeLabel: "Home",
+              confidence: 0.86,
+              evidence: ["gps:home", "screen:cursor", "imessage:from-me"],
+              notes: "one-tick sleeping between awake samples",
+            },
+          ],
+        },
+        { dir }
+      );
+      assert.equal(result.ok, true);
+      assert.equal(result.corrected, 1);
+      const day = await readLifeStateDay("2026-09-13", dir);
+      assert.equal(day.length, 3);
+      assert.equal(day[1].kind, "on_computer");
+      assert.equal(day[1].continued, true);
+      assert.equal(day[1].since, day[0].since);
+      assert.equal(day[1].model, "grok-4.6");
+      assert.ok(day[1].evidence.includes("cleanup:corrected"));
+      assert.equal(day[2].continued, true);
+      const kept = await readLifeStateDay("2026-09-12", dir);
+      assert.equal(kept[0].kind, other.kind);
+      assert.equal(kept[0].activity, other.activity);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("no-ops on empty corrections and rejects an unknown at", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "life-state-rewrite-empty-"));
+    try {
+      await appendLifeStateGuess(awake, {
+        dir,
+        now: new Date("2026-09-13T07:00:00.000Z"),
+        timeZone: "America/Los_Angeles",
+      });
+      const empty = await rewriteLifeStateDay("2026-09-13", { corrections: [] }, { dir });
+      assert.equal(empty.ok, true);
+      assert.equal(empty.corrected, 0);
+      const day = await readLifeStateDay("2026-09-13", dir);
+      assert.equal(day[0].kind, "on_computer");
+      await assert.rejects(
+        () =>
+          rewriteLifeStateDay(
+            "2026-09-13",
+            [{ at: "2026-09-13T07:55:00.000Z", kind: "sleeping" }],
+            { dir }
+          ),
+        /no sample at/
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("relinkLifeStateSequence", () => {
+  it("continues matching kinds from the previous sample", () => {
+    const prev = parseLifeStateRecord({
+      at: "2026-09-13T06:55:00.000Z",
+      local: "2026-09-12T23:55:00-07:00",
+      dateKey: "2026-09-12",
+      since: "2026-09-13T06:00:00.000Z",
+      continued: true,
+      kind: "sleeping",
+      activity: "asleep",
+      place: "kirkland-home",
+      placeLabel: "Home",
+      confidence: 0.8,
+      evidence: ["gps:home"],
+      model: "composer-2.5",
+    });
+    const next = relinkLifeStateSequence(
+      [
+        parseLifeStateRecord({
+          at: "2026-09-13T07:00:00.000Z",
+          local: "2026-09-13T00:00:00-07:00",
+          dateKey: "2026-09-13",
+          since: "2026-09-13T07:00:00.000Z",
+          continued: false,
+          kind: "sleeping",
+          activity: "asleep",
+          place: "kirkland-home",
+          placeLabel: "Home",
+          confidence: 0.8,
+          evidence: ["gps:home"],
+          model: "composer-2.5",
+        }),
+      ],
+      prev
+    );
+    assert.equal(next[0].continued, true);
+    assert.equal(next[0].since, prev.since);
   });
 });
 

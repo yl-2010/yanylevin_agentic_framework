@@ -41,6 +41,7 @@ import { startLocationHistoryScheduler } from "./location-history-agent.js";
 import { startLocationEnrichmentScheduler } from "./location-enrichment-agent.js";
 import { startContextSynthesisScheduler } from "./context-synthesis-agent.js";
 import { startChatTitleRefreshScheduler } from "./chat-title-refresh-agent.js";
+import { startLifeStateCleanupScheduler } from "./life-state-cleanup-agent.js";
 import { startCanvasSyncScheduler } from "./canvas-sync.js";
 import { startHealthTakeawaysScheduler } from "./health-takeaways-agent.js";
 import { startLocationBrainScheduler } from "./location-brain-agent.js";
@@ -992,6 +993,7 @@ app.use((_req, res) => {
   startHealthTakeawaysScheduler();
   startCanvasSyncScheduler();
   startChatTitleRefreshScheduler();
+  startLifeStateCleanupScheduler();
   startContextSynthesisScheduler();
   startLocationBrainScheduler();
   startHealthBrainScheduler();
