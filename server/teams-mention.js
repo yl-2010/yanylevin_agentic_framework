@@ -96,7 +96,7 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
   lines.push(
     `Read the surrounding thread before answering: node server/school-teams.js thread --chat ${JSON.stringify(chatArg)} --limit ${threadLimit} (school Teams skill).`,
     "The app and website thread is a normal Personal Agent chat. On long work, call send_chat_message first with a short status, then again when something new happens, the same as if this were typed in the app. Those bubbles stay in the app and website only. They are never sent to Teams.",
-    "Write the final bubble as the text that should land in that Teams chat (plain text, no markdown, no @agent). The app and website keep that final bubble as the end of the turn (the answer or what you did). Do not write Sent on Teams. Do not add // Sent by Yan's Personal Agent. The server appends that footer on the Teams message only, never in the app or website thread."
+    "Write the final bubble as the text that should land in that Teams chat. Markdown is fine, same as the app bubble (bold, italic, lists, links, headings, code). The server converts it to Teams HTML so desktop and mobile keep newlines and formatting. No HTML tags, no @agent. The app and website keep that final bubble as the end of the turn (the answer or what you did). Do not write Sent on Teams. Do not add // Sent by Yan's Personal Agent. The server appends that footer on the Teams message only, never in the app or website thread."
   );
   if (opts.deliverFinal !== false) {
     lines.push(

@@ -253,11 +253,18 @@ describe("school-teams urls and shapes", () => {
     assert.equal(body, "On it\n\n// Sent by Yan's Personal Agent");
   });
 
-  it("builds an IC3 send body without the footer (CLI applies that first)", () => {
+  it("builds an IC3 send body as RichText/Html so desktop keeps newlines", () => {
     const body = buildSendChatBody("On it");
-    assert.equal(body.messagetype, "Text");
-    assert.equal(body.content, "On it");
+    assert.equal(body.messagetype, "RichText/Html");
+    assert.equal(body.contenttype, "text");
+    assert.equal(body.content, "<p>On it</p>");
     assert.match(String(body.clientmessageid), /^\d+$/);
+  });
+
+  it("turns markdown newlines and bold into Teams HTML", () => {
+    const body = buildSendChatBody("**Hi**\nthere");
+    assert.equal(body.messagetype, "RichText/Html");
+    assert.equal(body.content, "<p><strong>Hi</strong><br>there</p>");
   });
 
   it("treats IC3 from 8:orgid as fromMe", () => {

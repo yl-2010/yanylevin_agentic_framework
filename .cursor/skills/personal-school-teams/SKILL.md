@@ -78,10 +78,13 @@ Reply `Sent to … (Teams)`.  Never from location-history or
 daily-briefing. Context-synthesis may send only when Yan's own message in that
 run directed it.
 
-The CLI appends `// Sent by Yan's Personal Agent`. Do not write that line in
-`--text`, and never put it in Personal Agent app or website bubbles. Same
-parent skip as iMessage (Rajasi / Michael / `Rajasi and Michael`). iMessage
-and email stay `Sent by Yan's Personal Agent` with no `//`.
+`--text` is markdown (or plain text). The CLI converts it to Teams HTML
+(`RichText/Html`) so desktop keeps newlines and bold/lists/links. Do not
+pass HTML. The CLI appends `// Sent by Yan's Personal Agent`. Do not write
+that line in `--text`, and never put it in Personal Agent app or website
+bubbles. Same parent skip as iMessage (Rajasi / Michael / `Rajasi and
+Michael`). iMessage and email stay `Sent by Yan's Personal Agent` with no
+`//`.
 
 1:1 or group chat:
 
@@ -137,9 +140,11 @@ chat: `send_chat_message` intermediates on long work, same as if this were
 typed there. Those bubbles stay in the app. The server sends your final
 bubble to that same Teams chat. The app and website keep that final bubble
 (the answer or what you did). Do not write Sent on Teams. Do not also
-`school-teams.js send` that same final text. Write the final as plain text:
-no markdown, no `@agent`, no `// Sent by Yan's Personal Agent`. The server adds
-that footer on Teams only.
+`school-teams.js send` that same final text. Markdown is fine, same as the
+app bubble (bold, italic, lists, links, headings, code). No HTML tags, no
+`@agent`, no `// Sent by Yan's Personal Agent`. The server converts that
+markdown to Teams HTML so desktop and mobile keep newlines and formatting,
+and adds the footer on Teams only.
 
 Later turns typed in the app are Yan. They do not auto-post unless you
 send via this skill.

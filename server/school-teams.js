@@ -13,6 +13,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { applyAgentSentFooter } from "./imessage-mention.js";
+import { markdownToTeamsHtml } from "./teams-format.js";
 import { applyDumpClock, givenName } from "./local-clock.js";
 import {
   GRAPH_BASE,
@@ -539,8 +540,8 @@ export function buildSendChannelUrl(teamId, channelId) {
 export function buildSendChatBody(text) {
   const n = Math.floor(Math.random() * 1e6);
   return {
-    content: String(text || ""),
-    messagetype: "Text",
+    content: markdownToTeamsHtml(text),
+    messagetype: "RichText/Html",
     contenttype: "text",
     clientmessageid: `${Date.now()}${String(n).padStart(6, "0")}`.slice(0, 19),
   };
