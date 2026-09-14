@@ -4,7 +4,7 @@
  */
 
 import { readFile, writeFile } from "node:fs/promises";
-import { fetchRecentChatMessages, isTeamsAuthError } from "./school-teams.js";
+import { fetchRecentChatMessages, isTeamsAuthError, isTeamsSelfChat } from "./school-teams.js";
 import {
   deliverGuestRateLimit,
   evaluateGuestMention,
@@ -119,7 +119,8 @@ export async function pollTeamsAgentMentions(deps = {}) {
     if (!shouldTriggerTeamsAgent(row)) continue;
     const key = teamsMessageKey(row);
     if (!key || seen.has(key)) continue;
-    hits.push(row);
+    const hit = isTeamsSelfChat(row) ? { ...row, fromMe: true } : row;
+    hits.push(hit);
   }
 
   hits.sort((a, b) => {

@@ -15,8 +15,10 @@ import {
   buildSendChatBody,
   buildSendChatUrl,
   chatDisplayName,
+  ensureSelfChat,
   fromMeOf,
   isCsaToken,
+  isTeamsSelfChat,
   isGraphAudience,
   isIc3Token,
   isTeamsAuthError,
@@ -246,6 +248,55 @@ describe("school-teams urls and shapes", () => {
     ];
     assert.equal(pickChat(chats, "Alex").match.id, "19:prasham");
     assert.equal(pickChat(chats, "friend@school.example").match.id, "19:prasham");
+  });
+
+  it("names Chat with yourself Me and treats it as a 1:1", () => {
+    const row = normalizeChat({
+      id: "48:notes",
+      threadType: "streamofnotes",
+      title: "",
+      members: [{ displayName: "Yan Levin", email: "owner@school.example" }],
+    });
+    assert.equal(row.chatType, "oneOnOne");
+    assert.equal(row.name, "Me");
+    assert.equal(isTeamsSelfChat(row), true);
+    assert.equal(isTeamsSelfChat({ chatId: "48:notes" }), true);
+  });
+
+  it("pins 48:notes when CSA omitted it", () => {
+    const chats = [
+      {
+        id: "19:prasham",
+        name: "Alex Rivera",
+        chatType: "oneOnOne",
+        members: [{ name: "Alex Rivera", email: "friend@school.example" }],
+      },
+    ];
+    const pinned = ensureSelfChat(chats, {
+      email: "owner@school.example",
+      name: "Yan Levin",
+    });
+    assert.equal(pinned[0].id, "48:notes");
+    assert.equal(pinned[0].name, "Me");
+    assert.equal(pickChat(pinned, "myself").match.id, "48:notes");
+    assert.equal(pickChat(pinned, "me").match.id, "48:notes");
+    assert.equal(pickChat(pinned, "48:notes").match.id, "48:notes");
+    assert.equal(pickChat(pinned, "owner@school.example").match.id, "48:notes");
+    assert.equal(pickChat(pinned, "Yan Levin").match.id, "48:notes");
+    assert.equal(pickChat(pinned, "Alex").match.id, "19:prasham");
+  });
+
+  it("treats IC3 from as fromMe when the from URL contains the oid", () => {
+    const oid = "4e03777e-4fc0-4313-bbd0-aaaaaaaaaaaa";
+    assert.equal(
+      fromMeOf(
+        {
+          from: `https://teams.cloud.microsoft/api/chatsvc/amer/v1/users/ME/contacts/8:orgid:${oid}`,
+        },
+        { objectId: oid }
+      ),
+      true
+    );
   });
 
   it("applies the agent footer on send bodies", () => {

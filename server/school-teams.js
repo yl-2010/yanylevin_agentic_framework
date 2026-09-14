@@ -36,6 +36,8 @@ const REFRESH_WAIT_MS = 45_000;
 const MT_GRACE_MS = 2_000;
 export const TEAMS_WEB_URL = "https://teams.microsoft.com/";
 export const TEAMS_CLOUD = "https://teams.cloud.microsoft";
+/** Teams "Chat with yourself" / Notes. CSA omits this virtual conversation. */
+export const TEAMS_SELF_CHAT_ID = "48:notes";
 export const DUMP_BODY_MAX = 400;
 export const DUMP_MAX = 150;
 export const DUMP_PAGE_SIZE = 50;
@@ -197,20 +199,98 @@ export function includeCsaChat(row) {
   return row.isConversationDeleted !== true;
 }
 
-function memberMatchesNeedle(member, needle) {
+export function isTeamsSelfChat(row) {
+  const id = String(row?.id || "")
+    .trim()
+    .toLowerCase();
+  const chatId = String(row?.chatId || "")
+    .trim()
+    .toLowerCase();
+  if (id === TEAMS_SELF_CHAT_ID || chatId === TEAMS_SELF_CHAT_ID) return true;
+  const t = String(
+    row?.threadType || row?.threadProperties?.threadType || row?.chatType || ""
+  )
+    .trim()
+    .toLowerCase();
+  return t === "streamofnotes";
+}
+
+export function isTeamsSelfChatNeedle(needle, selfChat = null, selfEmail = SCHOOL_EMAIL) {
+  const n = String(needle || "").trim().toLowerCase();
+  if (!n) return false;
+  if (n === TEAMS_SELF_CHAT_ID) return true;
+  if (n === "me" || n === "myself" || n === "self") return true;
+  if (n === "chat with myself" || n === "chat with me") return true;
+  const email = String(selfEmail || SCHOOL_EMAIL).trim().toLowerCase();
+  if (email && n === email) return true;
+  const members = Array.isArray(selfChat?.members) ? selfChat.members : [];
+  for (const m of members) {
+    const name = String(m?.name || "").trim().toLowerCase();
+    if (name && n === name) return true;
+    const given = givenName(m?.name).toLowerCase();
+    if (given && n === given) return true;
+    const memEmail = String(m?.email || "").trim().toLowerCase();
+    if (memEmail && n === memEmail) return true;
+  }
+  return false;
+}
+
+export function teamsSelfChatStub(self = {}) {
+  const email = String(self.email || SCHOOL_EMAIL).trim() || SCHOOL_EMAIL;
+  const objectId = String(self.objectId || "").trim();
+  const name = String(self.name || "").trim() || "Me";
+  return {
+    id: TEAMS_SELF_CHAT_ID,
+    name: "Me",
+    chatType: "oneOnOne",
+    updated: String(self.updated || "").trim(),
+    preview: String(self.preview || "").trim(),
+    members: [{ name, email, objectId }].filter((m) => m.name || m.email || m.objectId),
+  };
+}
+
+/**
+ * CSA never lists 48:notes. Pin it so @agent and --chat myself keep working.
+ * Call after the recent-chat slice so an old Notes thread is not dropped.
+ */
+export function ensureSelfChat(chats, self = {}) {
+  const list = Array.isArray(chats) ? [...chats] : [];
+  const stub = teamsSelfChatStub(self);
+  const idx = list.findIndex((c) => isTeamsSelfChat(c));
+  if (idx < 0) return [stub, ...list];
+  const existing = list[idx];
+  list[idx] = {
+    ...existing,
+    id: existing.id || TEAMS_SELF_CHAT_ID,
+    name:
+      existing.name && existing.name !== "(chat)" && existing.name !== stub.name
+        ? existing.name
+        : "Me",
+    chatType: "oneOnOne",
+    members: existing.members?.length ? existing.members : stub.members,
+  };
+  return list;
+}
+
+function memberMatchesNeedle(member, needle, selfEmail = SCHOOL_EMAIL) {
   const q = String(needle || "").trim().toLowerCase();
   if (!q) return false;
-  const name = String(member?.name || "").trim().toLowerCase();
   const email = String(member?.email || "").trim().toLowerCase();
+  if (email && email === String(selfEmail || "").trim().toLowerCase()) return false;
+  const name = String(member?.name || "").trim().toLowerCase();
   return (name && (name === q || name.includes(q))) || email === q;
 }
 
-export function pickChat(chats, needle) {
+export function pickChat(chats, needle, selfEmail = SCHOOL_EMAIL) {
   const n = String(needle || "").trim();
   const list = Array.isArray(chats) ? chats : [];
   if (!n) return { match: null, ambiguous: [], chats: list };
   const byId = list.find((c) => c.id === n);
   if (byId) return { match: byId, ambiguous: [], chats: list };
+  const selfChat = list.find((c) => isTeamsSelfChat(c));
+  if (selfChat && isTeamsSelfChatNeedle(n, selfChat, selfEmail)) {
+    return { match: selfChat, ambiguous: [], chats: list };
+  }
   const namePicked = pickByName(list, n);
   const hits = [];
   const seen = new Set();
@@ -224,7 +304,7 @@ export function pickChat(chats, needle) {
   for (const c of namePicked.ambiguous) add(c);
   for (const c of list) {
     if (c?.id && seen.has(c.id)) continue;
-    if ((c.members || []).some((m) => memberMatchesNeedle(m, n))) add(c);
+    if ((c.members || []).some((m) => memberMatchesNeedle(m, n, selfEmail))) add(c);
   }
   if (hits.length === 1) return { match: hits[0], ambiguous: [], chats: list };
   if (hits.length > 1) {
@@ -278,6 +358,7 @@ function memberObjectId(raw) {
 }
 
 export function chatDisplayName(raw, selfEmail = SCHOOL_EMAIL) {
+  if (isTeamsSelfChat(raw)) return "Me";
   const topic = String(raw?.title || raw?.topic || raw?.name || "").trim();
   if (topic && topic !== "(chat)") return topic;
   const self = String(selfEmail || "").trim().toLowerCase();
@@ -306,6 +387,7 @@ export function chatDisplayName(raw, selfEmail = SCHOOL_EMAIL) {
 }
 
 function chatTypeOf(raw) {
+  if (isTeamsSelfChat(raw)) return "oneOnOne";
   if (raw?.isOneOnOne === true) return "oneOnOne";
   const t = String(raw?.threadType || raw?.chatType || "").trim().toLowerCase();
   if (t === "meeting") return "meeting";
@@ -1004,8 +1086,17 @@ export async function listChats(session, { limit = 50 } = {}) {
     )
     .sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
   const cap = Math.min(mapped.length, Math.max(1, Number(limit) || 50));
-  const enriched = await enrichChats(session, mapped.slice(0, cap));
-  return enriched.sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
+  const claims = jwtClaims(session.token || "");
+  const pinned = ensureSelfChat(mapped.slice(0, cap), {
+    email: session.email || SCHOOL_EMAIL,
+    objectId: session.objectId,
+    name: String(claims.name || claims.given_name || "").trim(),
+  });
+  const enriched = await enrichChats(session, pinned);
+  return enriched.sort((a, b) => {
+    if (isTeamsSelfChat(a) !== isTeamsSelfChat(b)) return isTeamsSelfChat(a) ? -1 : 1;
+    return String(b.updated).localeCompare(String(a.updated));
+  });
 }
 
 export async function listChatMessages(session, chatId, { limit = 20 } = {}) {
@@ -1156,13 +1247,21 @@ async function listRecentChatMessages(session, opts = {}) {
   /** @type {object[]} */
   const out = [];
   for (const chat of chats) {
-    if (since && chat.updated && chat.updated < since) continue;
-    const rows = await listChatMessages(session, chat.id, {
-      limit: opts.messageLimit || 20,
-    });
+    if (since && chat.updated && chat.updated < since && !isTeamsSelfChat(chat)) continue;
+    let rows = [];
+    try {
+      rows = await listChatMessages(session, chat.id, {
+        limit: opts.messageLimit || 20,
+      });
+    } catch (err) {
+      if (isTeamsSelfChat(chat)) continue;
+      throw err;
+    }
+    const selfChat = isTeamsSelfChat(chat);
     for (const row of rows) {
       out.push({
         ...row,
+        fromMe: selfChat ? true : row.fromMe,
         chatId: chat.id,
         chat: chat.name,
         chatType: chat.chatType || row.chatType || "",
@@ -1383,7 +1482,7 @@ async function resolveChat(session, needle) {
   const n = String(needle || "").trim();
   if (!n) return { match: null, ambiguous: [], chats: [] };
   const chats = await listChats(session, { limit: 200 });
-  return pickChat(chats, n);
+  return pickChat(chats, n, session.email || SCHOOL_EMAIL);
 }
 
 async function resolveTeamChannel(session, teamNeedle, channelNeedle) {

@@ -323,6 +323,8 @@ describe("Personal Agent skill files", () => {
     assert.match(schoolTeams, /class channel/);
     assert.match(schoolTeams, /Anyone can call/);
     assert.match(schoolTeams, /except the Class of 2028/);
+    assert.match(schoolTeams, /to himself/);
+    assert.match(schoolTeams, /--chat myself/);
     assert.match(schoolTeams, /only Yan, Alex, Example Friend, and Example Neighbor/);
     assert.doesNotMatch(schoolTeams, /Other people typing `@agent` do nothing/);
     assert.match(schoolTeams, /school-teams-fill/);
@@ -401,6 +403,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /open_education_page/);
     assert.match(agent, /iMessage @agent/);
     assert.match(agent, /Teams @agent/);
+    assert.match(agent, /messages to himself/);
     assert.match(agent, /except the Class of 2028 Teams grade chat/);
     assert.match(agent, /only Yan, Alex, Example Friend, and Example Neighbor/);
     assert.match(agent, /keep that final bubble/);

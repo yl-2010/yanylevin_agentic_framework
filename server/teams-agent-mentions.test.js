@@ -98,6 +98,42 @@ describe("teams-agent-mentions poller", () => {
     assert.equal(started.length, 1);
   });
 
+  it("starts fromMe for Chat with yourself even if fromMe was missing", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "teams-agent-"));
+    const statePath = join(dir, "state.json");
+    await saveMentionState(
+      { lastAt: "2026-09-14T22:20:00.000Z", seenIds: [] },
+      statePath
+    );
+    /** @type {object[]} */
+    const started = [];
+    const result = await pollTeamsAgentMentions({
+      statePath,
+      now: () => new Date("2026-09-14T22:21:30.000Z"),
+      fetchRecent: async () => [
+        {
+          id: "notes1",
+          fromMe: false,
+          text: "@agent hi",
+          at: "2026-09-14T22:21:24Z",
+          chat: "Me",
+          chatId: "48:notes",
+          chatType: "oneOnOne",
+          messageType: "message",
+        },
+      ],
+      evaluateGuestMention: async () => {
+        throw new Error("self-chat should not be a guest");
+      },
+      startFromMessage: async (message) => {
+        started.push(message);
+      },
+    });
+    assert.equal(result.started, 1);
+    assert.equal(started[0].fromMe, true);
+    assert.equal(started[0].chatId, "48:notes");
+  });
+
   it("stays quiet when Teams is not signed in", async () => {
     const dir = await mkdtemp(join(tmpdir(), "teams-agent-"));
     const statePath = join(dir, "state.json");

@@ -90,7 +90,10 @@ Michael`). iMessage and email stay `Sent by Yan's Personal Agent` with no
 
 ```bash
 node server/school-teams.js send --chat "Alex" --text "Body here"
+node server/school-teams.js send --chat myself --text "Body here"
 ```
+
+`--chat myself` / `me` / `Me` is Chat with yourself (`48:notes`). CSA does not list that thread, so use those names (or the id) instead of guessing from members.
 
 Class channel only when Yan named the team **and** channel:
 
@@ -102,11 +105,11 @@ Do not post to a class channel as a send-to-person fallback.
 
 ## @agent
 
-Express polls school Teams **chats** (1:1 and group, not class channels)
-for `@agent` / `@Agent`. Yan `fromMe` starts a normal Personal Agent chat.
-The first user bubble is that Teams message. A reply that only quotes a
-message with `@agent` does not count. The new text itself has to contain
-`@agent`.
+Express polls school Teams **chats** (1:1 and group, not class channels,
+plus Chat with yourself) for `@agent` / `@Agent`. Yan `fromMe` starts a
+normal Personal Agent chat, including messages to himself. The first user
+bubble is that Teams message. A reply that only quotes a message with
+`@agent` does not count. The new text itself has to contain `@agent`.
 
 Anyone can call `@agent` in a 1:1 or any group chat except the Class of 2028
 Teams grade chat. In that one chat, only Yan, Alex, Example Friend, and Example Neighbor
