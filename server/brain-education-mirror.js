@@ -151,17 +151,27 @@ function collect() {
     }
     for (const name of names) {
       if (!name || name === ".Trash") continue;
-      const dirPath = path.join(gradeDir, name, EDUCATION_META_DIR);
-      const cls = readJson(path.join(dirPath, "class.json"));
-      if (!cls) continue;
-      const slug = String(cls.id || "").trim();
-      if (!slug) continue;
-      classes.set(slug, {
-        slug,
-        dirPath,
-        source: `onedrive:${name}/.education/class.json`,
-        cls,
-      });
+      const metaDir = path.join(gradeDir, name, EDUCATION_META_DIR);
+      const objectDirs = [metaDir];
+      if (fs.existsSync(metaDir)) {
+        for (const child of listDirs(metaDir)) {
+          if (child === "todos" || child === "dates") continue;
+          objectDirs.push(path.join(metaDir, child));
+        }
+      }
+      for (const dirPath of objectDirs) {
+        const cls = readJson(path.join(dirPath, "class.json"));
+        if (!cls) continue;
+        const slug = String(cls.id || "").trim();
+        if (!slug) continue;
+        const rel = path.relative(path.join(gradeDir, name), dirPath);
+        classes.set(slug, {
+          slug,
+          dirPath,
+          source: `onedrive:${name}/${rel}/class.json`,
+          cls,
+        });
+      }
     }
   }
 

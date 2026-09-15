@@ -22,7 +22,9 @@ const EXISTING_FOLDERS = {
   "advanced-calculus": "C. Advanced Calc",
   "spanish-4": "D. Spanish 4",
   "us-history": "E. US History",
+  "us-history-ws": "E. US History",
   "american-literature": "F. American Lit",
+  "american-literature-ws": "F. American Lit",
   "pe-yoga": "G. PE Yoga",
 };
 
@@ -70,8 +72,21 @@ async function main() {
     const props = JSON.parse(await readFile(join(src, "class.json"), "utf8"));
     const folder = folderForClass(classId, props);
     const classFolder = join(gradeDir, folder);
-    const objectDir = classObjectDir(gradeDir, folder);
-    console.log(`${classId} → ${folder}/.education`);
+    let objectDir = classObjectDir(gradeDir, folder);
+    let existing = null;
+    try {
+      existing = JSON.parse(await readFile(join(objectDir, "class.json"), "utf8"));
+    } catch {
+      existing = null;
+    }
+    if (existing?.id && existing.id !== classId) {
+      objectDir = join(objectDir, classId);
+    }
+    console.log(
+      `${classId} → ${folder}/.education${
+        existing?.id && existing.id !== classId ? `/${classId}` : ""
+      }`
+    );
     if (dryRun) continue;
 
     await mkdir(objectDir, { recursive: true });

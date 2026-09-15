@@ -75,6 +75,34 @@ export function classObjectDir(gradeDir, onedriveFolder) {
 }
 
 /**
+ * `.education` plus nested `.education/<classId>` for extra classes that share
+ * the same visible OneDrive folder (History / Lit winter-spring shells).
+ * @param {string} gradeDir
+ * @param {string} onedriveFolder
+ * @returns {Promise<string[]>}
+ */
+export async function listClassObjectDirs(gradeDir, onedriveFolder) {
+  const metaDir = classObjectDir(gradeDir, onedriveFolder);
+  /** @type {string[]} */
+  const dirs = [metaDir];
+  let entries;
+  try {
+    entries = await readdir(metaDir, { withFileTypes: true });
+  } catch (err) {
+    if (err?.code === "ENOENT") return [];
+    throw err;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const name = String(entry.name || "");
+    if (!name || name.startsWith(".")) continue;
+    if (RESERVED_CLASS_ROOT_DIRS.has(name.toLowerCase())) continue;
+    dirs.push(join(metaDir, name));
+  }
+  return dirs;
+}
+
+/**
  * Finder-hidden OneDrive folder name for a class that does not already have one.
  * @param {object|null|undefined} cls
  * @param {string} classId
@@ -88,14 +116,11 @@ export function hiddenOnedriveFolderName(cls, classId) {
       .slice(0, 1);
     return letter ? `.Free Period ${letter}` : `.Free Period`;
   }
-  if (id === "us-history-ws") return ".US History WS";
-  if (id === "american-literature-ws") return ".American Literature WS";
   if (id === "advanced-programming-ai-ml") return ".Advanced Programming AI-ML";
   if (id === "advanced-programming-emergent-topics") {
     return ".Advanced Programming Emergent Topics";
   }
   const name = String(cls?.name || id).trim() || id;
-  if (id.endsWith("-ws")) return `.${name} WS`;
   return `.${name}`;
 }
 

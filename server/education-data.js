@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { gitAddCommitPush } from "./git-publish.js";
 import { attachCanvasOverlay } from "./canvas-grades.js";
 import {
-  classObjectDir,
+  listClassObjectDirs,
   gradeDirFromMeta,
   listOnedriveFolderNames,
   listOnedriveTree,
@@ -797,17 +797,18 @@ export async function listClassEntriesForRoot(root) {
       includeHidden: true,
     });
     for (const name of folderNames) {
-      const objectDir = classObjectDir(gradeDir, name);
-      const props = await readJsonFile(join(objectDir, "class.json"));
-      if (!props || typeof props !== "object") continue;
-      const id = isSafeObjectId(props.id);
-      if (!id) continue;
-      byId.set(id, {
-        id,
-        objectDir,
-        onedriveFolder: name,
-        source: "onedrive",
-      });
+      for (const objectDir of await listClassObjectDirs(gradeDir, name)) {
+        const props = await readJsonFile(join(objectDir, "class.json"));
+        if (!props || typeof props !== "object") continue;
+        const id = isSafeObjectId(props.id);
+        if (!id) continue;
+        byId.set(id, {
+          id,
+          objectDir,
+          onedriveFolder: name,
+          source: "onedrive",
+        });
+      }
     }
   }
 

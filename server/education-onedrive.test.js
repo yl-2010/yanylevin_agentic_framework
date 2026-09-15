@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   gradeDirFromMeta,
+  listClassObjectDirs,
   hiddenOnedriveFolderName,
   isSafeRelativePath,
   listOnedriveTree,
@@ -138,17 +139,6 @@ describe("hiddenOnedriveFolderName", () => {
       ".Independent Study"
     );
     assert.equal(
-      hiddenOnedriveFolderName({ name: "United States History" }, "us-history-ws"),
-      ".US History WS"
-    );
-    assert.equal(
-      hiddenOnedriveFolderName(
-        { name: "American Literature" },
-        "american-literature-ws"
-      ),
-      ".American Literature WS"
-    );
-    assert.equal(
       hiddenOnedriveFolderName({ freePeriod: true, period: "B" }, "free-period-b"),
       ".Free Period B"
     );
@@ -156,6 +146,28 @@ describe("hiddenOnedriveFolderName", () => {
       hiddenOnedriveFolderName({}, "advanced-programming-ai-ml"),
       ".Advanced Programming AI-ML"
     );
+  });
+});
+
+describe("listClassObjectDirs", () => {
+  it("includes nested extra class folders", async () => {
+    const grade = join(tmpdir(), `edu-class-dirs-${Date.now()}`);
+    const nested = join(grade, "E. US History", ".education", "us-history-ws");
+    await mkdir(nested, { recursive: true });
+    await writeFile(join(grade, "E. US History", ".education", "class.json"), "{}");
+    await writeFile(join(nested, "class.json"), "{}");
+    await mkdir(join(grade, "E. US History", ".education", "todos"), {
+      recursive: true,
+    });
+    const dirs = await listClassObjectDirs(grade, "E. US History");
+    assert.deepEqual(
+      dirs.map((d) => d.slice(grade.length)),
+      [
+        "/E. US History/.education",
+        "/E. US History/.education/us-history-ws",
+      ]
+    );
+    await rm(grade, { recursive: true, force: true });
   });
 });
 
