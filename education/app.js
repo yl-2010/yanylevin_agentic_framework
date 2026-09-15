@@ -2362,6 +2362,60 @@
     );
   }
 
+  function documentTitleForRoute() {
+    const fallback = "Education";
+    if (!tree || !route) return fallback;
+    if (route.view === "class") {
+      const cls = (tree.classes || []).find(
+        (c) => c.id === route.classId && !isFixture(c)
+      );
+      if (!cls) return fallback;
+      const period = String(cls.period || "").trim();
+      const name = classScheduleName(cls);
+      if (period && name) return `${period} ${name}`;
+      return name || fallback;
+    }
+    if (route.view === "project") {
+      const project = (tree.projects || []).find(
+        (p) => p.id === route.projectId && !isFixture(p)
+      );
+      return (project && (project.name || project.id)) || fallback;
+    }
+    if (route.view === "todo") {
+      const t = findTodoById(route.itemId, {
+        classId: route.classId,
+        projectId: route.projectId,
+      });
+      if (!t) return fallback;
+      const tag = todoTagKey(t);
+      const name = stripTodoTagPrefix(t.name || t.id);
+      if (tag && tag !== "none") return `${tag} ${name}`;
+      return name || fallback;
+    }
+    if (route.view === "capsule") {
+      const t = findTodoById(route.itemId, {
+        classId: route.classId,
+        projectId: route.projectId,
+      });
+      const cap = (t?.capsules || []).find(
+        (c) => c && String(c.id) === String(route.capsuleId || "")
+      );
+      return String(cap?.title || "").trim() || fallback;
+    }
+    if (route.view === "date") {
+      const d = findDateById(route.itemId, {
+        classId: route.classId,
+        projectId: route.projectId,
+      });
+      return (d && (d.name || d.id)) || fallback;
+    }
+    return fallback;
+  }
+
+  function syncDocumentTitle() {
+    document.title = documentTitleForRoute();
+  }
+
   function render({ scroll = "keep" } = {}) {
     if (!appEl || !tree) return;
     const keepX = window.scrollX;
@@ -2382,6 +2436,7 @@
 
     didEntrance = true;
     applyScroll(scroll, keepX, keepY);
+    syncDocumentTitle();
     queueMicrotask(() => window.reinitLiquidGlass?.());
   }
 
