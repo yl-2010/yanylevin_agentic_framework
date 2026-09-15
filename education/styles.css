@@ -1126,14 +1126,22 @@ html[data-resolved-theme="light"] .edu-filter.is-on {
 }
 
 .edu-canvas-orb-score {
+  position: relative;
+  z-index: 2;
   display: block;
-  max-width: calc(var(--corner-orb) - 8px);
-  padding: 0 3px;
-  font-size: 11px;
+  max-width: 78%;
+  padding: 0 2px;
+  font-size: calc(var(--corner-orb) * 0.26);
   font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
+  letter-spacing: -0.045em;
+  line-height: 1;
   text-align: center;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.edu-canvas-orb-score--compact {
+  font-size: calc(var(--corner-orb) * 0.2);
 }
 
 .md-math {

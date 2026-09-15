@@ -115,8 +115,9 @@
     const href = normalizeCanvasLink(rawLink);
     if (!href) return "";
     const label = String(scoreLabel || "").trim();
+    const compact = label.length > 5 ? " edu-canvas-orb-score--compact" : "";
     const inner = label
-      ? `<span class="edu-canvas-orb-score">${escapeHtml(label)}</span>`
+      ? `<span class="edu-canvas-orb-score${compact}">${escapeHtml(label)}</span>`
       : CANVAS_ICON_SVG;
     const aria = label ? `Open in Canvas, ${label}` : "Open in Canvas";
     return `<div class="edu-canvas-slot"><a class="corner circle edu-canvas-orb${
