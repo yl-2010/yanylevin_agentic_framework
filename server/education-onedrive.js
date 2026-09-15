@@ -120,6 +120,8 @@ export function onedriveWebUrlForAbs(absPath, onedriveRoot, webRoot) {
 
 /**
  * Office URI scheme that opens the same cloud item, not a downloaded copy.
+ * Path segments in `webUrl` are already encoded. Do not encodeURIComponent the
+ * whole URL: that turns %20 into %2520, and Word opens with no document.
  * @param {string|null|undefined} webUrl
  * @param {unknown} name
  * @returns {string|null}
@@ -128,7 +130,20 @@ export function officeOpenUri(webUrl, name) {
   const scheme = officeSchemeForName(name);
   const url = String(webUrl || "").trim();
   if (!scheme || !url) return null;
-  return `${scheme}:ofe|u|${encodeURIComponent(url)}`;
+  if (/[\u0000-\u001f|]/.test(url)) return null;
+  return `${scheme}:ofe|u|${url}`;
+}
+
+/**
+ * SharePoint URL that opens in the browser (Office Online), not a DAV download.
+ * @param {string|null|undefined} webUrl
+ * @returns {string|null}
+ */
+export function officeWebViewUrl(webUrl) {
+  const url = String(webUrl || "").trim();
+  if (!url) return null;
+  if (/[?&]web=/.test(url)) return url;
+  return url.includes("?") ? `${url}&web=1` : `${url}?web=1`;
 }
 
 /**
@@ -146,8 +161,10 @@ export function attachOfficeOpenFields(row, absPath, opts = {}) {
     opts.onedriveWebRoot
   );
   const officeUri = officeOpenUri(webUrl, row.name);
-  if (!webUrl || !officeUri) return row;
+  const webViewUrl = officeWebViewUrl(webUrl);
+  if (!webUrl || !officeUri || !webViewUrl) return row;
   row.webUrl = webUrl;
+  row.webViewUrl = webViewUrl;
   row.officeUri = officeUri;
   return row;
 }

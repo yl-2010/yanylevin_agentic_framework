@@ -105,6 +105,7 @@ struct EducationContextFile: Decodable, Identifiable, Hashable {
     let files: [EducationContextFile]?
     let webUrl: String?
     let officeUri: String?
+    let webViewUrl: String?
 
     var id: String {
         "\(source ?? "education")|\(kind ?? "file")|\(path ?? name)"
@@ -117,8 +118,12 @@ struct EducationContextFile: Decodable, Identifiable, Hashable {
     /// Word / Excel / PowerPoint on OneDrive. Same cloud item, not a downloaded copy.
     var opensInOfficeApp: Bool {
         guard let officeUri, !officeUri.isEmpty else { return false }
-        guard let webUrl, !webUrl.isEmpty else { return false }
         return true
+    }
+
+    var browserURL: URL? {
+        if let webViewUrl { return OfficeDocument.webURL(from: webViewUrl) }
+        return OfficeDocument.webURL(from: webUrl)
     }
 }
 

@@ -24,6 +24,7 @@ import {
   onedriveWebRootFromMeta,
   onedriveWebUrlForAbs,
   officeOpenUri,
+  officeWebViewUrl,
   officeOpenOptsFromMeta,
 } from "./education-onedrive.js";
 
@@ -440,11 +441,17 @@ describe("office open URLs", () => {
 
   it("builds an Office URI for the same cloud item", () => {
     const url = `${web}/11th%20Grade/H.%20Physics/ball%20drop%20writeup.docx`;
-    assert.equal(
-      officeOpenUri(url, "ball drop writeup.docx"),
-      `ms-word:ofe|u|${encodeURIComponent(url)}`
-    );
+    assert.equal(officeOpenUri(url, "ball drop writeup.docx"), `ms-word:ofe|u|${url}`);
     assert.equal(officeOpenUri(url, "quotes.html"), null);
+    assert.equal(officeWebViewUrl(url), `${url}?web=1`);
+    assert.equal(
+      officeOpenUri(
+        `${web}/HW%20Sep%2015%20Colonial%20Government%20%26%20British/hw.docx`,
+        "hw.docx"
+      ),
+      `ms-word:ofe|u|${web}/HW%20Sep%2015%20Colonial%20Government%20%26%20British/hw.docx`
+    );
+    assert.equal(officeOpenUri("https://contoso-my.sharepoint.com/a|b.docx", "hw.docx"), null);
   });
 
   it("needs both the local folder and the SharePoint root", () => {
@@ -473,16 +480,14 @@ describe("office open URLs", () => {
     const folder = rows.find((r) => r.name === "hw scans");
     const xlsx = folder?.files?.find((f) => f.name === "sheet.xlsx");
     assert.equal(docx.webUrl, `${web}/notes.docx`);
-    assert.equal(
-      docx.officeUri,
-      `ms-word:ofe|u|${encodeURIComponent(`${web}/notes.docx`)}`
-    );
+    assert.equal(docx.webViewUrl, `${web}/notes.docx?web=1`);
+    assert.equal(docx.officeUri, `ms-word:ofe|u|${web}/notes.docx`);
     assert.equal(html.webUrl, undefined);
     assert.equal(html.officeUri, undefined);
     assert.equal(xlsx?.webUrl, `${web}/hw%20scans/sheet.xlsx`);
     assert.equal(
       xlsx?.officeUri,
-      `ms-excel:ofe|u|${encodeURIComponent(`${web}/hw%20scans/sheet.xlsx`)}`
+      `ms-excel:ofe|u|${web}/hw%20scans/sheet.xlsx`
     );
     await rm(dir, { recursive: true, force: true });
   });

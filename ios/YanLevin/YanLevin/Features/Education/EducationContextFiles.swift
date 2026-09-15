@@ -91,7 +91,7 @@ struct EducationContextFilesView: View {
     }
 
     private func openOfficeFallback(_ file: EducationContextFile) {
-        if let web = OfficeDocument.webURL(from: file.webUrl) {
+        if let web = file.browserURL {
             UIApplication.shared.open(web)
             return
         }

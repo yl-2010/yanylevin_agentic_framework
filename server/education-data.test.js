@@ -272,10 +272,8 @@ describe("listContextFiles office open", () => {
     assert.equal(html.webUrl, undefined);
     assert.equal(html.officeUri, undefined);
     assert.equal(docx.webUrl, `${web}/notes.docx`);
-    assert.equal(
-      docx.officeUri,
-      `ms-word:ofe|u|${encodeURIComponent(`${web}/notes.docx`)}`
-    );
+    assert.equal(docx.webViewUrl, `${web}/notes.docx?web=1`);
+    assert.equal(docx.officeUri, `ms-word:ofe|u|${web}/notes.docx`);
     await rm(dir, { recursive: true, force: true });
   });
 });

@@ -1891,9 +1891,14 @@
         });
         const officeUri = String(f?.officeUri || "").trim();
         const webUrl = String(f?.webUrl || "").trim();
-        if (officeUri && webUrl) {
+        const webViewUrl =
+          String(f?.webViewUrl || "").trim() ||
+          (webUrl
+            ? `${webUrl}${webUrl.includes("?") ? "&" : "?"}web=1`
+            : "");
+        if (officeUri && webViewUrl) {
           return `<a class="edu-file-tile" href="${escapeHtml(
-            webUrl
+            webViewUrl
           )}" target="_blank" rel="noopener noreferrer" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
             filterId
           )}" data-edu-office="${escapeHtml(officeUri)}" title="${escapeHtml(
@@ -3051,13 +3056,7 @@
         if (!isUnmodifiedLeftClick(event)) return;
         event.preventDefault();
         const uri = officeBtn.getAttribute("data-edu-office");
-        if (!uri) return;
-        const a = document.createElement("a");
-        a.href = uri;
-        a.rel = "noopener noreferrer";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+        if (uri) window.location.assign(uri);
         return;
       }
 
