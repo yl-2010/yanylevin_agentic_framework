@@ -16,11 +16,13 @@ describe("assignmentLooksComplete", () => {
     assert.equal(assignmentLooksComplete({ excused: true }), true);
     assert.equal(assignmentLooksComplete({ score: 0 }), true);
     assert.equal(assignmentLooksComplete({ workflowState: "unsubmitted" }), false);
+    assert.equal(assignmentLooksComplete({ plannerComplete: true }), true);
+    assert.equal(assignmentLooksComplete({ markedComplete: true }), true);
   });
 });
 
 describe("attachCanvasCompletion", () => {
-  it("sets done from Canvas without clearing a local checkoff", () => {
+  it("overlays Canvas complete and incomplete, including uncheck", () => {
     const tree = {
       classes: [
         {
@@ -28,6 +30,7 @@ describe("attachCanvasCompletion", () => {
           todos: [
             { id: "lab", canvasId: 1, done: false },
             { id: "early", canvasId: 2, done: true, completedAt: "2026-09-10T01:00:00Z" },
+            { id: "local", done: true, completedAt: "2026-09-10T01:00:00Z" },
           ],
         },
       ],
@@ -40,8 +43,10 @@ describe("attachCanvasCompletion", () => {
     });
     assert.equal(tree.classes[0].todos[0].done, true);
     assert.equal(tree.classes[0].todos[0].completedAt, "2026-09-14T18:00:00Z");
-    assert.equal(tree.classes[0].todos[1].done, true);
-    assert.equal(tree.classes[0].todos[1].completedAt, "2026-09-10T01:00:00Z");
+    assert.equal(tree.classes[0].todos[1].done, false);
+    assert.equal(tree.classes[0].todos[1].completedAt, undefined);
+    assert.equal(tree.classes[0].todos[2].done, true);
+    assert.equal(tree.classes[0].todos[2].completedAt, "2026-09-10T01:00:00Z");
   });
 });
 

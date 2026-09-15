@@ -17,8 +17,9 @@ This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how
 
 ## When to run
 
-- **Page open (Express, not you):** `/api/education/data?live=1` fetches submissions and grades for mapped courses and overlays `done` + `canvasWork` in the API. That does **not** write `todo.json`. You still never persist completion.
-- **Hourly:** Express runs a light fetch + this skill (mapped classes only, no new-class hunt) every clock hour except the 01:00 nightly window. Writes `last-hourly-sync.json`.
+- **Page open (Express, not you):** `/api/education/data?live=1` fetches submissions, planner complete, and grades for mapped courses and overlays `done` + `canvasWork` in the API. That does **not** write `todo.json`. You still never persist completion.
+- **Checkoff (Express, not you):** Yan checking off a Canvas-linked todo writes a planner override (`marked_complete`) so Canvas To-Do matches. Local-only todos stay local. You still never POST to Canvas.
+- **Hourly:** Express runs a light fetch + this skill (mapped classes only, no new-class hunt) at **:00** in the briefing timezone, except the 01:00 nightly window. Restarts wait for the next :00. Writes `last-hourly-sync.json`.
 - **Nightly:** Express runs the full fetch + this skill at **01:00** (`nightlyAgentsLocalTime` in `education/you@example.com/daily-briefing/meta.json`). Same slot as location compose/enrichment. Context synthesis is later (02:30). Daily briefing is 06:00. **Re-read what hourly Composer wrote during the day and fix mistakes.**
 - **Manual (Personal Agent):** Yan says sync / pull / update Canvas. First fetch, then apply this skill **in this turn** (full nightly rules, including class map). Do not spawn a nested Cursor agent.
 
@@ -39,6 +40,7 @@ education/you@example.com/.canvas/
   course-map.json       # Canvas course id → education class folder id (you maintain this on nightly; hourly must not edit it)
   last-agent-sync.json  # written by the nightly runner, not by you
   last-hourly-sync.json # written by the hourly Composer runner
+  planner-overrides.json # Express: Canvas planner override ids after a checkoff
 education/you@example.com/classes/<classId>/
   class.json
   todos/<todoId>/todo.json
@@ -103,8 +105,8 @@ Read each mapped course `syllabus` plus snapshot `events[]`. Create/update **imp
 
 ## Never
 
-- **Never** set or clear `done` or `completedAt` in todo.json from Canvas. Yan checks work off in yanylevin. Express may overlay submitted/graded as `done` on `/api/education/data` without writing files. An agent update must leave those keys exactly as they are.
-- **Never** POST/PUT/DELETE to Canvas. Read-only.
+- **Never** set or clear `done` or `completedAt` in todo.json from Canvas. Yan checks work off in yanylevin. Express overlays Canvas submitted/graded/planner-complete as `done` on `/api/education/data` without writing those keys. Express may POST/PUT Canvas planner overrides when Yan checks a Canvas-linked todo. An agent update must leave `done` / `completedAt` exactly as they are.
+- **Never** POST/PUT/DELETE to Canvas. Read-only. Checkoff write-back is Express only.
 - **Never** delete an education todo/date because it disappeared from Canvas.
 - **Never** recreate a todo/date Yan already deleted (`deleted.md`). Judgement, not exact clocks.
 - **Never** touch fixtures (`"fixture": true` or ids starting `_example-`).

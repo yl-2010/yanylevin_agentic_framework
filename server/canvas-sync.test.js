@@ -160,6 +160,15 @@ describe("shouldSkipCanvasHourly", () => {
 });
 
 describe("nextCanvasHourlyAt", () => {
+  it("schedules the next round hour in the briefing timezone", () => {
+    const meta = { timezone: "America/Los_Angeles", nightlyAgentsLocalTime: "01:00" };
+    const when = nextCanvasHourlyAt(
+      meta,
+      new Date("2026-09-14T16:10:00.000Z")
+    );
+    assert.equal(when.toISOString(), "2026-09-14T17:00:00.000Z");
+  });
+
   it("jumps past the 01:00 nightly slot", () => {
     const meta = { timezone: "America/Los_Angeles", nightlyAgentsLocalTime: "01:00" };
     const when = nextCanvasHourlyAt(
@@ -167,6 +176,7 @@ describe("nextCanvasHourlyAt", () => {
       new Date("2026-09-14T07:30:00.000Z")
     );
     assert.equal(when.getUTCHours(), 9);
+    assert.equal(when.getUTCMinutes(), 0);
   });
 });
 

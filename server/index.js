@@ -42,7 +42,7 @@ import { startLocationEnrichmentScheduler } from "./location-enrichment-agent.js
 import { startContextSynthesisScheduler } from "./context-synthesis-agent.js";
 import { startChatTitleRefreshScheduler } from "./chat-title-refresh-agent.js";
 import { startLifeStateCleanupScheduler } from "./life-state-cleanup-agent.js";
-import { startCanvasSyncScheduler, applyLiveCanvasOverlay, YAN_EMAIL } from "./canvas-sync.js";
+import { startCanvasSyncScheduler, applyLiveCanvasOverlay, seedLiveCanvasTodoDone, syncCanvasTodoDone, YAN_EMAIL } from "./canvas-sync.js";
 import { canonicalizeEmail } from "./identity.js";
 import { startHealthTakeawaysScheduler } from "./health-takeaways-agent.js";
 import { startLocationBrainScheduler } from "./location-brain-agent.js";
@@ -593,6 +593,12 @@ app.patch(
         classId,
         projectId,
       });
+      if (canonicalizeEmail(req.user.email) === YAN_EMAIL) {
+        await seedLiveCanvasTodoDone(props, done);
+        syncCanvasTodoDone(props, done).catch((err) =>
+          console.error("[canvas-sync] todo done", err)
+        );
+      }
       res.setHeader("Cache-Control", "no-store");
       res.json({
         ok: true,

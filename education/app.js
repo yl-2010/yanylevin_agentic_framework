@@ -75,6 +75,8 @@
   let userEmail = "";
   /** Snapshot to skip no-op SSE/poll refreshes. */
   let treeFingerprint = "";
+  /** Recent local checkoffs win over a slower Canvas overlay. */
+  const localDoneLocks = new Map();
   /** Entrance fade only on first paint after a real browser load. */
   let didEntrance = false;
   /** @type {Set<string>} */
@@ -2552,6 +2554,57 @@
       apply(tree.todos);
     }
     treeFingerprint = fingerprintTree(tree);
+    rememberLocalDone(todoId, nextDone, {
+      classId: wantClass,
+      projectId: wantProject,
+    });
+  }
+
+  function doneLockKey(todoId, { classId = null, projectId = null } = {}) {
+    if (projectId) return `p/${projectId}/${todoId}`;
+    if (classId) return `${classId}/${todoId}`;
+    return String(todoId);
+  }
+
+  function rememberLocalDone(todoId, nextDone, scope) {
+    localDoneLocks.set(doneLockKey(todoId, scope), {
+      done: Boolean(nextDone),
+      at: Date.now(),
+    });
+  }
+
+  function applyLocalDoneLocks(data) {
+    if (!data || typeof data !== "object") return data;
+    const now = Date.now();
+    for (const [key, lock] of localDoneLocks) {
+      if (now - lock.at > 30_000) {
+        localDoneLocks.delete(key);
+      }
+    }
+    if (!localDoneLocks.size) return data;
+    const paint = (todo, scope) => {
+      if (!todo || typeof todo !== "object") return;
+      const key = doneLockKey(todo.id, scope);
+      const lock = localDoneLocks.get(key);
+      if (!lock) return;
+      todo.done = lock.done;
+      if (lock.done) {
+        if (!todo.completedAt) todo.completedAt = new Date().toISOString();
+      } else {
+        delete todo.completedAt;
+      }
+    };
+    for (const cls of data.classes || []) {
+      const scope = { classId: cls.id, projectId: null };
+      for (const t of cls.todos || []) paint(t, scope);
+      for (const t of cls.classOnlyTodos || []) paint(t, scope);
+    }
+    for (const t of data.todos || []) paint(t, {});
+    for (const p of data.projects || []) {
+      const scope = { classId: null, projectId: p.id };
+      for (const t of p.todos || []) paint(t, scope);
+    }
+    return data;
   }
 
   async function fetchData({ live = false } = {}) {
@@ -2563,6 +2616,7 @@
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `data ${res.status}`);
+    applyLocalDoneLocks(data);
     const nextFp = fingerprintTree(data);
     if (tree && nextFp === treeFingerprint) return;
     tree = data;
@@ -2605,8 +2659,9 @@
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `done ${res.status}`);
     } catch (err) {
-      // Revert on failure
+      localDoneLocks.delete(doneLockKey(todoId, { classId, projectId }));
       applyTodoDoneLocal(todoId, !nextDone, { classId, projectId });
+      localDoneLocks.delete(doneLockKey(todoId, { classId, projectId }));
       if (!patchTodoDoneDom(todoId, !nextDone, { classId, projectId })) render();
       throw err;
     }

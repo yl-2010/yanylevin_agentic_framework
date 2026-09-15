@@ -3,7 +3,8 @@
  * Nightly: Grok 4.6 xhigh, full map (new classes, syllabus, dates).
  * Hourly: Composer 2.5 (not fast), mapped classes only.
  * Live overlay: page-open GET of submissions + grades. Token from
- * server/.env (never commit). Does not sync done into todo.json files.
+ * server/.env (never commit). Agents never write done into todo.json.
+ * Express may POST planner overrides when Yan checks off a Canvas todo.
  */
 
 import { mkdir, open, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -19,7 +20,7 @@ import {
 import { scheduleTodayKey } from "./education-data.js";
 import { formatDeletedBlock, loadDeletedMarkdown } from "./education-match.js";
 import { gitAddCommitPush } from "./git-publish.js";
-import { attachCanvasOverlay } from "./canvas-grades.js";
+import { attachCanvasOverlay, canvasAssignmentIdFromLink } from "./canvas-grades.js";
 import {
   createLaterAuthRetry,
   promptWithAuthRetry,
@@ -68,6 +69,9 @@ let hourlyInFlight = null;
 let liveCache = null;
 /** @type {Promise<object|null>|null} */
 let liveFetchInFlight = null;
+const PENDING_COMPLETE_MS = 90_000;
+/** @type {Map<number, { complete: boolean, overrideId?: string, at: number }>} */
+const pendingComplete = new Map();
 
 const laterAuthRetry = createLaterAuthRetry({
   prefix: "canvas-sync",
@@ -307,14 +311,23 @@ export function shouldSkipCanvasHourly(meta, now = new Date()) {
 }
 
 export function nextCanvasHourlyAt(meta, now = new Date()) {
-  const t = new Date(now.getTime());
-  t.setSeconds(0, 0);
-  t.setMilliseconds(0);
-  t.setMinutes(0);
-  t.setHours(t.getHours() + 1);
-  let cursor = t;
-  for (let i = 0; i < 28; i++) {
-    if (!shouldSkipCanvasHourly(meta, cursor)) return cursor;
+  const clock = briefingNow(meta, now);
+  const tz = clock.timezone || "America/Los_Angeles";
+  let hour = Number(clock.hour) + 1;
+  let dateKey = clock.dateKey;
+  if (hour >= 24) {
+    hour = 0;
+    dateKey = addDaysToDateKey(dateKey, 1);
+  }
+  let cursor = zonedLocalToUtc(
+    dateKey,
+    `${String(hour).padStart(2, "0")}:00`,
+    tz
+  );
+  for (let i = 0; i < 30; i++) {
+    if (cursor.getTime() > now.getTime() + 2000 && !shouldSkipCanvasHourly(meta, cursor)) {
+      return cursor;
+    }
     cursor = new Date(cursor.getTime() + 60 * 60 * 1000);
   }
   return cursor;
@@ -326,9 +339,189 @@ export function canvasHourKey(meta, now = new Date()) {
   return `${clock.dateKey}T${hh}`;
 }
 
+function isoDaysFromNow(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString();
+}
+
+async function fetchPlannerItems(base, token, fetchOpts) {
+  try {
+    const start = encodeURIComponent(isoDaysFromNow(-14));
+    const end = encodeURIComponent(isoDaysFromNow(60));
+    return await canvasGetAll(
+      base,
+      token,
+      `/api/v1/planner/items?start_date=${start}&end_date=${end}&per_page=50`,
+      { ...fetchOpts, maxPages: 6 }
+    );
+  } catch (err) {
+    console.error("[canvas-sync] planner items", err);
+    return [];
+  }
+}
+
+function applyPlannerItems(assignments, items) {
+  if (!Array.isArray(assignments) || !assignments.length) return;
+  const byId = new Map();
+  for (const row of assignments) {
+    const id = Number(row?.id);
+    if (Number.isFinite(id)) byId.set(id, row);
+  }
+  for (const item of items || []) {
+    const pid = Number(item?.plannable_id || item?.plannable?.id);
+    const row = byId.get(pid);
+    if (!row) continue;
+    if (item?.planner_override?.marked_complete) row.plannerComplete = true;
+    const oid = item?.planner_override?.id;
+    if (oid != null && oid !== "") row.plannerOverrideId = String(oid);
+  }
+}
+
+function canvasIdFromTodo(todo) {
+  if (!todo || typeof todo !== "object") return null;
+  const fromField = Number(todo.canvasId);
+  if (Number.isFinite(fromField)) return fromField;
+  return canvasAssignmentIdFromLink(todo.canvasLink);
+}
+
+function applyPendingComplete(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return;
+  const rows = Array.isArray(snapshot.assignments) ? snapshot.assignments : [];
+  const now = Date.now();
+  for (const [id, pending] of pendingComplete) {
+    if (now - pending.at > PENDING_COMPLETE_MS) {
+      pendingComplete.delete(id);
+      continue;
+    }
+    let row = rows.find((a) => Number(a?.id) === id);
+    if (!row) {
+      row = { id };
+      rows.push(row);
+      snapshot.assignments = rows;
+    }
+    row.plannerComplete = Boolean(pending.complete);
+    if (pending.overrideId) row.plannerOverrideId = String(pending.overrideId);
+  }
+}
+
 export function rememberLiveSnapshot(snapshot) {
-  if (snapshot && typeof snapshot === "object") {
-    liveCache = { snapshot, at: Date.now() };
+  if (!snapshot || typeof snapshot !== "object") return;
+  applyPendingComplete(snapshot);
+  liveCache = { snapshot, at: Date.now() };
+}
+
+async function readPlannerOverrides() {
+  try {
+    const raw = JSON.parse(
+      await readFile(join(canvasDir(), "planner-overrides.json"), "utf8")
+    );
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  } catch {
+    return {};
+  }
+}
+
+async function writePlannerOverrideId(canvasId, overrideId) {
+  const id = String(canvasId || "").trim();
+  const oid = String(overrideId || "").trim();
+  if (!id || !oid) return;
+  const map = await readPlannerOverrides();
+  map[id] = oid;
+  const dir = canvasDir();
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    join(dir, "planner-overrides.json"),
+    `${JSON.stringify(map, null, 2)}\n`,
+    "utf8"
+  );
+}
+
+export function patchLiveAssignmentComplete(canvasId, complete, overrideId) {
+  const id = Number(canvasId);
+  if (!Number.isFinite(id)) return;
+  pendingComplete.set(id, {
+    complete: Boolean(complete),
+    overrideId: overrideId ? String(overrideId) : undefined,
+    at: Date.now(),
+  });
+  if (liveCache?.snapshot) {
+    applyPendingComplete(liveCache.snapshot);
+    liveCache.at = Date.now();
+  }
+}
+
+export async function setPlannerComplete({ canvasId, plannerOverrideId, done }) {
+  const { base, token, configured } = canvasConfig();
+  if (!configured) return { ok: false, reason: "not configured" };
+  const id = String(canvasId || "").trim();
+  if (!id) {
+    const err = new Error("Missing Canvas assignment id");
+    err.status = 400;
+    throw err;
+  }
+  const marked = Boolean(done);
+  let overrideId = String(plannerOverrideId || "").trim();
+  if (!overrideId) {
+    const stored = await readPlannerOverrides();
+    overrideId = String(stored[id] || "").trim();
+  }
+  const timeoutMs = LIVE_TIMEOUT_MS;
+  let saved;
+  if (overrideId) {
+    saved = await canvasWrite(
+      base,
+      token,
+      `/api/v1/planner/overrides/${encodeURIComponent(overrideId)}`,
+      "PUT",
+      { marked_complete: marked },
+      { timeoutMs }
+    );
+  } else {
+    saved = await canvasWrite(
+      base,
+      token,
+      `/api/v1/planner/overrides`,
+      "POST",
+      {
+        plannable_type: "assignment",
+        plannable_id: Number(id) || id,
+        marked_complete: marked,
+      },
+      { timeoutMs }
+    );
+  }
+  const newId = String(saved?.id || overrideId || "").trim();
+  if (newId) await writePlannerOverrideId(id, newId);
+  patchLiveAssignmentComplete(id, marked, newId);
+  return { ok: true, plannerOverrideId: newId, done: marked };
+}
+
+export async function seedLiveCanvasTodoDone(todo, done) {
+  const canvasId = canvasIdFromTodo(todo);
+  if (!Number.isFinite(canvasId)) {
+    return { skipped: true, reason: "no-canvas-id" };
+  }
+  if (!liveCache?.snapshot) {
+    const disk = await readCanvasSnapshot();
+    if (disk) rememberLiveSnapshot(disk);
+  }
+  patchLiveAssignmentComplete(canvasId, done, todo?.plannerOverrideId);
+  return { skipped: false, canvasId };
+}
+
+export async function syncCanvasTodoDone(todo, done) {
+  const seeded = await seedLiveCanvasTodoDone(todo, done);
+  if (seeded.skipped) return { ok: false, ...seeded };
+  try {
+    return await setPlannerComplete({
+      canvasId: seeded.canvasId,
+      plannerOverrideId: todo?.plannerOverrideId,
+      done,
+    });
+  } catch (err) {
+    console.error("[canvas-sync] planner complete", err);
+    return { ok: false, reason: err instanceof Error ? err.message : "write failed" };
   }
 }
 
@@ -408,11 +601,12 @@ async function canvasFetch(base, token, path, { timeoutMs } = {}) {
   return { data, next: next ? next[1] : "" };
 }
 
-async function canvasGetAll(base, token, path, { timeoutMs } = {}) {
+async function canvasGetAll(base, token, path, { timeoutMs, maxPages } = {}) {
   /** @type {unknown[]} */
   const out = [];
   let url = path;
-  for (let i = 0; i < 40; i++) {
+  const limit = Math.min(40, Math.max(1, Number(maxPages) || 40));
+  for (let i = 0; i < limit; i++) {
     const page = await canvasFetch(base, token, url, { timeoutMs });
     if (Array.isArray(page.data)) out.push(...page.data);
     else if (page.data) out.push(page.data);
@@ -420,6 +614,45 @@ async function canvasGetAll(base, token, path, { timeoutMs } = {}) {
     url = page.next;
   }
   return out;
+}
+
+async function canvasWrite(base, token, path, method, body, { timeoutMs } = {}) {
+  const url = path.startsWith("http") ? path : `${base}${path}`;
+  /** @type {RequestInit} */
+  const init = {
+    method: String(method || "POST").toUpperCase(),
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body || {}),
+  };
+  const ms = Number(timeoutMs);
+  if (Number.isFinite(ms) && ms > 0) {
+    init.signal = AbortSignal.timeout(ms);
+  }
+  let res;
+  try {
+    res = await fetch(url, init);
+  } catch (err) {
+    const timedOut = err && (err.name === "TimeoutError" || err.name === "AbortError");
+    const e = new Error(timedOut ? `Canvas timed out ${path}` : `Canvas write failed ${path}`);
+    e.status = 502;
+    throw e;
+  }
+  if (!res.ok) {
+    const err = new Error(`Canvas ${res.status} ${path}`);
+    err.status = res.status;
+    throw err;
+  }
+  const text = await res.text();
+  if (!text.trim()) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
 }
 
 function firstStudentEnrollment(course, extra = null) {
@@ -498,6 +731,8 @@ function assignmentRow(item, course, timeZone) {
     submittedAt: sub?.submitted_at || "",
     workflowState: clip(sub?.workflow_state, 24),
     excused: Boolean(sub?.excused),
+    plannerComplete: Boolean(item?.planner_override?.marked_complete),
+    plannerOverrideId: clip(item?.planner_override?.id, 24),
     types,
     description: stripHtml(item?.description, 1500),
   };
@@ -817,6 +1052,7 @@ export async function fetchCanvasSnapshot(opts = {}) {
     }
   }
 
+  const plannerPromise = fetchPlannerItems(base, token, fetchOpts);
   /** @type {ReturnType<typeof assignmentRow>[]} */
   const assignmentChunks = await Promise.all(
     courses.map(async (course) => {
@@ -837,6 +1073,7 @@ export async function fetchCanvasSnapshot(opts = {}) {
     })
   );
   const assignments = assignmentChunks.flat();
+  applyPlannerItems(assignments, await plannerPromise);
 
   const year = Number(String(dateKey).slice(0, 4));
   const month = Number(String(dateKey).slice(5, 7));
@@ -1009,7 +1246,9 @@ export async function getLiveCanvasSnapshot({ force = false } = {}) {
   if (liveFetchInFlight) return liveFetchInFlight;
   if (!force) {
     if (liveCache?.snapshot) return liveCache.snapshot;
-    return readCanvasSnapshot();
+    const disk = await readCanvasSnapshot();
+    if (disk) rememberLiveSnapshot(disk);
+    return liveCache?.snapshot || disk;
   }
   if (liveCache?.snapshot && Date.now() - liveCache.at < LIVE_MIN_INTERVAL_MS) {
     return liveCache.snapshot;
@@ -1105,7 +1344,7 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
   const timezone = resolveBriefingTimezone(meta, dateKey);
   const dir = canvasDir();
 
-    if (!force && !fetchOnly) {
+  if (!force && !fetchOnly) {
     const last = await readLastAgentSync(dir);
     if (last?.dateKey === dateKey) {
       console.log(`[canvas-sync] skip ${dateKey}: already synced`);
@@ -1374,22 +1613,6 @@ async function maybeRunMissed() {
   }
 }
 
-async function maybeRunMissedHourly() {
-  try {
-    const { configured } = canvasConfig();
-    if (!configured) return;
-    const meta = await readMeta();
-    if (shouldSkipCanvasHourly(meta)) return;
-    const last = await readLastHourlySync();
-    const at = Date.parse(last?.at || "");
-    if (Number.isFinite(at) && Date.now() - at < 70 * 60 * 1000) return;
-    console.log("[canvas-hourly] missed-job recovery");
-    await runCanvasHourlySync({ force: true });
-  } catch (err) {
-    console.error("[canvas-hourly] missed-job recovery failed", err);
-  }
-}
-
 function armTimer(meta) {
   if (timer) clearTimeout(timer);
   const when = nextCanvasSyncAt(meta);
@@ -1421,7 +1644,7 @@ function armHourlyTimer(meta) {
     `[canvas-hourly] next agent ${when.toISOString()} (in ${Math.round(capped / 60000)} min)`
   );
   hourlyTimer = setTimeout(() => {
-    runCanvasHourlySync({ force: true })
+    runCanvasHourlySync({ force: false })
       .catch((err) => console.error("[canvas-hourly] scheduled run failed", err))
       .finally(() => {
         readMeta()
@@ -1440,11 +1663,6 @@ export function startCanvasHourlyScheduler() {
   readMeta()
     .then((meta) => {
       armHourlyTimer(meta);
-      setTimeout(() => {
-        maybeRunMissedHourly().catch((err) =>
-          console.error("[canvas-hourly] missed recovery", err)
-        );
-      }, 20000);
     })
     .catch((err) => {
       console.error("[canvas-hourly] scheduler start failed", err);

@@ -108,6 +108,7 @@ export function todoCanvasAssignmentId(todo) {
 export function assignmentLooksComplete(row) {
   if (!row || typeof row !== "object") return false;
   if (row.excused) return true;
+  if (row.plannerComplete || row.markedComplete) return true;
   if (row.submittedAt) return true;
   const state = String(row.workflowState || "").toLowerCase();
   if (state === "submitted" || state === "graded" || state === "pending_review") {
@@ -181,8 +182,8 @@ export function attachCanvasGrades(tree, snapshot, courseMap = null) {
 }
 
 /**
- * Overlay Canvas completion onto todos. Never clears a local checkoff.
- * Does not write files.
+ * Overlay Canvas completion onto todos. Canvas-linked rows follow Canvas
+ * (including uncheck). Does not write files.
  * @param {object} tree
  * @param {object|null} snapshot
  */
@@ -195,11 +196,16 @@ export function attachCanvasCompletion(tree, snapshot) {
     const id = todoCanvasAssignmentId(todo);
     if (id == null) return;
     const row = byId.get(id);
-    if (!row || !assignmentLooksComplete(row)) return;
-    todo.done = true;
-    if (!todo.completedAt && row.submittedAt) {
-      todo.completedAt = row.submittedAt;
+    if (!row) return;
+    if (assignmentLooksComplete(row)) {
+      todo.done = true;
+      if (!todo.completedAt && row.submittedAt) {
+        todo.completedAt = row.submittedAt;
+      }
+      return;
     }
+    todo.done = false;
+    delete todo.completedAt;
   };
 
   const paintClass = (cls) => {

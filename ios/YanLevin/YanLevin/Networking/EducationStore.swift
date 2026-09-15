@@ -577,6 +577,8 @@ final class EducationStore: ObservableObject {
     /// Last `/api/education/data` payload. Identical bytes skip `@Published tree`
     /// so Chat map cards are not rebuilt on every agent-file SSE tick.
     private var lastEducationData: Data?
+    /// Local checkoffs keep winning for 30s while Canvas/live overlay catches up.
+    private var pendingTodoDone: [String: (done: Bool, at: Date)] = [:]
     private var lastOpenedProjectId: String?
     private var lastOpenedAt = Date.distantPast
     private var lastIngestedNavigateKey = ""
@@ -854,15 +856,16 @@ final class EducationStore: ObservableObject {
             if let err = res.error, res.classes == nil {
                 errorText = err
             }
+            let painted = applyPendingTodoDone(res)
             let stable = Self.stableEducationPayload(data)
             if lastEducationData != stable {
                 lastEducationData = stable
                 if animated {
                     withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
-                        tree = res
+                        tree = painted
                     }
                 } else {
-                    tree = res
+                    tree = painted
                 }
                 AppGroupStore.cacheEducationData(data)
                 treeEpoch += 1
@@ -883,6 +886,7 @@ final class EducationStore: ObservableObject {
         projectId: String? = nil,
         token: String
     ) async {
+        rememberPendingTodoDone(id: id, classId: classId, projectId: projectId, done: done)
         withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
             applyLocalTodoDone(id: id, classId: classId, projectId: projectId, done: done)
         }
@@ -901,11 +905,69 @@ final class EducationStore: ObservableObject {
                 bearer: token,
                 query: query
             )
-            await load(token: token)
         } catch {
             errorText = error.localizedDescription
-            await load(token: token)
+            forgetPendingTodoDone(id: id, classId: classId, projectId: projectId)
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+                applyLocalTodoDone(id: id, classId: classId, projectId: projectId, done: !done)
+            }
         }
+    }
+
+    private func pendingTodoKey(id: String, classId: String?, projectId: String?) -> String {
+        if let projectId, !projectId.isEmpty { return "p/\(projectId)/\(id)" }
+        if let classId, !classId.isEmpty { return "\(classId)/\(id)" }
+        return id
+    }
+
+    private func rememberPendingTodoDone(id: String, classId: String?, projectId: String?, done: Bool) {
+        pendingTodoDone[pendingTodoKey(id: id, classId: classId, projectId: projectId)] = (done, Date())
+    }
+
+    private func forgetPendingTodoDone(id: String, classId: String?, projectId: String?) {
+        pendingTodoDone.removeValue(forKey: pendingTodoKey(id: id, classId: classId, projectId: projectId))
+    }
+
+    private func applyPendingTodoDone(_ res: EducationTreeResponse) -> EducationTreeResponse {
+        let now = Date()
+        pendingTodoDone = pendingTodoDone.filter { now.timeIntervalSince($0.value.at) < 30 }
+        guard !pendingTodoDone.isEmpty else { return res }
+        func stamp(_ done: Bool, current: String?) -> String? {
+            done ? (current ?? ISO8601DateFormatter().string(from: Date())) : nil
+        }
+        let classes = res.classes?.map { cls -> EducationClass in
+            cls.mappingTodos { todo in
+                let key = pendingTodoKey(id: todo.todoId, classId: cls.id, projectId: nil)
+                guard let pending = pendingTodoDone[key] else { return todo }
+                return todo.withDone(pending.done, completedAt: stamp(pending.done, current: todo.completedAt))
+            }
+        }
+        let projects = res.projects?.map { project -> EducationProject in
+            project.mappingTodos { todo in
+                let key = pendingTodoKey(id: todo.todoId, classId: nil, projectId: project.id)
+                guard let pending = pendingTodoDone[key] else { return todo }
+                return todo.withDone(pending.done, completedAt: stamp(pending.done, current: todo.completedAt))
+            }
+        }
+        let userTodos = res.todos?.map { todo -> EducationTodo in
+            let key = pendingTodoKey(id: todo.todoId, classId: nil, projectId: nil)
+            guard let pending = pendingTodoDone[key] else { return todo }
+            return todo.withDone(pending.done, completedAt: stamp(pending.done, current: todo.completedAt))
+        }
+        return EducationTreeResponse(
+            ok: res.ok,
+            email: res.email,
+            meta: res.meta,
+            schedule: res.schedule,
+            classes: classes,
+            projects: projects,
+            todos: userTodos,
+            dates: res.dates,
+            todayKey: res.todayKey,
+            activeClassIdsByDate: res.activeClassIdsByDate,
+            nowContext: res.nowContext,
+            error: res.error
+        )
     }
 
     private func applyLocalTodoDone(
