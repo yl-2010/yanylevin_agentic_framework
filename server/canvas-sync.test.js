@@ -7,11 +7,16 @@ import {
   localDueParts,
   nextCanvasSyncAt,
   CANVAS_SYNC_MODEL_SPEC,
+  CANVAS_HOURLY_MODEL_SPEC,
   dashboardClassMatchesCanvasCourse,
   snapshotHasDashboardClass,
   selectDashboardCanvasCourses,
   filterCanvasSnapshotToDashboard,
   buildCanvasSyncPrompt,
+  buildCanvasHourlyPrompt,
+  shouldSkipCanvasHourly,
+  nextCanvasHourlyAt,
+  canvasHourKey,
 } from "./canvas-sync.js";
 import {
   contextSynthesisHm,
@@ -124,6 +129,54 @@ describe("canvas sync model", () => {
       { id: "effort", value: "xhigh" },
       { id: "fast", value: "false" },
     ]);
+  });
+});
+
+describe("canvas hourly model", () => {
+  it("uses composer-2.5 with fast off", () => {
+    assert.equal(CANVAS_HOURLY_MODEL_SPEC.id, "composer-2.5");
+    assert.deepEqual(CANVAS_HOURLY_MODEL_SPEC.params, [
+      { id: "fast", value: "false" },
+    ]);
+  });
+});
+
+describe("shouldSkipCanvasHourly", () => {
+  it("skips the 01:00 nightly window", () => {
+    const meta = { timezone: "America/Los_Angeles", nightlyAgentsLocalTime: "01:00" };
+    assert.equal(
+      shouldSkipCanvasHourly(meta, new Date("2026-09-14T08:00:00.000Z")),
+      true
+    );
+    assert.equal(
+      shouldSkipCanvasHourly(meta, new Date("2026-09-14T07:50:00.000Z")),
+      true
+    );
+    assert.equal(
+      shouldSkipCanvasHourly(meta, new Date("2026-09-14T16:00:00.000Z")),
+      false
+    );
+  });
+});
+
+describe("nextCanvasHourlyAt", () => {
+  it("jumps past the 01:00 nightly slot", () => {
+    const meta = { timezone: "America/Los_Angeles", nightlyAgentsLocalTime: "01:00" };
+    const when = nextCanvasHourlyAt(
+      meta,
+      new Date("2026-09-14T07:30:00.000Z")
+    );
+    assert.equal(when.getUTCHours(), 9);
+  });
+});
+
+describe("canvasHourKey", () => {
+  it("is a date plus hour in the briefing timezone", () => {
+    const key = canvasHourKey(
+      { timezone: "America/Los_Angeles" },
+      new Date("2026-09-14T16:10:00.000Z")
+    );
+    assert.equal(key, "2026-09-14T09");
   });
 });
 
@@ -286,5 +339,22 @@ describe("buildCanvasSyncPrompt", () => {
     assert.match(prompt, /class\.json canvasLink to that course gradebook/);
     assert.match(prompt, /Do not recreate a todo or date that looks like a manually deleted\.md row/);
     assert.match(prompt, /classes\/lit\/todos\/essay/);
+    assert.match(prompt, /last-hourly-sync/);
+    assert.match(prompt, /Fix mistakes/);
+  });
+});
+
+describe("buildCanvasHourlyPrompt", () => {
+  it("stays on mapped classes and does not hunt for new ones", () => {
+    const prompt = buildCanvasHourlyPrompt({
+      dateKey: "2026-09-14",
+      hourKey: "2026-09-14T15",
+      timezone: "America/Los_Angeles",
+      deletedBlock: "Manually deleted objects (deleted.md).",
+    });
+    assert.match(prompt, /hourly pass/);
+    assert.match(prompt, /Do not look for new classes/);
+    assert.match(prompt, /Do not edit course-map\.json/);
+    assert.match(prompt, /NEVER write done/);
   });
 });

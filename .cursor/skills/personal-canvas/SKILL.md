@@ -13,18 +13,20 @@ disable-model-invocation: true
 
 EPS Canvas is `https://canvas.instructure.com`. A student API token lives in `server/.env` (`CANVAS_ACCESS_TOKEN`). Never print or commit the token.
 
-This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how dashboard classes line up with Canvas courses, then write education todos/dates. Model for the nightly job: **grok-4.6 xhigh** (effort=xhigh, fast=false).
+This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how dashboard classes line up with Canvas courses, then write education todos/dates. Nightly model: **grok-4.6 xhigh** (effort=xhigh, fast=false). Hourly model: **composer-2.5** (fast=false).
 
 ## When to run
 
-- **Nightly:** Express runs fetch + this skill at **01:00** (`nightlyAgentsLocalTime` in `education/you@example.com/daily-briefing/meta.json`). Same slot as location compose/enrichment. Context synthesis is later (02:30). Daily briefing is 06:00.
-- **Manual (Personal Agent):** Yan says sync / pull / update Canvas. First fetch, then apply this skill **in this turn**. Do not spawn a nested Cursor agent.
+- **Page open (Express, not you):** `/api/education/data?live=1` fetches submissions and grades for mapped courses and overlays `done` + `canvasWork` in the API. That does **not** write `todo.json`. You still never persist completion.
+- **Hourly:** Express runs a light fetch + this skill (mapped classes only, no new-class hunt) every clock hour except the 01:00 nightly window. Writes `last-hourly-sync.json`.
+- **Nightly:** Express runs the full fetch + this skill at **01:00** (`nightlyAgentsLocalTime` in `education/you@example.com/daily-briefing/meta.json`). Same slot as location compose/enrichment. Context synthesis is later (02:30). Daily briefing is 06:00. **Re-read what hourly Composer wrote during the day and fix mistakes.**
+- **Manual (Personal Agent):** Yan says sync / pull / update Canvas. First fetch, then apply this skill **in this turn** (full nightly rules, including class map). Do not spawn a nested Cursor agent.
 
 ```bash
 node --env-file=server/.env server/canvas-sync.js --fetch-only
 ```
 
-To run the background Grok job instead: `node --env-file=server/.env server/canvas-sync.js --force` from the repo root.
+To run the background Grok job instead: `node --env-file=server/.env server/canvas-sync.js --force` from the repo root. Hourly Composer: `node --env-file=server/.env server/canvas-sync.js --hourly`.
 
 If `.canvas/snapshot.json` is missing and the fetch CLI fails, say Canvas is not configured (token / network). Do not invent assignments.
 
@@ -34,8 +36,9 @@ If `.canvas/snapshot.json` is missing and the fetch CLI fails, say Canvas is not
 education/you@example.com/.canvas/
   snapshot.json         # only dashboard / junior-year classes (assignments, events, syllabi)
   assignments.md        # readable index of that same subset
-  course-map.json       # Canvas course id → education class folder id (you maintain this)
+  course-map.json       # Canvas course id → education class folder id (you maintain this on nightly; hourly must not edit it)
   last-agent-sync.json  # written by the nightly runner, not by you
+  last-hourly-sync.json # written by the hourly Composer runner
 education/you@example.com/classes/<classId>/
   class.json
   todos/<todoId>/todo.json
@@ -44,7 +47,11 @@ education/you@example.com/classes/<classId>/
 
 Dashboard schema: `.cursor/skills/personal-agent/education-dashboard.md`.
 
-## Map courses first
+## Hourly pass (Composer)
+
+When the runner says hourly: **do not** map new classes, **do not** create class folders, **do not** edit `course-map.json`, **do not** mine syllabi. Only create/update todos for snapshot assignments whose `courseId` is already in `course-map.json`. Same Adv Calc HW due shift, yoga `hiddenFromHome`, tagging, and deleted.md rules. If nothing changed, stop.
+
+## Map courses first (nightly / manual only)
 
 1. Read `classes/*/class.json` (skip `_example-dummy`, skip `"freePeriod": true`).
 2. Read `course-map.json` if present.
@@ -96,13 +103,17 @@ Read each mapped course `syllabus` plus snapshot `events[]`. Create/update **imp
 
 ## Never
 
-- **Never** set or clear `done` or `completedAt` from Canvas. Yan checks work off in yanylevin. An update must leave those keys exactly as they are.
+- **Never** set or clear `done` or `completedAt` in todo.json from Canvas. Yan checks work off in yanylevin. Express may overlay submitted/graded as `done` on `/api/education/data` without writing files. An agent update must leave those keys exactly as they are.
 - **Never** POST/PUT/DELETE to Canvas. Read-only.
 - **Never** delete an education todo/date because it disappeared from Canvas.
 - **Never** recreate a todo/date Yan already deleted (`deleted.md`). Judgement, not exact clocks.
 - **Never** touch fixtures (`"fixture": true` or ids starting `_example-`).
 - **Never** put Canvas rows on projects or user-level todos. Class folders only.
 - **Never** mix this with Fitness OS gym logs.
+
+## Nightly review of hourly Composer
+
+Read `last-hourly-sync.json`. Walk mapped class todos against the **full** snapshot. Fix wrong tags, `HW:` prefixes left on names, Adv Calc HW dues pulled back to Canvas time, yoga CW `hiddenFromHome`, missing `canvasId`/`canvasLink`, duplicates, and course-map drift. Then do the usual full map (new junior-year courses may have appeared).
 
 ## After writes
 

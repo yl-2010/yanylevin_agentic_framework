@@ -53,6 +53,10 @@ struct EducationView: View {
                 if case .projectDetail(let project) = path.last {
                     Task { await store.markProjectOpened(id: project.id, token: auth.session?.token) }
                 }
+                Task {
+                    guard let token = auth.session?.token else { return }
+                    await store.load(token: token, live: true)
+                }
             }
             .navigationDestination(for: EducationRoute.self) { route in
                 switch route {
@@ -85,6 +89,7 @@ struct EducationView: View {
             await store.load(token: token)
             applyEducationTodoHandoff()
             applyEducationClassHandoff()
+            Task { await store.load(token: token, live: true) }
             await store.runLiveSession(token: token)
         }
         .onAppear {
@@ -473,7 +478,7 @@ struct EducationView: View {
 
     private func reload() async {
         guard let token = auth.session?.token else { return }
-        await store.load(token: token)
+        await store.load(token: token, live: true)
         applyEducationTodoHandoff()
         applyEducationClassHandoff()
         applyPendingAgentEducationNavigate()
@@ -586,7 +591,7 @@ struct ClassDetailView: View {
         }
         .refreshable {
             guard let token = auth.session?.token else { return }
-            await store.load(token: token)
+            await store.load(token: token, live: true)
         }
     }
 
@@ -899,7 +904,7 @@ struct ProjectDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .refreshable {
             guard let token = auth.session?.token else { return }
-            await store.load(token: token)
+            await store.load(token: token, live: true)
         }
         .onAppear {
             Task { await store.markProjectOpened(id: project.id, token: auth.session?.token) }
@@ -1146,7 +1151,7 @@ struct DateDetailView: View {
         }
         .refreshable {
             guard let token = auth.session?.token else { return }
-            await store.load(token: token)
+            await store.load(token: token, live: true)
         }
     }
 
@@ -1299,7 +1304,7 @@ struct TodoDetailView: View {
         }
         .refreshable {
             guard let token = auth.session?.token else { return }
-            await store.load(token: token)
+            await store.load(token: token, live: true)
         }
     }
 
@@ -1924,7 +1929,7 @@ private struct CapsuleDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .refreshable {
             guard let token = auth.session?.token else { return }
-            await store.load(token: token)
+            await store.load(token: token, live: true)
         }
     }
 

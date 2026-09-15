@@ -93,6 +93,38 @@ function assignmentKey(row) {
   return Number.isFinite(id) ? id : null;
 }
 
+export function todoCanvasAssignmentId(todo) {
+  if (!todo || typeof todo !== "object") return null;
+  const fromField = Number(todo.canvasId);
+  if (Number.isFinite(fromField)) return fromField;
+  return canvasAssignmentIdFromLink(todo.canvasLink);
+}
+
+/**
+ * Submitted, graded, excused, or a posted score. Used to paint `done` in the
+ * API overlay. Agents still must not write done into todo.json.
+ * @param {object|null|undefined} row
+ */
+export function assignmentLooksComplete(row) {
+  if (!row || typeof row !== "object") return false;
+  if (row.excused) return true;
+  if (row.submittedAt) return true;
+  const state = String(row.workflowState || "").toLowerCase();
+  if (state === "submitted" || state === "graded" || state === "pending_review") {
+    return true;
+  }
+  return finiteFrom(row.score) != null;
+}
+
+function assignmentsById(snapshot) {
+  const map = new Map();
+  for (const row of snapshot?.assignments || []) {
+    const id = assignmentKey(row);
+    if (id != null) map.set(id, row);
+  }
+  return map;
+}
+
 /**
  * Attach live Canvas labels onto an education tree. Mutates `tree`.
  * @param {object} tree
@@ -107,19 +139,13 @@ export function attachCanvasGrades(tree, snapshot, courseMap = null) {
       .filter((c) => c && c.id != null)
       .map((c) => [Number(c.id), c])
   );
-  const assignmentsById = new Map();
-  for (const row of snapshot.assignments || []) {
-    const id = assignmentKey(row);
-    if (id != null) assignmentsById.set(id, row);
-  }
+  const byAssignment = assignmentsById(snapshot);
 
   const paintTodo = (todo) => {
     if (!todo || typeof todo !== "object") return;
-    const fromField = Number(todo.canvasId);
-    const fromLink = canvasAssignmentIdFromLink(todo.canvasLink);
-    const id = Number.isFinite(fromField) ? fromField : fromLink;
+    const id = todoCanvasAssignmentId(todo);
     if (id == null) return;
-    const row = assignmentsById.get(id);
+    const row = byAssignment.get(id);
     if (!row) return;
     todo.canvasWork = formatAssignmentWork(row);
   };
@@ -151,5 +177,53 @@ export function attachCanvasGrades(tree, snapshot, courseMap = null) {
   for (const p of tree.projects || []) {
     for (const t of p.todos || []) paintTodo(t);
   }
+  return tree;
+}
+
+/**
+ * Overlay Canvas completion onto todos. Never clears a local checkoff.
+ * Does not write files.
+ * @param {object} tree
+ * @param {object|null} snapshot
+ */
+export function attachCanvasCompletion(tree, snapshot) {
+  if (!tree || !snapshot) return tree;
+  const byId = assignmentsById(snapshot);
+
+  const paintTodo = (todo) => {
+    if (!todo || typeof todo !== "object") return;
+    const id = todoCanvasAssignmentId(todo);
+    if (id == null) return;
+    const row = byId.get(id);
+    if (!row || !assignmentLooksComplete(row)) return;
+    todo.done = true;
+    if (!todo.completedAt && row.submittedAt) {
+      todo.completedAt = row.submittedAt;
+    }
+  };
+
+  const paintClass = (cls) => {
+    if (!cls || typeof cls !== "object") return;
+    for (const t of cls.todos || []) paintTodo(t);
+    for (const t of cls.classOnlyTodos || []) paintTodo(t);
+  };
+
+  for (const cls of tree.classes || []) paintClass(cls);
+  for (const t of tree.todos || []) paintTodo(t);
+  for (const p of tree.projects || []) {
+    for (const t of p.todos || []) paintTodo(t);
+  }
+  return tree;
+}
+
+/**
+ * Grades plus completion overlay. Mutates `tree`.
+ * @param {object} tree
+ * @param {object|null} snapshot
+ * @param {Record<string, string>|null} [courseMap]
+ */
+export function attachCanvasOverlay(tree, snapshot, courseMap = null) {
+  attachCanvasGrades(tree, snapshot, courseMap);
+  attachCanvasCompletion(tree, snapshot);
   return tree;
 }

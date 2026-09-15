@@ -1,11 +1,49 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  attachCanvasCompletion,
   attachCanvasGrades,
+  assignmentLooksComplete,
   formatAssignmentWork,
   formatCourseScoreLabel,
   trimScore,
 } from "./canvas-grades.js";
+
+describe("assignmentLooksComplete", () => {
+  it("treats submitted, graded, excused, or a posted score as complete", () => {
+    assert.equal(assignmentLooksComplete({ submittedAt: "2026-09-14T19:00:00Z" }), true);
+    assert.equal(assignmentLooksComplete({ workflowState: "graded" }), true);
+    assert.equal(assignmentLooksComplete({ excused: true }), true);
+    assert.equal(assignmentLooksComplete({ score: 0 }), true);
+    assert.equal(assignmentLooksComplete({ workflowState: "unsubmitted" }), false);
+  });
+});
+
+describe("attachCanvasCompletion", () => {
+  it("sets done from Canvas without clearing a local checkoff", () => {
+    const tree = {
+      classes: [
+        {
+          id: "physics",
+          todos: [
+            { id: "lab", canvasId: 1, done: false },
+            { id: "early", canvasId: 2, done: true, completedAt: "2026-09-10T01:00:00Z" },
+          ],
+        },
+      ],
+    };
+    attachCanvasCompletion(tree, {
+      assignments: [
+        { id: 1, submittedAt: "2026-09-14T18:00:00Z", workflowState: "submitted" },
+        { id: 2, workflowState: "unsubmitted" },
+      ],
+    });
+    assert.equal(tree.classes[0].todos[0].done, true);
+    assert.equal(tree.classes[0].todos[0].completedAt, "2026-09-14T18:00:00Z");
+    assert.equal(tree.classes[0].todos[1].done, true);
+    assert.equal(tree.classes[0].todos[1].completedAt, "2026-09-10T01:00:00Z");
+  });
+});
 
 describe("trimScore", () => {
   it("drops trailing zeros", () => {

@@ -340,6 +340,7 @@
     route = parseRoute();
     render({ scroll });
     maybeTouchProjectOpened();
+    fetchData({ live: true }).catch((err) => console.error("[edu live]", err));
   }
 
   const AGENT_NAV_STORE = "edu-agent-navigate-id";
@@ -2553,11 +2554,12 @@
     treeFingerprint = fingerprintTree(tree);
   }
 
-  async function fetchData() {
+  async function fetchData({ live = false } = {}) {
     const mac = window.YanMacApi;
     if (!mac) throw new Error("YanMacApi missing");
-    const res = await mac.macFetch("/api/education/data", {
-      timeoutMs: 30_000,
+    const path = live ? "/api/education/data?live=1" : "/api/education/data";
+    const res = await mac.macFetch(path, {
+      timeoutMs: live ? 45_000 : 30_000,
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `data ${res.status}`);
@@ -2859,6 +2861,7 @@
     route = parseRoute();
     render({ scroll: "restore" });
     maybeTouchProjectOpened();
+    fetchData({ live: true }).catch((err) => console.error("[edu live]", err));
   });
 
   async function boot() {
@@ -2885,6 +2888,7 @@
       await fetchData();
       maybeTouchProjectOpened();
       subscribeEvents();
+      fetchData({ live: true }).catch((err) => console.error("[edu live]", err));
       // Normalize /education → /education/
       if (window.location.pathname === "/education") {
         navigate("/education/", { replace: true, scroll: "keep" });

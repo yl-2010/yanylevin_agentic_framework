@@ -825,20 +825,25 @@ final class EducationStore: ObservableObject {
         }
     }
 
-    func load(token: String, animated: Bool = false) async {
+    func load(token: String, animated: Bool = false, live: Bool = false) async {
         let showLoading = tree == nil
         if showLoading { isLoading = true }
         if errorText != nil { errorText = nil }
         defer { if showLoading { isLoading = false } }
         do {
-            let bust = URLQueryItem(
-                name: "_",
-                value: String(Int(Date().timeIntervalSince1970 * 1000))
-            )
+            var query = [
+                URLQueryItem(
+                    name: "_",
+                    value: String(Int(Date().timeIntervalSince1970 * 1000))
+                )
+            ]
+            if live {
+                query.append(URLQueryItem(name: "live", value: "1"))
+            }
             let (data, http) = try await APIClient.shared.requestRaw(
                 "api/education/data",
                 bearer: token,
-                query: [bust]
+                query: query
             )
             guard (200..<300).contains(http.statusCode) else {
                 let msg = String(data: data, encoding: .utf8) ?? ""

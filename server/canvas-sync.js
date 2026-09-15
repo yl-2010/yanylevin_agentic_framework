@@ -1,8 +1,9 @@
 /**
- * Canvas LMS fetch + nightly dashboard sync agent (Grok 4.6 xhigh).
- * Token from server/.env (never commit). Writes
- * education/you@example.com/.canvas/ then a local agent maps
- * assignments onto existing education classes. Does not sync done state.
+ * Canvas LMS fetch + dashboard sync agents.
+ * Nightly: Grok 4.6 xhigh, full map (new classes, syllabus, dates).
+ * Hourly: Composer 2.5 (not fast), mapped classes only.
+ * Live overlay: page-open GET of submissions + grades. Token from
+ * server/.env (never commit). Does not sync done into todo.json files.
  */
 
 import { mkdir, open, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -18,6 +19,7 @@ import {
 import { scheduleTodayKey } from "./education-data.js";
 import { formatDeletedBlock, loadDeletedMarkdown } from "./education-match.js";
 import { gitAddCommitPush } from "./git-publish.js";
+import { attachCanvasOverlay } from "./canvas-grades.js";
 import {
   createLaterAuthRetry,
   promptWithAuthRetry,
@@ -46,14 +48,35 @@ export const CANVAS_SYNC_MODEL_SPEC = {
   ],
 };
 
+export const CANVAS_HOURLY_MODEL_SPEC = {
+  id: process.env.CURSOR_CANVAS_HOURLY_MODEL || "composer-2.5",
+  params: [{ id: "fast", value: "false" }],
+};
+
+export const LIVE_TIMEOUT_MS = 12_000;
+export const LIVE_MIN_INTERVAL_MS = 10_000;
+
 /** @type {ReturnType<typeof setTimeout>|null} */
 let timer = null;
+/** @type {ReturnType<typeof setTimeout>|null} */
+let hourlyTimer = null;
 /** @type {Promise<unknown>|null} */
 let inFlight = null;
+/** @type {Promise<unknown>|null} */
+let hourlyInFlight = null;
+/** @type {{ snapshot: object, at: number }|null} */
+let liveCache = null;
+/** @type {Promise<object|null>|null} */
+let liveFetchInFlight = null;
 
 const laterAuthRetry = createLaterAuthRetry({
   prefix: "canvas-sync",
   run: () => runCanvasSync({ force: true }),
+});
+
+const hourlyLaterAuthRetry = createLaterAuthRetry({
+  prefix: "canvas-hourly",
+  run: () => runCanvasHourlySync({ force: true }),
 });
 
 export function canvasConfig() {
@@ -260,6 +283,72 @@ async function listDashboardClassNames() {
   return names;
 }
 
+async function readCourseMap(dir) {
+  try {
+    const raw = JSON.parse(await readFile(join(dir || canvasDir(), "course-map.json"), "utf8"));
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+    return raw;
+  } catch {
+    return {};
+  }
+}
+
+export function mappedCourseIds(map) {
+  if (!map || typeof map !== "object") return [];
+  return Object.keys(map)
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id));
+}
+
+export function shouldSkipCanvasHourly(meta, now = new Date()) {
+  const clock = briefingNow(meta, now);
+  const nightly = hmToMinutes(canvasSyncHm(meta));
+  return clock.minutes >= nightly - 10 && clock.minutes < nightly + 20;
+}
+
+export function nextCanvasHourlyAt(meta, now = new Date()) {
+  const t = new Date(now.getTime());
+  t.setSeconds(0, 0);
+  t.setMilliseconds(0);
+  t.setMinutes(0);
+  t.setHours(t.getHours() + 1);
+  let cursor = t;
+  for (let i = 0; i < 28; i++) {
+    if (!shouldSkipCanvasHourly(meta, cursor)) return cursor;
+    cursor = new Date(cursor.getTime() + 60 * 60 * 1000);
+  }
+  return cursor;
+}
+
+export function canvasHourKey(meta, now = new Date()) {
+  const clock = briefingNow(meta, now);
+  const hh = String(clock.hour).padStart(2, "0");
+  return `${clock.dateKey}T${hh}`;
+}
+
+export function rememberLiveSnapshot(snapshot) {
+  if (snapshot && typeof snapshot === "object") {
+    liveCache = { snapshot, at: Date.now() };
+  }
+}
+
+async function fetchCourseById(base, token, id, { timeoutMs, includeSyllabus } = {}) {
+  const bits = [
+    "include[]=enrollments",
+    "include[]=total_scores",
+    "include[]=current_grading_period_scores",
+  ];
+  if (includeSyllabus) bits.push("include[]=syllabus_body");
+  const { data } = await canvasFetch(
+    base,
+    token,
+    `/api/v1/courses/${id}?${bits.join("&")}`,
+    { timeoutMs }
+  );
+  if (!data || !data.id || data.access_restricted_by_date) return null;
+  return data;
+}
+
 export function localDueParts(iso, timeZone) {
   const ms = Date.parse(iso || "");
   if (!Number.isFinite(ms)) return { dueDate: "", dueTime: "" };
@@ -286,14 +375,28 @@ export function localDueParts(iso, timeZone) {
   }
 }
 
-async function canvasFetch(base, token, path) {
+async function canvasFetch(base, token, path, { timeoutMs } = {}) {
   const url = path.startsWith("http") ? path : `${base}${path}`;
-  const res = await fetch(url, {
+  /** @type {RequestInit} */
+  const init = {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
     },
-  });
+  };
+  const ms = Number(timeoutMs);
+  if (Number.isFinite(ms) && ms > 0) {
+    init.signal = AbortSignal.timeout(ms);
+  }
+  let res;
+  try {
+    res = await fetch(url, init);
+  } catch (err) {
+    const timedOut = err && (err.name === "TimeoutError" || err.name === "AbortError");
+    const e = new Error(timedOut ? `Canvas timed out ${path}` : `Canvas fetch failed ${path}`);
+    e.status = 502;
+    throw e;
+  }
   if (!res.ok) {
     const err = new Error(`Canvas ${res.status} ${path}`);
     err.status = res.status;
@@ -305,12 +408,12 @@ async function canvasFetch(base, token, path) {
   return { data, next: next ? next[1] : "" };
 }
 
-async function canvasGetAll(base, token, path) {
+async function canvasGetAll(base, token, path, { timeoutMs } = {}) {
   /** @type {unknown[]} */
   const out = [];
   let url = path;
   for (let i = 0; i < 40; i++) {
-    const page = await canvasFetch(base, token, url);
+    const page = await canvasFetch(base, token, url, { timeoutMs });
     if (Array.isArray(page.data)) out.push(...page.data);
     else if (page.data) out.push(page.data);
     if (!page.next) break;
@@ -576,11 +679,33 @@ async function writeLastAgentSync(dir, payload) {
   );
 }
 
+async function writeLastHourlySync(dir, payload) {
+  await writeFile(
+    join(dir, "last-hourly-sync.json"),
+    `${JSON.stringify(payload, null, 2)}\n`,
+    "utf8"
+  );
+}
+
+async function readLastHourlySync(dir) {
+  try {
+    return JSON.parse(await readFile(join(dir || canvasDir(), "last-hourly-sync.json"), "utf8"));
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Pull dashboard-matching courses, then their assignments, syllabi, and events.
- * Prior-year / extra enrollments are listed by Canvas but not stored. Does not
- * copy Canvas done state onto education todos. Submissions are for scores only.
- * @param {{ dir?: string, timeZone?: string }} [opts]
+ * Pull dashboard-matching courses, then their assignments (and optionally
+ * syllabi / events). Submissions are for scores and live completion overlay.
+ * @param {{
+ *   dir?: string,
+ *   timeZone?: string,
+ *   light?: boolean,
+ *   mappedOnly?: boolean,
+ *   persist?: boolean,
+ *   timeoutMs?: number,
+ * }} [opts]
  */
 export async function fetchCanvasSnapshot(opts = {}) {
   const { base, token, configured } = canvasConfig();
@@ -591,66 +716,127 @@ export async function fetchCanvasSnapshot(opts = {}) {
   const now = briefingNow(meta);
   const timeZone = opts.timeZone || now.timezone || "America/Los_Angeles";
   const dateKey = now.dateKey;
+  const light = Boolean(opts.light);
+  const mappedOnly = Boolean(opts.mappedOnly);
+  const persist = opts.persist !== false;
+  const timeoutMs = opts.timeoutMs;
+  const dir = canvasDir(opts.dir);
+  const fetchOpts = timeoutMs != null ? { timeoutMs } : {};
 
-  const coursesRaw = await canvasGetAll(
-    base,
-    token,
-    `/api/v1/courses?enrollment_state=current_and_future&per_page=50&include[]=enrollments&include[]=total_scores&include[]=current_grading_period_scores`
-  );
-  const visible = coursesRaw.filter((c) => c && !c.access_restricted_by_date);
   const classNames = await listDashboardClassNames();
-  const { keep: courses, skip } = selectDashboardCanvasCourses(visible, classNames);
+  const courseMap = await readCourseMap(dir);
+  /** @type {object[]} */
+  let courses = [];
+  /** @type {object[]} */
+  let skip = [];
+
+  if (mappedOnly) {
+    const ids = mappedCourseIds(courseMap);
+    if (!ids.length) {
+      const empty = {
+        updatedAt: new Date().toISOString(),
+        base,
+        timezone: timeZone,
+        dateKey,
+        skippedCourseCount: 0,
+        courses: [],
+        assignments: [],
+        events: [],
+      };
+      return {
+        ok: true,
+        courses: 0,
+        skippedCourses: 0,
+        assignments: 0,
+        events: 0,
+        snapshot: empty,
+      };
+    }
+    const fetched = await Promise.all(
+      ids.map((id) =>
+        fetchCourseById(base, token, id, {
+          timeoutMs,
+          includeSyllabus: !light,
+        }).catch((err) => {
+          console.error(`[canvas-sync] course ${id}`, err);
+          return null;
+        })
+      )
+    );
+    courses = fetched.filter(Boolean);
+  } else {
+    const coursesRaw = await canvasGetAll(
+      base,
+      token,
+      `/api/v1/courses?enrollment_state=current_and_future&per_page=50&include[]=enrollments&include[]=total_scores&include[]=current_grading_period_scores`,
+      fetchOpts
+    );
+    const visible = coursesRaw.filter((c) => c && !c.access_restricted_by_date);
+    const picked = selectDashboardCanvasCourses(visible, classNames);
+    courses = picked.keep;
+    skip = picked.skip;
+  }
+
   const courseById = new Map(courses.map((c) => [c.id, c]));
   /** @type {Map<number, object>} */
   const enrollmentByCourse = new Map();
-  try {
-    const ownEnrollments = await canvasGetAll(
-      base,
-      token,
-      `/api/v1/users/self/enrollments?state[]=active&state[]=invited&per_page=50`
-    );
-    for (const row of ownEnrollments) {
-      const id = Number(row?.course_id);
-      if (Number.isFinite(id) && !enrollmentByCourse.has(id)) {
-        enrollmentByCourse.set(id, row);
-      }
-    }
-  } catch (err) {
-    console.error("[canvas-sync] enrollments", err);
-  }
-
-  for (const course of courses) {
+  if (!mappedOnly) {
     try {
-      const { data } = await canvasFetch(
+      const ownEnrollments = await canvasGetAll(
         base,
         token,
-        `/api/v1/courses/${course.id}?include[]=syllabus_body`
+        `/api/v1/users/self/enrollments?state[]=active&state[]=invited&per_page=50`,
+        fetchOpts
       );
-      if (data && typeof data === "object" && data.syllabus_body) {
-        course.syllabus_body = data.syllabus_body;
+      for (const row of ownEnrollments) {
+        const id = Number(row?.course_id);
+        if (Number.isFinite(id) && !enrollmentByCourse.has(id)) {
+          enrollmentByCourse.set(id, row);
+        }
       }
     } catch (err) {
-      console.error(`[canvas-sync] syllabus course ${course.id}`, err);
+      console.error("[canvas-sync] enrollments", err);
+    }
+  }
+
+  if (!light && !mappedOnly) {
+    for (const course of courses) {
+      try {
+        const { data } = await canvasFetch(
+          base,
+          token,
+          `/api/v1/courses/${course.id}?include[]=syllabus_body`,
+          fetchOpts
+        );
+        if (data && typeof data === "object" && data.syllabus_body) {
+          course.syllabus_body = data.syllabus_body;
+        }
+      } catch (err) {
+        console.error(`[canvas-sync] syllabus course ${course.id}`, err);
+      }
     }
   }
 
   /** @type {ReturnType<typeof assignmentRow>[]} */
-  const assignments = [];
-  for (const course of courses) {
-    try {
-      const rows = await canvasGetAll(
-        base,
-        token,
-        `/api/v1/courses/${course.id}/assignments?per_page=50&order_by=due_at&include[]=submission`
-      );
-      for (const item of rows) {
-        const row = assignmentRow(item, course, timeZone);
-        if (row) assignments.push(row);
+  const assignmentChunks = await Promise.all(
+    courses.map(async (course) => {
+      try {
+        const rows = await canvasGetAll(
+          base,
+          token,
+          `/api/v1/courses/${course.id}/assignments?per_page=50&order_by=due_at&include[]=submission`,
+          fetchOpts
+        );
+        return rows
+          .map((item) => assignmentRow(item, course, timeZone))
+          .filter(Boolean);
+      } catch (err) {
+        console.error(`[canvas-sync] assignments course ${course.id}`, err);
+        return [];
       }
-    } catch (err) {
-      console.error(`[canvas-sync] assignments course ${course.id}`, err);
-    }
-  }
+    })
+  );
+  const assignments = assignmentChunks.flat();
 
   const year = Number(String(dateKey).slice(0, 4));
   const month = Number(String(dateKey).slice(5, 7));
@@ -658,21 +844,27 @@ export async function fetchCanvasSnapshot(opts = {}) {
   const startDate = `${schoolStartYear}-08-01`;
   const endDate = `${schoolStartYear + 1}-07-31`;
   /** @type {ReturnType<typeof eventRow>[]} */
-  const events = [];
-  for (const course of courses) {
-    try {
-      const rows = await canvasGetAll(
-        base,
-        token,
-        `/api/v1/calendar_events?type=event&context_codes[]=course_${course.id}&start_date=${startDate}&end_date=${endDate}&per_page=50`
-      );
-      for (const item of rows) {
-        const row = eventRow(item, courseById, timeZone);
-        if (row) events.push(row);
-      }
-    } catch (err) {
-      console.error(`[canvas-sync] events course ${course.id}`, err);
-    }
+  let events = [];
+  if (!light) {
+    const eventChunks = await Promise.all(
+      courses.map(async (course) => {
+        try {
+          const rows = await canvasGetAll(
+            base,
+            token,
+            `/api/v1/calendar_events?type=event&context_codes[]=course_${course.id}&start_date=${startDate}&end_date=${endDate}&per_page=50`,
+            fetchOpts
+          );
+          return rows
+            .map((item) => eventRow(item, courseById, timeZone))
+            .filter(Boolean);
+        } catch (err) {
+          console.error(`[canvas-sync] events course ${course.id}`, err);
+          return [];
+        }
+      })
+    );
+    events = eventChunks.flat();
   }
 
   const snapshot = {
@@ -681,6 +873,8 @@ export async function fetchCanvasSnapshot(opts = {}) {
     timezone: timeZone,
     dateKey,
     skippedCourseCount: skip.length,
+    light,
+    mappedOnly,
     courses: courses.map((c) => {
       const scores = courseScores(c, enrollmentByCourse.get(Number(c.id)));
       return {
@@ -691,17 +885,19 @@ export async function fetchCanvasSnapshot(opts = {}) {
         syllabusUrl: `${base}/courses/${c.id}/assignments/syllabus`,
         grade: scores.grade,
         currentScore: scores.currentScore,
-        syllabus: stripHtml(c.syllabus_body, 8000),
+        syllabus: light ? "" : stripHtml(c.syllabus_body, 8000),
       };
     }),
     assignments,
     events,
   };
 
-  const dir = canvasDir(opts.dir);
-  await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, "snapshot.json"), `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
-  await writeFile(join(dir, "assignments.md"), formatCanvasAssignmentsMarkdown(snapshot), "utf8");
+  rememberLiveSnapshot(snapshot);
+  if (persist) {
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, "snapshot.json"), `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
+    await writeFile(join(dir, "assignments.md"), formatCanvasAssignmentsMarkdown(snapshot), "utf8");
+  }
   return {
     ok: true,
     courses: snapshot.courses.length,
@@ -750,7 +946,13 @@ async function resolveModelSelection(apiKey, spec) {
   }
 }
 
-export function buildCanvasSyncPrompt({ dateKey, timezone, force, deletedBlock }) {
+export function buildCanvasSyncPrompt({
+  dateKey,
+  timezone,
+  force,
+  deletedBlock,
+  hourlyBlock,
+}) {
   const rebuild = force
     ? "This is a forced/manual sync. Re-read the snapshot and apply the skill even if last-agent-sync.json is today."
     : "If last-agent-sync.json is already today and the snapshot has not grown new work, still apply any missing todos/dates from the snapshot.";
@@ -758,23 +960,92 @@ export function buildCanvasSyncPrompt({ dateKey, timezone, force, deletedBlock }
     typeof deletedBlock === "string" && deletedBlock.trim()
       ? deletedBlock.trim()
       : "";
+  const hourly =
+    typeof hourlyBlock === "string" && hourlyBlock.trim()
+      ? hourlyBlock.trim()
+      : "";
   return [
     `Follow ${SKILL_PATH}. Sync Canvas into Yan's education dashboard.`,
     "Yan only (you@example.com). Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} (timezone ${timezone}).`,
     `Snapshot: ${CANVAS_REL}/snapshot.json (also assignments.md). Optional map: ${CANVAS_REL}/course-map.json.`,
+    `Hourly Composer log: ${CANVAS_REL}/last-hourly-sync.json. Read it. Fix mistakes those daytime Composer 2.5 passes made (wrong tags, HW: prefixes left on names, Adv Calc HW dues pulled back to Canvas time, yoga CW hiddenFromHome, missing canvasId, duplicate todos, course-map drift).`,
     "Yan is a 2026-27 junior. Those academic dashboard classes are often missing from Canvas until school publishes them. That is expected.",
     "FIRST: map snapshot courses to education/you@example.com/classes/ (skip free-period shells and fixtures). The snapshot already dropped non-dashboard enrollments. If ZERO dashboard classes appear in Canvas, STOP immediately. Do not invent Class of 2028, EPS Library, Iceland EBC, Graphic Design, or prior-year shells. Do not create todos. One short note is enough.",
     "If at least one class maps: set class.json canvasLink to that course gradebook (htmlUrl + /grades). Create or update todos for every Canvas assignment on those mapped classes only. Set canvasLink and canvasId. Tag CW/HW/QA/MA. Store name without a CW/HW/QA/MA prefix (HW: Signed Syllabus → Signed Syllabus). Use snapshot dueDate/dueTime.",
     "Pull major syllabus / calendar-event dates onto date.json with canvasLink.",
-    "NEVER write done or completedAt from Canvas. New todos start done false. Updates leave those keys untouched.",
+    "NEVER write done or completedAt from Canvas. New todos start done false. Updates leave those keys untouched. Page-load overlay paints completion in the API; you still must not persist it.",
     "Do not POST to Canvas. Do not delete education todos just because Canvas dropped a row.",
     "Do not recreate a todo or date that looks like a manually deleted.md row. Judgement, not exact due clocks. canvasId is a strong hint.",
     rebuild,
+    hourly,
     deleted,
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+export function buildCanvasHourlyPrompt({ dateKey, hourKey, timezone, deletedBlock }) {
+  const deleted =
+    typeof deletedBlock === "string" && deletedBlock.trim()
+      ? deletedBlock.trim()
+      : "";
+  return [
+    `Follow ${SKILL_PATH} (hourly pass). Sync Canvas todos into already mapped classes only.`,
+    "Yan only (you@example.com). Local only. Never spawn a Cursor cloud agent.",
+    `Today's date key: ${dateKey} hour ${hourKey} (timezone ${timezone}).`,
+    `Snapshot: ${CANVAS_REL}/snapshot.json (light, mapped courses only). Map: ${CANVAS_REL}/course-map.json.`,
+    "Do not look for new classes. Do not create class folders. Do not edit course-map.json. Do not mine syllabi or invent dates from empty events.",
+    "For every snapshot assignment whose courseId is already in course-map.json: create or update the class todo (canvasId, canvasLink, tag, name without CW/HW/QA/MA prefix, dueDate/dueTime). Same Adv Calc HW due shift and yoga hiddenFromHome rules.",
+    "If the snapshot matches existing todos, do nothing.",
+    "NEVER write done or completedAt from Canvas. Do not POST to Canvas. Do not delete todos because Canvas dropped a row. Do not recreate deleted.md rows.",
+    deleted,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export async function getLiveCanvasSnapshot({ force = false } = {}) {
+  if (liveFetchInFlight) return liveFetchInFlight;
+  if (!force) {
+    if (liveCache?.snapshot) return liveCache.snapshot;
+    return readCanvasSnapshot();
+  }
+  if (liveCache?.snapshot && Date.now() - liveCache.at < LIVE_MIN_INTERVAL_MS) {
+    return liveCache.snapshot;
+  }
+  liveFetchInFlight = (async () => {
+    try {
+      const fetched = await fetchCanvasSnapshot({
+        light: true,
+        mappedOnly: true,
+        persist: false,
+        timeoutMs: LIVE_TIMEOUT_MS,
+      });
+      if (fetched.ok && fetched.snapshot) return fetched.snapshot;
+    } catch (err) {
+      console.error("[canvas-sync] live fetch", err);
+    }
+    if (liveCache?.snapshot) return liveCache.snapshot;
+    return readCanvasSnapshot();
+  })().finally(() => {
+    liveFetchInFlight = null;
+  });
+  return liveFetchInFlight;
+}
+
+export async function applyLiveCanvasOverlay(tree, { force = false } = {}) {
+  const { configured } = canvasConfig();
+  if (!configured || !tree) return tree;
+  try {
+    const snapshot = await getLiveCanvasSnapshot({ force });
+    if (!snapshot) return tree;
+    const map = await readCourseMap();
+    attachCanvasOverlay(tree, snapshot, map);
+  } catch (err) {
+    console.error("[canvas-sync] live overlay", err);
+  }
+  return tree;
 }
 
 async function acquireLock() {
@@ -893,7 +1164,17 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
     const deletedBlock = formatDeletedBlock(
       await loadDeletedMarkdown(join(ROOT, "education", YAN_EMAIL))
     );
-    const prompt = buildCanvasSyncPrompt({ dateKey, timezone, force, deletedBlock });
+    const lastHourly = await readLastHourlySync(dir);
+    const hourlyBlock = lastHourly
+      ? `Last hourly Composer run: ${JSON.stringify(lastHourly)}. Review those writes against the full snapshot.`
+      : "No last-hourly-sync.json yet (no daytime Composer run recorded).";
+    const prompt = buildCanvasSyncPrompt({
+      dateKey,
+      timezone,
+      force,
+      deletedBlock,
+      hourlyBlock,
+    });
     const { result, authFailed, capacityFailed, transientFailed, usedFallback } =
       await promptWithAuthRetry({
       prefix: "canvas-sync",
@@ -942,6 +1223,141 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
   }
 }
 
+export async function runCanvasHourlySync(opts = {}) {
+  if (hourlyInFlight) return hourlyInFlight;
+  hourlyInFlight = runCanvasHourlySyncOnce(opts).finally(() => {
+    hourlyInFlight = null;
+  });
+  return hourlyInFlight;
+}
+
+async function runCanvasHourlySyncOnce({ force = false } = {}) {
+  const { configured } = canvasConfig();
+  if (!configured) {
+    return { ok: false, reason: "not configured" };
+  }
+  const meta = await readMeta();
+  const now = briefingNow(meta);
+  const dateKey = now.dateKey;
+  const hourKey = canvasHourKey(meta);
+  const timezone = resolveBriefingTimezone(meta, dateKey);
+  if (!force && shouldSkipCanvasHourly(meta)) {
+    console.log(`[canvas-hourly] skip ${hourKey}: nightly window`);
+    return { ok: true, skipped: true, reason: "nightly-window", dateKey, hourKey };
+  }
+  const dir = canvasDir();
+  if (!force) {
+    const last = await readLastHourlySync(dir);
+    if (last?.hourKey === hourKey) {
+      console.log(`[canvas-hourly] skip ${hourKey}: already ran`);
+      hourlyLaterAuthRetry.clear();
+      return { ok: true, skipped: true, reason: "already-hourly", dateKey, hourKey };
+    }
+  }
+
+  const handle = await acquireLock();
+  if (!handle) {
+    console.log(`[canvas-hourly] skip ${hourKey}: in-flight lock`);
+    return { ok: true, skipped: true, reason: "in-flight", dateKey, hourKey };
+  }
+
+  try {
+    const map = await readCourseMap(dir);
+    if (!mappedCourseIds(map).length) {
+      console.log(`[canvas-hourly] skip ${hourKey}: no course-map`);
+      await writeLastHourlySync(dir, {
+        dateKey,
+        hourKey,
+        at: new Date().toISOString(),
+        status: "skipped",
+        reason: "no-course-map",
+      });
+      return { ok: true, skipped: true, reason: "no-course-map", dateKey, hourKey };
+    }
+
+    const fetched = await fetchCanvasSnapshot({
+      timeZone: timezone,
+      light: true,
+      mappedOnly: true,
+    });
+    if (!fetched.ok) return fetched;
+    if (!fetched.courses) {
+      await writeLastHourlySync(dir, {
+        dateKey,
+        hourKey,
+        at: new Date().toISOString(),
+        status: "skipped",
+        reason: "no-mapped-courses",
+      });
+      return { ok: true, skipped: true, reason: "no-mapped-courses", dateKey, hourKey };
+    }
+
+    await reloadCursorApiKeyFromEnv();
+    const apiKey = requireCursorApiKey();
+    const model = await resolveModelSelection(apiKey, CANVAS_HOURLY_MODEL_SPEC);
+    console.log(
+      `[canvas-hourly] agent ${hourKey} tz=${timezone} model=${model.id} assignments=${fetched.assignments}`
+    );
+
+    const deletedBlock = formatDeletedBlock(
+      await loadDeletedMarkdown(join(ROOT, "education", YAN_EMAIL))
+    );
+    const prompt = buildCanvasHourlyPrompt({
+      dateKey,
+      hourKey,
+      timezone,
+      deletedBlock,
+    });
+    const { result, authFailed, capacityFailed, transientFailed, usedFallback } =
+      await promptWithAuthRetry({
+        prefix: "canvas-hourly",
+        prompt,
+        model,
+        cwd: ROOT,
+      });
+
+    if (usedFallback) {
+      console.warn("[canvas-hourly] used auto after composer retries");
+    }
+    if (transientFailed) {
+      hourlyLaterAuthRetry.schedule(hourKey);
+      return {
+        ok: false,
+        dateKey,
+        hourKey,
+        status: result?.status || "error",
+        reason: authFailed ? "auth" : capacityFailed ? "capacity" : "error",
+        courses: fetched.courses,
+        assignments: fetched.assignments,
+      };
+    }
+
+    hourlyLaterAuthRetry.clear();
+    await writeLastHourlySync(dir, {
+      dateKey,
+      hourKey,
+      at: new Date().toISOString(),
+      status: result?.status || "finished",
+      model: model.id,
+      assignments: fetched.assignments,
+    });
+    await gitAddCommitPush({
+      paths: [`education/${YAN_EMAIL}`],
+      message: `education: ${hourKey} canvas hourly`,
+    });
+    return {
+      ok: true,
+      dateKey,
+      hourKey,
+      status: result?.status || "finished",
+      courses: fetched.courses,
+      assignments: fetched.assignments,
+    };
+  } finally {
+    await releaseLock(handle);
+  }
+}
+
 async function maybeRunMissed() {
   try {
     const { configured } = canvasConfig();
@@ -955,6 +1371,22 @@ async function maybeRunMissed() {
     await runCanvasSync({ force: true });
   } catch (err) {
     console.error("[canvas-sync] missed-job recovery failed", err);
+  }
+}
+
+async function maybeRunMissedHourly() {
+  try {
+    const { configured } = canvasConfig();
+    if (!configured) return;
+    const meta = await readMeta();
+    if (shouldSkipCanvasHourly(meta)) return;
+    const last = await readLastHourlySync();
+    const at = Date.parse(last?.at || "");
+    if (Number.isFinite(at) && Date.now() - at < 70 * 60 * 1000) return;
+    console.log("[canvas-hourly] missed-job recovery");
+    await runCanvasHourlySync({ force: true });
+  } catch (err) {
+    console.error("[canvas-hourly] missed-job recovery failed", err);
   }
 }
 
@@ -980,6 +1412,45 @@ function armTimer(meta) {
   }, capped);
 }
 
+function armHourlyTimer(meta) {
+  if (hourlyTimer) clearTimeout(hourlyTimer);
+  const when = nextCanvasHourlyAt(meta);
+  const delay = Math.max(1000, when.getTime() - Date.now());
+  const capped = Math.min(delay, 3 * 60 * 60 * 1000);
+  console.log(
+    `[canvas-hourly] next agent ${when.toISOString()} (in ${Math.round(capped / 60000)} min)`
+  );
+  hourlyTimer = setTimeout(() => {
+    runCanvasHourlySync({ force: true })
+      .catch((err) => console.error("[canvas-hourly] scheduled run failed", err))
+      .finally(() => {
+        readMeta()
+          .then((m) => armHourlyTimer(m))
+          .catch((err) => {
+            console.error("[canvas-hourly] reschedule failed", err);
+            hourlyTimer = setTimeout(() => startCanvasHourlyScheduler(), 60 * 60 * 1000);
+          });
+      });
+  }, capped);
+}
+
+export function startCanvasHourlyScheduler() {
+  const { configured } = canvasConfig();
+  if (!configured) return;
+  readMeta()
+    .then((meta) => {
+      armHourlyTimer(meta);
+      setTimeout(() => {
+        maybeRunMissedHourly().catch((err) =>
+          console.error("[canvas-hourly] missed recovery", err)
+        );
+      }, 20000);
+    })
+    .catch((err) => {
+      console.error("[canvas-hourly] scheduler start failed", err);
+    });
+}
+
 export function startCanvasSyncScheduler() {
   const { configured } = canvasConfig();
   if (!configured) {
@@ -998,6 +1469,7 @@ export function startCanvasSyncScheduler() {
     .catch((err) => {
       console.error("[canvas-sync] scheduler start failed", err);
     });
+  startCanvasHourlyScheduler();
 }
 
 const isMain = (() => {
@@ -1013,13 +1485,20 @@ const isMain = (() => {
 if (isMain) {
   const force = process.argv.includes("--force");
   const fetchOnly = process.argv.includes("--fetch-only");
-  runCanvasSync({ force, fetchOnly })
+  const hourly = process.argv.includes("--hourly");
+  const run = hourly
+    ? runCanvasHourlySync({ force: true })
+    : runCanvasSync({ force, fetchOnly });
+  run
     .then((result) => {
-      console.log("[canvas-sync]", result && { ...result, snapshot: undefined });
+      console.log(
+        hourly ? "[canvas-hourly]" : "[canvas-sync]",
+        result && { ...result, snapshot: undefined }
+      );
       if (!result?.ok && !result?.skipped) process.exitCode = 1;
     })
     .catch((err) => {
-      console.error("[canvas-sync] failed", err);
+      console.error(hourly ? "[canvas-hourly] failed" : "[canvas-sync] failed", err);
       process.exitCode = 1;
     });
 }

@@ -77,7 +77,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Apple Health / workouts / sleep / HR (Yan only) | `.cursor/skills/personal-health/SKILL.md` |
 | Apple Calendar on the Studio (read/write) | `.cursor/skills/personal-calendar/SKILL.md` |
 | Apple Home accessories / lights / sensors (Yan only) | `.cursor/skills/personal-home/SKILL.md` |
-| EPS Canvas sync (nightly + manual) | `.cursor/skills/personal-canvas/SKILL.md` |
+| EPS Canvas sync (hourly Composer + nightly Grok + manual) | `.cursor/skills/personal-canvas/SKILL.md` |
 | iMessage read and send | `.cursor/skills/personal-imessage/SKILL.md` |
 | Apple Screen Time / app usage (Yan only) | `.cursor/skills/personal-screentime/SKILL.md` |
 | Contacts lookup (sqlite, no Contacts.app) | `.cursor/skills/personal-contacts/SKILL.md` |
@@ -101,7 +101,7 @@ Live context on Express turns is authoritative for clock, class-now, the open sc
 
 ## Nightly jobs (Yan, manual)
 
-Times are in `education/you@example.com/daily-briefing/meta.json` (`nightlyAgentsLocalTime` 01:00, `chatTitleRefreshLocalTime` 01:30, `lifeStateCleanupLocalTime` 01:30, `contextSynthesisLocalTime` 02:30, `brainProjectionLocalTime` 03:00, `compileLocalTime` 06:00). Fact-check starts as soon as both 03:00 agents finish, not on a 03:30 clock. Those overnight jobs read yesterday's 5-minute life-state log (`/tmp/yanylevin-context-life-state.json` or `node server/life-state.js day`) as a context source. They do not write samples. The 01:30 life-state cleanup job is the exception: it rewrites yesterday's JSONL.
+Times are in `education/you@example.com/daily-briefing/meta.json` (`nightlyAgentsLocalTime` 01:00, `chatTitleRefreshLocalTime` 01:30, `lifeStateCleanupLocalTime` 01:30, `contextSynthesisLocalTime` 02:30, `brainProjectionLocalTime` 03:00, `compileLocalTime` 06:00). Canvas also runs an hourly Composer pass on mapped classes (skips the 01:00 hour). Fact-check starts as soon as both 03:00 agents finish, not on a 03:30 clock. Those overnight jobs read yesterday's 5-minute life-state log (`/tmp/yanylevin-context-life-state.json` or `node server/life-state.js day`) as a context source. They do not write samples. The 01:30 life-state cleanup job is the exception: it rewrites yesterday's JSONL.
 
 When Yan says run location enrichment / enrich my places / run health takeaways / run context synthesis / run the nightly pipeline / update my memories / retitle chats / clean life-state logs / run life-state cleanup / run location brain / project my places / run health brain / run fact check / fact-check overnight context / fill a person from iMessage / fill school Outlook / fill school Teams / fill Apple Mail, **do not** do the whole Grok/Composer pass in this chat turn. From the repo root:
 
