@@ -1,11 +1,12 @@
 /**
  * Finder hide/show for class todo and date folders on OneDrive.
- * Uses `chflags hidden` so names stay undotted (Cmd+Shift+. still reveals them).
+ * Hide by renaming to a leading-dot folder. OneDrive syncs the name;
+ * macOS `chflags hidden` stays on one Mac and also stalls the client.
  */
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   dateFolderShouldBeVisible,
@@ -16,7 +17,11 @@ import {
   listClassEntriesForRoot,
   userEducationRoot,
 } from "./education-data.js";
-import { gradeDirFromMeta } from "./education-onedrive.js";
+import {
+  gradeDirFromMeta,
+  objectDirId,
+  objectFolderPaths,
+} from "./education-onedrive.js";
 import { canonicalizeEmail, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
 
 const execFileAsync = promisify(execFile);
@@ -38,22 +43,77 @@ async function readJson(path) {
   }
 }
 
-/**
- * @param {string} absPath
- * @param {boolean} hidden
- */
-export async function setFinderHidden(absPath, hidden) {
+async function dirExists(path) {
+  try {
+    const st = await stat(path);
+    return st.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+async function clearFinderHiddenFlag(absPath) {
   if (process.platform !== "darwin") return;
-  const flag = hidden ? "hidden" : "nohidden";
-  await execFileAsync("chflags", [flag, absPath]);
+  try {
+    await execFileAsync("chflags", ["nohidden", absPath]);
+  } catch {
+    /* leftover flag is best-effort */
+  }
+}
+
+/**
+ * Hide with `.id`, show as `id`. Clears leftover chflags so OneDrive can sync.
+ * @param {string} parent
+ * @param {string} id
+ * @param {boolean} hidden
+ * @returns {Promise<string|null>} resulting folder path
+ */
+export async function setObjectFolderHidden(parent, id, hidden) {
+  const paths = objectFolderPaths(parent, id);
+  if (paths.length < 2) return null;
+  const [visiblePath, hiddenPath] = paths;
+  const vis = await dirExists(visiblePath);
+  const hid = await dirExists(hiddenPath);
+  if (hidden) {
+    if (hid && !vis) {
+      await clearFinderHiddenFlag(hiddenPath);
+      return hiddenPath;
+    }
+    if (vis && hid) {
+      await clearFinderHiddenFlag(visiblePath);
+      await clearFinderHiddenFlag(hiddenPath);
+      return hiddenPath;
+    }
+    if (vis) {
+      await clearFinderHiddenFlag(visiblePath);
+      await rename(visiblePath, hiddenPath);
+      await clearFinderHiddenFlag(hiddenPath);
+      return hiddenPath;
+    }
+    return null;
+  }
+  if (vis && !hid) {
+    await clearFinderHiddenFlag(visiblePath);
+    return visiblePath;
+  }
+  if (vis && hid) {
+    await clearFinderHiddenFlag(visiblePath);
+    await clearFinderHiddenFlag(hiddenPath);
+    return visiblePath;
+  }
+  if (hid) {
+    await clearFinderHiddenFlag(hiddenPath);
+    await rename(hiddenPath, visiblePath);
+    await clearFinderHiddenFlag(visiblePath);
+    return visiblePath;
+  }
+  return null;
 }
 
 async function listChildDirs(dir) {
   try {
     const entries = await readdir(dir, { withFileTypes: true });
-    return entries
-      .filter((e) => e.isDirectory() && e.name && !e.name.startsWith("."))
-      .map((e) => e.name);
+    return entries.filter((e) => e.isDirectory() && e.name).map((e) => e.name);
   } catch (err) {
     if (err?.code === "ENOENT") return [];
     throw err;
@@ -70,8 +130,10 @@ export function classObjectFolderCandidates(entry, id, kind) {
   const classFolder = entry.classFolder || entry.objectDir;
   /** @type {string[]} */
   const out = [];
-  if (classFolder) out.push(join(classFolder, id));
-  if (entry.objectDir) out.push(join(entry.objectDir, nested, id));
+  if (classFolder) out.push(...objectFolderPaths(classFolder, id));
+  if (entry.objectDir) {
+    out.push(...objectFolderPaths(join(entry.objectDir, nested), id));
+  }
   return [...new Set(out)];
 }
 
@@ -111,7 +173,9 @@ async function findDate(email, dateId, { classId = null } = {}) {
     if (!resolvedClass) {
       const entries = await listClassEntriesForRoot(root);
       const hit = entries.find(
-        (e) => path === e.objectDir || path.startsWith((e.classFolder || e.objectDir) + "/")
+        (e) =>
+          path === e.objectDir ||
+          path.startsWith((e.classFolder || e.objectDir) + "/")
       );
       if (hit) resolvedClass = hit.id;
     }
@@ -154,48 +218,39 @@ export async function revealOpenEducationObject(email, query) {
   return false;
 }
 
+async function syncKind(parent, kind, cls, schedule, now, seen) {
+  const fileName = kind === "todo" ? "todo.json" : "date.json";
+  for (const name of await listChildDirs(parent)) {
+    const id = objectDirId(name);
+    if (!id || seen.has(id)) continue;
+    const jsonPath = join(parent, name, fileName);
+    const props = await readJson(jsonPath);
+    if (!props) continue;
+    seen.add(id);
+    const obj = { id, ...props };
+    const visible =
+      kind === "todo"
+        ? todoFolderShouldBeVisible(obj, cls, schedule, now)
+        : dateFolderShouldBeVisible(obj, schedule, now);
+    try {
+      await setObjectFolderHidden(parent, id, !visible);
+    } catch (err) {
+      console.error("[onedrive-visibility]", kind, join(parent, name), err);
+    }
+  }
+}
+
 async function syncClassFolder(entry, cls, schedule, now) {
   const classFolder = entry.classFolder || entry.objectDir;
   if (!classFolder) return;
   const nestedTodos = join(entry.objectDir, "todos");
   const nestedDates = join(entry.objectDir, "dates");
-  const todoParents = [classFolder, nestedTodos];
-  const dateParents = [classFolder, nestedDates];
   const seenTodos = new Set();
   const seenDates = new Set();
-
-  for (const parent of todoParents) {
-    for (const id of await listChildDirs(parent)) {
-      if (seenTodos.has(id)) continue;
-      const jsonPath = join(parent, id, "todo.json");
-      const props = await readJson(jsonPath);
-      if (!props) continue;
-      seenTodos.add(id);
-      const todo = { id, ...props };
-      const visible = todoFolderShouldBeVisible(todo, cls, schedule, now);
-      try {
-        await setFinderHidden(join(parent, id), !visible);
-      } catch (err) {
-        console.error("[onedrive-visibility] todo", join(parent, id), err);
-      }
-    }
-  }
-  for (const parent of dateParents) {
-    for (const id of await listChildDirs(parent)) {
-      if (seenDates.has(id)) continue;
-      const jsonPath = join(parent, id, "date.json");
-      const props = await readJson(jsonPath);
-      if (!props) continue;
-      seenDates.add(id);
-      const dateObj = { id, ...props };
-      const visible = dateFolderShouldBeVisible(dateObj, schedule, now);
-      try {
-        await setFinderHidden(join(parent, id), !visible);
-      } catch (err) {
-        console.error("[onedrive-visibility] date", join(parent, id), err);
-      }
-    }
-  }
+  await syncKind(classFolder, "todo", cls, schedule, now, seenTodos);
+  await syncKind(nestedTodos, "todo", cls, schedule, now, seenTodos);
+  await syncKind(classFolder, "date", cls, schedule, now, seenDates);
+  await syncKind(nestedDates, "date", cls, schedule, now, seenDates);
 }
 
 /**

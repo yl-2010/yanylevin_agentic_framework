@@ -65,6 +65,39 @@ export const EDUCATION_META_DIR = ".education";
 const RESERVED_CLASS_ROOT_DIRS = new Set(["todos", "dates"]);
 
 /**
+ * Object folder id from a class-root directory name.
+ * Hidden todos/dates use a leading-dot name so OneDrive syncs Finder hide.
+ * `.education` is not an object folder.
+ * @param {unknown} name
+ * @returns {string|null}
+ */
+export function objectDirId(name) {
+  const s = String(name || "").trim();
+  if (!s || s === "." || s === ".." || s === EDUCATION_META_DIR) return null;
+  if (s === ".Trash" || s.startsWith("._")) return null;
+  if (s.includes("/") || s.includes("\\") || s.includes("\0")) return null;
+  if (s.startsWith(".")) {
+    const id = s.slice(1);
+    if (!id || id.startsWith(".") || id.includes("..")) return null;
+    return id;
+  }
+  if (s.includes("..")) return null;
+  return s;
+}
+
+/**
+ * Visible then hidden folder paths for a class todo/date id.
+ * @param {string} parent
+ * @param {string} id
+ * @returns {string[]}
+ */
+export function objectFolderPaths(parent, id) {
+  const clean = objectDirId(id) || objectDirId(String(id || "").replace(/^\./, ""));
+  if (!parent || !clean) return [];
+  return [join(parent, clean), join(parent, `.${clean}`)];
+}
+
+/**
  * Dashboard object tree inside a class OneDrive folder (`class.json`, todos, dates).
  * Hidden in Finder until Cmd+Shift+.
  * @param {string} gradeDir

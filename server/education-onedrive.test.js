@@ -13,6 +13,8 @@ import {
   mergeContextFileLists,
   normalizeClassFolderName,
   onedriveNameScore,
+  objectDirId,
+  objectFolderPaths,
   resolveOnedriveAbsolutePath,
 } from "./education-onedrive.js";
 
@@ -274,5 +276,22 @@ describe("resolveOnedriveAbsolutePath", () => {
       () => resolveOnedriveAbsolutePath(dir, "../outside.pdf"),
       /invalid file name/
     );
+  });
+});
+
+describe("objectDirId", () => {
+  it("strips a leading dot and ignores .education", () => {
+    assert.equal(objectDirId("hw-foo"), "hw-foo");
+    assert.equal(objectDirId(".hw-foo"), "hw-foo");
+    assert.equal(objectDirId(".education"), null);
+    assert.equal(objectDirId(".Trash"), null);
+    assert.equal(objectDirId("._sync"), null);
+  });
+
+  it("lists visible then hidden paths", () => {
+    assert.deepEqual(objectFolderPaths("/class", "hw-foo"), [
+      "/class/hw-foo",
+      "/class/.hw-foo",
+    ]);
   });
 });

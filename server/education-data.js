@@ -17,6 +17,8 @@ import {
   matchOnedriveFolder,
   mergeContextFileLists,
   isSafeRelativePath,
+  objectDirId,
+  objectFolderPaths,
   resolveOnedriveAbsolutePath,
   statOnedriveFile,
 } from "./education-onedrive.js";
@@ -557,8 +559,8 @@ export async function resolveContextFile(email, opts) {
       const entry = await classEntryForRoot(root, classId);
       if (entry) {
         folder = await firstExistingDir([
-          join(entry.classFolder || entry.objectDir, id),
-          join(entry.objectDir, "todos", id),
+          ...objectFolderPaths(entry.classFolder || entry.objectDir, id),
+          ...objectFolderPaths(join(entry.objectDir, "todos"), id),
         ]);
       } else {
         folder = join(root, "classes", classId, "todos", id);
@@ -578,8 +580,8 @@ export async function resolveContextFile(email, opts) {
       const entry = await classEntryForRoot(root, classId);
       if (entry) {
         folder = await firstExistingDir([
-          join(entry.classFolder || entry.objectDir, id),
-          join(entry.objectDir, "dates", id),
+          ...objectFolderPaths(entry.classFolder || entry.objectDir, id),
+          ...objectFolderPaths(join(entry.objectDir, "dates"), id),
         ]);
       } else {
         folder = join(root, "classes", classId, "dates", id);
@@ -1103,11 +1105,18 @@ async function loadObjectFolder(
 ) {
   const ids = await listDirs(parentDir);
   const fileName = kind === "todo" ? "todo.json" : "date.json";
+  /** @type {Map<string, string>} */
+  const dirById = new Map();
+  for (const dirName of ids) {
+    const id = objectDirId(dirName);
+    if (!id) continue;
+    const prev = dirById.get(id);
+    if (!prev || !dirName.startsWith(".")) dirById.set(id, dirName);
+  }
   /** @type {object[]} */
   const out = [];
-  for (const id of ids) {
-    if (String(id).startsWith(".")) continue;
-    const objectDir = join(parentDir, id);
+  for (const [id, dirName] of dirById) {
+    const objectDir = join(parentDir, dirName);
     const jsonPath = join(objectDir, fileName);
     const props = await readJsonFile(jsonPath);
     if (!props || typeof props !== "object") continue;
@@ -1819,8 +1828,12 @@ export async function findTodo(
     const entry = await classEntryForRoot(root, scopedClass);
     if (entry) {
       const classFolder = entry.classFolder || entry.objectDir;
-      candidates.push(join(classFolder, id, "todo.json"));
-      candidates.push(join(entry.objectDir, "todos", id, "todo.json"));
+      for (const folder of objectFolderPaths(classFolder, id)) {
+        candidates.push(join(folder, "todo.json"));
+      }
+      for (const folder of objectFolderPaths(join(entry.objectDir, "todos"), id)) {
+        candidates.push(join(folder, "todo.json"));
+      }
     } else {
       candidates.push(
         join(root, "classes", scopedClass, "todos", id, "todo.json")
@@ -1830,8 +1843,12 @@ export async function findTodo(
     candidates.push(join(root, "todos", id, "todo.json"));
     for (const entry of await listClassEntriesForRoot(root)) {
       const classFolder = entry.classFolder || entry.objectDir;
-      candidates.push(join(classFolder, id, "todo.json"));
-      candidates.push(join(entry.objectDir, "todos", id, "todo.json"));
+      for (const folder of objectFolderPaths(classFolder, id)) {
+        candidates.push(join(folder, "todo.json"));
+      }
+      for (const folder of objectFolderPaths(join(entry.objectDir, "todos"), id)) {
+        candidates.push(join(folder, "todo.json"));
+      }
     }
     const projectIds = await listDirs(join(root, "projects"));
     for (const pid of projectIds) {

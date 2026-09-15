@@ -9,6 +9,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isFixture, listClassEntriesForRoot } from "./education-data.js";
+import { objectDirId } from "./education-onedrive.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const DEFAULT_EDUCATION_EMAIL = "you@example.com";
@@ -174,6 +175,23 @@ async function listDirs(dir) {
   }
 }
 
+async function listObjectDirs(dir) {
+  try {
+    const entries = await readdir(dir, { withFileTypes: true });
+    return entries
+      .filter(
+        (e) =>
+          e.isDirectory() &&
+          objectDirId(e.name) &&
+          !e.name.startsWith("_example")
+      )
+      .map((e) => e.name);
+  } catch (err) {
+    if (err?.code === "ENOENT") return [];
+    throw err;
+  }
+}
+
 async function readJson(path) {
   try {
     return JSON.parse(await readFile(path, "utf8"));
@@ -189,11 +207,19 @@ async function readJson(path) {
  * @param {string} pathPrefix
  */
 async function loadObjects(parentDir, fileName, parent, pathPrefix) {
-  const ids = await listDirs(parentDir);
+  const names = await listObjectDirs(parentDir);
+  /** @type {Map<string, string>} */
+  const dirById = new Map();
+  for (const dirName of names) {
+    const id = objectDirId(dirName);
+    if (!id) continue;
+    const prev = dirById.get(id);
+    if (!prev || !dirName.startsWith(".")) dirById.set(id, dirName);
+  }
   /** @type {object[]} */
   const out = [];
-  for (const id of ids) {
-    const props = await readJson(join(parentDir, id, fileName));
+  for (const [id, dirName] of dirById) {
+    const props = await readJson(join(parentDir, dirName, fileName));
     if (!props || typeof props !== "object") continue;
     const item = { id, ...props };
     if (isFixture(item) || isFixture({ id })) continue;

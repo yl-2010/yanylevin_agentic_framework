@@ -9,7 +9,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { EDU_ROOT, BRAIN_ROOT, serializeFrontmatter } from "./brain-lib.js";
-import { EDUCATION_META_DIR, gradeDirFromMeta } from "./education-onedrive.js";
+import { EDUCATION_META_DIR, gradeDirFromMeta, objectDirId } from "./education-onedrive.js";
 
 const MIRROR_ROOT = path.join(BRAIN_ROOT, "education");
 
@@ -40,6 +40,15 @@ function listDirs(dir) {
   return fs
     .readdirSync(dir, { withFileTypes: true })
     .filter((e) => e.isDirectory() && !e.name.startsWith("_example") && !e.name.startsWith("."))
+    .map((e) => e.name)
+    .sort();
+}
+
+function listObjectDirs(dir) {
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && objectDirId(e.name) && !e.name.startsWith("_example"))
     .map((e) => e.name)
     .sort();
 }
@@ -110,14 +119,15 @@ function collectChildren(stubs, parentDir, parentId, parentSlug, classFolder) {
   const seenTodos = new Set();
   const seenDates = new Set();
   for (const dir of todoParents) {
-    for (const child of listDirs(dir)) {
-      if (seenTodos.has(child)) continue;
+    for (const child of listObjectDirs(dir)) {
+      const id = objectDirId(child);
+      if (!id || seenTodos.has(id)) continue;
       const todoPath = path.join(dir, child, "todo.json");
       if (!fs.existsSync(todoPath)) continue;
-      seenTodos.add(child);
+      seenTodos.add(id);
       stubs.push(
         collectTodo({
-          slug: `${parentSlug}--${child}`,
+          slug: `${parentSlug}--${id}`,
           parentEdge: { type: "part_of", to: parentId },
           dirPath: path.join(dir, child),
           sourceRel: path.relative(EDU_ROOT, todoPath),
@@ -126,14 +136,15 @@ function collectChildren(stubs, parentDir, parentId, parentSlug, classFolder) {
     }
   }
   for (const dir of dateParents) {
-    for (const child of listDirs(dir)) {
-      if (seenDates.has(child)) continue;
+    for (const child of listObjectDirs(dir)) {
+      const id = objectDirId(child);
+      if (!id || seenDates.has(id)) continue;
       const datePath = path.join(dir, child, "date.json");
       if (!fs.existsSync(datePath)) continue;
-      seenDates.add(child);
+      seenDates.add(id);
       stubs.push(
         collectDate({
-          slug: `${parentSlug}--${child}`,
+          slug: `${parentSlug}--${id}`,
           parentEdge: { type: "part_of", to: parentId },
           dirPath: path.join(dir, child),
           sourceRel: path.relative(EDU_ROOT, datePath),
