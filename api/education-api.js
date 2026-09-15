@@ -240,7 +240,7 @@ module.exports = async function handler(req, res) {
         return;
       }
       const q = new URLSearchParams();
-      for (const key of ["scope", "name", "id", "classId", "projectId"]) {
+      for (const key of ["scope", "name", "id", "classId", "projectId", "source", "path"]) {
         const raw = req.query?.[key];
         const val = Array.isArray(raw) ? raw[0] : raw;
         if (val != null && String(val).trim() !== "") q.set(key, String(val));

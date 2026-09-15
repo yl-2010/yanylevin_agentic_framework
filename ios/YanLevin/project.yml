@@ -63,6 +63,9 @@ targets:
         # Query only. Opening canvas-courses:// does not need a paid Apple team.
         LSApplicationQueriesSchemes:
           - canvas-courses
+          - ms-word
+          - ms-excel
+          - ms-powerpoint
         YanSiteBaseURL: https://yanylevin.com
         YanApiBaseURL: https://api.yanylevin.com
         ITSAppUsesNonExemptEncryption: false

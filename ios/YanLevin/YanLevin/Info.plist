@@ -37,6 +37,9 @@
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>canvas-courses</string>
+		<string>ms-word</string>
+		<string>ms-excel</string>
+		<string>ms-powerpoint</string>
 	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>

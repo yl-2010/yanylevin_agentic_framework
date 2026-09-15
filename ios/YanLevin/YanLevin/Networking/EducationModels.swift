@@ -1,7 +1,22 @@
 import Foundation
 
+/// Office URI schemes (`ms-word:ofe|u|…`) that open the live OneDrive item.
+enum OfficeDocument {
+    static func url(from uri: String?) -> URL? {
+        let trimmed = (uri ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if let url = URL(string: trimmed) { return url }
+        var allowed = CharacterSet.urlFragmentAllowed
+        allowed.insert(charactersIn: "|")
+        return trimmed.addingPercentEncoding(withAllowedCharacters: allowed).flatMap(URL.init(string:))
+    }
+
+    static func webURL(from raw: String?) -> URL? {
+        CanvasLMS.webURL(from: raw)
+    }
+}
+
 /// Canvas LMS web URLs and the Student app's `canvas-courses://` scheme.
-enum CanvasLMS {
     static let studentAppScheme = "canvas-courses"
 
     /// Normalized http(s) Canvas URL, if present.
@@ -88,6 +103,8 @@ struct EducationContextFile: Decodable, Identifiable, Hashable {
     let source: String?
     let path: String?
     let files: [EducationContextFile]?
+    let webUrl: String?
+    let officeUri: String?
 
     var id: String {
         "\(source ?? "education")|\(kind ?? "file")|\(path ?? name)"
@@ -96,6 +113,13 @@ struct EducationContextFile: Decodable, Identifiable, Hashable {
     var displayName: String { name }
 
     var isFolder: Bool { kind == "folder" }
+
+    /// Word / Excel / PowerPoint on OneDrive. Same cloud item, not a downloaded copy.
+    var opensInOfficeApp: Bool {
+        guard let officeUri, !officeUri.isEmpty else { return false }
+        guard let webUrl, !webUrl.isEmpty else { return false }
+        return true
+    }
 }
 
 struct EducationSchedule: Decodable {

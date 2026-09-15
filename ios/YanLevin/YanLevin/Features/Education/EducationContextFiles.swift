@@ -11,7 +11,8 @@ struct EducationFileOwner: Equatable {
 }
 
 /// Liquid-glass file tiles. API order (pinned top, then newest mtime, then pinned bottom).
-/// Folders expand in place. Files open Quick Look.
+/// Folders expand in place. Office files on OneDrive open in Word/Excel/PowerPoint.
+/// Other files open Quick Look (a copy).
 struct EducationContextFilesView: View {
     let files: [EducationContextFile]
     let owner: EducationFileOwner
@@ -68,6 +69,36 @@ struct EducationContextFilesView: View {
     }
 
     private func open(_ file: EducationContextFile) {
+        if file.opensInOfficeApp {
+            openInOffice(file)
+            return
+        }
+        openCopy(file)
+    }
+
+    private func openInOffice(_ file: EducationContextFile) {
+        if let officeURL = OfficeDocument.url(from: file.officeUri),
+           UIApplication.shared.canOpenURL(officeURL)
+        {
+            UIApplication.shared.open(officeURL, options: [:]) { ok in
+                if !ok {
+                    DispatchQueue.main.async { self.openOfficeFallback(file) }
+                }
+            }
+            return
+        }
+        openOfficeFallback(file)
+    }
+
+    private func openOfficeFallback(_ file: EducationContextFile) {
+        if let web = OfficeDocument.webURL(from: file.webUrl) {
+            UIApplication.shared.open(web)
+            return
+        }
+        openCopy(file)
+    }
+
+    private func openCopy(_ file: EducationContextFile) {
         guard let token = auth.session?.token else {
             openError = "Please sign in again."
             return

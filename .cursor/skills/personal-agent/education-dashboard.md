@@ -14,7 +14,7 @@ Canonical schedule files live in `.cursor/skills/class-schedule/SKILL.md` (weekl
 
 ```
 education/<email>/
-  meta.json                 # gradeFolder, onedriveRoot, optional hiddenFiles / visibleFiles / filesTop / filesBottom for user-level dropped files; optional projectsTop / projectsBottom for the Projects panel
+  meta.json                 # gradeFolder, onedriveRoot, onedriveWebRoot (SharePoint Documents URL for opening Word/Excel/PPT in the native apps), optional hiddenFiles / visibleFiles / filesTop / filesBottom for user-level dropped files; optional projectsTop / projectsBottom for the Projects panel
   .projects-opened.json     # last-opened map (user clicks + agent creates). Gitignored. Write on project create; do not git add.
   schedule.json             # bells + weekdayPeriods + closedDates (from PDF)
   deleted.md                # agent-only: objects this user deleted on purpose; nightly jobs skip recreating them
@@ -54,7 +54,9 @@ OneDrive (Yan, `meta.json` onedriveRoot + gradeFolder, currently `11th Grade`):
 
 **OneDrive class folders (web + iOS class page):** Express lists the live `onedriveRoot` / `gradeFolder` / `onedriveFolder` tree and skips todo/date object folders (those files show on the todo/date page). Bytes stay in OneDrive. Nested leftover folders still expand as tiles. `.education/` is omitted from tiles. `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` still apply by basename.
 
-Yan’s Mac: `onedriveRoot` is `$HOME/Documents`; current year folder is `11th Grade`. Visible class folders stay all year: `A. Data Sci 1`, `C. Advanced Calc`, `D. Spanish 4`, `E. US History`, `F. American Lit`, `G. PE Yoga`, `H. Physics`. Hidden until Cmd+Shift+.: `.Independent Study`, `.Advanced Programming AI-ML`, `.Advanced Programming Emergent Topics`, `.Free Period A`, `.Free Period B`. History is F fall / E winter-spring; Lit is E fall / F winter-spring. Those letter swaps live on `class.json` `period` as `{ "fall", "winter", "spring" }` with `"trimester": "year"`. There is no winter-spring shell class. Period letters on the folder names are not always the current period. Class Notebooks are not those grade folders. Do not git-publish OneDrive paths.
+**Opening files (web + iOS):** Word / Excel / PowerPoint that live under `onedriveRoot` open the same OneDrive item in the native app (`ms-word:` / `ms-excel:` / `ms-powerpoint:` with the SharePoint URL from `onedriveWebRoot`). Desktop from the website, Word/Excel/PPT iOS apps from the phone. Cmd-click, middle-click, and drag-to-tab stay native `<a href>`: Office tiles use the SharePoint URL so the new tab is still that file; HTML / PDF / everything else still uses `/api/education/file` and opens a copy (blob on web, Quick Look on iOS). Project files under `education/<email>/` are never OneDrive, so they stay copies.
+
+Yan’s Mac: `onedriveRoot` is `$HOME/Documents`; `onedriveWebRoot` is the SharePoint Documents URL in `meta.json`; current year folder is `11th Grade`. Visible class folders stay all year: `A. Data Sci 1`, `C. Advanced Calc`, `D. Spanish 4`, `E. US History`, `F. American Lit`, `G. PE Yoga`, `H. Physics`. Hidden until Cmd+Shift+.: `.Independent Study`, `.Advanced Programming AI-ML`, `.Advanced Programming Emergent Topics`, `.Free Period A`, `.Free Period B`. History is F fall / E winter-spring; Lit is E fall / F winter-spring. Those letter swaps live on `class.json` `period` as `{ "fall", "winter", "spring" }` with `"trimester": "year"`. There is no winter-spring shell class. Period letters on the folder names are not always the current period. Class Notebooks are not those grade folders. Do not git-publish OneDrive paths.
 
 **Context file visibility:** dashboard file tiles omit some dropped files; bytes stay in the same folder. Do not delete the file or rename to a dotfile.
 

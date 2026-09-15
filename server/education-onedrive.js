@@ -4,7 +4,7 @@
  */
 
 import { readdir, stat } from "node:fs/promises";
-import { basename, join, resolve, sep } from "node:path";
+import { basename, extname, join, relative, resolve, sep } from "node:path";
 
 const PROPERTY_JSON = new Set([
   "class.json",
@@ -33,6 +33,124 @@ const PERIOD_PREFIX = /^[A-Ha-h]\.\s*/;
 const MAX_DEPTH = 8;
 const MATCH_MIN_SCORE = 55;
 const DEFAULT_UI_HIDDEN_FILES = new Set(["context.md", "deleted.md"]);
+
+/** Word / Excel / PowerPoint. HTML, PDF, and everything else stay copy-open. */
+const OFFICE_SCHEME_BY_EXT = {
+  ".doc": "ms-word",
+  ".docx": "ms-word",
+  ".docm": "ms-word",
+  ".dot": "ms-word",
+  ".dotx": "ms-word",
+  ".dotm": "ms-word",
+  ".xls": "ms-excel",
+  ".xlsx": "ms-excel",
+  ".xlsm": "ms-excel",
+  ".xlsb": "ms-excel",
+  ".xlt": "ms-excel",
+  ".xltx": "ms-excel",
+  ".xltm": "ms-excel",
+  ".xlam": "ms-excel",
+  ".ppt": "ms-powerpoint",
+  ".pptx": "ms-powerpoint",
+  ".pptm": "ms-powerpoint",
+  ".pot": "ms-powerpoint",
+  ".potx": "ms-powerpoint",
+  ".potm": "ms-powerpoint",
+  ".pps": "ms-powerpoint",
+  ".ppsx": "ms-powerpoint",
+  ".ppsm": "ms-powerpoint",
+};
+
+/**
+ * @param {unknown} name
+ * @returns {string|null}
+ */
+export function officeSchemeForName(name) {
+  const ext = extname(String(name || "")).toLowerCase();
+  return OFFICE_SCHEME_BY_EXT[ext] || null;
+}
+
+/**
+ * SharePoint Documents root from meta.json. https only.
+ * @param {object|null|undefined} meta
+ * @returns {string|null}
+ */
+export function onedriveWebRootFromMeta(meta) {
+  const raw = String(meta?.onedriveWebRoot || "").trim();
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "https:") return null;
+    if (!u.hostname.toLowerCase().includes("sharepoint.com")) return null;
+    return raw.replace(/\/+$/, "");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {object|null|undefined} meta
+ * @returns {{ onedriveRoot?: string, onedriveWebRoot?: string }}
+ */
+export function officeOpenOptsFromMeta(meta) {
+  const onedriveRoot = String(meta?.onedriveRoot || "").trim();
+  const onedriveWebRoot = onedriveWebRootFromMeta(meta);
+  if (!onedriveRoot || !onedriveWebRoot) return {};
+  return { onedriveRoot, onedriveWebRoot };
+}
+
+/**
+ * SharePoint URL for a file under the synced OneDrive folder.
+ * @param {string} absPath
+ * @param {string|null|undefined} onedriveRoot
+ * @param {string|null|undefined} webRoot
+ * @returns {string|null}
+ */
+export function onedriveWebUrlForAbs(absPath, onedriveRoot, webRoot) {
+  const root = String(onedriveRoot || "").trim();
+  const web = String(webRoot || "").trim().replace(/\/+$/, "");
+  const file = String(absPath || "").trim();
+  if (!file || !root || !web) return null;
+  const rel = relative(resolve(root), resolve(file));
+  if (!rel || rel === "." || rel.startsWith("..")) return null;
+  const parts = rel.split(/[/\\]/).filter(Boolean);
+  if (!parts.length) return null;
+  return `${web}/${parts.map(encodeURIComponent).join("/")}`;
+}
+
+/**
+ * Office URI scheme that opens the same cloud item, not a downloaded copy.
+ * @param {string|null|undefined} webUrl
+ * @param {unknown} name
+ * @returns {string|null}
+ */
+export function officeOpenUri(webUrl, name) {
+  const scheme = officeSchemeForName(name);
+  const url = String(webUrl || "").trim();
+  if (!scheme || !url) return null;
+  return `${scheme}:ofe|u|${encodeURIComponent(url)}`;
+}
+
+/**
+ * Attach webUrl + officeUri when this is an Office file on OneDrive.
+ * HTML / PDF / other types stay untouched so clients keep copy-open.
+ * @param {object} row
+ * @param {string} absPath
+ * @param {{ onedriveRoot?: string, onedriveWebRoot?: string }} [opts]
+ */
+export function attachOfficeOpenFields(row, absPath, opts = {}) {
+  if (!row || String(row.kind || "file") === "folder") return row;
+  const webUrl = onedriveWebUrlForAbs(
+    absPath,
+    opts.onedriveRoot,
+    opts.onedriveWebRoot
+  );
+  const officeUri = officeOpenUri(webUrl, row.name);
+  if (!webUrl || !officeUri) return row;
+  row.webUrl = webUrl;
+  row.officeUri = officeUri;
+  return row;
+}
 
 const NAME_ALIASES = [
   [/\bunited states\b/g, "us"],
@@ -401,6 +519,8 @@ function isHiddenName(name, hiddenSet, visibleSet) {
  *   depth?: number,
  *   hiddenNames?: Set<string>|string[],
  *   visibleNames?: Set<string>|string[],
+ *   onedriveRoot?: string,
+ *   onedriveWebRoot?: string,
  * }} [opts]
  * @returns {Promise<object[]>}
  */
@@ -464,6 +584,8 @@ export async function listOnedriveTree(dir, opts = {}) {
           depth: depth + 1,
           hiddenNames: hiddenSet,
           visibleNames: visibleSet,
+          onedriveRoot: opts.onedriveRoot,
+          onedriveWebRoot: opts.onedriveWebRoot,
         });
         out.push({
           name: entry.name,
@@ -478,15 +600,21 @@ export async function listOnedriveTree(dir, opts = {}) {
         continue;
       }
       if (!entry.isFile() && !st.isFile()) continue;
-      out.push({
-        name: entry.name,
-        kind: "file",
-        source: "onedrive",
-        path: rel,
-        size: st.size,
-        mtime,
-        mtimeMs,
-      });
+      out.push(
+        attachOfficeOpenFields(
+          {
+            name: entry.name,
+            kind: "file",
+            source: "onedrive",
+            path: rel,
+            size: st.size,
+            mtime,
+            mtimeMs,
+          },
+          abs,
+          opts
+        )
+      );
     } catch {
       /* skip unreadable */
     }

@@ -256,6 +256,30 @@ describe("isSafeContextFileName", () => {
   });
 });
 
+describe("listContextFiles office open", () => {
+  it("attaches SharePoint URLs to Office files only", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "edu-office-"));
+    await writeFile(join(dir, "quotes.html"), "<h1>q</h1>");
+    await writeFile(join(dir, "notes.docx"), "doc");
+    const web =
+      "https://contoso-my.sharepoint.com/personal/yan_contoso_org/Documents";
+    const files = await listContextFiles(dir, {
+      onedriveRoot: dir,
+      onedriveWebRoot: web,
+    });
+    const html = files.find((f) => f.name === "quotes.html");
+    const docx = files.find((f) => f.name === "notes.docx");
+    assert.equal(html.webUrl, undefined);
+    assert.equal(html.officeUri, undefined);
+    assert.equal(docx.webUrl, `${web}/notes.docx`);
+    assert.equal(
+      docx.officeUri,
+      `ms-word:ofe|u|${encodeURIComponent(`${web}/notes.docx`)}`
+    );
+    await rm(dir, { recursive: true, force: true });
+  });
+});
+
 describe("sortEducationProjects", () => {
   it("parses projectsTop names lowercase and skips paths", () => {
     assert.deepEqual(

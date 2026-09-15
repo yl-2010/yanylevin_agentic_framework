@@ -20,6 +20,11 @@ import {
   sanitizeFinderFolderName,
   uniqueFinderFolderName,
   resolveOnedriveAbsolutePath,
+  officeSchemeForName,
+  onedriveWebRootFromMeta,
+  onedriveWebUrlForAbs,
+  officeOpenUri,
+  officeOpenOptsFromMeta,
 } from "./education-onedrive.js";
 
 describe("gradeDirFromMeta", () => {
@@ -383,5 +388,102 @@ describe("classObjectFinderName", () => {
       uniqueFinderFolderName("Survey", ["survey"], "survey"),
       "Survey"
     );
+  });
+});
+
+describe("office open URLs", () => {
+  const root = "/Users/yan/OneDrive";
+  const web =
+    "https://contoso-my.sharepoint.com/personal/yan_contoso_org/Documents";
+
+  it("maps Word Excel PowerPoint only", () => {
+    assert.equal(officeSchemeForName("Summer Reading.docx"), "ms-word");
+    assert.equal(officeSchemeForName("youtube data practice.xlsx"), "ms-excel");
+    assert.equal(officeSchemeForName("interesting dataset.pptx"), "ms-powerpoint");
+    assert.equal(officeSchemeForName("quotes.html"), null);
+    assert.equal(officeSchemeForName("hw ping pong.pdf"), null);
+  });
+
+  it("rejects non-https or non-sharepoint web roots", () => {
+    assert.equal(
+      onedriveWebRootFromMeta({ onedriveWebRoot: web }),
+      web
+    );
+    assert.equal(
+      onedriveWebRootFromMeta({ onedriveWebRoot: web + "/" }),
+      web
+    );
+    assert.equal(
+      onedriveWebRootFromMeta({ onedriveWebRoot: "http://evil.example/x" }),
+      null
+    );
+    assert.equal(
+      onedriveWebRootFromMeta({ onedriveWebRoot: "https://example.com/x" }),
+      null
+    );
+  });
+
+  it("builds a SharePoint URL from the local path", () => {
+    assert.equal(
+      onedriveWebUrlForAbs(
+        join(root, "11th Grade", "F. American Lit", "Summer Reading.docx"),
+        root,
+        web
+      ),
+      `${web}/11th%20Grade/F.%20American%20Lit/Summer%20Reading.docx`
+    );
+    assert.equal(
+      onedriveWebUrlForAbs("/tmp/other.docx", root, web),
+      null
+    );
+  });
+
+  it("builds an Office URI for the same cloud item", () => {
+    const url = `${web}/11th%20Grade/H.%20Physics/ball%20drop%20writeup.docx`;
+    assert.equal(
+      officeOpenUri(url, "ball drop writeup.docx"),
+      `ms-word:ofe|u|${encodeURIComponent(url)}`
+    );
+    assert.equal(officeOpenUri(url, "quotes.html"), null);
+  });
+
+  it("needs both the local folder and the SharePoint root", () => {
+    const opts = officeOpenOptsFromMeta({
+      onedriveRoot: root,
+      onedriveWebRoot: web,
+    });
+    assert.equal(opts.onedriveRoot, root);
+    assert.equal(opts.onedriveWebRoot, web);
+    assert.deepEqual(officeOpenOptsFromMeta({ onedriveRoot: root }), {});
+  });
+
+  it("attaches office fields only to Office files in listOnedriveTree", async () => {
+    const dir = join(tmpdir(), `edu-office-${Date.now()}`);
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, "notes.docx"), "doc");
+    await writeFile(join(dir, "quotes.html"), "html");
+    await mkdir(join(dir, "hw scans"), { recursive: true });
+    await writeFile(join(dir, "hw scans", "sheet.xlsx"), "xls");
+    const rows = await listOnedriveTree(dir, {
+      onedriveRoot: dir,
+      onedriveWebRoot: web,
+    });
+    const docx = rows.find((r) => r.name === "notes.docx");
+    const html = rows.find((r) => r.name === "quotes.html");
+    const folder = rows.find((r) => r.name === "hw scans");
+    const xlsx = folder?.files?.find((f) => f.name === "sheet.xlsx");
+    assert.equal(docx.webUrl, `${web}/notes.docx`);
+    assert.equal(
+      docx.officeUri,
+      `ms-word:ofe|u|${encodeURIComponent(`${web}/notes.docx`)}`
+    );
+    assert.equal(html.webUrl, undefined);
+    assert.equal(html.officeUri, undefined);
+    assert.equal(xlsx?.webUrl, `${web}/hw%20scans/sheet.xlsx`);
+    assert.equal(
+      xlsx?.officeUri,
+      `ms-excel:ofe|u|${encodeURIComponent(`${web}/hw%20scans/sheet.xlsx`)}`
+    );
+    await rm(dir, { recursive: true, force: true });
   });
 });

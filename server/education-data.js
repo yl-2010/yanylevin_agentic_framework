@@ -21,6 +21,8 @@ import {
   objectFolderPaths,
   resolveOnedriveAbsolutePath,
   statOnedriveFile,
+  attachOfficeOpenFields,
+  officeOpenOptsFromMeta,
 } from "./education-onedrive.js";
 import {
   canonicalizeEmail,
@@ -377,6 +379,8 @@ async function readProjectsOpened(root) {
  *   topNames?: string[]|Set<string>,
  *   bottomNames?: string[]|Set<string>,
  *   skipPin?: boolean,
+ *   onedriveRoot?: string,
+ *   onedriveWebRoot?: string,
  * }} [opts]
  * @returns {Promise<{ name: string, size: number, mtime: string, kind: string, source: string }[]>}
  */
@@ -417,13 +421,19 @@ export async function listContextFiles(dir, opts = {}) {
   for (const n of visibleSet) hiddenSet.delete(n);
   const visible = out
     .filter((f) => !hiddenSet.has(f.name.toLowerCase()))
-    .map(({ name, size, mtime }) => ({
-      name,
-      size,
-      mtime,
-      kind: "file",
-      source: "education",
-    }));
+    .map(({ name, size, mtime }) =>
+      attachOfficeOpenFields(
+        {
+          name,
+          size,
+          mtime,
+          kind: "file",
+          source: "education",
+        },
+        join(dir, name),
+        opts
+      )
+    );
   if (opts?.skipPin) return visible;
   return pinContextFileOrder(visible, opts?.topNames, opts?.bottomNames);
 }
@@ -1101,7 +1111,12 @@ export function stripTodoTagPrefix(name) {
 async function loadObjectFolder(
   parentDir,
   kind,
-  { includeFixtures = false, classId = null, projectId = null } = {}
+  {
+    includeFixtures = false,
+    classId = null,
+    projectId = null,
+    officeOpen = {},
+  } = {}
 ) {
   const ids = await listDirs(parentDir);
   const fileName = kind === "todo" ? "todo.json" : "date.json";
@@ -1132,7 +1147,10 @@ async function loadObjectFolder(
       if (typeof item.name === "string") item.name = stripTodoTagPrefix(item.name);
     }
     if (!includeFixtures && isFixture(item)) continue;
-    item.files = await listContextFiles(objectDir, contextFileListOpts(props));
+    item.files = await listContextFiles(objectDir, {
+      ...contextFileListOpts(props),
+      ...officeOpen,
+    });
     out.push(item);
   }
   return out;
@@ -1604,12 +1622,15 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
   const schedule = (await readJsonFile(join(root, "schedule.json"))) || {};
   const todayKey = scheduleTodayKey(schedule);
   const panelKeys = includeFixtures ? [] : uiPanelDateKeys(schedule, todayKey);
+  const officeOpen = officeOpenOptsFromMeta(meta);
 
   const todos = await loadObjectFolder(join(root, "todos"), "todo", {
     includeFixtures,
+    officeOpen,
   });
   const dates = await loadObjectFolder(join(root, "dates"), "date", {
     includeFixtures,
+    officeOpen,
   });
 
   const classEntries = await listClassEntriesForRoot(root);
@@ -1646,12 +1667,17 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
     const classTodos = await loadClassScopedObjects(entry, "todo", {
       includeFixtures,
       classId,
+      officeOpen,
     });
     const classDates = await loadClassScopedObjects(entry, "date", {
       includeFixtures,
       classId,
+      officeOpen,
     });
-    const fileOpts = contextFileListOpts(props);
+    const fileOpts = {
+      ...contextFileListOpts(props),
+      ...officeOpen,
+    };
     const eduFiles = await listContextFiles(classDir, {
       ...fileOpts,
       skipPin: true,
@@ -1663,6 +1689,7 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
       driveFiles = await listOnedriveTree(join(gradeDir, driveFolder), {
         hiddenNames: fileOpts.hiddenNames,
         visibleNames: fileOpts.visibleNames,
+        ...officeOpen,
       });
     }
     const classFiles = pinContextFileOrder(
@@ -1717,17 +1744,17 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
     const projectTodos = await loadObjectFolder(
       join(projectDir, "todos"),
       "todo",
-      { includeFixtures, projectId }
+      { includeFixtures, projectId, officeOpen }
     );
     const projectDates = await loadObjectFolder(
       join(projectDir, "dates"),
       "date",
-      { includeFixtures, projectId }
+      { includeFixtures, projectId, officeOpen }
     );
-    const projectFiles = await listContextFiles(
-      projectDir,
-      contextFileListOpts(props)
-    );
+    const projectFiles = await listContextFiles(projectDir, {
+      ...contextFileListOpts(props),
+      ...officeOpen,
+    });
     projects.push({
       ...project,
       _birthMs: birthMs,

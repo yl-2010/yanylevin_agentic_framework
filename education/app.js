@@ -1889,6 +1889,19 @@
           source: f?.source === "onedrive" ? "onedrive" : undefined,
           path: f?.path,
         });
+        const officeUri = String(f?.officeUri || "").trim();
+        const webUrl = String(f?.webUrl || "").trim();
+        if (officeUri && webUrl) {
+          return `<a class="edu-file-tile" href="${escapeHtml(
+            webUrl
+          )}" target="_blank" rel="noopener noreferrer" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
+            filterId
+          )}" data-edu-office="${escapeHtml(officeUri)}" title="${escapeHtml(
+            name
+          )}"><span class="edu-file-name">${escapeHtml(
+            name
+          )}</span></a>`;
+        }
         return `<a class="edu-file-tile" href="/api/education/file?${escapeHtml(
           qs
         )}" target="_blank" rel="noopener noreferrer" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
@@ -3030,6 +3043,21 @@
           if (kids) kids.hidden = false;
         }
         queueMicrotask(() => window.reinitLiquidGlass?.());
+        return;
+      }
+
+      const officeBtn = t.closest?.("[data-edu-office]");
+      if (officeBtn) {
+        if (!isUnmodifiedLeftClick(event)) return;
+        event.preventDefault();
+        const uri = officeBtn.getAttribute("data-edu-office");
+        if (!uri) return;
+        const a = document.createElement("a");
+        a.href = uri;
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
         return;
       }
 
