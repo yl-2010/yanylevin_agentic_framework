@@ -600,6 +600,18 @@ export async function resolveContextFile(email, opts) {
     st = await stat(absFile);
   } catch (err) {
     if (err?.code === "ENOENT") {
+      if (scope === "class" && id) {
+        try {
+          return await resolveOnedriveContextFile(root, {
+            scope: "class",
+            id,
+            name: fileName,
+            path: fileName,
+          });
+        } catch {
+          /* still missing */
+        }
+      }
       const missing = new Error("file not found");
       missing.status = 404;
       throw missing;
@@ -607,6 +619,18 @@ export async function resolveContextFile(email, opts) {
     throw err;
   }
   if (!st.isFile()) {
+    if (scope === "class" && id) {
+      try {
+        return await resolveOnedriveContextFile(root, {
+          scope: "class",
+          id,
+          name: fileName,
+          path: fileName,
+        });
+      } catch {
+        /* still missing */
+      }
+    }
     const err = new Error("file not found");
     err.status = 404;
     throw err;
