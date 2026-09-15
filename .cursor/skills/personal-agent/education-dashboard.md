@@ -37,11 +37,20 @@ OneDrive (Yan, `meta.json` onedriveRoot + gradeFolder, currently `11th Grade`):
     .education/                   # Finder-hidden. class.json + CONTEXT.md only
       class.json
       CONTEXT.md
-    <todoId>/todo.json + that todo's files   # .<todoId>/ when hidden (OneDrive syncs the rename)
-    <dateId>/date.json + that date's files
+    <Finder name>/todo.json + that todo's files   # leading-dot when hidden (OneDrive syncs the rename)
+    <Finder name>/date.json + that date's files
 ```
 
-**Hard rule:** exactly one properties JSON per object folder. New fields = new keys in that JSON, never sidecar property files. Dropped context files sit directly in the object folder (alongside the JSON) — no `context/` subfolder. **Yan classes live on OneDrive**, not under `education/<email>/classes/` (that tree only keeps `_example-dummy`). `class.json` and `CONTEXT.md` stay in `.education/`. Every class todo and date is a folder directly under the visible class folder (`H. Physics/hw-ping-pong-vacuum-cannon-ws/todo.json`), with its files in that same folder. Do not leave school files at the class folder root if they belong to a todo. Finder hides a todo/date folder until it is relevant (opened on web/iOS, or HW/CW the period before due, QA/MA two periods before due) and hides it again once a completed todo has moved into the class-view Completed box. Overdue open todos stay visible. If a still-future folder already has a user or agent-request file (worksheet, quotes.html, anything besides todo.json/date.json, CONTEXT.md, deleted.md, or junk), show it early. Do not early-show Completed folders or undated todos that only unhide when opened. Hide by renaming to `.todoId` so OneDrive syncs it to every Mac. Cmd+Shift+. still shows those folders. Do not use `chflags hidden`. OneDrive does not copy that flag, and it stalls the Mac client. Projects and user-level objects stay under `education/<email>/`. Alex has no `onedriveRoot`; his classes stay in `education/you@example.com/classes/` with nested `todos/` + `dates/`.
+**Hard rule:** exactly one properties JSON per object folder. New fields = new keys in that JSON, never sidecar property files. Dropped context files sit directly in the object folder (alongside the JSON) — no `context/` subfolder. **Yan classes live on OneDrive**, not under `education/<email>/classes/` (that tree only keeps `_example-dummy`). `class.json` and `CONTEXT.md` stay in `.education/`. Every class todo and date is a folder directly under the visible class folder (`H. Physics/HW Sep 15 Ping Pong Vacuum Cannon WS/todo.json`), with its files in that same folder. Do not leave school files at the class folder root if they belong to a todo. Finder hides a todo/date folder until it is relevant (opened on web/iOS, or HW/CW the period before due, QA/MA two periods before due) and hides it again once a completed todo has moved into the class-view Completed box. Overdue open todos stay visible. If a still-future folder already has a user or agent-request file (worksheet, quotes.html, anything besides todo.json/date.json, CONTEXT.md, deleted.md, or junk), show it early. Do not early-show Completed folders or undated todos that only unhide when opened. Hide by renaming to a leading-dot folder (`.HW Sep 15 Ping Pong Vacuum Cannon WS`) so OneDrive syncs it to every Mac. Cmd+Shift+. still shows those folders. Do not use `chflags hidden`. OneDrive does not copy that flag, and it stalls the Mac client. Projects and user-level objects stay under `education/<email>/`. Alex has no `onedriveRoot`; his classes stay in `education/you@example.com/classes/` with nested `todos/` + `dates/`.
+
+**OneDrive Finder names (class todos/dates only):** spaces, not kebab hyphens. Web and iOS still paint `todo.json` `name` + `tag` (or `date.json` `name`). The due date is Finder-only.
+
+- Todos: `TAG Mon D Name` → `HW Sep 15 Comparing Motion Diagrams`. Skip `TAG` when there is no CW/HW/QA/MA. Skip `Mon D` when there is no `dueDate`. Day has no leading zero (`Sep 2`).
+- Dates: `Mon D Name` → `Aug 27 Advisory conference`. Skip the date part when `date` is missing.
+- Illegal filename characters (`/ : " ? *` and similar) become spaces. A ` - ` dash between words becomes a space. Keep hyphens inside words (`in-class`, `14-15`, `Write-up`).
+- Unique within that class folder. Extra copies Yan asked for: `HW Sep 15 Essay (2)`.
+- Express visibility sync renames kebab leftovers and updates the folder when tag / due / name change. Create with this name so Finder looks right immediately.
+- Projects, user-level, and Alex classes are not Yan's school OneDrive. Those folder ids can stay unique slugs (spaces are fine; do not kebab for the sake of kebab).
 
 **OneDrive class folders (web + iOS class page):** Express lists the live `onedriveRoot` / `gradeFolder` / `onedriveFolder` tree and skips todo/date object folders (those files show on the todo/date page). Bytes stay in OneDrive. Nested leftover folders still expand as tiles. `.education/` is omitted from tiles. `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` still apply by basename.
 
@@ -103,16 +112,16 @@ Copy the shape of `education/you@example.com/dates/fall-orientation-day-1/date.j
 
 Todos are distinct by the triple **`name` + parent + `dueDate`**:
 
-- **parent** = the parent class folder (OneDrive `<onedriveFolder>/<todoId>/` for Yan; `classes/<classId>/todos/…` for Alex / fixtures), project folder (`projects/<projectId>/todos/…`), or **user-level** (`todos/…`)
+- **parent** = the parent class folder (OneDrive `<onedriveFolder>/<Finder name>/` for Yan; `classes/<classId>/todos/…` for Alex / fixtures), project folder (`projects/<projectId>/todos/…`), or **user-level** (`todos/…`)
 - **`dueDate`** = the `YYYY-MM-DD` string, or **none** when omitted / empty (`dueTime` alone does **not** make them distinct)
 - Same name under different parents, or same name/parent with different due dates → **different todos** (create both as asked)
-- Folder `todoId` is only a path slug — still keep it unique **within that parent folder** (never overwrite). Prefer a slug of the final `name`
+- Folder `todoId` is the on-disk folder name — still keep it unique **within that parent folder** (never overwrite). On OneDrive classes, that name is the Finder string above (`HW Sep 15 Title`), not a kebab of the title.
 
 **Before creating a todo**, scan existing todos in that same class / project (or user-level). If another already has the **same `name` + same parent + same `dueDate` (including both none)**, or a **similar name** on that same parent + dueDate (same rules as dates: lowercase, strip years, advisor/advisory, singular/plural):
 
 1. **Update that folder** unless Yan asked for a second copy of the same work
 2. The ` (2)` / ` (3)` suffix is **only** when Yan asked for another copy with the same triple. Then: do **not** overwrite; append ` (2)` first; **if `Name (2)` already exists with that same parent + dueDate, use ` (3)`**; if that exists too, ` (4)`, and so on — always the smallest unused ` (N)` (e.g. `Essay` → `Essay (2)` → `Essay (3)`)
-3. Use a matching unique folder id (e.g. `essay-2`, `essay-3`)
+3. Use a matching unique folder name (OneDrive: `HW Sep 15 Essay (2)`; elsewhere a unique folder id is fine)
 4. Brief reply may mention the rename (“Added Essay (3) due Fri”)
 
 Nightly actions never invents ` (2)`. It updates or skips.
@@ -131,7 +140,7 @@ Same event if same **parent** + same **`date`** + **similar name**:
 
 If it matches: **update that folder**. Never mint a new slug. `Advisory conference` and `Advisor conferences 2026–27` on 2026-08-27 are one event. Last year's first day does not match this year's: the `date` field differs.
 
-Folder `dateId` stays unique within that parent folder. Prefer a slug of the final `name`.
+Folder `dateId` stays unique within that parent folder. On OneDrive classes, that is the Finder name (`Aug 27 Advisory conference`), not a kebab of the title.
 
 ### Manually deleted (`deleted.md`)
 
@@ -184,7 +193,7 @@ Call `open_education_page` when the user asks about **one** dashboard object, sa
 The jump happens **once**, when your final reply for this turn lands. Not when you call the tool. File writes and chat polls do not replay it. Last call in the turn wins. A later turn can jump again (same page or a different one) by calling the tool again.
 
 - `view`: `home` | `class` | `project` | `todo` | `date` | `capsule`
-- `todoId` / `dateId` / `classId` / `projectId` are **folder slugs**, not display names. Class todos need `classId`. Project todos need `projectId`. Capsules need `todoId` + `capsuleId`.
+- `todoId` / `dateId` / `classId` / `projectId` are **folder names on disk**, not the UI title. Class OneDrive todos look like `HW Sep 15 Title`. Class todos need `classId`. Project todos need `projectId`. Capsules need `todoId` + `capsuleId`.
 - After a create, call once the folder exists so clients can resolve it.
 - Skip if Live context is already that page. Skip lists of many items. Skip mail, news compile, fitness, and anything outside `/education`.
 - You can call it mid-turn (after you know the id). The page still waits until the turn ends. Do not mention the tool or tell them to refresh.
@@ -197,7 +206,7 @@ Users can attach files in Personal Agent chat (web: drag onto /education compose
 - Inspect attachments as needed (images may also be shown inline to the model)
 - When an attachment belongs in long-term dashboard context, **copy identical bytes** into the matching place using the **original filename**:
   - **Class** (or a leftover file that should appear on the class page): that class’s visible OneDrive folder (`meta.json` `onedriveRoot` + `gradeFolder` + `class.json` `onedriveFolder`). Do not write under `education/<email>/classes/`. Prefer the todo folder when the file belongs to a todo.
-  - **Class todo / date:** that class’s `<onedriveFolder>/<id>/` next to the JSON. Not `.education/todos/`.
+  - **Class todo / date:** that class’s `<onedriveFolder>/<Finder name>/` next to the JSON. Not `.education/todos/`.
   - **Project / user-level:** the object folder alongside the JSON (no `context/` subfolder), same as before
 - User-level / “main education folder” = `education/<email>/` (next to `meta.json` / `schedule.json`)
 - Four11 / class-schedule cards (Yan or classmates): parse into `schedule.json`, `brain/identity-school.md`, and `people/<slug>/schedule.md`. Do **not** copy the original PDF/screenshot into the user-level education folder

@@ -480,8 +480,8 @@ export function normalizeEducationNavigate(raw) {
   };
   const classId = str("classId");
   const projectId = str("projectId");
-  const todoId = str("todoId");
-  const dateId = str("dateId");
+  const todoId = str("todoId", 200);
+  const dateId = str("dateId", 200);
   const capsuleId = str("capsuleId");
   if (view === "class" && !classId) return null;
   if (view === "project" && !projectId) return null;
@@ -640,9 +640,10 @@ function openEducationPageTool(sid, session) {
           projectId: { type: "string", description: "Project folder id" },
           todoId: {
             type: "string",
-            description: "Todo folder slug (not the display name)",
+            description:
+              "Todo folder name on disk (OneDrive class folders look like HW Sep 15 Title, not the UI title alone)",
           },
-          dateId: { type: "string", description: "Date folder slug" },
+          dateId: { type: "string", description: "Date folder name on disk" },
           capsuleId: { type: "string", description: "Briefing capsule id" },
         },
         required: ["view"],
@@ -1082,10 +1083,10 @@ function normalizeUiContext(raw) {
   str("period", 8);
   str("projectId", 120);
   str("projectName", 160);
-  str("todoId", 120);
+  str("todoId", 200);
   str("todoName", 200);
   str("tag", 8);
-  str("dateId", 120);
+  str("dateId", 200);
   str("dateName", 200);
   str("date", 32);
   str("capsuleId", 120);

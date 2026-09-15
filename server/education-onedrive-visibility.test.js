@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   objectFolderHasUserFiles,
+  renameObjectFolder,
   setObjectFolderHidden,
 } from "./education-onedrive-visibility.js";
 
@@ -22,6 +23,23 @@ describe("setObjectFolderHidden", () => {
     assert.equal(shown, visible);
     await stat(join(visible, "todo.json"));
     await assert.rejects(stat(join(parent, ".hw-foo")));
+    await rm(parent, { recursive: true, force: true });
+  });
+
+  it("hides a Finder name that has spaces", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "edu-hide-space-"));
+    const visible = join(parent, "HW Sep 15 Foo");
+    await mkdir(visible);
+    await writeFile(join(visible, "todo.json"), "{}\n");
+    const hiddenPath = await setObjectFolderHidden(
+      parent,
+      "HW Sep 15 Foo",
+      true
+    );
+    assert.equal(hiddenPath, join(parent, ".HW Sep 15 Foo"));
+    await stat(join(parent, ".HW Sep 15 Foo", "todo.json"));
+    const shown = await setObjectFolderHidden(parent, "HW Sep 15 Foo", false);
+    assert.equal(shown, visible);
     await rm(parent, { recursive: true, force: true });
   });
 });
@@ -46,5 +64,25 @@ describe("objectFolderHasUserFiles", () => {
     await writeFile(join(dir, "notes", "quotes.html"), "<p></p>");
     assert.equal(await objectFolderHasUserFiles(dir), true);
     await rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe("renameObjectFolder", () => {
+  it("renames a hidden kebab folder to a spaced Finder name", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "edu-rename-"));
+    const hidden = join(parent, ".hw-comparing-motion-diagrams");
+    await mkdir(hidden);
+    await writeFile(join(hidden, "todo.json"), "{}\n");
+    const id = await renameObjectFolder(
+      parent,
+      "hw-comparing-motion-diagrams",
+      "HW Sep 15 Comparing Motion Diagrams"
+    );
+    assert.equal(id, "HW Sep 15 Comparing Motion Diagrams");
+    await stat(
+      join(parent, ".HW Sep 15 Comparing Motion Diagrams", "todo.json")
+    );
+    await assert.rejects(stat(hidden));
+    await rm(parent, { recursive: true, force: true });
   });
 });

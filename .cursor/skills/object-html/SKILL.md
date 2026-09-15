@@ -19,8 +19,8 @@ Public yanylevin.com pages are `.cursor/skills/yanylevin-webpage-create/SKILL.md
 
 **Canonical clone.** Copy chrome from these, do not invent a new look:
 
-- Layout + light tokens: `$HOME/Documents/11th Grade/F. American Lit/summer-reading-when-the-emperor-was-divine/quotes.html`
-- Dark tokens + optional good/bad marks: `$HOME/Documents/11th Grade/D. Spanish 4/hw-8-9-de-septiembre-cuestionario-inicio-de-ano/errores.html`
+- Layout + light tokens: `$HOME/Documents/11th Grade/F. American Lit/.HW Sep 9 Summer Read/quotes.html`
+- Dark tokens + optional good/bad marks: `$HOME/Documents/11th Grade/D. Spanish 4/.HW Sep 8 8-9 de septiembre CUESTIONARIO inicio de año/errores.html`
 
 Do not run the frontend-design unique-aesthetic playbook. No Inter, no purple, no new display font.
 
@@ -30,8 +30,8 @@ Apply Unslop to headings and agent-written copy. Quoted source text can keep the
 
 | Ask | File |
 |---|---|
-| Quotes on a class todo | that class’s OneDrive `<todoId>/quotes.html` |
-| Errors on a class todo | `…/<todoId>/errores.html` (or `errors.html`) |
+| Quotes on a class todo | that class’s OneDrive Finder folder `/quotes.html` (`HW Sep 15 Title/quotes.html`) |
+| Errors on a class todo | `…/<Finder name>/errores.html` (or `errors.html`) |
 | Notes on a project | `education/<email>/projects/<id>/notes.html` |
 | Anything on a **class** page | the visible class OneDrive folder (e.g. `…/11th Grade/H. Physics/quotes.html`). Not `.education/`, not `education/<email>/classes/`. |
 

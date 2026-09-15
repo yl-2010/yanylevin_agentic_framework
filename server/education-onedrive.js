@@ -97,6 +97,108 @@ export function objectFolderPaths(parent, id) {
   return [join(parent, clean), join(parent, `.${clean}`)];
 }
 
+const FINDER_NAME_MAX = 180;
+const FINDER_MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+const FINDER_TODO_TAGS = new Set(["CW", "HW", "QA", "MA"]);
+const FINDER_TAG_PREFIX = /^(CW|HW|QA|MA)(?:\s*:\s*|\s+)/i;
+const FINDER_ILLEGAL = /[<>:"/\\|?*\u0000-\u001f]/g;
+
+/**
+ * `YYYY-MM-DD` → `Sep 15`. Empty when the date is missing or invalid.
+ * @param {unknown} isoDate
+ */
+export function formatFinderShortDate(isoDate) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(isoDate || "").trim());
+  if (!m) return "";
+  const month = FINDER_MONTHS[Number(m[2]) - 1];
+  const day = Number(m[3]);
+  if (!month || day < 1 || day > 31) return "";
+  return `${month} ${day}`;
+}
+
+/**
+ * Finder/OneDrive-safe folder basename. Spaces between words, no kebab.
+ * Underscores only if a space is not legal there (leading/trailing already
+ * stripped). Illegal Windows/OneDrive characters become spaces.
+ * @param {unknown} name
+ */
+export function sanitizeFinderFolderName(name) {
+  let s = String(name || "")
+    .replace(/[\u2013\u2014]/g, " ")
+    .replace(/"/g, "")
+    .replace(FINDER_ILLEGAL, " ")
+    .replace(/\s+-\s+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  s = s.replace(/^\.+/, "").replace(/\.+$/, "").trim();
+  if (!s || s === "." || s === "..") return "";
+  if (s.length > FINDER_NAME_MAX) {
+    const cut = s.slice(0, FINDER_NAME_MAX).replace(/ \S*$/, "").trim();
+    s = cut.length >= 24 ? cut : s.slice(0, FINDER_NAME_MAX).trim();
+  }
+  return s;
+}
+
+/**
+ * OneDrive class todo/date folder name as it should appear in Finder.
+ * Todos: `HW Sep 15 Assignment Name`. Dates: `Sep 15 Event Name`.
+ * Hide is a leading dot on this same string. App/web titles still come
+ * from JSON `name` + `tag`, not this folder.
+ * @param {"todo"|"date"} kind
+ * @param {object|null|undefined} props
+ */
+export function classObjectFinderName(kind, props) {
+  const tagRaw =
+    kind === "todo" ? String(props?.tag || "").trim().toUpperCase() : "";
+  const tagPart = FINDER_TODO_TAGS.has(tagRaw) ? tagRaw : "";
+  const dateIso = kind === "todo" ? props?.dueDate : props?.date;
+  const datePart = formatFinderShortDate(dateIso);
+  const rawName = String(props?.name || props?.title || "").trim();
+  const stripped = rawName.replace(FINDER_TAG_PREFIX, "").trim() || rawName;
+  const namePart = sanitizeFinderFolderName(stripped);
+  const joined = sanitizeFinderFolderName(
+    [tagPart, datePart, namePart].filter(Boolean).join(" ")
+  );
+  return joined || "Untitled";
+}
+
+/**
+ * Unique basename within a parent. ` (2)` / ` (3)` if taken.
+ * `currentId` is the folder we are renaming, so it may keep its name.
+ * @param {string} desired
+ * @param {Iterable<string>} occupied
+ * @param {string} [currentId]
+ */
+export function uniqueFinderFolderName(desired, occupied, currentId = "") {
+  const base = sanitizeFinderFolderName(desired) || "Untitled";
+  const currentKey = String(currentId || "").toLowerCase();
+  const taken = new Set();
+  for (const id of occupied || []) {
+    const key = String(id || "").toLowerCase();
+    if (!key || key === currentKey) continue;
+    taken.add(key);
+  }
+  if (!taken.has(base.toLowerCase())) return base;
+  for (let n = 2; n < 100; n++) {
+    const candidate = sanitizeFinderFolderName(`${base} (${n})`);
+    if (candidate && !taken.has(candidate.toLowerCase())) return candidate;
+  }
+  return sanitizeFinderFolderName(`${base} (${Date.now()})`) || base;
+}
+
 /**
  * Dashboard object tree inside a class OneDrive folder (`class.json`, todos, dates).
  * Hidden in Finder until Cmd+Shift+.

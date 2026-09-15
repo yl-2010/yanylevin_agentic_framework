@@ -4,10 +4,16 @@ extension APIClient {
     static func makeURL(path: String, query: [URLQueryItem] = []) -> URL? {
         let trimmed = path.hasPrefix("/") ? String(path.dropFirst()) : path
         let root = APIConfig.usesMacAPI(trimmed) ? APIConfig.apiBaseURL : APIConfig.siteBaseURL
-        let base = root.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard var components = URLComponents(string: "\(base)/\(trimmed)") else {
+        guard var components = URLComponents(url: root, resolvingAgainstBaseURL: false) else {
             return nil
         }
+        let encodedRel = trimmed.split(separator: "/", omittingEmptySubsequences: false).map { part in
+            String(part).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String(part)
+        }.joined(separator: "/")
+        let basePath = components.path.hasSuffix("/")
+            ? String(components.path.dropLast())
+            : components.path
+        components.percentEncodedPath = "\(basePath)/\(encodedRel)"
         if !query.isEmpty {
             components.queryItems = query
         }

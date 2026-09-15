@@ -15,6 +15,10 @@ import {
   onedriveNameScore,
   objectDirId,
   objectFolderPaths,
+  classObjectFinderName,
+  formatFinderShortDate,
+  sanitizeFinderFolderName,
+  uniqueFinderFolderName,
   resolveOnedriveAbsolutePath,
 } from "./education-onedrive.js";
 
@@ -288,10 +292,96 @@ describe("objectDirId", () => {
     assert.equal(objectDirId("._sync"), null);
   });
 
+  it("keeps spaces in Finder names and still strips one leading hide-dot", () => {
+    assert.equal(
+      objectDirId("HW Sep 15 Comparing Motion Diagrams"),
+      "HW Sep 15 Comparing Motion Diagrams"
+    );
+    assert.equal(
+      objectDirId(".HW Sep 15 Comparing Motion Diagrams"),
+      "HW Sep 15 Comparing Motion Diagrams"
+    );
+    assert.deepEqual(
+      objectFolderPaths("/class", "HW Sep 15 Foo"),
+      ["/class/HW Sep 15 Foo", "/class/.HW Sep 15 Foo"]
+    );
+  });
+
   it("lists visible then hidden paths", () => {
     assert.deepEqual(objectFolderPaths("/class", "hw-foo"), [
       "/class/hw-foo",
       "/class/.hw-foo",
     ]);
+  });
+});
+
+describe("classObjectFinderName", () => {
+  it("builds HW Sep 15 Assignment Name for todos", () => {
+    assert.equal(formatFinderShortDate("2026-09-15"), "Sep 15");
+    assert.equal(formatFinderShortDate("2026-09-02"), "Sep 2");
+    assert.equal(formatFinderShortDate(""), "");
+    assert.equal(
+      classObjectFinderName("todo", {
+        name: "Comparing Motion Diagrams",
+        tag: "HW",
+        dueDate: "2026-09-15",
+      }),
+      "HW Sep 15 Comparing Motion Diagrams"
+    );
+  });
+
+  it("strips a tag prefix from the JSON name and drops illegal chars", () => {
+    assert.equal(
+      classObjectFinderName("todo", {
+        name: "HW: Bring a number/stat/visual to class",
+        tag: "HW",
+        dueDate: "2026-11-18",
+      }),
+      "HW Nov 18 Bring a number stat visual to class"
+    );
+    assert.equal(
+      classObjectFinderName("todo", {
+        name: '#F1: Motion in 1-Dimension',
+        tag: "MA",
+        dueDate: "2026-09-25",
+      }),
+      "MA Sep 25 #F1 Motion in 1-Dimension"
+    );
+    assert.equal(
+      sanitizeFinderFolderName(' "When the Emperor Was Divine" '),
+      "When the Emperor Was Divine"
+    );
+  });
+
+  it("omits missing tag or due date and names dates with the event date", () => {
+    assert.equal(
+      classObjectFinderName("todo", {
+        name: "Introduction to Pivot - Ping Pong Vacuum Cannon",
+        tag: "CW",
+      }),
+      "CW Introduction to Pivot Ping Pong Vacuum Cannon"
+    );
+    assert.equal(
+      classObjectFinderName("date", {
+        name: "Advisory conference",
+        date: "2026-08-27",
+      }),
+      "Aug 27 Advisory conference"
+    );
+  });
+
+  it("adds (2) when the Finder name is taken", () => {
+    assert.equal(
+      uniqueFinderFolderName("HW Sep 15 Essay", ["HW Sep 15 Essay"], ""),
+      "HW Sep 15 Essay (2)"
+    );
+    assert.equal(
+      uniqueFinderFolderName("HW Sep 15 Essay", ["HW Sep 15 Essay"], "HW Sep 15 Essay"),
+      "HW Sep 15 Essay"
+    );
+    assert.equal(
+      uniqueFinderFolderName("Survey", ["survey"], "survey"),
+      "Survey"
+    );
   });
 });

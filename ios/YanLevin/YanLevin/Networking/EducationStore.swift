@@ -1038,9 +1038,8 @@ final class EducationStore: ObservableObject {
         }
         lastOpenedProjectId = id
         lastOpenedAt = now
-        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
         _ = try? await APIClient.shared.requestRaw(
-            "api/education/project/\(encoded)/opened",
+            "api/education/project/\(id)/opened",
             method: "POST",
             bearer: token
         )
@@ -1062,10 +1061,8 @@ final class EducationStore: ObservableObject {
             if let projectId, !projectId.isEmpty {
                 query.append(URLQueryItem(name: "projectId", value: projectId))
             }
-            let encodedTodo = todoId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? todoId
-            let encodedCap = capsuleId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? capsuleId
             let _: CapsuleVoteResponse = try await APIClient.shared.request(
-                "api/education/todo/\(encodedTodo)/capsule/\(encodedCap)/vote",
+                "api/education/todo/\(todoId)/capsule/\(capsuleId)/vote",
                 method: "PATCH",
                 body: CapsuleVoteBody(vote: vote, classId: classId, projectId: projectId),
                 bearer: token,

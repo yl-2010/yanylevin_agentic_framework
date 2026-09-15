@@ -1,7 +1,9 @@
 /**
- * Finder hide/show for class todo and date folders on OneDrive.
+ * Finder hide/show and Finder names for class todo and date folders on OneDrive.
  * Hide by renaming to a leading-dot folder. OneDrive syncs the name;
  * macOS `chflags hidden` stays on one Mac and also stalls the client.
+ * Visible names look like `HW Sep 15 Assignment Name` (spaces, due date for
+ * todos). Web and iOS still use JSON `name` + `tag`.
  */
 
 import { execFile } from "node:child_process";
@@ -18,9 +20,11 @@ import {
   userEducationRoot,
 } from "./education-data.js";
 import {
+  classObjectFinderName,
   gradeDirFromMeta,
   objectDirId,
   objectFolderPaths,
+  uniqueFinderFolderName,
 } from "./education-onedrive.js";
 import { canonicalizeEmail, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
 
@@ -155,6 +159,45 @@ export async function setObjectFolderHidden(parent, id, hidden) {
   return null;
 }
 
+/**
+ * Rename a todo/date folder, keeping the leading-dot hide state.
+ * Case-only changes go through a temp name so APFS accepts them.
+ * @param {string} parent
+ * @param {string} fromId
+ * @param {string} toId
+ * @returns {Promise<string|null>} resulting id (no leading dot)
+ */
+export async function renameObjectFolder(parent, fromId, toId) {
+  const fromClean = objectDirId(fromId);
+  const toClean = objectDirId(toId);
+  if (!parent || !fromClean || !toClean) return fromClean || null;
+  if (fromClean === toClean) return fromClean;
+
+  const [fromVis, fromHid] = objectFolderPaths(parent, fromClean);
+  const [toVis, toHid] = objectFolderPaths(parent, toClean);
+  const vis = await dirExists(fromVis);
+  const hid = await dirExists(fromHid);
+  if (!vis && !hid) return fromClean;
+
+  const hidden = hid && !vis;
+  const fromPath = hidden ? fromHid : fromVis;
+  const toPath = hidden ? toHid : toVis;
+  const caseOnly = fromClean.toLowerCase() === toClean.toLowerCase();
+  if (!caseOnly) {
+    if ((await dirExists(toVis)) || (await dirExists(toHid))) return fromClean;
+  }
+
+  if (caseOnly) {
+    const tmpPath = join(parent, `.__yan_rename_${process.hrtime.bigint()}__`);
+    await rename(fromPath, tmpPath);
+    await rename(tmpPath, toPath);
+  } else {
+    await rename(fromPath, toPath);
+  }
+  await clearFinderHiddenFlag(toPath);
+  return toClean;
+}
+
 async function listChildDirs(dir) {
   try {
     const entries = await readdir(dir, { withFileTypes: true });
@@ -263,17 +306,51 @@ export async function revealOpenEducationObject(email, query) {
   return false;
 }
 
-async function syncKind(parent, kind, cls, schedule, now, seen) {
+async function syncKind(
+  parent,
+  kind,
+  cls,
+  schedule,
+  now,
+  seen,
+  { renameFinder = false } = {}
+) {
   const fileName = kind === "todo" ? "todo.json" : "date.json";
-  for (const name of await listChildDirs(parent)) {
-    const id = objectDirId(name);
+  const names = await listChildDirs(parent);
+  const occupied = new Set();
+  for (const name of names) {
+    const oid = objectDirId(name);
+    if (oid) occupied.add(oid);
+  }
+  for (const name of names) {
+    let id = objectDirId(name);
     if (!id || seen.has(id)) continue;
     const jsonPath = join(parent, name, fileName);
     const props = await readJson(jsonPath);
     if (!props) continue;
+    if (renameFinder) {
+      const desired = uniqueFinderFolderName(
+        classObjectFinderName(kind, props),
+        occupied,
+        id
+      );
+      if (desired !== id) {
+        try {
+          const next = await renameObjectFolder(parent, id, desired);
+          if (next && next !== id) {
+            occupied.delete(id);
+            occupied.add(next);
+            id = next;
+          }
+        } catch (err) {
+          console.error("[onedrive-visibility] rename", kind, name, err);
+        }
+      }
+    }
     seen.add(id);
     const obj = { id, ...props };
-    const folderPath = join(parent, name);
+    const [visPath, hidPath] = objectFolderPaths(parent, id);
+    const folderPath = (await dirExists(visPath)) ? visPath : hidPath;
     const hasUserFiles = await objectFolderHasUserFiles(folderPath);
     const visible =
       kind === "todo"
@@ -294,9 +371,13 @@ async function syncClassFolder(entry, cls, schedule, now) {
   const nestedDates = join(entry.objectDir, "dates");
   const seenTodos = new Set();
   const seenDates = new Set();
-  await syncKind(classFolder, "todo", cls, schedule, now, seenTodos);
+  await syncKind(classFolder, "todo", cls, schedule, now, seenTodos, {
+    renameFinder: true,
+  });
   await syncKind(nestedTodos, "todo", cls, schedule, now, seenTodos);
-  await syncKind(classFolder, "date", cls, schedule, now, seenDates);
+  await syncKind(classFolder, "date", cls, schedule, now, seenDates, {
+    renameFinder: true,
+  });
   await syncKind(nestedDates, "date", cls, schedule, now, seenDates);
 }
 
