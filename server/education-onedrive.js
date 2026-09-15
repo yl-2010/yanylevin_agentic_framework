@@ -58,11 +58,50 @@ export function gradeDirFromMeta(meta) {
 }
 
 /**
- * @param {unknown} name
- * @returns {string}
+ * Hidden Finder folder that holds class.json, CONTEXT.md, todos, and dates.
  */
+export const EDUCATION_META_DIR = ".education";
+
+const RESERVED_CLASS_ROOT_DIRS = new Set(["todos", "dates"]);
+
+/**
+ * Dashboard object tree inside a class OneDrive folder (`class.json`, todos, dates).
+ * Hidden in Finder until Cmd+Shift+.
+ * @param {string} gradeDir
+ * @param {string} onedriveFolder
+ */
+export function classObjectDir(gradeDir, onedriveFolder) {
+  return join(gradeDir, onedriveFolder, EDUCATION_META_DIR);
+}
+
+/**
+ * Finder-hidden OneDrive folder name for a class that does not already have one.
+ * @param {object|null|undefined} cls
+ * @param {string} classId
+ */
+export function hiddenOnedriveFolderName(cls, classId) {
+  const id = String(classId || "").trim();
+  if (cls?.freePeriod === true) {
+    const letter = String(cls.period || id.replace(/^free-period-/i, ""))
+      .trim()
+      .toUpperCase()
+      .slice(0, 1);
+    return letter ? `.Free Period ${letter}` : `.Free Period`;
+  }
+  if (id === "us-history-ws") return ".US History WS";
+  if (id === "american-literature-ws") return ".American Literature WS";
+  if (id === "advanced-programming-ai-ml") return ".Advanced Programming AI-ML";
+  if (id === "advanced-programming-emergent-topics") {
+    return ".Advanced Programming Emergent Topics";
+  }
+  const name = String(cls?.name || id).trim() || id;
+  if (id.endsWith("-ws")) return `.${name} WS`;
+  return `.${name}`;
+}
+
 export function normalizeClassFolderName(name) {
   let t = String(name || "").toLowerCase();
+  t = t.replace(/^\.+/, "");
   t = t.replace(PERIOD_PREFIX, "");
   t = t.replace(/&/g, " and ");
   for (const [re, to] of NAME_ALIASES) t = t.replace(re, to);
@@ -102,10 +141,10 @@ export function onedriveNameScore(a, b) {
 export function matchOnedriveFolder(cls, folderNames) {
   const names = Array.isArray(folderNames) ? folderNames.filter(Boolean) : [];
   if (!names.length || !cls || typeof cls !== "object") return null;
-  if (cls.freePeriod === true) return null;
 
   const explicit = String(cls.onedriveFolder || "").trim();
   if (explicit && names.includes(explicit)) return explicit;
+  if (cls.freePeriod === true) return null;
 
   const label = String(cls.name || "").trim();
   if (!label) return null;
@@ -152,12 +191,17 @@ function isIgnorableFsName(name) {
  * @param {string} gradeDir
  * @returns {Promise<string[]>}
  */
-export async function listOnedriveFolderNames(gradeDir) {
+export async function listOnedriveFolderNames(gradeDir, { includeHidden = false } = {}) {
   if (!gradeDir) return [];
   try {
     const entries = await readdir(gradeDir, { withFileTypes: true });
     return entries
-      .filter((e) => e.isDirectory() && !isIgnorableFsName(e.name))
+      .filter((e) => {
+        if (!e.isDirectory()) return false;
+        if (e.name === ".Trash") return false;
+        if (!includeHidden && isIgnorableFsName(e.name)) return false;
+        return true;
+      })
       .map((e) => e.name)
       .sort((a, b) => a.localeCompare(b, "en"));
   } catch (err) {
@@ -226,6 +270,12 @@ export async function listOnedriveTree(dir, opts = {}) {
   const out = [];
   for (const entry of entries) {
     if (isIgnorableFsName(entry.name)) continue;
+    if (
+      depth === 0 &&
+      RESERVED_CLASS_ROOT_DIRS.has(String(entry.name || "").toLowerCase())
+    ) {
+      continue;
+    }
     const safe = isSafeEntryName(entry.name);
     if (!safe) continue;
     if (isHiddenName(entry.name, hiddenSet, visibleSet)) continue;

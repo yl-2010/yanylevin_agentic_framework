@@ -41,11 +41,14 @@ education/you@example.com/.canvas/
   last-agent-sync.json  # written by the nightly runner, not by you
   last-hourly-sync.json # written by the hourly Composer runner
   planner-overrides.json # Express: Canvas planner override ids after a checkoff
-education/you@example.com/classes/<classId>/
+
+OneDrive <gradeFolder>/<onedriveFolder>/.education/
   class.json
   todos/<todoId>/todo.json
   dates/<dateId>/date.json
 ```
+
+Yan class trees live on OneDrive (see education-dashboard.md). Do not write `education/you@example.com/classes/<id>/` except `_example-dummy`.
 
 Dashboard schema: `.cursor/skills/personal-agent/education-dashboard.md`.
 
@@ -55,7 +58,7 @@ When the runner says hourly: **do not** map new classes, **do not** create class
 
 ## Map courses first (nightly / manual only)
 
-1. Read `classes/*/class.json` (skip `_example-dummy`, skip `"freePeriod": true`).
+1. Read each class `.education/class.json` on OneDrive (skip `_example-dummy`, skip `"freePeriod": true`).
 2. Read `course-map.json` if present.
 3. Match Canvas `courses[]` to those folders by name / course code (American Literature, Physics, Spanish 4, Data Science, US History, Calc, programming titles, PE Yoga, Independent Study, and similar). Fetch still asks Canvas for current and future enrollments, then **drops** anything that is not a dashboard class before writing the snapshot (9th/10th-year shells, Class of 2028, EPS Library, Iceland EBC, Graphic Design, clubs, advisory). Update `course-map.json` when you are confident.
 4. **Skip** any leftover Canvas course with no dashboard class. Do not create new class folders from Canvas. Do not store or import extras.

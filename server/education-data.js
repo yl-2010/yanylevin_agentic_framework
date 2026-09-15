@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { gitAddCommitPush } from "./git-publish.js";
 import { attachCanvasOverlay } from "./canvas-grades.js";
 import {
+  classObjectDir,
   gradeDirFromMeta,
   listOnedriveFolderNames,
   listOnedriveTree,
@@ -472,22 +473,17 @@ async function resolveOnedriveContextFile(root, opts) {
     throw err;
   }
 
-  const props = await readJsonFile(join(root, "classes", classId, "class.json"));
-  if (!props || typeof props !== "object") {
+  const entry = await classEntryForRoot(root, classId);
+  if (!entry?.onedriveFolder) {
     const err = new Error("file not found");
     err.status = 404;
     throw err;
   }
 
-  const folderNames = await listOnedriveFolderNames(gradeDir);
-  const folder = matchOnedriveFolder(props, folderNames);
-  if (!folder) {
-    const err = new Error("file not found");
-    err.status = 404;
-    throw err;
-  }
-
-  const absFile = resolveOnedriveAbsolutePath(join(gradeDir, folder), rel);
+  const absFile = resolveOnedriveAbsolutePath(
+    join(gradeDir, entry.onedriveFolder),
+    rel
+  );
   return statOnedriveFile(absFile);
 }
 
@@ -540,7 +536,8 @@ export async function resolveContextFile(email, opts) {
       err.status = 400;
       throw err;
     }
-    folder = join(root, "classes", id);
+    const entry = await classEntryForRoot(root, id);
+    folder = entry?.objectDir || join(root, "classes", id);
   } else if (scope === "project") {
     if (!id) {
       const err = new Error("project id required");
@@ -557,7 +554,10 @@ export async function resolveContextFile(email, opts) {
     if (projectId) {
       folder = join(root, "projects", projectId, "todos", id);
     } else if (classId) {
-      folder = join(root, "classes", classId, "todos", id);
+      const entry = await classEntryForRoot(root, classId);
+      folder = entry
+        ? join(entry.objectDir, "todos", id)
+        : join(root, "classes", classId, "todos", id);
     } else {
       folder = join(root, "todos", id);
     }
@@ -570,7 +570,10 @@ export async function resolveContextFile(email, opts) {
     if (projectId) {
       folder = join(root, "projects", projectId, "dates", id);
     } else if (classId) {
-      folder = join(root, "classes", classId, "dates", id);
+      const entry = await classEntryForRoot(root, classId);
+      folder = entry
+        ? join(entry.objectDir, "dates", id)
+        : join(root, "classes", classId, "dates", id);
     } else {
       folder = join(root, "dates", id);
     }
@@ -582,7 +585,15 @@ export async function resolveContextFile(email, opts) {
 
   const absFolder = resolve(folder);
   const absRoot = resolve(root);
-  if (absFolder !== absRoot && !absFolder.startsWith(absRoot + sep)) {
+  const meta = (await readJsonFile(join(root, "meta.json"))) || {};
+  const gradeDir = gradeDirFromMeta(meta);
+  const absGrade = gradeDir ? resolve(gradeDir) : null;
+  const inEducation =
+    absFolder === absRoot || absFolder.startsWith(absRoot + sep);
+  const inOnedrive =
+    Boolean(absGrade) &&
+    (absFolder === absGrade || absFolder.startsWith(absGrade + sep));
+  if (!inEducation && !inOnedrive) {
     const err = new Error("forbidden");
     err.status = 403;
     throw err;
@@ -748,6 +759,77 @@ async function listDirs(dir) {
     if (err?.code === "ENOENT") return [];
     throw err;
   }
+}
+
+/**
+ * Class object folders: OneDrive `.education` when mapped, else
+ * `education/<email>/classes/<id>` (fixtures, Alex, leftovers).
+ * @param {string} root
+ * @returns {Promise<{
+ *   id: string,
+ *   objectDir: string,
+ *   onedriveFolder: string|null,
+ *   source: "onedrive"|"education",
+ * }[]>}
+ */
+export async function listClassEntriesForRoot(root) {
+  /** @type {Map<string, { id: string, objectDir: string, onedriveFolder: string|null, source: "onedrive"|"education" }>} */
+  const byId = new Map();
+  const meta = (await readJsonFile(join(root, "meta.json"))) || {};
+  const gradeDir = gradeDirFromMeta(meta);
+
+  for (const classId of await listDirs(join(root, "classes"))) {
+    const objectDir = join(root, "classes", classId);
+    const props = await readJsonFile(join(objectDir, "class.json"));
+    if (!props || typeof props !== "object") continue;
+    const id = isSafeObjectId(props.id) || isSafeObjectId(classId);
+    if (!id) continue;
+    byId.set(id, {
+      id,
+      objectDir,
+      onedriveFolder: String(props.onedriveFolder || "").trim() || null,
+      source: "education",
+    });
+  }
+
+  if (gradeDir) {
+    const folderNames = await listOnedriveFolderNames(gradeDir, {
+      includeHidden: true,
+    });
+    for (const name of folderNames) {
+      const objectDir = classObjectDir(gradeDir, name);
+      const props = await readJsonFile(join(objectDir, "class.json"));
+      if (!props || typeof props !== "object") continue;
+      const id = isSafeObjectId(props.id);
+      if (!id) continue;
+      byId.set(id, {
+        id,
+        objectDir,
+        onedriveFolder: name,
+        source: "onedrive",
+      });
+    }
+  }
+
+  return [...byId.values()].sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
+ * @param {string} email
+ */
+export async function listClassEntries(email) {
+  return listClassEntriesForRoot(userEducationRoot(email));
+}
+
+/**
+ * @param {string} root
+ * @param {string} classId
+ */
+async function classEntryForRoot(root, classId) {
+  const id = isSafeObjectId(classId);
+  if (!id) return null;
+  const entries = await listClassEntriesForRoot(root);
+  return entries.find((e) => e.id === id) || null;
 }
 
 /**
@@ -1215,13 +1297,13 @@ export async function resolveNowScheduleContext(email, now = new Date()) {
     String(schedule.source || "").trim() ||
     "education/2026-27 Weekly Class Schedule.pdf";
 
-  const classIds = await listDirs(join(root, "classes"));
+  const classEntries = await listClassEntriesForRoot(root);
   /** @type {object[]} */
   const classes = [];
-  for (const classId of classIds) {
-    const props = await readJsonFile(join(root, "classes", classId, "class.json"));
+  for (const entry of classEntries) {
+    const props = await readJsonFile(join(entry.objectDir, "class.json"));
     if (!props || typeof props !== "object") continue;
-    const cls = { id: classId, ...props };
+    const cls = { id: entry.id, ...props };
     if (isFixture(cls)) continue;
     if (!isClassActiveOnDate(cls, clock.dateKey, schedule)) continue;
     classes.push(cls);
@@ -1417,18 +1499,19 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
     includeFixtures,
   });
 
-  const classIds = await listDirs(join(root, "classes"));
+  const classEntries = await listClassEntriesForRoot(root);
   /** @type {object[]} */
   const classes = [];
   /** @type {Record<string, string[]>} */
   const activeClassIdsByDate = {};
-  const gradeDir = includeFixtures ? null : gradeDirFromMeta(meta);
+  const gradeDir = gradeDirFromMeta(meta);
   const driveFolderNames = gradeDir
-    ? await listOnedriveFolderNames(gradeDir)
+    ? await listOnedriveFolderNames(gradeDir, { includeHidden: true })
     : [];
 
-  for (const classId of classIds) {
-    const classDir = join(root, "classes", classId);
+  for (const entry of classEntries) {
+    const classId = entry.id;
+    const classDir = entry.objectDir;
     const props = await readJsonFile(join(classDir, "class.json"));
     if (!props || typeof props !== "object") continue;
     const cls = { id: classId, ...props };
@@ -1461,7 +1544,8 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
       skipPin: true,
     });
     let driveFiles = [];
-    const driveFolder = matchOnedriveFolder(props, driveFolderNames);
+    const driveFolder =
+      entry.onedriveFolder || matchOnedriveFolder(props, driveFolderNames);
     if (gradeDir && driveFolder) {
       driveFiles = await listOnedriveTree(join(gradeDir, driveFolder), {
         hiddenNames: fileOpts.hiddenNames,
@@ -1626,12 +1710,18 @@ export async function findTodo(
       join(root, "projects", scopedProject, "todos", id, "todo.json")
     );
   } else if (scopedClass) {
-    candidates.push(join(root, "classes", scopedClass, "todos", id, "todo.json"));
+    const entry = await classEntryForRoot(root, scopedClass);
+    if (entry) {
+      candidates.push(join(entry.objectDir, "todos", id, "todo.json"));
+    } else {
+      candidates.push(
+        join(root, "classes", scopedClass, "todos", id, "todo.json")
+      );
+    }
   } else {
     candidates.push(join(root, "todos", id, "todo.json"));
-    const classIds = await listDirs(join(root, "classes"));
-    for (const cid of classIds) {
-      candidates.push(join(root, "classes", cid, "todos", id, "todo.json"));
+    for (const entry of await listClassEntriesForRoot(root)) {
+      candidates.push(join(entry.objectDir, "todos", id, "todo.json"));
     }
     const projectIds = await listDirs(join(root, "projects"));
     for (const pid of projectIds) {
@@ -1645,8 +1735,11 @@ export async function findTodo(
       let resolvedClass = scopedClass;
       let resolvedProject = scopedProject;
       if (!resolvedClass && !resolvedProject) {
-        const cm = path.match(/\/classes\/([^/]+)\/todos\//);
-        if (cm) resolvedClass = cm[1];
+        const entries = await listClassEntriesForRoot(root);
+        const hit = entries.find(
+          (e) => path === e.objectDir || path.startsWith(e.objectDir + "/")
+        );
+        if (hit) resolvedClass = hit.id;
         const pm = path.match(/\/projects\/([^/]+)\/todos\//);
         if (pm) resolvedProject = pm[1];
       }
@@ -1694,16 +1787,18 @@ export async function setTodoDone(
 
   const rel = found.path.startsWith(ROOT + "/")
     ? found.path.slice(ROOT.length + 1)
-    : found.path;
+    : null;
   const scope = found.projectId
     ? ` project=${found.projectId}`
     : found.classId
       ? ` class=${found.classId}`
       : "";
-  gitAddCommitPush({
-    paths: [rel],
-    message: `education: set todo ${todoId}${scope} done=${Boolean(done)}`,
-  }).catch((err) => console.error("[education-data] git publish", err));
+  if (rel) {
+    gitAddCommitPush({
+      paths: [rel],
+      message: `education: set todo ${todoId}${scope} done=${Boolean(done)}`,
+    }).catch((err) => console.error("[education-data] git publish", err));
+  }
 
   return next;
 }
@@ -1822,11 +1917,13 @@ export async function setCapsuleVote(
 
   const rel = found.path.startsWith(ROOT + "/")
     ? found.path.slice(ROOT.length + 1)
-    : found.path;
-  gitAddCommitPush({
-    paths: [rel],
-    message: `education: set todo ${todoId} capsule ${capId} vote=${nextVote || "none"}`,
-  }).catch((err) => console.error("[education-data] git publish", err));
+    : null;
+  if (rel) {
+    gitAddCommitPush({
+      paths: [rel],
+      message: `education: set todo ${todoId} capsule ${capId} vote=${nextVote || "none"}`,
+    }).catch((err) => console.error("[education-data] git publish", err));
+  }
 
   return next;
 }

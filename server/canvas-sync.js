@@ -17,7 +17,7 @@ import {
   resolveBriefingTimezone,
   zonedLocalToUtc,
 } from "./daily-briefing-agent.js";
-import { scheduleTodayKey } from "./education-data.js";
+import { listClassEntriesForRoot, scheduleTodayKey } from "./education-data.js";
 import { formatDeletedBlock, loadDeletedMarkdown } from "./education-match.js";
 import { gitAddCommitPush } from "./git-publish.js";
 import { attachCanvasOverlay, canvasAssignmentIdFromLink } from "./canvas-grades.js";
@@ -263,19 +263,14 @@ export function filterCanvasSnapshotToDashboard(snapshot, classNames) {
 }
 
 async function listDashboardClassNames() {
-  const root = join(ROOT, "education", YAN_EMAIL, "classes");
-  let ids = [];
-  try {
-    ids = await readdir(root);
-  } catch {
-    return [];
-  }
+  const root = join(ROOT, "education", YAN_EMAIL);
   /** @type {string[]} */
   const names = [];
-  for (const id of ids) {
-    if (!id || id.startsWith(".") || id.startsWith("_example")) continue;
+  for (const entry of await listClassEntriesForRoot(root)) {
     try {
-      const props = JSON.parse(await readFile(join(root, id, "class.json"), "utf8"));
+      const props = JSON.parse(
+        await readFile(join(entry.objectDir, "class.json"), "utf8")
+      );
       if (!props || typeof props !== "object") continue;
       if (props.fixture === true || props.freePeriod === true) continue;
       const name = String(props.name || "").trim();
@@ -1208,7 +1203,7 @@ export function buildCanvasSyncPrompt({
     `Snapshot: ${CANVAS_REL}/snapshot.json (also assignments.md). Optional map: ${CANVAS_REL}/course-map.json.`,
     `Hourly Composer log: ${CANVAS_REL}/last-hourly-sync.json. Read it. Fix mistakes those daytime Composer 2.5 passes made (wrong tags, HW: prefixes left on names, Adv Calc HW dues pulled back to Canvas time, yoga CW hiddenFromHome, missing canvasId, duplicate todos, course-map drift).`,
     "Yan is a 2026-27 junior. Those academic dashboard classes are often missing from Canvas until school publishes them. That is expected.",
-    "FIRST: map snapshot courses to education/you@example.com/classes/ (skip free-period shells and fixtures). The snapshot already dropped non-dashboard enrollments. If ZERO dashboard classes appear in Canvas, STOP immediately. Do not invent Class of 2028, EPS Library, Iceland EBC, Graphic Design, or prior-year shells. Do not create todos. One short note is enough.",
+    "FIRST: map snapshot courses to Yan's class folders (OneDrive `.education` under the grade folder, skip free-period shells and fixtures). The snapshot already dropped non-dashboard enrollments. If ZERO dashboard classes appear in Canvas, STOP immediately. Do not invent Class of 2028, EPS Library, Iceland EBC, Graphic Design, or prior-year shells. Do not create todos. One short note is enough.",
     "If at least one class maps: set class.json canvasLink to that course gradebook (htmlUrl + /grades). Create or update todos for every Canvas assignment on those mapped classes only. Set canvasLink and canvasId. Tag CW/HW/QA/MA. Store name without a CW/HW/QA/MA prefix (HW: Signed Syllabus → Signed Syllabus). Use snapshot dueDate/dueTime.",
     "Pull major syllabus / calendar-event dates onto date.json with canvasLink.",
     "NEVER write done or completedAt from Canvas. New todos start done false. Updates leave those keys untouched. Page-load overlay paints completion in the API; you still must not persist it.",

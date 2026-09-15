@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   gradeDirFromMeta,
+  hiddenOnedriveFolderName,
   isSafeRelativePath,
   listOnedriveTree,
   matchOnedriveFolder,
@@ -102,7 +103,7 @@ describe("onedrive class name match", () => {
     );
   });
 
-  it("skips free periods and unmatched names", () => {
+  it("skips free periods and unmatched names unless an explicit folder exists", () => {
     assert.equal(
       matchOnedriveFolder(
         { name: "Free Period", period: "B", freePeriod: true },
@@ -115,6 +116,46 @@ describe("onedrive class name match", () => {
       null
     );
     assert.equal(onedriveNameScore("Independent Study", "A. Data Sci 1"), 0);
+    assert.equal(
+      matchOnedriveFolder(
+        {
+          name: "Free Period",
+          period: "A",
+          freePeriod: true,
+          onedriveFolder: ".Free Period A",
+        },
+        [".Free Period A", ...folders]
+      ),
+      ".Free Period A"
+    );
+  });
+});
+
+describe("hiddenOnedriveFolderName", () => {
+  it("uses a leading-dot name for missing classes", () => {
+    assert.equal(
+      hiddenOnedriveFolderName({ name: "Independent Study" }, "independent-study"),
+      ".Independent Study"
+    );
+    assert.equal(
+      hiddenOnedriveFolderName({ name: "United States History" }, "us-history-ws"),
+      ".US History WS"
+    );
+    assert.equal(
+      hiddenOnedriveFolderName(
+        { name: "American Literature" },
+        "american-literature-ws"
+      ),
+      ".American Literature WS"
+    );
+    assert.equal(
+      hiddenOnedriveFolderName({ freePeriod: true, period: "B" }, "free-period-b"),
+      ".Free Period B"
+    );
+    assert.equal(
+      hiddenOnedriveFolderName({}, "advanced-programming-ai-ml"),
+      ".Advanced Programming AI-ML"
+    );
   });
 });
 
@@ -142,6 +183,10 @@ describe("listOnedriveTree", () => {
     await writeFile(join(dir, "notes.docx"), "doc");
     await writeFile(join(dir, "hw scans", "scan.pdf"), "pdf");
     await writeFile(join(dir, ".DS_Store"), "skip");
+    await mkdir(join(dir, "todos", "hw-1"), { recursive: true });
+    await writeFile(join(dir, "todos", "hw-1", "todo.json"), "{}");
+    await mkdir(join(dir, ".education"), { recursive: true });
+    await writeFile(join(dir, ".education", "class.json"), "{}");
     const t0 = new Date("2024-01-01T00:00:00Z");
     const t1 = new Date("2025-01-01T00:00:00Z");
     await utimes(join(dir, "notes.docx"), t0, t0);

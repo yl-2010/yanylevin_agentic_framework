@@ -19,8 +19,8 @@ Public yanylevin.com pages are `.cursor/skills/yanylevin-webpage-create/SKILL.md
 
 **Canonical clone.** Copy chrome from these, do not invent a new look:
 
-- Layout + light tokens: `education/you@example.com/classes/american-literature/todos/summer-reading-when-the-emperor-was-divine/quotes.html`
-- Dark tokens + optional good/bad marks: `education/you@example.com/classes/spanish-4/todos/hw-8-9-de-septiembre-cuestionario-inicio-de-ano/errores.html`
+- Layout + light tokens: `$HOME/Documents/11th Grade/F. American Lit/.education/todos/summer-reading-when-the-emperor-was-divine/quotes.html`
+- Dark tokens + optional good/bad marks: `$HOME/Documents/11th Grade/D. Spanish 4/.education/todos/hw-8-9-de-septiembre-cuestionario-inicio-de-ano/errores.html`
 
 Do not run the frontend-design unique-aesthetic playbook. No Inter, no purple, no new display font.
 
@@ -30,10 +30,10 @@ Apply Unslop to headings and agent-written copy. Quoted source text can keep the
 
 | Ask | File |
 |---|---|
-| Quotes on a todo | `education/<email>/classes/<id>/todos/<todoId>/quotes.html` |
-| Errors on a todo | `…/todos/<todoId>/errores.html` (or `errors.html`) |
+| Quotes on a class todo | that class’s OneDrive `.education/todos/<todoId>/quotes.html` |
+| Errors on a class todo | `…/.education/todos/<todoId>/errores.html` (or `errors.html`) |
 | Notes on a project | `education/<email>/projects/<id>/notes.html` |
-| Anything on a **class** page | that class’s OneDrive folder: `meta.json` `onedriveRoot` + `gradeFolder` + `class.json` `onedriveFolder` (e.g. `…/11th Grade/H. Physics/quotes.html`). Do **not** write it under `education/<email>/classes/<id>/`. |
+| Anything on a **class** page | the visible class OneDrive folder (e.g. `…/11th Grade/H. Physics/quotes.html`). Not `.education/`, not `education/<email>/classes/`. |
 
 Todo / date / project HTML still sits beside the properties JSON. Class HTML shows in the class file tiles from OneDrive (live). Basename the user would tap. Show in the file tiles unless they asked to hide (`hiddenFiles`).
 

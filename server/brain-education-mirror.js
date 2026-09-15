@@ -9,6 +9,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { EDU_ROOT, BRAIN_ROOT, serializeFrontmatter } from "./brain-lib.js";
+import { EDUCATION_META_DIR, gradeDirFromMeta } from "./education-onedrive.js";
 
 const MIRROR_ROOT = path.join(BRAIN_ROOT, "education");
 
@@ -124,17 +125,53 @@ function collectChildren(stubs, parentDir, parentId, parentSlug) {
 
 function collect() {
   const stubs = [];
+  /** @type {Map<string, { slug: string, dirPath: string, source: string, cls: object }>} */
+  const classes = new Map();
 
   for (const slug of listDirs(path.join(EDU_ROOT, "classes"))) {
     const dirPath = path.join(EDU_ROOT, "classes", slug);
     const cls = readJson(path.join(dirPath, "class.json"));
     if (!cls) continue;
+    classes.set(slug, {
+      slug,
+      dirPath,
+      source: `classes/${slug}/class.json`,
+      cls,
+    });
+  }
+
+  const meta = readJson(path.join(EDU_ROOT, "meta.json")) || {};
+  const gradeDir = gradeDirFromMeta(meta);
+  if (gradeDir && fs.existsSync(gradeDir)) {
+    let names = [];
+    try {
+      names = fs.readdirSync(gradeDir);
+    } catch {
+      names = [];
+    }
+    for (const name of names) {
+      if (!name || name === ".Trash") continue;
+      const dirPath = path.join(gradeDir, name, EDUCATION_META_DIR);
+      const cls = readJson(path.join(dirPath, "class.json"));
+      if (!cls) continue;
+      const slug = String(cls.id || "").trim();
+      if (!slug) continue;
+      classes.set(slug, {
+        slug,
+        dirPath,
+        source: `onedrive:${name}/.education/class.json`,
+        cls,
+      });
+    }
+  }
+
+  for (const { slug, dirPath, source, cls } of classes.values()) {
     stubs.push(
       stub({
         outPath: path.join(MIRROR_ROOT, "classes", `${slug}.md`),
         name: cls.name,
         kind: "education-class",
-        source: `classes/${slug}/class.json`,
+        source,
         fields: { period: cls.period ?? null, trimester: cls.trimester ?? null },
       }),
     );

@@ -8,7 +8,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { isFixture } from "./education-data.js";
+import { isFixture, listClassEntriesForRoot } from "./education-data.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const DEFAULT_EDUCATION_EMAIL = "you@example.com";
@@ -237,22 +237,22 @@ export async function loadEducationActionIndex(userRoot = defaultEducationRoot()
     ...(await loadObjects(join(userRoot, "todos"), "todo.json", "user-level", "todos")),
   ];
 
-  for (const classId of await listDirs(join(userRoot, "classes"))) {
-    const parent = `class:${classId}`;
+  for (const entry of await listClassEntriesForRoot(userRoot)) {
+    const parent = `class:${entry.id}`;
     dates.push(
       ...(await loadObjects(
-        join(userRoot, "classes", classId, "dates"),
+        join(entry.objectDir, "dates"),
         "date.json",
         parent,
-        `classes/${classId}/dates`
+        `classes/${entry.id}/dates`
       ))
     );
     todos.push(
       ...(await loadObjects(
-        join(userRoot, "classes", classId, "todos"),
+        join(entry.objectDir, "todos"),
         "todo.json",
         parent,
-        `classes/${classId}/todos`
+        `classes/${entry.id}/todos`
       ))
     );
   }
