@@ -50,16 +50,14 @@ Output is JSON. Use `id` from pages/search when reading a body. Summarize.
 Do not print tokens. Do not dump huge HTML (`page` already returns text;
 `--html` only if you must see markup).
 
-If `signedIn` is false or the payload says `not signed in`, Yan has to finish
-login on the Mac Studio. Chrome opens **Graph Explorer**, not Outlook:
+If `signedIn` is false or the payload says `not signed in`, run login on the
+Mac Studio. Chrome opens **Graph Explorer**, not Outlook. The script clicks
+`owner@school.example` on the Microsoft account picker, then Run query.
+Do not tell Yan to click Sign in. Stay at the computer only if 2FA appears.
 
 ```bash
 node server/school-onenote.js login
 ```
-
-Sign in as `owner@school.example` if asked. If the page shows
-`GET /me/onenote/notebooks`, click **Run query**. Accept the Notes permission
-prompt if Microsoft shows one. The window closes when the token is captured.
 
 Cookies live in `~/.yanylevin/school-mail/`. The OneNote Graph token lives in
 `~/.yanylevin/school-onenote/session.json` (not in git). Never copy those

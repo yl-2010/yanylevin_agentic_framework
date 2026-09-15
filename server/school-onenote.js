@@ -26,8 +26,9 @@ import {
 export { SCHOOL_EMAIL, GRAPH_BASE };
 
 const LOGIN_WAIT_MS = 10 * 60_000;
-const REFRESH_WAIT_MS = 45_000;
+const REFRESH_WAIT_MS = 75_000;
 const PAGE_TEXT_MAX = 8000;
+const LOGIN_CLICK_MS = 700;
 export const OUTLOOK_WEB_CLIENT_ID = "9199bf20-a13f-4107-85dc-02114787ef48";
 export const EPS_TENANT_ID = "b2681e8b-dd20-46cf-b163-371a2d7c6014";
 export const GRAPH_EXPLORER_URL =
@@ -139,6 +140,57 @@ export function graphNotesAuthorizeUrl() {
     login_hint: SCHOOL_EMAIL,
   });
   return `https://login.microsoftonline.com/${EPS_TENANT_ID}/oauth2/v2.0/authorize?${params}`;
+}
+
+export function isMicrosoftLoginUrl(url) {
+  try {
+    const host = new URL(String(url || "")).hostname.toLowerCase();
+    return (
+      host === "login.microsoftonline.com" ||
+      host === "login.microsoft.com" ||
+      host === "login.live.com" ||
+      host === "login.windows.net" ||
+      host.endsWith(".microsoftonline.com") ||
+      host.endsWith(".login.microsoftonline.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function isGraphExplorerUrl(url) {
+  try {
+    const u = new URL(String(url || ""));
+    const host = u.hostname.toLowerCase();
+    return (
+      host === "developer.microsoft.com" &&
+      u.pathname.toLowerCase().includes("/graph/graph-explorer")
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function looksLikeSchoolAccountLabel(text, email = SCHOOL_EMAIL) {
+  const t = String(text || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  const e = String(email || "")
+    .trim()
+    .toLowerCase();
+  if (!t || !e) return false;
+  return t.includes(e);
+}
+
+export function schoolAccountSelectors(email = SCHOOL_EMAIL) {
+  const e = String(email || "").trim();
+  return [
+    `[data-test-id="${e}"]`,
+    `[data-tid="${e}"]`,
+    `[aria-label="${e}"]`,
+    `[aria-label*="${e}" i]`,
+  ];
 }
 
 export function buildNotebooksUrl() {
@@ -278,15 +330,19 @@ async function launchChrome(opts) {
   await mkdir(dir, { recursive: true, mode: 0o700 });
   return chromium.launchPersistentContext(dir, {
     channel: "chrome",
-    headless: !headed,
+    // Real Chrome, even when hidden. True headless never gets past Microsoft's
+    // account picker, so Graph Explorer sat there until Yan clicked the school
+    // account by hand.
+    headless: false,
     viewport: { width: 1280, height: 900 },
     args: headed ? [] : ["--window-position=-2400,-2400"],
   });
 }
 
-function waitForNotesToken(context, timeoutMs, page) {
+function waitForNotesToken(context, timeoutMs) {
   return new Promise((resolve, reject) => {
     let done = false;
+    const pages = new Set();
     const timer = setTimeout(() => {
       cleanup();
       reject(new Error("timed out waiting for OneNote Graph sign-in"));
@@ -306,25 +362,138 @@ function waitForNotesToken(context, timeoutMs, page) {
     function onNav(frame) {
       consider(tokenFromUrl(frame.url()));
     }
+    function attachPage(page) {
+      if (!page || pages.has(page)) return;
+      pages.add(page);
+      page.on("framenavigated", onNav);
+      consider(tokenFromUrl(page.url()));
+    }
     function cleanup() {
       clearTimeout(timer);
       context.off("request", onReq);
-      page?.off("framenavigated", onNav);
+      context.off("page", attachPage);
+      for (const p of pages) {
+        p.off("framenavigated", onNav);
+      }
     }
     context.on("request", onReq);
-    page?.on("framenavigated", onNav);
-    consider(tokenFromUrl(page?.url?.() || ""));
+    context.on("page", attachPage);
+    for (const p of context.pages()) attachPage(p);
   });
 }
 
-async function clickIfVisible(page, name, timeoutMs = 4000) {
+async function clickLocator(loc, timeoutMs = LOGIN_CLICK_MS) {
   try {
-    const btn = page.getByRole("button", { name, exact: false });
-    await btn.first().waitFor({ state: "visible", timeout: timeoutMs });
-    await btn.first().click({ timeout: 3000 });
+    const el = loc.first();
+    await el.waitFor({ state: "visible", timeout: timeoutMs });
+    await el.click({ timeout: 2500 });
     return true;
   } catch {
     return false;
+  }
+}
+
+async function clickNamedControl(root, name, timeoutMs = LOGIN_CLICK_MS) {
+  const locators = [
+    root.getByRole("button", { name, exact: true }),
+    root.getByRole("link", { name, exact: true }),
+    root.getByRole("button", { name, exact: false }),
+    root.getByRole("link", { name, exact: false }),
+  ];
+  for (const loc of locators) {
+    if (await clickLocator(loc, timeoutMs)) return true;
+  }
+  return false;
+}
+
+async function clickSchoolAccountOn(root, email = SCHOOL_EMAIL) {
+  const e = String(email || "").trim();
+  if (!e) return false;
+  const locators = [
+    ...schoolAccountSelectors(e).map((sel) => root.locator(sel)),
+    root.getByRole("button", { name: e }),
+    root.getByRole("link", { name: e }),
+    root.getByRole("menuitem", { name: e }),
+    root.getByRole("option", { name: e }),
+    root.locator("[role='button']").filter({ hasText: e }),
+    root.locator(".tile, .table").filter({ hasText: e }),
+    root.getByText(e, { exact: false }),
+  ];
+  for (const loc of locators) {
+    if (await clickLocator(loc, LOGIN_CLICK_MS)) return true;
+  }
+  return false;
+}
+
+function loginRoots(page) {
+  try {
+    return [page, ...page.frames()];
+  } catch {
+    return [page];
+  }
+}
+
+function contextHasMicrosoftLogin(context) {
+  try {
+    return context.pages().some((p) => !p.isClosed() && isMicrosoftLoginUrl(p.url()));
+  } catch {
+    return false;
+  }
+}
+
+async function advanceLoginPage(page, context, signInPages) {
+  if (!page || page.isClosed()) return;
+  const url = page.url();
+  const roots = loginRoots(page);
+  for (const root of roots) {
+    try {
+      if (isMicrosoftLoginUrl(root.url()) && (await clickSchoolAccountOn(root))) return;
+    } catch {
+      // frame navigated
+    }
+  }
+  if (isMicrosoftLoginUrl(url)) {
+    for (const root of roots) {
+      if (await clickNamedControl(root, /^Yes$/i)) return;
+      if (await clickNamedControl(root, /^Accept$/i)) return;
+      if (await clickNamedControl(root, /^Consent$/i)) return;
+    }
+    return;
+  }
+  if (isGraphExplorerUrl(url)) {
+    if (!contextHasMicrosoftLogin(context) && !signInPages.has(page)) {
+      for (const root of roots) {
+        if (await clickNamedControl(root, /^Sign in$/i)) {
+          signInPages.add(page);
+          return;
+        }
+      }
+    }
+    for (const root of roots) {
+      if (await clickNamedControl(root, /Run query/i)) return;
+      if (await clickNamedControl(root, /^Accept$/i)) return;
+      if (await clickNamedControl(root, /^Consent$/i)) return;
+    }
+    return;
+  }
+  for (const root of roots) {
+    if (await clickNamedControl(root, /^Accept$/i)) return;
+    if (await clickNamedControl(root, /^Consent$/i)) return;
+  }
+}
+
+async function driveLogin(context, signal) {
+  const signInPages = new WeakSet();
+  while (!signal.aborted) {
+    for (const page of context.pages()) {
+      if (signal.aborted) return;
+      try {
+        await advanceLoginPage(page, context, signInPages);
+      } catch {
+        // navigation mid-click
+      }
+    }
+    await sleep(900);
   }
 }
 
@@ -332,9 +501,11 @@ async function captureToken(opts) {
   const headed = Boolean(opts.headed);
   const waitMs = headed ? LOGIN_WAIT_MS : REFRESH_WAIT_MS;
   const context = await launchChrome(opts);
+  const ac = new AbortController();
   try {
     const page = context.pages()[0] || (await context.newPage());
-    const pending = waitForNotesToken(context, waitMs, page);
+    const pending = waitForNotesToken(context, waitMs);
+    void driveLogin(context, ac.signal);
     try {
       await page.goto(GRAPH_EXPLORER_URL, {
         waitUntil: "domcontentloaded",
@@ -343,12 +514,6 @@ async function captureToken(opts) {
     } catch {
       // token listener still runs
     }
-    await sleep(2500);
-    await clickIfVisible(page, "Sign in");
-    await sleep(2000);
-    await clickIfVisible(page, "Run query");
-    await clickIfVisible(page, "Accept");
-    await clickIfVisible(page, "Consent");
     const hashed = tokenFromUrl(page.url());
     if (hashed) {
       await saveSession({ token: hashed }, opts.root);
@@ -358,6 +523,7 @@ async function captureToken(opts) {
     await saveSession({ token }, opts.root);
     return token;
   } finally {
+    ac.abort();
     await context.close().catch(() => {});
   }
 }
@@ -487,8 +653,21 @@ export async function runSchoolOnenote(argv, opts = {}) {
 
   if (cmd === "login") {
     process.stderr.write(
-      `Chrome opens Graph Explorer as ${SCHOOL_EMAIL}. Sign in if asked. If you see GET /me/onenote/notebooks, click Run query (and Accept if a permissions prompt appears). The window closes once a OneNote token is captured.\n`
+      `Signing in to Graph Explorer as ${SCHOOL_EMAIL}. The script clicks the school account and Run query.\n`
     );
+    try {
+      const token = await captureToken({ headed: false, root });
+      return {
+        ok: true,
+        signedIn: true,
+        account: SCHOOL_EMAIL,
+        email: jwtEmail(token),
+      };
+    } catch {
+      process.stderr.write(
+        `Hidden Chrome did not finish. Opening a window. Complete 2FA if Microsoft asks.\n`
+      );
+    }
     try {
       const token = await captureToken({ headed: true, root });
       return {

@@ -5,15 +5,20 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   GRAPH_BASE,
+  SCHOOL_EMAIL,
   buildNotebooksUrl,
   buildPageContentUrl,
   buildPagesUrl,
   buildSearchUrl,
   flattenNotebookSections,
+  isGraphExplorerUrl,
+  isMicrosoftLoginUrl,
   isNotesToken,
+  looksLikeSchoolAccountLabel,
   parseArgs,
   pickByName,
   runSchoolOnenote,
+  schoolAccountSelectors,
   tokenFromUrl,
 } from "./school-onenote.js";
 
@@ -80,6 +85,41 @@ describe("school-onenote tokens", () => {
     });
     const url = `https://outlook.office.com/mail/#access_token=${token}&token_type=Bearer`;
     assert.equal(tokenFromUrl(url), token);
+  });
+});
+
+describe("school-onenote login screens", () => {
+  it("spots Microsoft account-picker hosts", () => {
+    assert.equal(
+      isMicrosoftLoginUrl(
+        "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
+      ),
+      true
+    );
+    assert.equal(
+      isMicrosoftLoginUrl("https://developer.microsoft.com/en-us/graph/graph-explorer"),
+      false
+    );
+  });
+
+  it("spots Graph Explorer", () => {
+    assert.equal(
+      isGraphExplorerUrl(
+        "https://developer.microsoft.com/en-us/graph/graph-explorer?request=me/onenote/notebooks"
+      ),
+      true
+    );
+    assert.equal(isGraphExplorerUrl("https://login.microsoftonline.com/"), false);
+  });
+
+  it("matches the school account tile, including Sign in with email", () => {
+    assert.equal(
+      looksLikeSchoolAccountLabel("Sign in with owner@school.example"),
+      true
+    );
+    assert.equal(looksLikeSchoolAccountLabel("Yan Levin\nowner@school.example"), true);
+    assert.equal(looksLikeSchoolAccountLabel("Sign in with another account"), false);
+    assert.equal(schoolAccountSelectors()[0], `[data-test-id="${SCHOOL_EMAIL}"]`);
   });
 });
 
