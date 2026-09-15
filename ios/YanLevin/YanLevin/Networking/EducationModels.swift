@@ -108,6 +108,26 @@ struct EducationSchedule: Decodable {
     let dayOverrides: [String: DayOverride]?
     let trimesters: [String: EducationTermRange]?
 
+    init(
+        timezone: String? = nil,
+        schoolStart: String? = nil,
+        schoolEnd: String? = nil,
+        bells: [BellSlot]? = nil,
+        weekdayPeriods: [String: [String]]? = nil,
+        closedDates: [String]? = nil,
+        dayOverrides: [String: DayOverride]? = nil,
+        trimesters: [String: EducationTermRange]? = nil
+    ) {
+        self.timezone = timezone
+        self.schoolStart = schoolStart
+        self.schoolEnd = schoolEnd
+        self.bells = bells
+        self.weekdayPeriods = weekdayPeriods
+        self.closedDates = closedDates
+        self.dayOverrides = dayOverrides
+        self.trimesters = trimesters
+    }
+
     func trimesterName(for dateKey: String) -> String? {
         let keys = ["fall", "winter", "spring"]
         for name in keys {

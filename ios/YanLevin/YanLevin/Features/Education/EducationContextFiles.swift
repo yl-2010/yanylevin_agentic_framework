@@ -19,8 +19,6 @@ struct EducationContextFilesView: View {
     var pairColumns: Bool = false
     @ObservedObject var store: EducationStore
     @EnvironmentObject private var auth: AuthStore
-    @EnvironmentObject private var educationFocus: EducationFocusStore
-    @Environment(\.colorScheme) private var colorScheme
 
     @State private var previewItem: PreviewItem?
     @State private var openingName: String?
@@ -37,40 +35,87 @@ struct EducationContextFilesView: View {
         return [GridItem(.flexible(), spacing: 14)]
     }
 
+    @ViewBuilder
     var body: some View {
-        Group {
-            if !files.isEmpty {
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
-                    ForEach(files) { file in
-                        fileCell(file)
-                    }
+        if files.isEmpty {
+            EmptyView()
+        } else {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
+                ForEach(files) { file in
+                    EducationContextFileCell(
+                        file: file,
+                        pairColumns: pairColumns,
+                        expandedIds: $expandedIds,
+                        openingName: openingName,
+                        onOpen: open
+                    )
                 }
-                .sheet(item: $previewItem) { item in
-                    EducationQuickLookPreview(url: item.url)
-                        .ignoresSafeArea()
-                }
-                .alert("Couldn’t open file", isPresented: Binding(
-                    get: { openError != nil },
-                    set: { if !$0 { openError = nil } }
-                )) {
-                    Button("OK", role: .cancel) { openError = nil }
-                } message: {
-                    Text(openError ?? "")
-                }
-                .modifier(EducationFilePreviewDismiss(previewItem: $previewItem))
             }
+            .sheet(item: $previewItem) { item in
+                EducationQuickLookPreview(url: item.url)
+                    .ignoresSafeArea()
+            }
+            .alert("Couldn’t open file", isPresented: Binding(
+                get: { openError != nil },
+                set: { if !$0 { openError = nil } }
+            )) {
+                Button("OK", role: .cancel) { openError = nil }
+            } message: {
+                Text(openError ?? "")
+            }
+            .modifier(EducationFilePreviewDismiss(previewItem: $previewItem))
         }
     }
 
-    @ViewBuilder
-    private func fileCell(_ file: EducationContextFile) -> some View {
+    private func open(_ file: EducationContextFile) {
+        guard let token = auth.session?.token else {
+            openError = "Please sign in again."
+            return
+        }
+        openingName = file.id
+        Task {
+            defer { openingName = nil }
+            do {
+                let url = try await store.downloadContextFile(
+                    scope: owner.scope,
+                    id: owner.id,
+                    classId: owner.classId,
+                    projectId: owner.projectId,
+                    name: file.name,
+                    source: file.source,
+                    path: file.path,
+                    token: token
+                )
+                previewItem = PreviewItem(url: url)
+            } catch {
+                openError = error.localizedDescription
+            }
+        }
+    }
+}
+
+private struct EducationContextFileCell: View {
+    let file: EducationContextFile
+    let pairColumns: Bool
+    @Binding var expandedIds: Set<String>
+    let openingName: String?
+    let onOpen: (EducationContextFile) -> Void
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
         if file.isFolder {
             VStack(alignment: .leading, spacing: 10) {
-                folderButton(file)
+                folderButton
                 if expandedIds.contains(file.id) {
                     VStack(alignment: .leading, spacing: 14) {
                         ForEach(file.files ?? []) { child in
-                            fileCell(child)
+                            EducationContextFileCell(
+                                file: child,
+                                pairColumns: pairColumns,
+                                expandedIds: $expandedIds,
+                                openingName: openingName,
+                                onOpen: onOpen
+                            )
                         }
                     }
                     .padding(.leading, 12)
@@ -79,11 +124,11 @@ struct EducationContextFilesView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .gridCellColumns(pairColumns ? 2 : 1)
         } else {
-            fileButton(file)
+            fileButton
         }
     }
 
-    private func folderButton(_ file: EducationContextFile) -> some View {
+    private var folderButton: some View {
         let open = expandedIds.contains(file.id)
         return Button {
             withAnimation(.easeInOut(duration: 0.18)) {
@@ -116,9 +161,9 @@ struct EducationContextFilesView: View {
         .accessibilityValue(open ? "Expanded" : "Collapsed")
     }
 
-    private func fileButton(_ file: EducationContextFile) -> some View {
+    private var fileButton: some View {
         Button {
-            open(file)
+            onOpen(file)
         } label: {
             Text(file.displayName)
                 .font(.body.weight(.semibold))
@@ -134,32 +179,6 @@ struct EducationContextFilesView: View {
         .ylHapticOnTap()
         .disabled(openingName != nil)
         .accessibilityLabel("Open \(file.displayName)")
-    }
-
-    private func open(_ file: EducationContextFile) {
-        guard let token = auth.session?.token else {
-            openError = "Please sign in again."
-            return
-        }
-        openingName = file.id
-        Task {
-            defer { openingName = nil }
-            do {
-                let url = try await store.downloadContextFile(
-                    scope: owner.scope,
-                    id: owner.id,
-                    classId: owner.classId,
-                    projectId: owner.projectId,
-                    name: file.name,
-                    source: file.source,
-                    path: file.path,
-                    token: token
-                )
-                previewItem = PreviewItem(url: url)
-            } catch {
-                openError = error.localizedDescription
-            }
-        }
     }
 }
 
