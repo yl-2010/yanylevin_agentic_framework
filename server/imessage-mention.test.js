@@ -42,7 +42,8 @@ describe("imessage-mention", () => {
     assert.equal(isJypeThread("jype"), true);
     assert.equal(isJypeThread("Class of 2028"), false);
     assert.equal(agentSentFooterFor({ platform: "teams" }), TEAMS_AGENT_SENT_FOOTER);
-    assert.equal(agentSentFooterFor({ chat: "JYPE" }), AGENT_SENT_FOOTER);
+    assert.equal(agentSentFooterFor({ chat: "JYPE" }), TEAMS_AGENT_SENT_FOOTER);
+    assert.equal(agentSentFooterFor({ platform: "email" }), AGENT_SENT_FOOTER);
   });
 
   it("triggers on Yan fromMe or guest texts with the token", () => {
@@ -125,7 +126,7 @@ describe("imessage-mention", () => {
       `On it\n\n${AGENT_SENT_FOOTER}`,
       { chat: "JYPE" }
     );
-    assert.equal(reapplied, `On it\n\n${AGENT_SENT_FOOTER}`);
+    assert.equal(reapplied, `On it\n\n${TEAMS_AGENT_SENT_FOOTER}`);
     assert.equal(
       applyAgentSentFooter("On it", { chat: "Class of 2028", platform: "teams" }),
       `On it\n\n${TEAMS_AGENT_SENT_FOOTER}`
@@ -165,7 +166,9 @@ describe("imessage-mention", () => {
     assert.match(bare, /only @agent/);
     assert.match(bare, /infer why they called you/);
     assert.match(bare, /limit=80/);
-    assert.match(block, /Do not add Sent by Yan's Personal Agent/);
+    assert.match(block, /Do not add \/\/ Sent by Yan's Personal Agent/);
+    assert.match(block, /Newlines work/);
+    assert.match(block, /does not render markdown/);
     assert.match(block, /server appends that footer on the iMessage only/);
     assert.match(block, /server delivers your final bubble/);
     assert.match(block, /keep that final bubble/);

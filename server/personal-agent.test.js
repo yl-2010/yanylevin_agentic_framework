@@ -373,6 +373,7 @@ describe("Personal Agent skill files", () => {
     assert.match(imessage, /never put it in Personal Agent app or website bubbles/);
     assert.match(imessage, /JYPE \(iMessage or Teams\)/);
     assert.match(imessage, /\/\/ Sent by Yan's Personal Agent/);
+    assert.match(imessage, /does not render markdown/);
 
     const screentime = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.screentime), "utf8");
     assert.match(screentime, /screentime-read\.js/);
@@ -416,7 +417,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /who will \*\*see\*\* the reply|who will see the reply/);
     assert.match(agent, /From Alex on iMessage/);
     assert.match(agent, /Composer 2\.5/);
-    assert.match(agent, /no `Sent by Yan's Personal Agent`/);
+    assert.match(agent, /no `\/\/ Sent by Yan's Personal Agent`/);
     assert.match(agent, /Never put `Sent by Yan's Personal Agent` in app or website bubbles/);
     assert.match(agent, /cannot send into a different group chat/);
     assert.match(agent, /JYPE \(iMessage or Teams\)/);

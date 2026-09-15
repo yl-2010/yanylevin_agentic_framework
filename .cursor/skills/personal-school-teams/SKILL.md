@@ -83,8 +83,8 @@ run directed it.
 pass HTML. The CLI appends `// Sent by Yan's Personal Agent`. Do not write
 that line in `--text`, and never put it in Personal Agent app or website
 bubbles. Same parent skip as iMessage (Rajasi / Michael / `Rajasi and
-Michael`). iMessage and email stay `Sent by Yan's Personal Agent` with no
-`//`.
+Michael`). iMessage uses the same `// Sent by Yan's Personal Agent` line.
+Email stays `Sent by Yan's Personal Agent` with no `//`.
 
 1:1 or group chat:
 

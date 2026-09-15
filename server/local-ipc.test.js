@@ -50,7 +50,7 @@ describe("local ipc", () => {
     assert.equal(res.out.status, 200);
     assert.equal(res.out.body.ok, true);
     assert.equal(got.to, "Example Friend");
-    assert.match(got.text, /^hi\n\nSent by Yan's Personal Agent$/);
+    assert.match(got.text, /^hi\n\n\/\/ Sent by Yan's Personal Agent$/);
   });
 
   it("starts context synthesis in the background", async () => {

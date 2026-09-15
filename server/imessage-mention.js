@@ -36,8 +36,8 @@ export function isJypeThread(threadLabel) {
  */
 export function agentSentFooterFor(origin) {
   const platform = String(origin?.platform || origin?.channel || "").toLowerCase();
-  if (platform === "teams") return TEAMS_AGENT_SENT_FOOTER;
-  return AGENT_SENT_FOOTER;
+  if (platform === "email" || platform === "mail") return AGENT_SENT_FOOTER;
+  return TEAMS_AGENT_SENT_FOOTER;
 }
 
 /**
@@ -271,7 +271,7 @@ export function formatIMessageOriginBlock(origin, opts = {}) {
   lines.push(
     `Read the surrounding thread before answering: curl -sS --unix-socket /tmp/personal-agent-local.sock "http://localhost/imessage/thread?person=${threadQ}&limit=${threadLimit}" (iMessage skill).`,
     "The app and website thread is a normal Personal Agent chat. On long work, call send_chat_message first with a short status, then again when something new happens, the same as if this were typed in the app. Those bubbles stay in the app and website only. They are never sent to iMessage.",
-    "Write the final bubble as the text that should land in that iMessage (plain text, no markdown, no @agent). The app and website keep that final bubble as the end of the turn (the answer or what you did). Do not write Sent on iMessage. Do not add Sent by Yan's Personal Agent. The server appends that footer on the iMessage only, never in the app or website thread."
+    "Write the final bubble as the text that should land in that iMessage. Newlines work. Fake lists with • or dashes if you want them. iMessage does not render markdown (no bold or italic). No HTML tags, no @agent. The app and website keep that final bubble as the end of the turn (the answer or what you did). Do not write Sent on iMessage. Do not add // Sent by Yan's Personal Agent. The server appends that footer on the iMessage only, never in the app or website thread."
   );
   if (opts.deliverFinal !== false) {
     lines.push(
