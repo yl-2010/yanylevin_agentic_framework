@@ -26,11 +26,11 @@ export const FRIEND_HOURLY_LIMIT = 20;
 export const CONTACTS_TTL_MS = 60_000;
 export const PEOPLE_TTL_MS = 60_000;
 
-/** First remaining Grok turns per Pacific day, per platform. Then Composer. */
-export const GROK_DAILY = {
-  "alex-rivera": 16,
-  "example-friend": 8,
-  "example-neighbor": 8,
+/** Grok turns per Pacific clock hour, per platform. Then Composer. */
+export const GROK_HOURLY = {
+  "alex-rivera": FRIEND_HOURLY_LIMIT,
+  "example-friend": FRIEND_HOURLY_LIMIT / 2,
+  "example-neighbor": FRIEND_HOURLY_LIMIT / 2,
 };
 
 export const HOURLY_BY_SLUG = {
@@ -389,6 +389,7 @@ export async function takeGuestSlot(opts) {
   if (row.hourKey !== hour) {
     row.hourKey = hour;
     row.hourCount = 0;
+    row.grokCount = 0;
   }
   if (row.dayKey !== day) {
     row.dayKey = day;
@@ -401,7 +402,7 @@ export async function takeGuestSlot(opts) {
     return { overHourly: true, useGrok: false, hourCount: row.hourCount };
   }
   row.hourCount += 1;
-  const grokCap = Number(GROK_DAILY[slug]) || 0;
+  const grokCap = Number(GROK_HOURLY[slug]) || 0;
   let useGrok = false;
   if (grokCap > 0 && row.grokCount < grokCap) {
     row.grokCount += 1;
