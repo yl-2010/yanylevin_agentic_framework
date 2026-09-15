@@ -800,7 +800,17 @@ html[data-resolved-theme="dark"] .edu-back-shadow feGaussianBlur {
   width: 100%;
   min-width: 0;
   padding-left: 0.85rem;
-  border-left: 2px solid color-mix(in srgb, var(--fg) 14%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--fg) 10%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-resolved-theme="light"]) .edu-file-folder-children {
+    border-left-color: color-mix(in srgb, var(--fg) 14%, transparent);
+  }
+}
+
+html[data-resolved-theme="dark"] .edu-file-folder-children {
+  border-left-color: color-mix(in srgb, var(--fg) 14%, transparent);
 }
 
 .edu-file-folder-children[hidden] {
