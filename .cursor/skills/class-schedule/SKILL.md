@@ -40,8 +40,8 @@ Express may inject a **Live context** clock plus in-class-now / next / previous 
 
 Home **Classes** is two day panels, each sorted by **clock start time** (never period letter):
 
-- School day: today + following school day
-- Weekend / closed day: next school day + the one after
+- School day before last bell + 15 min (3:00 + buffer = 3:15 on a normal day): today + following school day
+- After that, or weekend / closed day: next school day + the one after
 - **A–H days** (`dayOverrides.*.allPeriods`): only the first panel — all eight periods in time order; no second day box
 - Current class highlighted in place (no pin-to-top)
 - Empty A–H slots (no real class that day) show the matching free-period shell when one exists

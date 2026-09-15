@@ -857,12 +857,43 @@
     };
   }
 
+  const SCHOOL_DAY_END_BUFFER_MINUTES = 15;
+  const DEFAULT_LAST_BELL_END_MINUTES = 15 * 60;
+
+  /** Last bell end for that calendar day (override slots, else default bells). */
+  function lastBellEndMinutes(parts, schedule) {
+    const override = dayOverride(parts, schedule);
+    const overrideSlots = Array.isArray(override?.slots)
+      ? override.slots
+      : Array.isArray(override?.meetings)
+        ? override.meetings
+        : null;
+    let max = null;
+    const consider = (end) => {
+      const mins = timeToMinutes(end);
+      if (mins == null) return;
+      if (max == null || mins > max) max = mins;
+    };
+    if (overrideSlots) {
+      overrideSlots.forEach((slot) => consider(slot?.end));
+      if (max != null) return max;
+    }
+    bells(schedule).forEach((bell) => consider(bell?.end));
+    return max != null ? max : DEFAULT_LAST_BELL_END_MINUTES;
+  }
+
+  /** Today still counts as a schedule panel until last bell plus 15 minutes. */
+  function schoolDayStillInSession(now, schedule) {
+    if (!isSchoolDay(now, schedule)) return false;
+    return now.minutes < lastBellEndMinutes(now, schedule) + SCHOOL_DAY_END_BUFFER_MINUTES;
+  }
+
   function classSections(schedule, classes) {
     const now = todayParts();
-    const todayIsSchool = isSchoolDay(now, schedule);
+    const showToday = schoolDayStillInSession(now, schedule);
     let day1;
     let day2;
-    if (todayIsSchool) {
+    if (showToday) {
       day1 = { y: now.y, m: now.m, day: now.day, weekday: now.weekday };
       day2 = nextSchoolDay(now, schedule, true);
     } else {
@@ -878,7 +909,7 @@
         label: title.plain,
         labelHtml: title.html,
         dateKey: dateKeyOf(day1),
-        isToday: todayIsSchool && day1.y === now.y && day1.m === now.m && day1.day === now.day,
+        isToday: showToday && day1.y === now.y && day1.m === now.m && day1.day === now.day,
         classes: classesForDay(day1, schedule, classes),
         nowMinutes: now.minutes,
         allPeriods,

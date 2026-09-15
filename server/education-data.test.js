@@ -18,6 +18,7 @@ import {
   activeMeetingAt,
   partitionClassTodos,
   stripTodoTagPrefix,
+  uiPanelDateKeys,
 } from "./education-data.js";
 
 describe("parseHiddenFileNames", () => {
@@ -480,5 +481,47 @@ describe("partitionClassTodos", () => {
   it("treats a missing list as empty", () => {
     assert.deepEqual(partitionClassTodos(null), { home: [], classOnly: [] });
     assert.deepEqual(partitionClassTodos(undefined), { home: [], classOnly: [] });
+  });
+});
+
+describe("uiPanelDateKeys", () => {
+  const schedule = {
+    schoolStart: "2026-09-02",
+    schoolEnd: "2027-06-11",
+    closedDates: ["2026-09-03", "2026-09-04", "2026-09-07", "2026-09-18", "2026-09-21"],
+    dayOverrides: {
+      "2026-09-02": { allPeriods: true, label: "AH" },
+    },
+  };
+
+  it("keeps today plus the next two school days", () => {
+    assert.deepEqual(uiPanelDateKeys(schedule, "2026-09-14"), [
+      "2026-09-14",
+      "2026-09-15",
+      "2026-09-16",
+    ]);
+  });
+
+  it("skips weekend to the next two school days", () => {
+    assert.deepEqual(uiPanelDateKeys(schedule, "2026-09-12"), [
+      "2026-09-14",
+      "2026-09-15",
+    ]);
+  });
+
+  it("still includes following days on an A-H date", () => {
+    assert.deepEqual(uiPanelDateKeys(schedule, "2026-09-02"), [
+      "2026-09-02",
+      "2026-09-08",
+      "2026-09-09",
+    ]);
+  });
+
+  it("skips a closed Friday to Monday", () => {
+    assert.deepEqual(uiPanelDateKeys(schedule, "2026-09-17"), [
+      "2026-09-17",
+      "2026-09-22",
+      "2026-09-23",
+    ]);
   });
 });

@@ -1227,26 +1227,28 @@ function nextSchoolDayParts(from, schedule, skipToday = true) {
   return null;
 }
 
-/** Dates the Classes panels may show (today + following school day, or next two). */
-function uiPanelDateKeys(schedule, todayKey) {
+/**
+ * Dates the Classes panels may show. Always include today (if a school day)
+ * plus the next two school days so the client can roll past last-bell+15
+ * without a refetch. A–H days still render as one panel on the client.
+ */
+export function uiPanelDateKeys(schedule, todayKey) {
   const now = parseYmdParts(todayKey);
   if (!now) return [todayKey];
-  const todayIsSchool = isSchoolDayParts(now, schedule);
   /** @type {string[]} */
   const keys = [];
-  let day1;
-  let day2;
-  if (todayIsSchool) {
-    day1 = now;
-    day2 = nextSchoolDayParts(now, schedule, true);
-  } else {
-    day1 = nextSchoolDayParts(now, schedule, true);
-    day2 = day1 ? nextSchoolDayParts(day1, schedule, true) : null;
-  }
-  if (day1) keys.push(ymdParts(day1));
-  const override = schedule?.dayOverrides?.[keys[0]];
-  if (override?.allPeriods) return keys;
-  if (day2) keys.push(ymdParts(day2));
+  const seen = new Set();
+  const push = (parts) => {
+    if (!parts) return;
+    const key = ymdParts(parts);
+    if (seen.has(key)) return;
+    seen.add(key);
+    keys.push(key);
+  };
+  if (isSchoolDayParts(now, schedule)) push(now);
+  const day1 = nextSchoolDayParts(now, schedule, true);
+  push(day1);
+  if (day1) push(nextSchoolDayParts(day1, schedule, true));
   return keys.length ? keys : [todayKey];
 }
 

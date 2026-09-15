@@ -44,6 +44,8 @@ struct DaySection: Identifiable, Hashable {
 
 enum EducationScheduleHelper {
     static let highlightLeadMinutes = 10
+    static let schoolDayEndBufferMinutes = 15
+    static let defaultLastBellEndMinutes = 15 * 60
 
     /// Port of `meetingHighlightStartMin` in server/education-data.js.
     static func highlightStartMin(
@@ -144,11 +146,11 @@ enum EducationScheduleHelper {
         )
         let now = todayParts()
         let query = ScheduleQuery(schedule: schedule)
-        let todayIsSchool = isSchoolDay(now, query: query)
+        let showToday = schoolDayStillInSession(now, query: query)
 
         let day1: YMD?
         let day2: YMD?
-        if todayIsSchool {
+        if showToday {
             day1 = now
             day2 = nextSchoolDay(from: now, query: query, skipToday: true)
         } else {
@@ -164,7 +166,7 @@ enum EducationScheduleHelper {
                 dateKey: dateKey(day1),
                 typeCode: title.typeCode,
                 whenLabel: title.when,
-                isToday: todayIsSchool && day1.y == now.y && day1.m == now.m && day1.day == now.day,
+                isToday: showToday && day1.y == now.y && day1.m == now.m && day1.day == now.day,
                 nowMinutes: now.minutes,
                 classes: classesForDay(
                     day1,
@@ -464,6 +466,20 @@ enum EducationScheduleHelper {
             cur = addDays(cur, 1)
         }
         return nil
+    }
+
+    private static func lastBellEndMinutes(_ p: YMD, query: ScheduleQuery) -> Int {
+        if let slots = dayOverride(p, schedule: query.schedule)?.slots {
+            let ends = slots.compactMap { timeToMinutes($0.end) }
+            if let max = ends.max() { return max }
+        }
+        let ends = query.sortedBells.compactMap { timeToMinutes($0.end) }
+        return ends.max() ?? defaultLastBellEndMinutes
+    }
+
+    private static func schoolDayStillInSession(_ now: YMD, query: ScheduleQuery) -> Bool {
+        guard isSchoolDay(now, query: query) else { return false }
+        return now.minutes < lastBellEndMinutes(now, query: query) + schoolDayEndBufferMinutes
     }
 
     private static func dayOverride(_ p: YMD, schedule: EducationSchedule) -> DayOverride? {
