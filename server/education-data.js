@@ -555,9 +555,14 @@ export async function resolveContextFile(email, opts) {
       folder = join(root, "projects", projectId, "todos", id);
     } else if (classId) {
       const entry = await classEntryForRoot(root, classId);
-      folder = entry
-        ? join(entry.objectDir, "todos", id)
-        : join(root, "classes", classId, "todos", id);
+      if (entry) {
+        folder = await firstExistingDir([
+          join(entry.classFolder || entry.objectDir, id),
+          join(entry.objectDir, "todos", id),
+        ]);
+      } else {
+        folder = join(root, "classes", classId, "todos", id);
+      }
     } else {
       folder = join(root, "todos", id);
     }
@@ -571,9 +576,14 @@ export async function resolveContextFile(email, opts) {
       folder = join(root, "projects", projectId, "dates", id);
     } else if (classId) {
       const entry = await classEntryForRoot(root, classId);
-      folder = entry
-        ? join(entry.objectDir, "dates", id)
-        : join(root, "classes", classId, "dates", id);
+      if (entry) {
+        folder = await firstExistingDir([
+          join(entry.classFolder || entry.objectDir, id),
+          join(entry.objectDir, "dates", id),
+        ]);
+      } else {
+        folder = join(root, "classes", classId, "dates", id);
+      }
     } else {
       folder = join(root, "dates", id);
     }
@@ -751,6 +761,19 @@ async function readJsonFile(path) {
   }
 }
 
+async function firstExistingDir(paths) {
+  for (const p of paths) {
+    if (!p) continue;
+    try {
+      const st = await stat(p);
+      if (st.isDirectory()) return p;
+    } catch {
+      /* try next */
+    }
+  }
+  return paths.find(Boolean) || null;
+}
+
 async function listDirs(dir) {
   try {
     const entries = await readdir(dir, { withFileTypes: true });
@@ -768,12 +791,13 @@ async function listDirs(dir) {
  * @returns {Promise<{
  *   id: string,
  *   objectDir: string,
+ *   classFolder: string,
  *   onedriveFolder: string|null,
  *   source: "onedrive"|"education",
  * }[]>}
  */
 export async function listClassEntriesForRoot(root) {
-  /** @type {Map<string, { id: string, objectDir: string, onedriveFolder: string|null, source: "onedrive"|"education" }>} */
+  /** @type {Map<string, { id: string, objectDir: string, classFolder: string, onedriveFolder: string|null, source: "onedrive"|"education" }>} */
   const byId = new Map();
   const meta = (await readJsonFile(join(root, "meta.json"))) || {};
   const gradeDir = gradeDirFromMeta(meta);
@@ -787,6 +811,7 @@ export async function listClassEntriesForRoot(root) {
     byId.set(id, {
       id,
       objectDir,
+      classFolder: objectDir,
       onedriveFolder: String(props.onedriveFolder || "").trim() || null,
       source: "education",
     });
@@ -797,6 +822,7 @@ export async function listClassEntriesForRoot(root) {
       includeHidden: true,
     });
     for (const name of folderNames) {
+      const classFolder = join(gradeDir, name);
       for (const objectDir of await listClassObjectDirs(gradeDir, name)) {
         const props = await readJsonFile(join(objectDir, "class.json"));
         if (!props || typeof props !== "object") continue;
@@ -805,6 +831,7 @@ export async function listClassEntriesForRoot(root) {
         byId.set(id, {
           id,
           objectDir,
+          classFolder,
           onedriveFolder: name,
           source: "onedrive",
         });
@@ -872,6 +899,57 @@ export function classTrimesters(cls) {
  * @param {{ trimesters?: Record<string, { start?: string, end?: string }> }|null|undefined} schedule
  * @returns {"fall"|"winter"|"spring"|null}
  */
+function normalizePeriodMap(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  /** @type {Record<string, string>} */
+  const out = {};
+  for (const key of TRI_KEYS) {
+    const letter = String(raw[key] || "")
+      .trim()
+      .toUpperCase();
+    if (letter) out[key] = letter;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/**
+ * Trimester → period letter when `period` is a map, or `periods` on the
+ * published class row.
+ * @param {object|null|undefined} cls
+ * @returns {Record<string, string>|null}
+ */
+export function classPeriodsMap(cls) {
+  if (!cls || typeof cls !== "object") return null;
+  if (cls.period && typeof cls.period === "object" && !Array.isArray(cls.period)) {
+    return normalizePeriodMap(cls.period);
+  }
+  if (cls.periods && typeof cls.periods === "object" && !Array.isArray(cls.periods)) {
+    return normalizePeriodMap(cls.periods);
+  }
+  return null;
+}
+
+/**
+ * Period letter for a class on a YYYY-MM-DD.
+ * @param {object|null|undefined} cls
+ * @param {string} dateKey
+ * @param {object|null|undefined} schedule
+ */
+export function classPeriodOnDate(cls, dateKey, schedule) {
+  const map = classPeriodsMap(cls);
+  if (map) {
+    const term = trimesterForDate(dateKey, schedule);
+    if (term && map[term]) return map[term];
+    for (const key of TRI_KEYS) {
+      if (map[key]) return map[key];
+    }
+    return "";
+  }
+  return String(cls?.period || "")
+    .trim()
+    .toUpperCase();
+}
+
 export function trimesterForDate(dateKey, schedule) {
   const key = String(dateKey || "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
@@ -967,7 +1045,7 @@ export function isFreePeriodClass(cls) {
  * @param {Record<string, string[]>} activeClassIdsByDate
  * @param {object[]} classes
  */
-function pruneFreePeriodsWhenOccupied(activeClassIdsByDate, classes) {
+function pruneFreePeriodsWhenOccupied(activeClassIdsByDate, classes, schedule) {
   const byId = new Map(classes.map((c) => [c.id, c]));
   for (const dateKey of Object.keys(activeClassIdsByDate)) {
     const ids = activeClassIdsByDate[dateKey];
@@ -975,13 +1053,13 @@ function pruneFreePeriodsWhenOccupied(activeClassIdsByDate, classes) {
     for (const id of ids) {
       const c = byId.get(id);
       if (!c || isFreePeriodClass(c)) continue;
-      const p = String(c.period || "").toUpperCase();
+      const p = classPeriodOnDate(c, dateKey, schedule);
       if (p) occupied.add(p);
     }
     activeClassIdsByDate[dateKey] = ids.filter((id) => {
       const c = byId.get(id);
       if (!c || !isFreePeriodClass(c)) return true;
-      const p = String(c.period || "").toUpperCase();
+      const p = classPeriodOnDate(c, dateKey, schedule);
       return Boolean(p) && !occupied.has(p);
     });
   }
@@ -1028,6 +1106,7 @@ async function loadObjectFolder(
   /** @type {object[]} */
   const out = [];
   for (const id of ids) {
+    if (String(id).startsWith(".")) continue;
     const objectDir = join(parentDir, id);
     const jsonPath = join(objectDir, fileName);
     const props = await readJsonFile(jsonPath);
@@ -1048,6 +1127,25 @@ async function loadObjectFolder(
     out.push(item);
   }
   return out;
+}
+
+async function loadClassScopedObjects(entry, kind, opts) {
+  const nestedName = kind === "todo" ? "todos" : "dates";
+  /** @type {Map<string, object>} */
+  const byId = new Map();
+  const classFolder = entry.classFolder || entry.objectDir;
+  const parents = [];
+  if (classFolder) parents.push(classFolder);
+  if (entry.objectDir) {
+    const nested = join(entry.objectDir, nestedName);
+    if (nested !== classFolder) parents.push(nested);
+  }
+  for (const parent of parents) {
+    for (const item of await loadObjectFolder(parent, kind, opts)) {
+      if (!byId.has(item.id)) byId.set(item.id, item);
+    }
+  }
+  return [...byId.values()];
 }
 
 /**
@@ -1109,7 +1207,7 @@ export function scheduleNowParts(schedule, now = new Date()) {
   };
 }
 
-function timeToMinutes(t) {
+export function timeToMinutes(t) {
   const m = String(t || "").match(/^(\d{1,2}):(\d{2})$/);
   if (!m) return null;
   return Number(m[1]) * 60 + Number(m[2]);
@@ -1208,7 +1306,7 @@ function formatMinutes(mins) {
  * @param {{ dateKey: string, weekday: number }} day
  * @param {Set<string>|null} allowedIds
  */
-function classesForDayParts(schedule, classes, day, allowedIds) {
+export function classesForDayParts(schedule, classes, day, allowedIds) {
   const visible = (classes || []).filter((c) => {
     if (isFixture(c)) return false;
     if (allowedIds) return allowedIds.has(c.id);
@@ -1218,8 +1316,9 @@ function classesForDayParts(schedule, classes, day, allowedIds) {
   function classForPeriod(period) {
     const letter = String(period || "").toUpperCase();
     if (!letter) return null;
+    const dateKey = day?.dateKey || "";
     const matches = visible.filter(
-      (c) => String(c.period || "").toUpperCase() === letter
+      (c) => classPeriodOnDate(c, dateKey, schedule) === letter
     );
     if (!matches.length) return null;
     return matches.find((c) => !isFreePeriodClass(c)) || matches[0];
@@ -1375,7 +1474,7 @@ export async function resolveNowScheduleContext(email, now = new Date()) {
   };
 }
 
-function parseYmdParts(dateKey) {
+export function parseYmdParts(dateKey) {
   const m = String(dateKey || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return null;
   const y = Number(m[1]);
@@ -1388,7 +1487,7 @@ function parseYmdParts(dateKey) {
   return { y, m: mo, day: d, weekday: dt.getDay() };
 }
 
-function addDaysParts(parts, delta) {
+export function addDaysParts(parts, delta) {
   const dt = new Date(parts.y, parts.m - 1, parts.day + delta);
   return {
     y: dt.getFullYear(),
@@ -1402,7 +1501,7 @@ function ymdParts(parts) {
   return `${parts.y}-${String(parts.m).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
 }
 
-function isSchoolDayParts(parts, schedule) {
+export function isSchoolDayParts(parts, schedule) {
   if (parts.weekday === 0 || parts.weekday === 6) return false;
   const key = ymdParts(parts);
   const closed = Array.isArray(schedule?.closedDates)
@@ -1450,17 +1549,21 @@ export function uiPanelDateKeys(schedule, todayKey) {
   return keys.length ? keys : [todayKey];
 }
 
-/** Strip trimester metadata before sending the tree to the web UI. */
+/** Keep trimester ranges on the client so period maps resolve per day. */
 function publicSchedule(schedule) {
   if (!schedule || typeof schedule !== "object") return {};
-  const { trimesters, ...rest } = schedule;
-  return rest;
+  return { ...schedule };
 }
 
-function publicClassProps(cls) {
+function publicClassProps(cls, dateKey, schedule) {
   if (!cls || typeof cls !== "object") return cls;
-  const { trimester, ...rest } = cls;
-  return rest;
+  const { trimester, period, periods, ...rest } = cls;
+  const map = classPeriodsMap(cls);
+  const letter = classPeriodOnDate(cls, dateKey, schedule);
+  /** @type {Record<string, unknown>} */
+  const out = { ...rest, period: letter || undefined };
+  if (map) out.periods = map;
+  return out;
 }
 
 /**
@@ -1531,11 +1634,11 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
       activeClassIdsByDate[k].push(classId);
     }
 
-    const classTodos = await loadObjectFolder(join(classDir, "todos"), "todo", {
+    const classTodos = await loadClassScopedObjects(entry, "todo", {
       includeFixtures,
       classId,
     });
-    const classDates = await loadObjectFolder(join(classDir, "dates"), "date", {
+    const classDates = await loadClassScopedObjects(entry, "date", {
       includeFixtures,
       classId,
     });
@@ -1559,7 +1662,9 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
       fileOpts.bottomNames
     );
 
-    const published = includeFixtures ? cls : publicClassProps(cls);
+    const published = includeFixtures
+      ? cls
+      : publicClassProps(cls, todayKey, schedule);
     const { home: homeTodos, classOnly: classOnlyTodos } =
       partitionClassTodos(classTodos);
     /** @type {Record<string, unknown>} */
@@ -1578,7 +1683,7 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
   }
 
   if (!includeFixtures) {
-    pruneFreePeriodsWhenOccupied(activeClassIdsByDate, classes);
+    pruneFreePeriodsWhenOccupied(activeClassIdsByDate, classes, schedule);
   }
 
   const projectIds = await listDirs(join(root, "projects"));
@@ -1713,6 +1818,8 @@ export async function findTodo(
   } else if (scopedClass) {
     const entry = await classEntryForRoot(root, scopedClass);
     if (entry) {
+      const classFolder = entry.classFolder || entry.objectDir;
+      candidates.push(join(classFolder, id, "todo.json"));
       candidates.push(join(entry.objectDir, "todos", id, "todo.json"));
     } else {
       candidates.push(
@@ -1722,6 +1829,8 @@ export async function findTodo(
   } else {
     candidates.push(join(root, "todos", id, "todo.json"));
     for (const entry of await listClassEntriesForRoot(root)) {
+      const classFolder = entry.classFolder || entry.objectDir;
+      candidates.push(join(classFolder, id, "todo.json"));
       candidates.push(join(entry.objectDir, "todos", id, "todo.json"));
     }
     const projectIds = await listDirs(join(root, "projects"));
@@ -1737,9 +1846,13 @@ export async function findTodo(
       let resolvedProject = scopedProject;
       if (!resolvedClass && !resolvedProject) {
         const entries = await listClassEntriesForRoot(root);
-        const hit = entries.find(
-          (e) => path === e.objectDir || path.startsWith(e.objectDir + "/")
-        );
+        const hit = entries.find((e) => {
+          const classFolder = e.classFolder || e.objectDir;
+          return (
+            path.startsWith(classFolder + "/") ||
+            path.startsWith(e.objectDir + "/")
+          );
+        });
         if (hit) resolvedClass = hit.id;
         const pm = path.match(/\/projects\/([^/]+)\/todos\//);
         if (pm) resolvedProject = pm[1];
@@ -1785,6 +1898,7 @@ export async function setTodoDone(
     delete next.completedAt;
   }
   await writeFile(found.path, JSON.stringify(next, null, 2) + "\n", "utf8");
+  queueOnedriveVisibility(email);
 
   const rel = found.path.startsWith(ROOT + "/")
     ? found.path.slice(ROOT.length + 1)
@@ -1944,3 +2058,9 @@ export async function userTreeMtime(email) {
 }
 
 export { ROOT as REPO_ROOT };
+
+function queueOnedriveVisibility(email) {
+  import("./education-onedrive-visibility.js")
+    .then((m) => m.syncOnedriveObjectVisibility(email))
+    .catch((err) => console.error("[onedrive-visibility]", err));
+}

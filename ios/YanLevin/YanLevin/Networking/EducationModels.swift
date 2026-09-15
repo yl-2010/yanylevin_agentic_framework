@@ -106,6 +106,25 @@ struct EducationSchedule: Decodable {
     let weekdayPeriods: [String: [String]]?
     let closedDates: [String]?
     let dayOverrides: [String: DayOverride]?
+    let trimesters: [String: EducationTermRange]?
+
+    func trimesterName(for dateKey: String) -> String? {
+        let keys = ["fall", "winter", "spring"]
+        for name in keys {
+            guard let range = trimesters?[name],
+                  let start = range.start, !start.isEmpty,
+                  let end = range.end, !end.isEmpty,
+                  dateKey >= start, dateKey <= end
+            else { continue }
+            return name
+        }
+        return nil
+    }
+}
+
+struct EducationTermRange: Decodable {
+    let start: String?
+    let end: String?
 }
 
 struct DayOverride: Decodable {
@@ -146,6 +165,7 @@ struct EducationClass: Decodable, Identifiable, Hashable {
     let teacher: String?
     let room: String?
     let period: String?
+    let periods: [String: String]?
     let freePeriod: Bool?
     let detail: String?
     /// Optional Canvas gradebook URL — toolbar button only when set (or derived).
@@ -159,8 +179,18 @@ struct EducationClass: Decodable, Identifiable, Hashable {
     let dates: [EducationDate]?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, teacher, room, period, freePeriod, canvasLink, canvasScoreLabel, files, todos, classOnlyTodos, dates
+        case id, name, teacher, room, period, periods, freePeriod, canvasLink, canvasScoreLabel, files, todos, classOnlyTodos, dates
         case detail = "description"
+    }
+
+    func periodLetter(on dateKey: String, schedule: EducationSchedule?) -> String {
+        if let periods, !periods.isEmpty {
+            if let term = schedule?.trimesterName(for: dateKey),
+               let letter = periods[term], !letter.isEmpty {
+                return letter.uppercased()
+            }
+        }
+        return (period ?? "").uppercased()
     }
 
     var isFreePeriod: Bool { freePeriod == true }
@@ -211,6 +241,7 @@ struct EducationClass: Decodable, Identifiable, Hashable {
             teacher: teacher,
             room: room,
             period: period,
+            periods: periods,
             freePeriod: freePeriod,
             detail: detail,
             canvasLink: canvasLink,

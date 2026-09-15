@@ -197,6 +197,9 @@ describe("listOnedriveTree", () => {
     await writeFile(join(dir, ".DS_Store"), "skip");
     await mkdir(join(dir, "todos", "hw-1"), { recursive: true });
     await writeFile(join(dir, "todos", "hw-1", "todo.json"), "{}");
+    await mkdir(join(dir, "hw-personal-infographic"), { recursive: true });
+    await writeFile(join(dir, "hw-personal-infographic", "todo.json"), "{}");
+    await writeFile(join(dir, "hw-personal-infographic", "notes.pdf"), "pdf");
     await mkdir(join(dir, ".education"), { recursive: true });
     await writeFile(join(dir, ".education", "class.json"), "{}");
     const t0 = new Date("2024-01-01T00:00:00Z");

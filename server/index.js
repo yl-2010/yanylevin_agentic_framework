@@ -44,6 +44,10 @@ import { startChatTitleRefreshScheduler } from "./chat-title-refresh-agent.js";
 import { startLifeStateCleanupScheduler } from "./life-state-cleanup-agent.js";
 import { startCanvasSyncScheduler, applyLiveCanvasOverlay, seedLiveCanvasTodoDone, syncCanvasTodoDone, YAN_EMAIL } from "./canvas-sync.js";
 import { canonicalizeEmail } from "./identity.js";
+import {
+  revealOpenEducationObject,
+  syncOnedriveObjectVisibility,
+} from "./education-onedrive-visibility.js";
 import { startHealthTakeawaysScheduler } from "./health-takeaways-agent.js";
 import { startLocationBrainScheduler } from "./location-brain-agent.js";
 import { startHealthBrainScheduler } from "./health-brain-agent.js";
@@ -533,6 +537,14 @@ app.post("/api/education/health", requireYanHealthWriter, async (req, res) => {
 
 app.get("/api/education/data", requireEducationUser, async (req, res) => {
   try {
+    try {
+      await revealOpenEducationObject(req.user.email, req.query || {});
+    } catch (err) {
+      console.error("[onedrive-reveal]", err);
+    }
+    syncOnedriveObjectVisibility(req.user.email).catch((err) =>
+      console.error("[onedrive-visibility]", err)
+    );
     const tree = await readEducationTree(req.user.email);
     const live = /^(1|true|yes)$/i.test(String(req.query?.live || ""));
     if (canonicalizeEmail(req.user.email) === YAN_EMAIL) {

@@ -85,6 +85,7 @@ struct EducationView: View {
             }
         }
         .task(id: liveTaskID) {
+            store.focus = educationFocus
             guard let token = auth.session?.token else { return }
             await store.load(token: token)
             applyEducationTodoHandoff()
@@ -93,6 +94,7 @@ struct EducationView: View {
             await store.runLiveSession(token: token)
         }
         .onAppear {
+            store.focus = educationFocus
             applyEducationTodoHandoff()
             applyEducationClassHandoff()
         }

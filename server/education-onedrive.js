@@ -212,6 +212,18 @@ function isIgnorableFsName(name) {
   return false;
 }
 
+async function dirHasPropertyJson(abs) {
+  for (const name of ["todo.json", "date.json"]) {
+    try {
+      const st = await stat(join(abs, name));
+      if (st.isFile()) return true;
+    } catch {
+      /* missing */
+    }
+  }
+  return false;
+}
+
 /**
  * @param {string} gradeDir
  * @returns {Promise<string[]>}
@@ -311,6 +323,7 @@ export async function listOnedriveTree(dir, opts = {}) {
       const mtimeMs = st.mtimeMs;
       const mtime = new Date(mtimeMs).toISOString();
       if (entry.isDirectory() || st.isDirectory()) {
+        if (await dirHasPropertyJson(abs)) continue;
         const files = await listOnedriveTree(abs, {
           relPrefix: rel,
           depth: depth + 1,

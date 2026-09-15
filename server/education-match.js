@@ -229,31 +229,63 @@ function formatLine(row, dayKey, timeKey) {
  * Compact prompt block of existing non-fixture dates and open todos.
  * @param {string} [userRoot]
  */
+function mergeUniqueById(existing, incoming) {
+  const seen = new Set(existing.map((row) => row.id));
+  const out = [...existing];
+  for (const row of incoming) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    out.push(row);
+  }
+  return out;
+}
+
 export async function loadEducationActionIndex(userRoot = defaultEducationRoot()) {
-  const dates = [
+  let dates = [
     ...(await loadObjects(join(userRoot, "dates"), "date.json", "user-level", "dates")),
   ];
-  const todos = [
+  let todos = [
     ...(await loadObjects(join(userRoot, "todos"), "todo.json", "user-level", "todos")),
   ];
 
   for (const entry of await listClassEntriesForRoot(userRoot)) {
     const parent = `class:${entry.id}`;
-    dates.push(
-      ...(await loadObjects(
+    const classFolder = entry.classFolder || entry.objectDir;
+    dates = mergeUniqueById(
+      dates,
+      await loadObjects(
+        classFolder,
+        "date.json",
+        parent,
+        `classes/${entry.id}/dates`
+      )
+    );
+    dates = mergeUniqueById(
+      dates,
+      await loadObjects(
         join(entry.objectDir, "dates"),
         "date.json",
         parent,
         `classes/${entry.id}/dates`
-      ))
+      )
     );
-    todos.push(
-      ...(await loadObjects(
+    todos = mergeUniqueById(
+      todos,
+      await loadObjects(
+        classFolder,
+        "todo.json",
+        parent,
+        `classes/${entry.id}/todos`
+      )
+    );
+    todos = mergeUniqueById(
+      todos,
+      await loadObjects(
         join(entry.objectDir, "todos"),
         "todo.json",
         parent,
         `classes/${entry.id}/todos`
-      ))
+      )
     );
   }
 

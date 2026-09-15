@@ -761,11 +761,34 @@
   }
 
   /** Prefer a real class over a free-period shell for the same letter. */
-  function classForPeriod(visible, period) {
+  function trimesterForDate(dateKey, schedule) {
+    const key = String(dateKey || "");
+    const map = schedule?.trimesters;
+    if (!map || typeof map !== "object") return null;
+    for (const name of ["fall", "winter", "spring"]) {
+      const range = map[name];
+      if (!range || typeof range !== "object") continue;
+      const start = String(range.start || "");
+      const end = String(range.end || "");
+      if (start && end && key >= start && key <= end) return name;
+    }
+    return null;
+  }
+
+  function classPeriodLetter(cls, dateKey, schedule) {
+    const map = cls?.periods && typeof cls.periods === "object" ? cls.periods : null;
+    if (map) {
+      const term = trimesterForDate(dateKey, schedule);
+      if (term && map[term]) return String(map[term]).toUpperCase();
+    }
+    return String(cls?.period || "").toUpperCase();
+  }
+
+  function classForPeriod(visible, period, dateKey, schedule) {
     const letter = String(period || "").toUpperCase();
     if (!letter) return null;
     const matches = (visible || []).filter(
-      (c) => String(c.period || "").toUpperCase() === letter
+      (c) => classPeriodLetter(c, dateKey, schedule) === letter
     );
     if (!matches.length) return null;
     return matches.find((c) => !isFreePeriodClass(c)) || matches[0];
@@ -796,7 +819,7 @@
       overrideSlots.forEach((slot) => {
         const period = String(slot?.period || "").toUpperCase();
         if (!period) return;
-        const cls = classForPeriod(visible, period);
+        const cls = classForPeriod(visible, period, dayKey, schedule);
         if (!cls) return;
         const start = slot.start;
         const end = slot.end;
@@ -815,7 +838,7 @@
       periods.forEach((period, i) => {
         const bell = bellList[i];
         if (!bell) return;
-        const cls = classForPeriod(visible, period);
+        const cls = classForPeriod(visible, period, dayKey, schedule);
         if (!cls) return;
         out.push({
           class: cls,
@@ -1618,7 +1641,7 @@
    * @returns {{ dateKey: string, start: string, end: string, period: string } | null}
    */
   function nextClassOccurrence(cls, schedule) {
-    if (!cls?.period) return null;
+    if (!cls?.period && !(cls?.periods && typeof cls.periods === "object")) return null;
     const now = todayParts();
     let day = { y: now.y, m: now.m, day: now.day, weekday: now.weekday };
     for (let i = 0; i < 60; i++) {
@@ -2734,7 +2757,18 @@
   async function fetchData({ live = false } = {}) {
     const mac = window.YanMacApi;
     if (!mac) throw new Error("YanMacApi missing");
-    const path = live ? "/api/education/data?live=1" : "/api/education/data";
+    const r = parseRoute();
+    const qs = new URLSearchParams();
+    if (live) qs.set("live", "1");
+    if (r.view && r.view !== "home") qs.set("view", r.view);
+    if (r.itemId && (r.view === "todo" || r.view === "capsule")) {
+      qs.set("todoId", r.itemId);
+    }
+    if (r.itemId && r.view === "date") qs.set("dateId", r.itemId);
+    if (r.classId) qs.set("classId", r.classId);
+    if (r.projectId) qs.set("projectId", r.projectId);
+    const q = qs.toString();
+    const path = q ? `/api/education/data?${q}` : "/api/education/data";
     const res = await mac.macFetch(path, {
       timeoutMs: live ? 45_000 : 30_000,
     });

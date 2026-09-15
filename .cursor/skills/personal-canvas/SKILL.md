@@ -80,7 +80,7 @@ When at least one class maps, sync **only** those mapped classes and continue be
 For every snapshot assignment whose `courseId` is mapped:
 
 - Match an existing todo in that class by `canvasId`, then `canvasLink`, then same **name + parent + dueDate**.
-- **Create** if none, unless it looks like a row in `education/you@example.com/deleted.md`. Judgement, not exact due clocks. `canvasId` is a strong hint; similar name + class in the same year is enough. Skip those. Folder id: kebab of the title, unique in that class `todos/`. Set `createdAt` now. `done: false` on create only.
+- Create if none, unless it looks like a row in `education/you@example.com/deleted.md`. Judgement, not exact due clocks. `canvasId` is a strong hint; similar name + class in the same year is enough. Skip those. Folder id: kebab of the title, unique in that class folder. Set `createdAt` now. `done: false` on create only.
 - **Update** name, `dueDate`, `dueTime`, `tag`, `description`, `canvasLink`, `canvasId` when Canvas changed.
 - Prefer snapshot `dueDate` / `dueTime` (already in the briefing timezone). Undated Canvas rows may omit due fields.
 - **Advanced Calculus HW (Yan, 2026-09-10):** For `advanced-calculus` todos with `tag: "HW"`, do **not** use the Canvas due as the dashboard due. Canvas is typically two period-C meetings after the start day. Set `dueDate` / `dueTime` to the **previous** period-C meeting before Canvas due, at that day's C start from `schedule.json` (`bells` / `dayOverrides`). Match by `canvasId` first so a shifted due still updates the same todo. Do not pull those dues back to Canvas on later syncs. Leave MA / QA / CW on Canvas times. If Canvas due is not on a C meeting, leave Canvas times.
@@ -101,7 +101,7 @@ For every snapshot assignment whose `courseId` is mapped:
 
 Read each mapped course `syllabus` plus snapshot `events[]`. Create/update **important dates** (exams, concerts, trips, conferences, no-school mentioned in the syllabus, unit tests called out as calendar events). Skip routine class meetings.
 
-- Match by `canvasId` / `canvasLink` / same name+date in that class `dates/`. Also treat **similar names** on that date as the same event (advisor/advisory, stripped years). Update in place; never a second slug.
+- Match by `canvasId` / `canvasLink` / same name+date in that class folder. Also treat **similar names** on that date as the same event (advisor/advisory, stripped years). Update in place; never a second slug.
 - Skip create if the date looks like a `deleted.md` row (same judgement as todos).
 - Set `date`, optional `time`, markdown `description` when there are real facts, `canvasLink` (event url or course `syllabusUrl`), optional `canvasId`.
 - Do not turn syllabus fluff into dates.

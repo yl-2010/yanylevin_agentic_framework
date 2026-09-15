@@ -13,14 +13,14 @@ description: >-
 
 **One `.html` file. That is the whole page.** Inline `<style>` and `<script>`. No `styles.css`, no `theme.js`, no `sun-theme.js` sitting next to it, no `<link>` / `<script src>`. The dashboard opens a blob of that single file (web) or Quick Look (iOS). Sibling assets do not load.
 
-Dropped next to `todo.json` / `date.json` / `project.json`, or in the class OneDrive folder for class-level pages. No `/education/styles.css`, no liquid glass, no Karla, no YL orbs.
+Dropped next to `todo.json` / `date.json` / `project.json`, or in the class OneDrive folder only when the page is class-level (not a todo). No `/education/styles.css`, no liquid glass, no Karla, no YL orbs.
 
 Public yanylevin.com pages are `.cursor/skills/yanylevin-webpage-create/SKILL.md`. Chat HTML fences are `.cursor/skills/chat-widgets/SKILL.md`. Copies of a live liquid-glass page into a project stay copies of that page.
 
 **Canonical clone.** Copy chrome from these, do not invent a new look:
 
-- Layout + light tokens: `$HOME/Documents/11th Grade/F. American Lit/.education/todos/summer-reading-when-the-emperor-was-divine/quotes.html`
-- Dark tokens + optional good/bad marks: `$HOME/Documents/11th Grade/D. Spanish 4/.education/todos/hw-8-9-de-septiembre-cuestionario-inicio-de-ano/errores.html`
+- Layout + light tokens: `$HOME/Documents/11th Grade/F. American Lit/summer-reading-when-the-emperor-was-divine/quotes.html`
+- Dark tokens + optional good/bad marks: `$HOME/Documents/11th Grade/D. Spanish 4/hw-8-9-de-septiembre-cuestionario-inicio-de-ano/errores.html`
 
 Do not run the frontend-design unique-aesthetic playbook. No Inter, no purple, no new display font.
 
@@ -30,8 +30,8 @@ Apply Unslop to headings and agent-written copy. Quoted source text can keep the
 
 | Ask | File |
 |---|---|
-| Quotes on a class todo | that class’s OneDrive `.education/todos/<todoId>/quotes.html` |
-| Errors on a class todo | `…/.education/todos/<todoId>/errores.html` (or `errors.html`) |
+| Quotes on a class todo | that class’s OneDrive `<todoId>/quotes.html` |
+| Errors on a class todo | `…/<todoId>/errores.html` (or `errors.html`) |
 | Notes on a project | `education/<email>/projects/<id>/notes.html` |
 | Anything on a **class** page | the visible class OneDrive folder (e.g. `…/11th Grade/H. Physics/quotes.html`). Not `.education/`, not `education/<email>/classes/`. |
 

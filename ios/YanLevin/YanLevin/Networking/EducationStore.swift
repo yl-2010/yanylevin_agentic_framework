@@ -567,6 +567,7 @@ final class EducationStore: ObservableObject {
     @Published var chatHistoryLoading = false
     @Published var agentNavigate: AgentEducationNavigate?
     @Published private(set) var treeEpoch = 0
+    weak var focus: EducationFocusStore?
 
     private let sse = MacSSEClient()
     private var liveToken: String?
@@ -841,6 +842,23 @@ final class EducationStore: ObservableObject {
             ]
             if live {
                 query.append(URLQueryItem(name: "live", value: "1"))
+            }
+            if let ui = focus?.agentUiContext(tree: tree) {
+                if let view = ui.view, !view.isEmpty {
+                    query.append(URLQueryItem(name: "view", value: view))
+                }
+                if let todoId = ui.todoId, !todoId.isEmpty {
+                    query.append(URLQueryItem(name: "todoId", value: todoId))
+                }
+                if let dateId = ui.dateId, !dateId.isEmpty {
+                    query.append(URLQueryItem(name: "dateId", value: dateId))
+                }
+                if let classId = ui.classId, !classId.isEmpty {
+                    query.append(URLQueryItem(name: "classId", value: classId))
+                }
+                if let projectId = ui.projectId, !projectId.isEmpty {
+                    query.append(URLQueryItem(name: "projectId", value: projectId))
+                }
             }
             let (data, http) = try await APIClient.shared.requestRaw(
                 "api/education/data",

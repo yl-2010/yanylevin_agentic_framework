@@ -220,7 +220,7 @@ enum EducationScheduleHelper {
         schedule: EducationSchedule?,
         activeClassIdsByDate: [String: [String]]?
     ) -> NextClassOccurrence? {
-        guard let period = cls.period, !period.isEmpty else { return nil }
+        guard cls.period != nil || !(cls.periods ?? [:]).isEmpty else { return nil }
         let schedule = schedule ?? EducationSchedule(
             timezone: nil,
             schoolStart: nil,
@@ -520,7 +520,12 @@ enum EducationScheduleHelper {
             for slot in overrideSlots {
                 let period = (slot.period ?? "").uppercased()
                 guard !period.isEmpty else { continue }
-                guard let cls = classForPeriod(visible, period: period) else { continue }
+                guard let cls = classForPeriod(
+                    visible,
+                    period: period,
+                    dateKey: dayKey,
+                    schedule: schedule
+                ) else { continue }
                 out.append(DayClass(
                     cls: cls,
                     period: period,
@@ -537,7 +542,12 @@ enum EducationScheduleHelper {
                 guard i < bellList.count else { continue }
                 let bell = bellList[i]
                 let period = periodRaw.uppercased()
-                guard let cls = classForPeriod(visible, period: period) else { continue }
+                guard let cls = classForPeriod(
+                    visible,
+                    period: period,
+                    dateKey: dayKey,
+                    schedule: schedule
+                ) else { continue }
                 out.append(DayClass(
                     cls: cls,
                     period: period,
@@ -551,8 +561,15 @@ enum EducationScheduleHelper {
         return out.sorted { ($0.startMin ?? 0) < ($1.startMin ?? 0) }
     }
 
-    private static func classForPeriod(_ visible: [EducationClass], period: String) -> EducationClass? {
-        let matches = visible.filter { ($0.period ?? "").uppercased() == period }
+    private static func classForPeriod(
+        _ visible: [EducationClass],
+        period: String,
+        dateKey: String,
+        schedule: EducationSchedule
+    ) -> EducationClass? {
+        let matches = visible.filter {
+            $0.periodLetter(on: dateKey, schedule: schedule) == period
+        }
         guard !matches.isEmpty else { return nil }
         return matches.first(where: { !$0.isFreePeriod }) ?? matches[0]
     }

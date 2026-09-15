@@ -100,26 +100,46 @@ function collectDate({ slug, parentEdge, dirPath, sourceRel }) {
 
 // Todos/dates nested under a class or project get a `<parent>--<slug>` mirror
 // slug so top-level and nested names cannot collide.
-function collectChildren(stubs, parentDir, parentId, parentSlug) {
-  for (const child of listDirs(path.join(parentDir, "todos"))) {
-    stubs.push(
-      collectTodo({
-        slug: `${parentSlug}--${child}`,
-        parentEdge: { type: "part_of", to: parentId },
-        dirPath: path.join(parentDir, "todos", child),
-        sourceRel: path.relative(EDU_ROOT, path.join(parentDir, "todos", child, "todo.json")),
-      }),
-    );
+function collectChildren(stubs, parentDir, parentId, parentSlug, classFolder) {
+  const todoParents = [];
+  if (classFolder && classFolder !== parentDir) todoParents.push(classFolder);
+  todoParents.push(path.join(parentDir, "todos"));
+  const dateParents = [];
+  if (classFolder && classFolder !== parentDir) dateParents.push(classFolder);
+  dateParents.push(path.join(parentDir, "dates"));
+  const seenTodos = new Set();
+  const seenDates = new Set();
+  for (const dir of todoParents) {
+    for (const child of listDirs(dir)) {
+      if (seenTodos.has(child)) continue;
+      const todoPath = path.join(dir, child, "todo.json");
+      if (!fs.existsSync(todoPath)) continue;
+      seenTodos.add(child);
+      stubs.push(
+        collectTodo({
+          slug: `${parentSlug}--${child}`,
+          parentEdge: { type: "part_of", to: parentId },
+          dirPath: path.join(dir, child),
+          sourceRel: path.relative(EDU_ROOT, todoPath),
+        }),
+      );
+    }
   }
-  for (const child of listDirs(path.join(parentDir, "dates"))) {
-    stubs.push(
-      collectDate({
-        slug: `${parentSlug}--${child}`,
-        parentEdge: { type: "part_of", to: parentId },
-        dirPath: path.join(parentDir, "dates", child),
-        sourceRel: path.relative(EDU_ROOT, path.join(parentDir, "dates", child, "date.json")),
-      }),
-    );
+  for (const dir of dateParents) {
+    for (const child of listDirs(dir)) {
+      if (seenDates.has(child)) continue;
+      const datePath = path.join(dir, child, "date.json");
+      if (!fs.existsSync(datePath)) continue;
+      seenDates.add(child);
+      stubs.push(
+        collectDate({
+          slug: `${parentSlug}--${child}`,
+          parentEdge: { type: "part_of", to: parentId },
+          dirPath: path.join(dir, child),
+          sourceRel: path.relative(EDU_ROOT, datePath),
+        }),
+      );
+    }
   }
 }
 
@@ -135,6 +155,7 @@ function collect() {
     classes.set(slug, {
       slug,
       dirPath,
+      classFolder: dirPath,
       source: `classes/${slug}/class.json`,
       cls,
     });
@@ -168,6 +189,7 @@ function collect() {
         classes.set(slug, {
           slug,
           dirPath,
+          classFolder: path.join(gradeDir, name),
           source: `onedrive:${name}/${rel}/class.json`,
           cls,
         });
@@ -175,17 +197,21 @@ function collect() {
     }
   }
 
-  for (const { slug, dirPath, source, cls } of classes.values()) {
+  for (const { slug, dirPath, classFolder, source, cls } of classes.values()) {
+    const periodField =
+      cls.period && typeof cls.period === "object"
+        ? cls.period
+        : cls.period ?? null;
     stubs.push(
       stub({
         outPath: path.join(MIRROR_ROOT, "classes", `${slug}.md`),
         name: cls.name,
         kind: "education-class",
         source,
-        fields: { period: cls.period ?? null, trimester: cls.trimester ?? null },
+        fields: { period: periodField, trimester: cls.trimester ?? null },
       }),
     );
-    collectChildren(stubs, dirPath, `education/classes/${slug}`, slug);
+    collectChildren(stubs, dirPath, `education/classes/${slug}`, slug, classFolder);
   }
 
   for (const slug of listDirs(path.join(EDU_ROOT, "projects"))) {
