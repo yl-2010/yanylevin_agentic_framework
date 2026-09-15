@@ -181,8 +181,15 @@ function atOrAfter(clock, when) {
  * @param {object} cls
  * @param {object} schedule
  * @param {Date} [now]
+ * @param {{ hasUserFiles?: boolean }} [opts]
  */
-export function todoFolderShouldBeVisible(todo, cls, schedule, now = new Date()) {
+export function todoFolderShouldBeVisible(
+  todo,
+  cls,
+  schedule,
+  now = new Date(),
+  { hasUserFiles = false } = {}
+) {
   if (!todo) return false;
   if (todo.done && classTodoReadyForCompleted(todo, cls, schedule, now)) {
     return false;
@@ -193,30 +200,37 @@ export function todoFolderShouldBeVisible(todo, cls, schedule, now = new Date())
   const n = meetingsBeforeDue(todo, cls, schedule);
   const from = todoVisibleFromMeeting(todo, cls, schedule, n);
   if (!from) return false;
-  return atOrAfter(scheduleNowParts(schedule, now), from);
+  if (atOrAfter(scheduleNowParts(schedule, now), from)) return true;
+  return Boolean(hasUserFiles);
 }
 
 /**
  * Date folders: visible from the day before through the date, or if opened.
- * Hidden after the date.
+ * Hidden after the date. User files unhide a still-future date early.
  * @param {object} dateObj
  * @param {object} schedule
  * @param {Date} [now]
+ * @param {{ hasUserFiles?: boolean }} [opts]
  */
-export function dateFolderShouldBeVisible(dateObj, schedule, now = new Date()) {
+export function dateFolderShouldBeVisible(
+  dateObj,
+  schedule,
+  now = new Date(),
+  { hasUserFiles = false } = {}
+) {
   if (!dateObj) return false;
+  const clock = scheduleNowParts(schedule, now);
+  const key = String(dateObj.date || "").trim();
   if (dateObj.folderRevealedAt) {
-    const clock = scheduleNowParts(schedule, now);
-    const key = String(dateObj.date || "").trim();
     if (!key) return true;
     return clock.dateKey <= key;
   }
-  const key = String(dateObj.date || "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
-  const clock = scheduleNowParts(schedule, now);
   const startParts = parseYmdParts(key);
   if (!startParts) return false;
   const prev = addDaysParts(startParts, -1);
   const prevKey = `${String(prev.y).padStart(4, "0")}-${String(prev.m).padStart(2, "0")}-${String(prev.day).padStart(2, "0")}`;
-  return clock.dateKey >= prevKey && clock.dateKey <= key;
+  if (clock.dateKey > key) return false;
+  if (clock.dateKey >= prevKey) return true;
+  return Boolean(hasUserFiles);
 }

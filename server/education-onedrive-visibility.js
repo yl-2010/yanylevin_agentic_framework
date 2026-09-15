@@ -27,6 +27,51 @@ import { canonicalizeEmail, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
 const execFileAsync = promisify(execFile);
 
 
+const PROGRAM_FILE_NAMES = new Set([
+  "todo.json",
+  "date.json",
+  "class.json",
+  "project.json",
+  "meta.json",
+  "schedule.json",
+  "context.md",
+  "deleted.md",
+]);
+
+function isJunkFsName(name) {
+  const s = String(name || "");
+  if (!s || s.startsWith(".")) return true;
+  if (s === "Icon" || s.startsWith("Icon\r")) return true;
+  return false;
+}
+
+/**
+ * True when the folder has a dropped/user/agent file besides property JSON.
+ * @param {string} dir
+ */
+export async function objectFolderHasUserFiles(dir, depth = 0) {
+  if (depth > 8) return false;
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch (err) {
+    if (err?.code === "ENOENT") return false;
+    throw err;
+  }
+  for (const entry of entries) {
+    if (isJunkFsName(entry.name)) continue;
+    const abs = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (await objectFolderHasUserFiles(abs, depth + 1)) return true;
+      continue;
+    }
+    if (!entry.isFile()) continue;
+    if (PROGRAM_FILE_NAMES.has(String(entry.name).toLowerCase())) continue;
+    return true;
+  }
+  return false;
+}
+
 function isSafeObjectId(id) {
   const s = String(id || "").trim();
   if (!s || s.includes("..") || s.includes("/") || s.includes("\\")) return null;
@@ -228,10 +273,12 @@ async function syncKind(parent, kind, cls, schedule, now, seen) {
     if (!props) continue;
     seen.add(id);
     const obj = { id, ...props };
+    const folderPath = join(parent, name);
+    const hasUserFiles = await objectFolderHasUserFiles(folderPath);
     const visible =
       kind === "todo"
-        ? todoFolderShouldBeVisible(obj, cls, schedule, now)
-        : dateFolderShouldBeVisible(obj, schedule, now);
+        ? todoFolderShouldBeVisible(obj, cls, schedule, now, { hasUserFiles })
+        : dateFolderShouldBeVisible(obj, schedule, now, { hasUserFiles });
     try {
       await setObjectFolderHidden(parent, id, !visible);
     } catch (err) {

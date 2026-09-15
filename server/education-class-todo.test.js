@@ -141,6 +141,52 @@ describe("todo folder visibility", () => {
       true
     );
   });
+
+  it("shows a still-future todo early when it already has user files", () => {
+    const todo = {
+      id: "hw-later",
+      tag: "HW",
+      dueDate: "2026-11-01",
+      dueTime: "08:30",
+      done: false,
+    };
+    assert.equal(
+      todoFolderShouldBeVisible(todo, cls, schedule, at("2026-09-15T12:00:00-07:00")),
+      false
+    );
+    assert.equal(
+      todoFolderShouldBeVisible(todo, cls, schedule, at("2026-09-15T12:00:00-07:00"), {
+        hasUserFiles: true,
+      }),
+      true
+    );
+  });
+
+  it("does not unhide a Completed todo just because it has files", () => {
+    const todo = {
+      id: "hw-one",
+      tag: "HW",
+      dueDate: "2026-09-15",
+      dueTime: "08:30",
+      done: true,
+    };
+    assert.equal(
+      todoFolderShouldBeVisible(todo, cls, schedule, at("2026-09-15T09:40:00-07:00"), {
+        hasUserFiles: true,
+      }),
+      false
+    );
+  });
+
+  it("does not early-show an undated todo that has files", () => {
+    const todo = { id: "hw-someday", tag: "HW", done: false };
+    assert.equal(
+      todoFolderShouldBeVisible(todo, cls, schedule, at("2026-09-15T12:00:00-07:00"), {
+        hasUserFiles: true,
+      }),
+      false
+    );
+  });
 });
 
 describe("date folder visibility", () => {
@@ -160,6 +206,30 @@ describe("date folder visibility", () => {
     );
     assert.equal(
       dateFolderShouldBeVisible(dateObj, schedule, at("2026-09-17T12:00:00-07:00")),
+      false
+    );
+  });
+
+  it("shows a still-future date early when it already has user files", () => {
+    const dateObj = { id: "exam", date: "2026-11-01" };
+    assert.equal(
+      dateFolderShouldBeVisible(dateObj, schedule, at("2026-09-15T12:00:00-07:00")),
+      false
+    );
+    assert.equal(
+      dateFolderShouldBeVisible(dateObj, schedule, at("2026-09-15T12:00:00-07:00"), {
+        hasUserFiles: true,
+      }),
+      true
+    );
+  });
+
+  it("does not unhide a past date just because it has files", () => {
+    const dateObj = { id: "exam", date: "2026-09-16" };
+    assert.equal(
+      dateFolderShouldBeVisible(dateObj, schedule, at("2026-09-17T12:00:00-07:00"), {
+        hasUserFiles: true,
+      }),
       false
     );
   });
