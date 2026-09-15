@@ -84,10 +84,18 @@ struct EducationContextFile: Decodable, Identifiable, Hashable {
     let name: String
     let size: Int?
     let mtime: String?
+    let kind: String?
+    let source: String?
+    let path: String?
+    let files: [EducationContextFile]?
 
-    var id: String { name }
+    var id: String {
+        "\(source ?? "education")|\(kind ?? "file")|\(path ?? name)"
+    }
 
     var displayName: String { name }
+
+    var isFolder: Bool { kind == "folder" }
 }
 
 struct EducationSchedule: Decodable {

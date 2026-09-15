@@ -4,8 +4,11 @@
  */
 
 import { watch } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { canonicalizeEmail } from "./identity.js";
 import { userEducationRoot } from "./education-data.js";
+import { gradeDirFromMeta } from "./education-onedrive.js";
 
 /** @type {Map<string, Set<(event: string, data: object) => void>>} */
 const listenersByEmail = new Map();
@@ -83,15 +86,43 @@ export function attachEducationEvents(req, res, email) {
     });
   }
 
+  /** @type {import('node:fs').FSWatcher|null} */
+  let driveWatcher = null;
+  let closed = false;
+  readFile(join(root, "meta.json"), "utf8")
+    .then((raw) => {
+      if (closed) return;
+      let meta = {};
+      try {
+        meta = JSON.parse(raw);
+      } catch {
+        return;
+      }
+      const gradeDir = gradeDirFromMeta(meta);
+      if (!gradeDir) return;
+      driveWatcher = watch(gradeDir, { recursive: true }, (_event, filename) => {
+        bump(filename ? `onedrive:${String(filename)}` : "onedrive");
+      });
+    })
+    .catch(() => {
+      /* no OneDrive watch */
+    });
+
   const heartbeat = setInterval(() => {
     res.write(`: ping ${Date.now()}\n\n`);
   }, 25000);
 
   const cleanup = () => {
+    closed = true;
     clearInterval(heartbeat);
     if (timer) clearTimeout(timer);
     try {
       watcher?.close();
+    } catch {
+      /* ignore */
+    }
+    try {
+      driveWatcher?.close();
     } catch {
       /* ignore */
     }

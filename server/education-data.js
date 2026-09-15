@@ -10,6 +10,16 @@ import { fileURLToPath } from "node:url";
 import { gitAddCommitPush } from "./git-publish.js";
 import { attachCanvasOverlay } from "./canvas-grades.js";
 import {
+  gradeDirFromMeta,
+  listOnedriveFolderNames,
+  listOnedriveTree,
+  matchOnedriveFolder,
+  mergeContextFileLists,
+  isSafeRelativePath,
+  resolveOnedriveAbsolutePath,
+  statOnedriveFile,
+} from "./education-onedrive.js";
+import {
   canonicalizeEmail,
   isFullAccessEmail,
   FULL_ACCESS_EMAILS,
@@ -141,7 +151,7 @@ function toLowerNameSet(names) {
  * @param {string[]|Set<string>|undefined} bottomNames
  * @returns {{ name: string }[]}
  */
-function pinContextFileOrder(files, topNames, bottomNames) {
+export function pinContextFileOrder(files, topNames, bottomNames) {
   const topList = Array.isArray(topNames)
     ? topNames
     : topNames instanceof Set
@@ -363,8 +373,9 @@ async function readProjectsOpened(root) {
  *   visibleNames?: Set<string>|string[],
  *   topNames?: string[]|Set<string>,
  *   bottomNames?: string[]|Set<string>,
+ *   skipPin?: boolean,
  * }} [opts]
- * @returns {Promise<{ name: string, size: number, mtime: string }[]>}
+ * @returns {Promise<{ name: string, size: number, mtime: string, kind: string, source: string }[]>}
  */
 export async function listContextFiles(dir, opts = {}) {
   /** @type {{ name: string, size: number, mtimeMs: number, mtime: string }[]} */
@@ -403,8 +414,81 @@ export async function listContextFiles(dir, opts = {}) {
   for (const n of visibleSet) hiddenSet.delete(n);
   const visible = out
     .filter((f) => !hiddenSet.has(f.name.toLowerCase()))
-    .map(({ name, size, mtime }) => ({ name, size, mtime }));
+    .map(({ name, size, mtime }) => ({
+      name,
+      size,
+      mtime,
+      kind: "file",
+      source: "education",
+    }));
+  if (opts?.skipPin) return visible;
   return pinContextFileOrder(visible, opts?.topNames, opts?.bottomNames);
+}
+
+/**
+ * Resolve a file under the class OneDrive folder (bytes stay in OneDrive).
+ * @param {string} root user education root
+ * @param {{
+ *   scope?: string,
+ *   id?: string|null,
+ *   classId?: string|null,
+ *   name?: string,
+ *   path?: string|null,
+ * }} opts
+ */
+async function resolveOnedriveContextFile(root, opts) {
+  const scope = String(opts?.scope || "").trim().toLowerCase();
+  const classId =
+    scope === "class"
+      ? opts?.id != null && opts.id !== ""
+        ? isSafeObjectId(opts.id)
+        : null
+      : opts?.classId != null && opts.classId !== ""
+        ? isSafeObjectId(opts.classId)
+        : null;
+  if (scope !== "class" && scope !== "todo" && scope !== "date") {
+    const err = new Error("invalid scope");
+    err.status = 400;
+    throw err;
+  }
+  if (!classId) {
+    const err = new Error("class id required");
+    err.status = 400;
+    throw err;
+  }
+
+  const rel = isSafeRelativePath(opts?.path || opts?.name);
+  if (!rel) {
+    const err = new Error("invalid file name");
+    err.status = 400;
+    throw err;
+  }
+
+  const meta = (await readJsonFile(join(root, "meta.json"))) || {};
+  const gradeDir = gradeDirFromMeta(meta);
+  if (!gradeDir) {
+    const err = new Error("file not found");
+    err.status = 404;
+    throw err;
+  }
+
+  const props = await readJsonFile(join(root, "classes", classId, "class.json"));
+  if (!props || typeof props !== "object") {
+    const err = new Error("file not found");
+    err.status = 404;
+    throw err;
+  }
+
+  const folderNames = await listOnedriveFolderNames(gradeDir);
+  const folder = matchOnedriveFolder(props, folderNames);
+  if (!folder) {
+    const err = new Error("file not found");
+    err.status = 404;
+    throw err;
+  }
+
+  const absFile = resolveOnedriveAbsolutePath(join(gradeDir, folder), rel);
+  return statOnedriveFile(absFile);
 }
 
 /**
@@ -416,11 +500,18 @@ export async function listContextFiles(dir, opts = {}) {
  *   classId?: string|null,
  *   projectId?: string|null,
  *   name: string,
+ *   source?: string|null,
+ *   path?: string|null,
  * }} opts
  * @returns {Promise<{ path: string, name: string, size: number, mtime: string }>}
  */
 export async function resolveContextFile(email, opts) {
   const root = userEducationRoot(email);
+  const source = String(opts?.source || "").trim().toLowerCase();
+  if (source === "onedrive") {
+    return resolveOnedriveContextFile(root, opts);
+  }
+
   const fileName = isSafeContextFileName(opts?.name);
   if (!fileName) {
     const err = new Error("invalid file name");
@@ -1307,6 +1398,10 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
   const classes = [];
   /** @type {Record<string, string[]>} */
   const activeClassIdsByDate = {};
+  const gradeDir = includeFixtures ? null : gradeDirFromMeta(meta);
+  const driveFolderNames = gradeDir
+    ? await listOnedriveFolderNames(gradeDir)
+    : [];
 
   for (const classId of classIds) {
     const classDir = join(root, "classes", classId);
@@ -1336,9 +1431,23 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
       includeFixtures,
       classId,
     });
-    const classFiles = await listContextFiles(
-      classDir,
-      contextFileListOpts(props)
+    const fileOpts = contextFileListOpts(props);
+    const eduFiles = await listContextFiles(classDir, {
+      ...fileOpts,
+      skipPin: true,
+    });
+    let driveFiles = [];
+    const driveFolder = matchOnedriveFolder(props, driveFolderNames);
+    if (gradeDir && driveFolder) {
+      driveFiles = await listOnedriveTree(join(gradeDir, driveFolder), {
+        hiddenNames: fileOpts.hiddenNames,
+        visibleNames: fileOpts.visibleNames,
+      });
+    }
+    const classFiles = pinContextFileOrder(
+      mergeContextFileLists(eduFiles, driveFiles),
+      fileOpts.topNames,
+      fileOpts.bottomNames
     );
 
     const published = includeFixtures ? cls : publicClassProps(cls);
@@ -1355,6 +1464,7 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
     if (activeToday && classOnlyTodos.length) {
       classRow.classOnlyTodos = classOnlyTodos;
     }
+    if (driveFolder) classRow.onedriveFolder = driveFolder;
     classes.push(classRow);
   }
 

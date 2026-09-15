@@ -10,7 +10,11 @@ import {
   buildPageContentUrl,
   buildPagesUrl,
   buildSearchUrl,
+  buildSiteByPathUrl,
+  buildSitePageContentUrl,
   flattenNotebookSections,
+  pickSection,
+  sharePointSitePathFromUrl,
   isGraphExplorerUrl,
   isMicrosoftLoginUrl,
   isNotesToken,
@@ -129,6 +133,38 @@ describe("school-onenote urls and shapes", () => {
     assert.equal(buildPageContentUrl("1-x"), `${GRAPH_BASE}/me/onenote/pages/1-x/content`);
     assert.match(buildPagesUrl("sec1", { limit: 5 }), /\/sections\/sec1\/pages/);
     assert.match(buildSearchUrl("map"), /\$search=/);
+    assert.doesNotMatch(buildSearchUrl("map"), /\$select=/);
+    assert.match(
+      buildSiteByPathUrl("eastsidepreparatory.sharepoint.com", "/sites/6F59235AD9_Team"),
+      /\/sites\/eastsidepreparatory\.sharepoint\.com:\/sites\/6F59235AD9_Team$/
+    );
+    assert.match(
+      buildSitePageContentUrl("site-id", "1-x"),
+      /\/sites\/site-id\/onenote\/pages\/1-x\/content$/
+    );
+  });
+
+  it("parses a Teams Class Notebook SharePoint URL", () => {
+    const site = sharePointSitePathFromUrl(
+      "https://eastsidepreparatory.sharepoint.com/sites/6F59235AD9_Team/SiteAssets/Spanish%204%20-%202026-2027"
+    );
+    assert.deepEqual(site, {
+      hostname: "eastsidepreparatory.sharepoint.com",
+      path: "/sites/6F59235AD9_Team",
+    });
+    assert.equal(sharePointSitePathFromUrl("https://example.com/foo"), null);
+  });
+
+  it("picks a Content Library section when the name is duplicated", () => {
+    const rows = [
+      { id: "a", name: "Notas de clase", group: "_Content Library" },
+      { id: "b", name: "Notas de clase", group: "Yan Levin" },
+    ];
+    assert.equal(pickSection(rows, "Notas de clase").ambiguous.length, 2);
+    assert.equal(
+      pickSection(rows, "_Content Library/Notas de clase").match.id,
+      "a"
+    );
   });
 
   it("flattens class-notebook section groups", () => {

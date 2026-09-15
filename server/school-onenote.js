@@ -206,10 +206,13 @@ export function buildNotebookExpandUrl(id) {
   return `${GRAPH_BASE}/me/onenote/notebooks/${safe}?$expand=sections,sectionGroups($expand=sections)`;
 }
 
+function pageLimit(limit) {
+  return Math.min(50, Math.max(1, Number(limit) || 20));
+}
+
 export function buildPagesUrl(sectionId, { limit = 20 } = {}) {
   const safe = encodeURIComponent(String(sectionId || "").trim());
-  const top = Math.min(50, Math.max(1, Number(limit) || 20));
-  return `${GRAPH_BASE}/me/onenote/sections/${safe}/pages?$select=id,title,createdDateTime,lastModifiedDateTime,level,order,links&$top=${top}`;
+  return `${GRAPH_BASE}/me/onenote/sections/${safe}/pages?$select=id,title,createdDateTime,lastModifiedDateTime,level,order,links&$top=${pageLimit(limit)}`;
 }
 
 export function buildPageContentUrl(pageId) {
@@ -219,8 +222,46 @@ export function buildPageContentUrl(pageId) {
 
 export function buildSearchUrl(query, { limit = 20 } = {}) {
   const q = `"${String(query || "").replace(/"/g, "")}"`;
-  const top = Math.min(50, Math.max(1, Number(limit) || 20));
-  return `${GRAPH_BASE}/me/onenote/pages?$search=${encodeURIComponent(q)}&$select=id,title,createdDateTime,lastModifiedDateTime,parentSection,links&$top=${top}`;
+  // $select is rejected with $search on OneNote (Graph 20108).
+  return `${GRAPH_BASE}/me/onenote/pages?$search=${encodeURIComponent(q)}&$top=${pageLimit(limit)}`;
+}
+
+export function sharePointSitePathFromUrl(url) {
+  try {
+    const u = new URL(String(url || ""));
+    if (!/\.sharepoint\.com$/i.test(u.hostname)) return null;
+    const parts = u.pathname.split("/").filter(Boolean);
+    if (parts.length < 2) return null;
+    const kind = parts[0].toLowerCase();
+    if (kind !== "sites" && kind !== "teams") return null;
+    return {
+      hostname: u.hostname,
+      path: `/${parts[0]}/${decodeURIComponent(parts[1])}`,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function buildSiteByPathUrl(hostname, path) {
+  return `${GRAPH_BASE}/sites/${String(hostname || "").trim()}:${String(path || "").trim()}`;
+}
+
+export function buildSiteNotebooksExpandUrl(siteId) {
+  const safe = encodeURIComponent(String(siteId || "").trim());
+  return `${GRAPH_BASE}/sites/${safe}/onenote/notebooks?$select=id,displayName,userRole,isShared,lastModifiedDateTime,links&$expand=sections,sectionGroups($expand=sections)`;
+}
+
+export function buildSitePagesUrl(siteId, sectionId, { limit = 20 } = {}) {
+  const site = encodeURIComponent(String(siteId || "").trim());
+  const sec = encodeURIComponent(String(sectionId || "").trim());
+  return `${GRAPH_BASE}/sites/${site}/onenote/sections/${sec}/pages?$select=id,title,createdDateTime,lastModifiedDateTime,level,order,links&$top=${pageLimit(limit)}`;
+}
+
+export function buildSitePageContentUrl(siteId, pageId) {
+  const site = encodeURIComponent(String(siteId || "").trim());
+  const page = encodeURIComponent(String(pageId || "").trim());
+  return `${GRAPH_BASE}/sites/${site}/onenote/pages/${page}/content`;
 }
 
 export function normalizeNotebook(raw) {
@@ -262,6 +303,23 @@ export function normalizePage(raw) {
     section: String(parent.displayName || "").trim(),
     webUrl: String(raw?.links?.oneNoteWebUrl?.href || "").trim(),
   };
+}
+
+export function sectionPath(section) {
+  const name = String(section?.name || "").trim();
+  const group = String(section?.group || "").trim();
+  return group ? `${group}/${name}` : name;
+}
+
+export function pickSection(sections, needle) {
+  const n = String(needle || "").trim().toLowerCase();
+  const list = (Array.isArray(sections) ? sections : []).map((s) => ({
+    ...s,
+    path: sectionPath(s),
+  }));
+  const exactPath = list.filter((s) => s.path.toLowerCase() === n);
+  if (exactPath.length === 1) return { match: exactPath[0], ambiguous: [] };
+  return pickByName(list, needle, "name");
 }
 
 export function pickByName(rows, needle, nameKey = "name") {
@@ -599,6 +657,97 @@ async function listNotebooks(token) {
   return mergeNotebooks(owned.value, recent.value);
 }
 
+async function loadNotebookFromSite(token, picked) {
+  const site = sharePointSitePathFromUrl(picked.webUrl);
+  if (!site) return null;
+  const siteMeta = await apiGet(buildSiteByPathUrl(site.hostname, site.path), token);
+  const siteId = String(siteMeta?.id || "").trim();
+  if (!siteId) return null;
+  const list = await apiGet(buildSiteNotebooksExpandUrl(siteId), token);
+  const rows = (list.value || []).map((raw) => ({
+    ...normalizeNotebook(raw),
+    raw,
+  }));
+  const hit = pickByName(rows, picked.name);
+  const match = hit.match || (rows.length === 1 ? rows[0] : null);
+  if (!match) return null;
+  return {
+    notebook: { ...picked, id: match.id, name: match.name },
+    sections: flattenNotebookSections(match.raw),
+    siteId,
+  };
+}
+
+async function loadNotebookTree(token, picked) {
+  if (picked.id) {
+    try {
+      const full = await apiGet(buildNotebookExpandUrl(picked.id), token);
+      return {
+        notebook: picked,
+        sections: flattenNotebookSections(full),
+        siteId: "",
+      };
+    } catch {
+      // Class Notebooks 404 on /me/onenote/notebooks/{id}.
+    }
+  }
+  const fromSite = await loadNotebookFromSite(token, picked);
+  if (fromSite) return fromSite;
+  const err = new Error("notebook not readable via /me or SharePoint site");
+  err.status = 404;
+  throw err;
+}
+
+async function listSectionPages(token, { siteId, sectionId, limit }) {
+  if (siteId) {
+    return apiGet(buildSitePagesUrl(siteId, sectionId, { limit }), token);
+  }
+  try {
+    return await apiGet(buildPagesUrl(sectionId, { limit }), token);
+  } catch (err) {
+    if (Number(err?.status) !== 404) throw err;
+    const notebooks = await listNotebooks(token);
+    for (const nb of notebooks) {
+      const tree = await loadNotebookFromSite(token, nb).catch(() => null);
+      if (!tree?.siteId) continue;
+      try {
+        return await apiGet(buildSitePagesUrl(tree.siteId, sectionId, { limit }), token);
+      } catch {
+        continue;
+      }
+    }
+    throw err;
+  }
+}
+
+async function readPageHtml(token, pageId) {
+  try {
+    return await apiGet(buildPageContentUrl(pageId), token, { html: true });
+  } catch (err) {
+    if (Number(err?.status) !== 404) throw err;
+  }
+  const notebooks = await listNotebooks(token);
+  const seen = new Set();
+  for (const nb of notebooks) {
+    const site = sharePointSitePathFromUrl(nb.webUrl);
+    if (!site) continue;
+    const key = `${site.hostname}${site.path}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    try {
+      const siteMeta = await apiGet(buildSiteByPathUrl(site.hostname, site.path), token);
+      const siteId = String(siteMeta?.id || "").trim();
+      if (!siteId) continue;
+      return await apiGet(buildSitePageContentUrl(siteId, pageId), token, { html: true });
+    } catch {
+      continue;
+    }
+  }
+  const err = new Error("page not found");
+  err.status = 404;
+  throw err;
+}
+
 async function withToken(parsed, root, fn) {
   let token;
   try {
@@ -706,12 +855,13 @@ export async function runSchoolOnenote(argv, opts = {}) {
           account: SCHOOL_EMAIL,
         };
       }
-      const full = await apiGet(buildNotebookExpandUrl(picked.match.id), token);
+      const tree = await loadNotebookTree(token, picked.match);
       return {
         ok: true,
         account: SCHOOL_EMAIL,
-        notebook: picked.match.name,
-        sections: flattenNotebookSections(full),
+        notebook: tree.notebook.name,
+        siteId: tree.siteId || undefined,
+        sections: tree.sections,
       };
     });
   }
@@ -723,6 +873,7 @@ export async function runSchoolOnenote(argv, opts = {}) {
     return withToken(parsed, root, async (token) => {
       let sectionId = parsed.id;
       let sectionName = parsed.section;
+      let siteId = "";
       if (!sectionId) {
         if (!parsed.notebook) {
           return { ok: false, error: "pages needs --notebook with --section" };
@@ -732,23 +883,25 @@ export async function runSchoolOnenote(argv, opts = {}) {
         if (!nb.match) {
           return { ok: false, error: "notebook not found", account: SCHOOL_EMAIL };
         }
-        const full = await apiGet(buildNotebookExpandUrl(nb.match.id), token);
-        const sections = flattenNotebookSections(full);
-        const sec = pickByName(sections, parsed.section);
+        const tree = await loadNotebookTree(token, nb.match);
+        const sec = pickSection(tree.sections, parsed.section);
         if (!sec.match) {
           return {
             ok: false,
             error: sec.ambiguous.length ? "ambiguous section name" : "section not found",
-            sections: (sec.ambiguous.length ? sec.ambiguous : sections).map((s) =>
-              s.group ? `${s.group}/${s.name}` : s.name
-            ),
+            sections: (sec.ambiguous.length ? sec.ambiguous : tree.sections).map(sectionPath),
             account: SCHOOL_EMAIL,
           };
         }
         sectionId = sec.match.id;
         sectionName = sec.match.name;
+        siteId = tree.siteId;
       }
-      const data = await apiGet(buildPagesUrl(sectionId, { limit: parsed.limit }), token);
+      const data = await listSectionPages(token, {
+        siteId,
+        sectionId,
+        limit: parsed.limit,
+      });
       const rows = Array.isArray(data.value) ? data.value : [];
       return {
         ok: true,
@@ -762,7 +915,7 @@ export async function runSchoolOnenote(argv, opts = {}) {
   if (cmd === "page") {
     if (!parsed.id) return { ok: false, error: "page needs an id" };
     return withToken(parsed, root, async (token) => {
-      const data = await apiGet(buildPageContentUrl(parsed.id), token, { html: true });
+      const data = await readPageHtml(token, parsed.id);
       const html = String(data.html || "");
       return {
         ok: true,

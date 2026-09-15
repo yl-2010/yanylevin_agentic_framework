@@ -26,7 +26,7 @@ education/<email>/
   daily-briefing/           # Yan only: meta.json, profile.md, preferences.md, taste.md
   location/                 # Yan only: GPS stays/trips (not a dashboard object)
   classes/<classId>/
-    class.json + optional dropped files
+    class.json + optional dropped files (legacy; new files go to OneDrive)
     todos/<todoId>/todo.json + optional dropped files
     dates/<dateId>/date.json + optional dropped files
   projects/<projectId>/
@@ -35,7 +35,11 @@ education/<email>/
     dates/<dateId>/date.json + optional dropped files
 ```
 
-**Hard rule:** exactly one properties JSON per object folder. New fields = new keys in that JSON, never sidecar property files. Dropped context files sit directly in the object folder (alongside the JSON) — no `context/` subfolder.
+**Hard rule:** exactly one properties JSON per object folder. New fields = new keys in that JSON, never sidecar property files. Dropped context files sit directly in the object folder (alongside the JSON) — no `context/` subfolder. **Class files default to OneDrive:** write new class files (HTML, PDFs, scans, chat attachments that belong on the class page) into that class’s OneDrive folder, not `education/<email>/classes/<id>/`. Existing files already in the education object folder still show on web and iOS. Todos, dates, and projects keep education-folder files as they do today; new files for a **class** go to OneDrive.
+
+**OneDrive class folders (web + iOS class page):** Express merges `education/<email>/classes/<id>/` files with the live listing of `onedriveRoot` / `gradeFolder` / `onedriveFolder`. Bytes stay in OneDrive. Nested folders (e.g. Physics `hw scans`) show as collapsed tiles; tap expands them in place on the same class page (not a new page like a todo). `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` still apply by basename. Alex has no `onedriveRoot`; his class tiles stay education-folder only.
+
+Yan’s Mac: `onedriveRoot` is `$HOME/Documents`; current year folder is `11th Grade`. Current class folders: `A. Data Sci 1`, `C. Advanced Calc`, `D. Spanish 4`, `E. US History`, `F. American Lit`, `G. PE Yoga`, `H. Physics`. Name-match is used when `onedriveFolder` is omitted (period letters on those folders are not always the fall period). Class Notebooks are not those grade folders.
 
 **Context file visibility:** dashboard file tiles omit some dropped files; bytes stay in the same folder. Do not delete the file or rename to a dotfile.
 
@@ -57,7 +61,7 @@ education/<email>/
 
 ### Properties
 
-- **class.json:** `name`, `period` (A–H letter), `trimester`, optional `description` (always markdown when set), optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays — dashboard file-tile visibility and pin order; `context.md` is hidden by default), optional `canvasLink` (https URL to that course’s Canvas gradebook, e.g. `https://canvas.instructure.com/courses/3639020/grades` — web and iOS class views show the same Canvas orb as todos/dates only when set; clear/omit to hide), optional extras
+- **class.json:** `name`, `period` (A–H letter), `trimester`, optional `description` (always markdown when set), optional `onedriveFolder` (basename under `meta.json` `onedriveRoot`/`gradeFolder`, e.g. `"H. Physics"` — class page file tiles list that folder live; omit to auto-match by class name), optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays — dashboard file-tile visibility and pin order; `context.md` is hidden by default), optional `canvasLink` (https URL to that course’s Canvas gradebook, e.g. `https://canvas.instructure.com/courses/3639020/grades` — web and iOS class views show the same Canvas orb as todos/dates only when set; clear/omit to hide), optional extras
   - `trimester`: `"year"` (always visible), `"fall"` | `"winter"` | `"spring"` (one tri), or an array like `["fall", "spring"]` for multi-tri but not year-long
   - Year-long folders + context stay on disk all year
   - Trimester-only classes stay on disk forever (never delete)
@@ -185,7 +189,9 @@ Users can attach files in Personal Agent chat (web: drag onto /education compose
 
 - Files stay available for the **entire chat session** — later turns can still copy/read them; do not ask the user to re-send
 - Inspect attachments as needed (images may also be shown inline to the model)
-- When an attachment belongs in long-term dashboard context, **copy identical bytes** into the matching class / project / todo / important-date / user-level folder using the **original filename** (alongside the JSON — no `context/` subfolder)
+- When an attachment belongs in long-term dashboard context, **copy identical bytes** into the matching place using the **original filename**:
+  - **Class** (or a file that should appear on the class page): that class’s OneDrive folder (`meta.json` `onedriveRoot` + `gradeFolder` + `class.json` `onedriveFolder`). Do not also copy into `education/<email>/classes/<id>/`.
+  - **Todo / date / project / user-level:** the object folder alongside the JSON (no `context/` subfolder), same as before
 - User-level / “main education folder” = `education/<email>/` (next to `meta.json` / `schedule.json`)
 - Four11 / class-schedule cards (Yan or classmates): parse into `schedule.json`, `brain/identity-school.md`, and `people/<slug>/schedule.md`. Do **not** copy the original PDF/screenshot into the user-level education folder
 - Copy only what should persist; skip the rest
@@ -205,10 +211,10 @@ Text-only and attachment turns both run on **grok-4.6 high Fast**. The two Model
 - Pin Projects-box order when the user asks. Write `projectsTop` / `projectsBottom` on `meta.json`. Array order is the stuck order. Entries are folder ids or display names (case-insensitive). Add or reorder as asked; remove a name to unstick it (it goes back to last-opened order in the middle). A name should not sit in both lists: top wins if they conflict, but prefer deleting it from the other list. Drop the key if the array would be empty. Do not invent an order they did not ask for.
 - When creating a project, also merge its folder id and now (ISO) into `education/<email>/.projects-opened.json` so it sorts like a just-opened project (below `projectsTop`, above older unpinned). Create the file if missing. Keep other keys. Remove that id if the project is deleted. Do not git add this file.
 - Set/clear `canvasLink` (and `canvasId`) on todos/dates when the user provides a Canvas URL, or when following the personal-canvas sync skill for mapped classes. On mapped **classes**, set `class.json` `canvasLink` to the course gradebook (`htmlUrl` + `/grades`). Yan checks off `done` himself; Canvas sync agents must not copy completion into todo.json. Express overlays Canvas submitted/graded/planner-complete as `done` on the education API, and writes a Canvas planner override when Yan checks off a Canvas-linked todo.
-- Store chat attachments into object folders when they are useful context (identical file bytes)
-- When creating a static `.html` on a todo / date / project / class (quotes, errors, study sheet), read `.cursor/skills/object-html/SKILL.md`. One standalone file. Not the public webpage skill.
+- Store chat attachments into object folders when they are useful context (identical file bytes). Class-page files go to the class OneDrive folder, not `education/<email>/classes/<id>/`.
+- When creating a static `.html` on a **class** (quotes, errors, study sheet), read `.cursor/skills/object-html/SKILL.md` and write it in that class’s OneDrive folder. Todo / date / project HTML still sits next to that object’s JSON.
 - Maintain `schedule.json` when the PDF or calendar changes
-- Read OneDrive school files using `meta.json` `onedriveRoot` + `gradeFolder` (read-only unless asked to write). Yan’s Mac: `onedriveRoot` is `$HOME/Documents`; current year folder is `11th Grade`. Class Notebooks are not those grade folders. Use `.cursor/skills/personal-onenote/SKILL.md` when a todo or question needs a OneNote page.
+- Read OneDrive school files using `meta.json` `onedriveRoot` + `gradeFolder` + the class `onedriveFolder` (read-only unless asked to write). Yan’s Mac: `onedriveRoot` is `$HOME/Documents`; current year folder is `11th Grade`. Class page tiles already list that folder live; do not copy those files into `education/<email>/`. Class Notebooks are not those grade folders. Use `.cursor/skills/personal-onenote/SKILL.md` when a school question is about an agenda, HW instructions, maps, or day packets, or when a todo already names a OneNote page. Each class `CONTEXT.md` has that notebook's section map.
 - Browser / computer use: prefer Cursor Desktop on this repo, not cloud
 
 ## After edits

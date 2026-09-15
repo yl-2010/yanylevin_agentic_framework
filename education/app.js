@@ -24,6 +24,8 @@
   const DATE_FILTERS_PROJECT = ["ma", "loose"];
   const DATES_COLLAPSED_LIMIT = 6;
   const TODOS_COLLAPSED_LIMIT = 6;
+  /** Expanded OneDrive folder keys, survives SSE re-renders. */
+  const expandedFolders = new Set();
   const GRAD_CAP_SVG =
     '<svg class="edu-filter-cap" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3zm-7 12.18v2.66c0 .74 1.94 2.16 7 2.16s7-1.42 7-2.16v-2.66l-7 3.82-7-3.82z"/></svg>';
   const THUMB_UP_SVG =
@@ -1802,7 +1804,7 @@
 
   /**
    * Context-file query for /api/education/file.
-   * @param {{ scope: string, id?: string, classId?: string, projectId?: string, name: string }} opts
+   * @param {{ scope: string, id?: string, classId?: string, projectId?: string, name: string, source?: string, path?: string }} opts
    */
   function contextFileQuery(opts) {
     const q = new URLSearchParams();
@@ -1811,12 +1813,20 @@
     if (opts.id) q.set("id", String(opts.id));
     if (opts.classId) q.set("classId", String(opts.classId));
     if (opts.projectId) q.set("projectId", String(opts.projectId));
+    if (opts.source) q.set("source", String(opts.source));
+    if (opts.path) q.set("path", String(opts.path));
     return q.toString();
+  }
+
+  function folderKey(owner, file) {
+    const path = String(file?.path || file?.name || "").trim();
+    return `${owner.scope || ""}:${owner.id || ""}:${owner.classId || ""}:${path}`;
   }
 
   /**
    * Liquid-glass file tiles (API order: filesTop, then newest mtime, then filesBottom).
-   * @param {{ name: string }[]|null|undefined} files
+   * Folders expand in place; they do not navigate away.
+   * @param {{ name: string, kind?: string, source?: string, path?: string, files?: object[] }[]|null|undefined} files
    * @param {{ scope: string, id?: string, classId?: string, projectId?: string }} owner
    * @param {{ pair?: boolean, filterPrefix?: string }} [opts]
    */
@@ -1827,8 +1837,35 @@
       .map((f, i) => {
         const name = String(f?.name || "").trim();
         if (!name) return "";
-        const qs = contextFileQuery({ ...owner, name });
         const filterId = `${filterPrefix}-${i}`;
+        const isFolder = String(f?.kind || "") === "folder";
+        if (isFolder) {
+          const key = folderKey(owner, f);
+          const open = expandedFolders.has(key);
+          const childPrefix = `${filterPrefix}-dir-${i}`;
+          const children = filesHtml(f.files, owner, {
+            pair,
+            filterPrefix: childPrefix,
+          });
+          return `<div class="edu-file-folder-wrap">
+        <button type="button" class="edu-file-tile edu-file-folder" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
+          filterId
+        )}" data-edu-folder="${escapeHtml(key)}" aria-expanded="${
+            open ? "true" : "false"
+          }" title="${escapeHtml(name)}"><span class="edu-file-name">${escapeHtml(
+            name
+          )}</span></button>
+        <div class="edu-file-folder-children"${open ? "" : " hidden"}>${
+            children || `<p class="edu-empty">Empty folder</p>`
+          }</div>
+      </div>`;
+        }
+        const qs = contextFileQuery({
+          ...owner,
+          name,
+          source: f?.source === "onedrive" ? "onedrive" : undefined,
+          path: f?.path,
+        });
         return `<a class="edu-file-tile" href="/api/education/file?${escapeHtml(
           qs
         )}" target="_blank" rel="noopener noreferrer" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
@@ -2937,6 +2974,28 @@
         toggleDone(id, next, { classId, projectId }).catch((err) =>
           console.error("[edu done]", err)
         );
+        return;
+      }
+
+      const folderBtn = t.closest?.("[data-edu-folder]");
+      if (folderBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        const key = folderBtn.getAttribute("data-edu-folder");
+        if (!key) return;
+        const wrap = folderBtn.closest(".edu-file-folder-wrap");
+        const kids = wrap?.querySelector(":scope > .edu-file-folder-children");
+        const open = folderBtn.getAttribute("aria-expanded") === "true";
+        if (open) {
+          expandedFolders.delete(key);
+          folderBtn.setAttribute("aria-expanded", "false");
+          if (kids) kids.hidden = true;
+        } else {
+          expandedFolders.add(key);
+          folderBtn.setAttribute("aria-expanded", "true");
+          if (kids) kids.hidden = false;
+        }
+        queueMicrotask(() => window.reinitLiquidGlass?.());
         return;
       }
 

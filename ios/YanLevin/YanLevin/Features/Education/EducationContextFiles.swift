@@ -10,7 +10,8 @@ struct EducationFileOwner: Equatable {
     var projectId: String? = nil
 }
 
-/// Liquid-glass file tiles. API order (pinned top, then newest mtime, then pinned bottom); tap opens Quick Look.
+/// Liquid-glass file tiles. API order (pinned top, then newest mtime, then pinned bottom).
+/// Folders expand in place. Files open Quick Look.
 struct EducationContextFilesView: View {
     let files: [EducationContextFile]
     let owner: EducationFileOwner
@@ -24,6 +25,7 @@ struct EducationContextFilesView: View {
     @State private var previewItem: PreviewItem?
     @State private var openingName: String?
     @State private var openError: String?
+    @State private var expandedIds: Set<String> = []
 
     private var columns: [GridItem] {
         if pairColumns {
@@ -40,23 +42,7 @@ struct EducationContextFilesView: View {
             if !files.isEmpty {
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
                     ForEach(files) { file in
-                        Button {
-                            open(file)
-                        } label: {
-                            Text(file.displayName)
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(YLTheme.fg(colorScheme))
-                                .multilineTextAlignment(.leading)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 14)
-                                .ylGlassRounded(cornerRadius: 22, interactive: true)
-                                .opacity(openingName == file.name ? 0.55 : 1)
-                        }
-                        .buttonStyle(.plain)
-                        .ylHapticOnTap()
-                        .disabled(openingName != nil)
-                        .accessibilityLabel("Open \(file.displayName)")
+                        fileCell(file)
                     }
                 }
                 .sheet(item: $previewItem) { item in
@@ -76,12 +62,86 @@ struct EducationContextFilesView: View {
         }
     }
 
+    @ViewBuilder
+    private func fileCell(_ file: EducationContextFile) -> some View {
+        if file.isFolder {
+            VStack(alignment: .leading, spacing: 10) {
+                folderButton(file)
+                if expandedIds.contains(file.id) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        ForEach(file.files ?? []) { child in
+                            fileCell(child)
+                        }
+                    }
+                    .padding(.leading, 12)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .gridCellColumns(pairColumns ? 2 : 1)
+        } else {
+            fileButton(file)
+        }
+    }
+
+    private func folderButton(_ file: EducationContextFile) -> some View {
+        let open = expandedIds.contains(file.id)
+        return Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                if open {
+                    expandedIds.remove(file.id)
+                } else {
+                    expandedIds.insert(file.id)
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: open ? "chevron.down" : "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(YLTheme.fg(colorScheme).opacity(0.7))
+                    .frame(width: 12)
+                Text(file.displayName)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(YLTheme.fg(colorScheme))
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .ylGlassRounded(cornerRadius: 22, interactive: true)
+        }
+        .buttonStyle(.plain)
+        .ylHapticOnTap()
+        .accessibilityLabel(file.displayName)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityValue(open ? "Expanded" : "Collapsed")
+    }
+
+    private func fileButton(_ file: EducationContextFile) -> some View {
+        Button {
+            open(file)
+        } label: {
+            Text(file.displayName)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(YLTheme.fg(colorScheme))
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .ylGlassRounded(cornerRadius: 22, interactive: true)
+                .opacity(openingName == file.id ? 0.55 : 1)
+        }
+        .buttonStyle(.plain)
+        .ylHapticOnTap()
+        .disabled(openingName != nil)
+        .accessibilityLabel("Open \(file.displayName)")
+    }
+
     private func open(_ file: EducationContextFile) {
         guard let token = auth.session?.token else {
             openError = "Please sign in again."
             return
         }
-        openingName = file.name
+        openingName = file.id
         Task {
             defer { openingName = nil }
             do {
@@ -91,6 +151,8 @@ struct EducationContextFilesView: View {
                     classId: owner.classId,
                     projectId: owner.projectId,
                     name: file.name,
+                    source: file.source,
+                    path: file.path,
                     token: token
                 )
                 previewItem = PreviewItem(url: url)

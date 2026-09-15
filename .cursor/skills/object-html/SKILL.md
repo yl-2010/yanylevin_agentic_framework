@@ -1,19 +1,19 @@
 ---
 name: object-html
 description: >-
-  Create a self-contained static HTML file inside an education object
+  Create a self-contained static HTML file for an education object
   (todo, date, project, class, or user-level folder). Quotes.html lake/teal
   theme with light and dark palettes; desktop follows sunrise/sunset, phone
-  follows the device. Use when making quotes.html, errors.html, study
-  sheets, or any .html dropped next to todo.json / date.json / project.json.
-  Not public yanylevin.com pages (that is yanylevin-webpage-create).
+  follows the device. Class HTML is stored in that class's OneDrive folder.
+  Todo / date / project HTML still sits next to todo.json / date.json /
+  project.json. Not public yanylevin.com pages (that is yanylevin-webpage-create).
 ---
 
 # Static HTML in an object
 
 **One `.html` file. That is the whole page.** Inline `<style>` and `<script>`. No `styles.css`, no `theme.js`, no `sun-theme.js` sitting next to it, no `<link>` / `<script src>`. The dashboard opens a blob of that single file (web) or Quick Look (iOS). Sibling assets do not load.
 
-Dropped next to `todo.json` / `date.json` / `project.json` / `class.json` (or in the user-level education folder). No `/education/styles.css`, no liquid glass, no Karla, no YL orbs.
+Dropped next to `todo.json` / `date.json` / `project.json`, or in the class OneDrive folder for class-level pages. No `/education/styles.css`, no liquid glass, no Karla, no YL orbs.
 
 Public yanylevin.com pages are `.cursor/skills/yanylevin-webpage-create/SKILL.md`. Chat HTML fences are `.cursor/skills/chat-widgets/SKILL.md`. Copies of a live liquid-glass page into a project stay copies of that page.
 
@@ -33,12 +33,13 @@ Apply Unslop to headings and agent-written copy. Quoted source text can keep the
 | Quotes on a todo | `education/<email>/classes/<id>/todos/<todoId>/quotes.html` |
 | Errors on a todo | `…/todos/<todoId>/errores.html` (or `errors.html`) |
 | Notes on a project | `education/<email>/projects/<id>/notes.html` |
+| Anything on a **class** page | that class’s OneDrive folder: `meta.json` `onedriveRoot` + `gradeFolder` + `class.json` `onedriveFolder` (e.g. `…/11th Grade/H. Physics/quotes.html`). Do **not** write it under `education/<email>/classes/<id>/`. |
 
-Sit beside the properties JSON. Basename the user would tap. Show in the file tiles unless they asked to hide (`hiddenFiles`).
+Todo / date / project HTML still sits beside the properties JSON. Class HTML shows in the class file tiles from OneDrive (live). Basename the user would tap. Show in the file tiles unless they asked to hide (`hiddenFiles`).
 
 Images that must work in a blob are data URIs. No Google Fonts.
 
-This is education user data. Do not `npm run deploy:web`. Do not restart the Express API.
+Class OneDrive writes are not git education data. Do not `npm run deploy:web`. Do not restart the Express API. The SSE watcher on the grade folder refreshes the class page.
 
 ## 2. Theme
 
@@ -259,7 +260,7 @@ If JS never runs, the media query still switches. If the sun script never runs, 
 
 ## Checklist
 
-- [ ] Exactly one `.html` in the object folder. No sibling `.css` / `.js`
+- [ ] Class pages: one `.html` in the class OneDrive folder. Todo / date / project: one `.html` beside the JSON. No sibling `.css` / `.js`
 - [ ] No `<link rel="stylesheet">`, no `<script src>`
 - [ ] Both palettes; dark block is colors only
 - [ ] Boot script + solar math inlined in `<head>`

@@ -3,9 +3,10 @@ name: personal-onenote
 description: >-
   Read Yan's EPS Microsoft 365 OneNote / Class Notebooks
   (owner@school.example) via node server/school-onenote.js. Use when Yan
-  asks for something in OneNote, or when another job already names a
-  specific notebook or page. Yan only. Never a default nightly source.
-  
+  asks about school work that lives in a Class Notebook (agenda, HW
+  instructions, maps, day packets, grammar refs), or when a job names a
+  notebook or page. Yan only. Never a default nightly source. Never for
+  Alex.
 disable-model-invocation: true
 ---
 
@@ -17,21 +18,45 @@ Alex, skip this whole skill.
 Account: `owner@school.example`. Same Chrome login as school Outlook
 (`~/.yanylevin/school-mail/chrome-profile`). No Azure app. No API key.
 
+Per-class maps also live on each class `CONTEXT.md`. This file is the
+traversal guide. Do **not** dump page bodies into the brain.
+
 ## When to use
 
-Open OneNote only when this turn already needs it:
+Open OneNote when the question is about something teachers put in the Class
+Notebook, even if Yan never said the word OneNote:
 
-- Yan asked to get / find / read something from OneNote or a Class Notebook
-- A todo, Canvas item, mail, or nightly action names a specific notebook,
-  section, or page you must read to finish that job
+- In-class agenda / what we are doing today
+- Homework or CW *instructions* (the prompt, the map, the text to rewrite)
+- Day packets, slides posted as pages, grammar refs, rubrics
+- Yan's own filled pages (Crash Course notes, written HW on a page)
 
-Do **not** list notebooks "just in case." Do **not** dump page bodies into
-the brain. Do **not** run a history fill. There is no `school-onenote-fill`.
-Nightly triage, synthesis, and fact-check do not scan OneNote unless a claim
-they are already handling is specifically about a page.
+Canvas is still the due date and the upload. The dashboard todo is the
+tracking row. OneNote is the worksheet.
+
+Do **not** list every notebook "just in case." Do **not** run a history
+fill. There is no `school-onenote-fill`. Nightly triage, synthesis, and
+fact-check do not scan OneNote unless a claim they are already handling is
+specifically about a page.
+
+Yoga has no Class Notebook. Free periods neither. Speech & Debate 26-27
+is not in this account yet (only last year's Hayes notebooks).
 
 You only see what Yan can open as a student: Content Library, his private
 section, Collaboration Space. Leave other students' private sections alone.
+
+## Graph gotchas
+
+`/me/onenote/notebooks` dies on EPS (OneDrive over the 5k-item cap). Recent
+notebooks come back with **empty ids**. Class Notebooks live on Teams
+SharePoint sites. `/me/onenote/notebooks/{id}` and `/me/onenote/pages/{id}`
+404 for those. `school-onenote.js` resolves the site from the recent
+`webUrl` and uses `/sites/{siteId}/onenote/...`.
+
+`search` hits `/me` and often misses Class Notebooks. Prefer
+`--notebook` + `--section`. Duplicate section names (Spanish has two
+`Notas de clase`) need the group prefix:
+`--section "_Content Library/Notas de clase"`.
 
 ## Commands
 
@@ -41,12 +66,12 @@ From the repo root:
 node server/school-onenote.js status
 node server/school-onenote.js notebooks
 node server/school-onenote.js sections --notebook "Spanish 4"
-node server/school-onenote.js pages --notebook "Spanish 4" --section "Tri 1"
+node server/school-onenote.js pages --notebook "Spanish 4" --section "_Content Library/Notas de clase"
 node server/school-onenote.js page "<id>"
 node server/school-onenote.js search "colonial map"
 ```
 
-Output is JSON. Use `id` from pages/search when reading a body. Summarize.
+Output is JSON. Use `id` from pages when reading a body. Summarize.
 Do not print tokens. Do not dump huge HTML (`page` already returns text;
 `--html` only if you must see markup).
 
@@ -63,11 +88,95 @@ Cookies live in `~/.yanylevin/school-mail/`. The OneNote Graph token lives in
 `~/.yanylevin/school-onenote/session.json` (not in git). Never copy those
 folders into the repo.
 
+## 2026-27 class notebooks
+
+Teacher pages live under `_Content Library` unless noted. `Yan Levin` is
+his private copies. Prefer the teacher page for instructions.
+
+### Spanish 4 (`Spanish 4 - 2026-2027`)
+
+Sanchez. This is the notebook that actually runs the class.
+
+| Need | Section |
+| --- | --- |
+| Today's agenda | `_Content Library/Notas de clase` (dated `Clase N` pages) |
+| HW / CW prompt | `_Content Library/Tareas - CW` |
+| Grammar ref | `_Content Library/GRAMATICA con Profe Sánchez` |
+| Verb patterns | `_Content Library/VERBOS` |
+| Sentence frames | `_Content Library/FRASES DE ORO` |
+| Quizlet list | `_Content Library/Quizlets` |
+| QA study guide | `_Content Library/Pruebas` |
+| Rubrics | `_Content Library/Rúbricas` |
+| Extra reading / listening | `_Content Library/RECURSOS ADICIONALES 2` |
+| Group CW | `_Collaboration Space/Período D` |
+
+Yan's `Notas de clase` / `Tareas - Trabajo en clase` are copies. Write-on
+HW is on the teacher Tareas page, then a PDF goes to Canvas.
+
+### US History (`US History 26-27`)
+
+Bandel. Fall collab section is `Bandel F`.
+
+| Need | Section |
+| --- | --- |
+| Syllabus, Foner, Chicago, AI policy | `_Content Library/Course Resources` |
+| Unit lessons, PPTs, primary sources, maps, HW prompts | `_Content Library/I. Forming A Nation` |
+| Yan's filled HW (Crash Course notes, maps) | `Yan Levin/Homework` |
+
+Later units (`II`–`IV`) and `FINAL PROJECT` are shells. Numbered `1.3`
+pages are the lesson. `HW: ...` pages are the assignment (map is on
+`HW: The British Colonies`).
+
+### American Lit (`Am. Lit`)
+
+Sundberg Lunstrum. Yan is E period.
+
+| Need | Section |
+| --- | --- |
+| Day plan / in-class agenda | `_Content Library/Tri 1-Investigation and Vision` (`Day 1`, `Day 2`, `Day 3 (9-11)`) |
+| Syllabus, grading | `_Content Library/Course Resources` |
+| Thesis / claims / MLA | `_Content Library/Writing Resources` |
+| Grammar presentation slots | `_Content Library/Grammar Presentations` → `E Period Sundberg Lunstrum Presentations` |
+
+### Advanced Calculus (`Advanced Calculus 26-27`)
+
+Kruger. Current unit is Integration Techniques.
+
+| Need | Section |
+| --- | --- |
+| Day packet, warmup, notes | `_Content Library/Integration Techniques` (`Day 0`, `Day 1`, `Day 2`, `Day 3`) |
+| Problem set | same section, `Day N problem set` (solutions are `Day N solns`) |
+| Keisler / old AP sheet | `_Content Library/Resources` |
+| Yan's worked sets | `Yan Levin/Homework` |
+
+Due dates stay on Canvas. The page is the set.
+
+### Data Science 1 (`Data Science 1 (Fall) Notebook`)
+
+Zhou. Fall only.
+
+Everything teacher-posted is in `_Content Library/Using the Content Library`
+(Day 0 infographic through Day 5 presentation, slides, Excel how-tos, the
+HW/CW pages). Yan's Homework / Class Notes / Quizzes are empty shells.
+
+### Physics (`Physics 26-27`)
+
+Seeley, period H.
+
+| Need | Section |
+| --- | --- |
+| Day-by-day plan, PPT names, HW | `_Content Library/Schedules` → `Fall Schedule` |
+| Classroom norms (Responsible Action, 10%) | `_Content Library/Course Documents` |
+
+`Seeley (H Period)` is empty. `Dr. T (B-C-D-G)` is the other teacher, skip
+it. Yan's private sections are empty. A lot of Physics still lives on
+Canvas and paper.
+
 ## Search
 
-Prefer `search` or a named `--notebook` over listing everything. Class
-Notebooks often nest sections under `_Content Library`, `_Collaboration Space`,
-and Yan's name. `sections` flattens those groups.
+Prefer a named `--notebook` over listing everything. Class Notebooks nest
+under `_Content Library`, `_Collaboration Space`, and Yan's name.
+`sections` flattens those groups.
 
 This is not school OneDrive. Grade-folder Word/PPT files stay on the
 education-dashboard OneDrive path.

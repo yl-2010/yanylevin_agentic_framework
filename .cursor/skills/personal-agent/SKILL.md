@@ -70,7 +70,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Map / image / HTML widgets, location cards, place hours | `.cursor/skills/chat-widgets/SKILL.md` |
 | Yan inbox / Mail.app (search and send) | `.cursor/skills/personal-mail/SKILL.md` |
 | School Outlook `owner@school.example` | `.cursor/skills/personal-school-mail/SKILL.md` |
-| School OneNote / Class Notebooks (on demand only) | `.cursor/skills/personal-onenote/SKILL.md` |
+| School OneNote / Class Notebooks (on demand; school questions about agendas, HW instructions, maps, day packets) | `.cursor/skills/personal-onenote/SKILL.md` |
 | School Teams `owner@school.example` (nightly + on demand, send) | `.cursor/skills/personal-school-teams/SKILL.md` |
 | Compile Daily Briefing, news sources, thumbs, `preferences.md` | `.cursor/skills/daily-news/SKILL.md` |
 | Gym / machines / weights | `.cursor/skills/fitness-os/SKILL.md` |
@@ -97,7 +97,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Chat title refresh (manual / backfill) | `.cursor/skills/chat-title-refresh/SKILL.md` |
 | Life-state cleanup (manual) | `.cursor/skills/life-state-cleanup/SKILL.md` |
 
-Live context on Express turns is authoritative for clock, class-now, the open screen, and (Yan) today’s Apple Calendar plus a Canvas due-soon count. Trust it. Mail, iMessage, Screen Time, Contacts, OneNote, Teams, and Apple Home stay on-demand files (Teams is also a nightly dump). OneNote is not a nightly default source: open it only when Yan asks, or when a job already names a specific notebook or page. Named-people lookup above still opens `brain/people/`. Other `education/<email>/` files only when the question needs that data.
+Live context on Express turns is authoritative for clock, class-now, the open screen, and (Yan) today’s Apple Calendar plus a Canvas due-soon count. Trust it. Mail, iMessage, Screen Time, Contacts, OneNote, Teams, and Apple Home stay on-demand files (Teams is also a nightly dump). OneNote is not a nightly default source. Open it when a school question is about an agenda, HW instructions, maps, or day packets (class `CONTEXT.md` has the section map), or when a job already names a notebook or page. Named-people lookup above still opens `brain/people/`. Other `education/<email>/` files only when the question needs that data.
 
 ## Nightly jobs (Yan, manual)
 

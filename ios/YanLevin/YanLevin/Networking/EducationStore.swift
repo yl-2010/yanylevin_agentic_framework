@@ -1066,6 +1066,8 @@ final class EducationStore: ObservableObject {
         classId: String? = nil,
         projectId: String? = nil,
         name: String,
+        source: String? = nil,
+        path: String? = nil,
         token: String
     ) async throws -> URL {
         var query: [URLQueryItem] = [
@@ -1080,6 +1082,12 @@ final class EducationStore: ObservableObject {
         }
         if let projectId, !projectId.isEmpty {
             query.append(URLQueryItem(name: "projectId", value: projectId))
+        }
+        if let source, !source.isEmpty {
+            query.append(URLQueryItem(name: "source", value: source))
+        }
+        if let path, !path.isEmpty {
+            query.append(URLQueryItem(name: "path", value: path))
         }
 
         let (data, http) = try await APIClient.shared.requestRaw(
@@ -1098,7 +1106,8 @@ final class EducationStore: ObservableObject {
         // Unique folder per open so Quick Look gets a clean basename.
         let folder = dir.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let dest = folder.appendingPathComponent(name)
+        let destName = URL(fileURLWithPath: path ?? name).lastPathComponent
+        let dest = folder.appendingPathComponent(destName)
         try data.write(to: dest, options: .atomic)
         return dest
     }

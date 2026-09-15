@@ -557,6 +557,8 @@ app.get("/api/education/file", requireEducationUser, async (req, res) => {
       classId: req.query?.classId,
       projectId: req.query?.projectId,
       name: req.query?.name,
+      source: req.query?.source,
+      path: req.query?.path,
     });
     sendContextFile(res, file);
   } catch (err) {
