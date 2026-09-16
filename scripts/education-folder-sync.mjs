@@ -4,7 +4,7 @@
  * and keep Personal + EPS OneDrive accounts running on Mac.
  *
  * Watches local changes → commit + push those paths.
- * Polls origin → fast-forward when local has no extra commits, else pull --rebase.
+ * Polls origin → fast-forward when local has no extra commits, else rebase onto origin/main.
  * On each poll, relaunches OneDrive if either signed-in account quit.
  *
  * Paths:
@@ -15,11 +15,19 @@
  */
 
 import { watch, writeSync, statSync, unlinkSync } from "node:fs";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { hostname } from "node:os";
 import { promisify } from "node:util";
+import {
+  SSH_PRIMARY,
+  STALE_LOCK_RELS,
+  pickSshCommand,
+  remoteUpdateArgs,
+  shouldRemoveStaleLock,
+  shouldRetryGit,
+} from "./education-folder-sync-lib.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -35,9 +43,7 @@ const POLL_MS = Number(process.env.EDU_SYNC_POLL_MS || 20000);
 const GIT_TIMEOUT_MS = Number(process.env.EDU_SYNC_GIT_TIMEOUT_MS || 45000);
 const PULL_TIMEOUT_MS = Number(process.env.EDU_SYNC_PULL_TIMEOUT_MS || 300000);
 const STALE_LOCK_MS = Number(process.env.EDU_SYNC_STALE_LOCK_MS || 15000);
-const GIT_SSH_COMMAND =
-  process.env.GIT_SSH_COMMAND ||
-  "ssh -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=5 -o ServerAliveCountMax=3";
+const GIT_SSH_COMMAND = process.env.GIT_SSH_COMMAND || SSH_PRIMARY;
 const HOST = hostname().replace(/\.local$/, "");
 const IS_MAC = process.platform === "darwin";
 const ONEDRIVE_APP = "/Applications/OneDrive.app";
@@ -61,49 +67,100 @@ function log(...args) {
   }
 }
 
-/**
- * @param {string[]} args
- * @param {{ allowFail?: boolean, timeout?: number }} [opts]
- */
-async function git(args, opts = {}) {
-  const timeout = opts.timeout ?? GIT_TIMEOUT_MS;
+function killProcessGroup(pid) {
+  if (!pid) return;
   try {
-    const { stdout, stderr } = await execFileAsync("git", args, {
-      cwd: ROOT,
-      maxBuffer: 10 * 1024 * 1024,
-      timeout,
-      killSignal: "SIGTERM",
-      env: {
-        ...process.env,
-        GIT_TERMINAL_PROMPT: "0",
-        GIT_OPTIONAL_LOCKS: "0",
-        GIT_SSH_COMMAND,
-      },
-    });
-    return {
-      ok: true,
-      stdout: String(stdout || ""),
-      stderr: String(stderr || ""),
-    };
-  } catch (err) {
-    const timedOut =
-      Boolean(err.killed) || err.signal === "SIGTERM" || err.signal === "SIGKILL";
-    const stderr = timedOut
-      ? `timed out after ${timeout}ms`
-      : String(err.stderr || err.message || "");
-    if (opts.allowFail) {
-      return {
-        ok: false,
-        stdout: String(err.stdout || ""),
-        stderr,
-        code: err.code,
-      };
+    process.kill(-pid, "SIGKILL");
+  } catch {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      /* already gone */
     }
-    throw timedOut ? new Error(stderr) : err;
   }
 }
 
-/** True if a live process has .git/index.lock open. */
+/**
+ * Run git in its own process group so a timeout kills ssh children too.
+ * execFile SIGTERM left ssh holding origin/main.lock and the next fetch died.
+ *
+ * @param {string[]} args
+ * @param {{ allowFail?: boolean, timeout?: number, sshCommand?: string }} [opts]
+ */
+async function git(args, opts = {}) {
+  const timeout = opts.timeout ?? GIT_TIMEOUT_MS;
+  const sshCommand = opts.sshCommand || GIT_SSH_COMMAND;
+  const env = {
+    ...process.env,
+    GIT_TERMINAL_PROMPT: "0",
+    GIT_OPTIONAL_LOCKS: "0",
+    GIT_SSH_COMMAND: sshCommand,
+  };
+
+  const result = await new Promise((resolve) => {
+    const child = spawn("git", args, {
+      cwd: ROOT,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
+    });
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    let timer = null;
+    const finish = (payload) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolve(payload);
+    };
+    timer = setTimeout(() => {
+      killProcessGroup(child.pid);
+      finish({
+        ok: false,
+        stdout,
+        stderr: `timed out after ${timeout}ms`,
+        code: null,
+        signal: "SIGKILL",
+      });
+    }, timeout);
+
+    child.stdout?.on("data", (chunk) => {
+      stdout += String(chunk);
+      if (stdout.length > 10 * 1024 * 1024) killProcessGroup(child.pid);
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+    child.on("error", (err) => {
+      finish({
+        ok: false,
+        stdout,
+        stderr: err.message || String(err),
+        code: err.code,
+      });
+    });
+    child.on("close", (code, signal) => {
+      const timedOut = signal === "SIGKILL" || signal === "SIGTERM";
+      if (code === 0) {
+        finish({ ok: true, stdout, stderr });
+        return;
+      }
+      finish({
+        ok: false,
+        stdout,
+        stderr: timedOut ? `timed out after ${timeout}ms` : stderr,
+        code,
+        signal,
+      });
+    });
+  });
+
+  if (result.ok || opts.allowFail) return result;
+  throw new Error(String(result.stderr || "").trim() || `git ${args[0]} failed`);
+}
+
+/** True if a live process has the lock file open. */
 async function lockHasHolder(lockPath) {
   try {
     const { stdout } = await execFileAsync("lsof", [lockPath], {
@@ -117,26 +174,30 @@ async function lockHasHolder(lockPath) {
   }
 }
 
-/** SIGKILL / crash can leave index.lock with nobody holding it. */
-async function clearStaleIndexLock() {
-  const lockPath = join(ROOT, ".git", "index.lock");
-  let st;
-  try {
-    st = statSync(lockPath);
-  } catch {
-    return;
-  }
-  if (await lockHasHolder(lockPath)) return;
-  const ageMs = Date.now() - st.mtimeMs;
-  if (ageMs < STALE_LOCK_MS) return;
-  try {
-    unlinkSync(lockPath);
-    log(`removed stale .git/index.lock (${Math.round(ageMs / 1000)}s old)`);
-  } catch (err) {
-    log(
-      "could not remove index.lock:",
-      err instanceof Error ? err.message : err
-    );
+/** SIGKILL / crash can leave *.lock with nobody holding it. */
+async function clearStaleGitLocks() {
+  for (const rel of STALE_LOCK_RELS) {
+    const lockPath = join(ROOT, ".git", rel);
+    let st;
+    try {
+      st = statSync(lockPath);
+    } catch {
+      continue;
+    }
+    const hasHolder = await lockHasHolder(lockPath);
+    const ageMs = Date.now() - st.mtimeMs;
+    if (!shouldRemoveStaleLock({ ageMs, hasHolder, staleMs: STALE_LOCK_MS })) {
+      continue;
+    }
+    try {
+      unlinkSync(lockPath);
+      log(`removed stale .git/${rel} (${Math.round(ageMs / 1000)}s old)`);
+    } catch (err) {
+      log(
+        `could not remove ${rel}:`,
+        err instanceof Error ? err.message : err
+      );
+    }
   }
 }
 
@@ -194,21 +255,26 @@ async function ensureOneDriveRunning() {
   }
 }
 
-/** Retry git when another process holds index.lock. */
+/** Retry git on index/ref locks, DNS, and hung SSH. Rotate GitHub 443 → 22. */
 async function gitRetry(args, opts = {}, attempts = 5) {
   let last;
+  let lastErr = "";
   for (let i = 0; i < attempts; i++) {
-    last = await git(args, { allowFail: true });
+    last = await git(args, {
+      ...opts,
+      allowFail: true,
+      sshCommand: pickSshCommand(i, lastErr),
+    });
     if (last.ok) return last;
-    const errText = `${last.stderr} ${last.stdout}`;
-    if (!/index\.lock|Unable to create|locked/i.test(errText) || i === attempts - 1) {
+    lastErr = `${last.stderr} ${last.stdout}`;
+    if (!shouldRetryGit(lastErr, i, attempts)) {
       if (opts.allowFail) return last;
-      const err = new Error(errText.trim() || `git ${args[0]} failed`);
-      throw err;
+      throw new Error(lastErr.trim() || `git ${args[0]} failed`);
     }
-    await sleep(300 * (i + 1));
+    await sleep(400 * (i + 1));
   }
-  return last;
+  if (opts.allowFail) return last;
+  throw new Error((lastErr || `git ${args[0]} failed`).trim());
 }
 
 async function commitLocalIfNeeded() {
@@ -229,7 +295,7 @@ async function commitLocalIfNeeded() {
 }
 
 async function pullRemote() {
-  const fetch = await git(["fetch", "origin", "main"], { allowFail: true });
+  const fetch = await gitRetry(["fetch", "origin", "main"], { allowFail: true });
   if (!fetch.ok) {
     log("fetch failed:", fetch.stderr.trim() || fetch.stdout.trim());
     return false;
@@ -248,25 +314,20 @@ async function pullRemote() {
     "origin/main..HEAD",
   ]);
   const canFf = String(ahead).trim() === "0";
-  const pull = canFf
-    ? await git(["merge", "--ff-only", "origin/main"], {
-        allowFail: true,
-        timeout: PULL_TIMEOUT_MS,
-      })
-    : await git(
-        ["-c", "rebase.autoStash=true", "pull", "--rebase", "origin", "main"],
-        { allowFail: true, timeout: PULL_TIMEOUT_MS }
-      );
+  const pull = await gitRetry(remoteUpdateArgs(canFf), {
+    allowFail: true,
+    timeout: PULL_TIMEOUT_MS,
+  });
   if (!pull.ok) {
     log(
-      canFf ? "merge --ff-only failed:" : "pull --rebase failed:",
+      canFf ? "merge --ff-only failed:" : "rebase origin/main failed:",
       pull.stderr.trim() || pull.stdout.trim()
     );
     if (!canFf) await git(["rebase", "--abort"], { allowFail: true });
-    await clearStaleIndexLock();
+    await clearStaleGitLocks();
     return false;
   }
-  log(canFf ? "fast-forwarded origin/main" : "pulled origin/main");
+  log(canFf ? "fast-forwarded origin/main" : "rebased onto origin/main");
   return true;
 }
 
@@ -278,7 +339,7 @@ async function pushIfNeeded() {
   ]);
   if (String(ahead).trim() === "0") return false;
 
-  const push = await git(["push", "origin", "main"], { allowFail: true });
+  const push = await gitRetry(["push", "origin", "main"], { allowFail: true });
   if (!push.ok) {
     log("push failed:", push.stderr.trim() || push.stdout.trim());
     // Someone else pushed — next cycle will pull.
@@ -295,7 +356,7 @@ async function syncCycle(reason) {
     syncing = true;
     try {
       log(`sync (${reason})`);
-      await clearStaleIndexLock();
+      await clearStaleGitLocks();
       await commitLocalIfNeeded();
       await pullRemote();
       // After rebase, local folder edits may need another commit (rare).

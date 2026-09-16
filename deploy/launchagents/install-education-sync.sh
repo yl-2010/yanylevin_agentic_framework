@@ -35,10 +35,18 @@ if [[ "$REPO" != "$HOME/yanylevin_agentic_framework" ]] || [[ "$NODE_BIN" != "/o
 fi
 
 uid="$(id -u)"
-launchctl bootout "gui/${uid}/${LABEL}" 2>/dev/null || true
-launchctl bootstrap "gui/${uid}" "$DEST"
-launchctl enable "gui/${uid}/${LABEL}" 2>/dev/null || true
-launchctl kickstart -k "gui/${uid}/${LABEL}"
+DOMAIN="gui/${uid}"
+SERVICE="${DOMAIN}/${LABEL}"
+
+# Copy first. If the job is already loaded, restart it (bootout+bootstrap
+# on a live job often returns I/O error 5 and leaves sync dead).
+if launchctl print "$SERVICE" >/dev/null 2>&1; then
+  launchctl kickstart -k "$SERVICE"
+else
+  launchctl bootstrap "$DOMAIN" "$DEST"
+  launchctl enable "$SERVICE" 2>/dev/null || true
+  launchctl kickstart -k "$SERVICE"
+fi
 
 echo "installed ${LABEL}"
 echo "logs: /tmp/yanylevin-education-sync.log"
