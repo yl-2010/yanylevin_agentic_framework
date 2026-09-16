@@ -60,6 +60,10 @@ struct AgentUiContext: Encodable {
     var capsuleBody: String? = nil
     var capsuleCitations: String? = nil
     var phoneLocation: AgentPhoneLocation? = nil
+    var site: String? = nil
+    var caseId: String? = nil
+    var caseName: String? = nil
+    var caseSide: String? = nil
 }
 
 /// Shared across Education + Chat tabs: which education screen is open.
@@ -69,6 +73,7 @@ enum EducationRoute: Hashable {
     case todoDetail(EducationTodo)
     case dateDetail(EducationDate)
     case capsuleDetail(EducationTodo, EducationCapsule)
+    case caseDetail(EducationCase, side: String)
 }
 
 @MainActor
@@ -80,19 +85,38 @@ final class EducationFocusStore: ObservableObject {
     @Published var scrollToTopGeneration = 0
     @Published var filePreviewPresented = false
     @Published var filePreviewDismissGeneration = 0
-    /// "" = Yan's personal education. "jype" = shared JYPE workspace.
+    /// "" = Yan's personal education. "jype" = shared JYPE workspace (API + chat).
     @Published var workspace: String = ""
+    /// Palette + which home. Debate uses site without switching workspace.
+    @Published var site: String = ""
 
-    var isJype: Bool { workspace == "jype" }
+    var isJype: Bool { workspace == "jype" || site == "jype" }
+    var isDebate: Bool { site == "debate" }
 
     func enterJype() {
         workspace = "jype"
+        site = "jype"
+        path = []
+    }
+
+    func enterDebate() {
+        site = "debate"
+        workspace = ""
+        path = []
+    }
+
+    func exitPortal() {
+        site = ""
+        workspace = ""
         path = []
     }
 
     func exitJype() {
-        workspace = ""
-        path = []
+        exitPortal()
+    }
+
+    func exitDebate() {
+        exitPortal()
     }
 
     func handleTabReselect() {
@@ -104,8 +128,8 @@ final class EducationFocusStore: ObservableObject {
             scrollToTopGeneration += 1
             return
         }
-        if path.isEmpty && isJype {
-            exitJype()
+        if path.isEmpty && (isJype || isDebate) {
+            exitPortal()
             return
         }
         guard !path.isEmpty else { return }
@@ -146,6 +170,13 @@ final class EducationFocusStore: ObservableObject {
         return false
     }
 
+    func isShowingCase(_ id: String, side: String) -> Bool {
+        if case .caseDetail(let debateCase, let s) = path.last {
+            return debateCase.id == id && s.lowercased() == side.lowercased()
+        }
+        return false
+    }
+
     private var pendingAgentNavigate: AgentEducationNavigate?
     private var lastAppliedNavigateKey = ""
 
@@ -155,6 +186,9 @@ final class EducationFocusStore: ObservableObject {
         let key = nav.dedupeKey
         if !key.isEmpty, key == lastAppliedNavigateKey { return true }
         let view = (nav.view ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if shouldEnterDebate(nav) || view == "case" {
+            if !isDebate { enterDebate() }
+        }
         let ok: Bool
         switch view {
         case "home":
@@ -170,6 +204,8 @@ final class EducationFocusStore: ObservableObject {
             ok = applyDateNavigate(nav, tree: tree)
         case "capsule":
             ok = applyCapsuleNavigate(nav, tree: tree)
+        case "case":
+            ok = applyCaseNavigate(nav, tree: tree)
         default:
             return false
         }
@@ -200,6 +236,14 @@ final class EducationFocusStore: ObservableObject {
         let id = (projectId ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !id.isEmpty else { return false }
         guard let project = tree?.projects?.first(where: { $0.id == id }) else { return false }
+        if project.isJypePortal {
+            enterJype()
+            return true
+        }
+        if project.isDebatePortal {
+            enterDebate()
+            return true
+        }
         if isShowingProject(id) { return true }
         path = [.projectDetail(project)]
         return true
@@ -254,9 +298,48 @@ final class EducationFocusStore: ObservableObject {
         return true
     }
 
+    private func shouldEnterDebate(_ nav: AgentEducationNavigate) -> Bool {
+        let site = (nav.site ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if site == "debate" { return true }
+        let raw = (nav.path ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return raw.hasPrefix("/debate")
+    }
+
+    private func applyCaseNavigate(_ nav: AgentEducationNavigate, tree: EducationTreeResponse?) -> Bool {
+        let caseId = (nav.caseId ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !caseId.isEmpty else { return false }
+        if !isDebate { enterDebate() }
+        guard let debateCase = debateCase(id: caseId, from: tree) else { return false }
+        let side = Self.normalizedCaseSide(nav.caseSide)
+        if isShowingCase(debateCase.id, side: side) { return true }
+        path = [.caseDetail(debateCase, side: side)]
+        return true
+    }
+
+    private func debateCase(id: String, from tree: EducationTreeResponse?) -> EducationCase? {
+        if let match = tree?.projects?.first(where: { $0.id.lowercased() == "debate" })?
+            .cases?.first(where: { $0.id == id })
+        {
+            return match
+        }
+        for project in tree?.projects ?? [] {
+            if let match = project.cases?.first(where: { $0.id == id }) {
+                return match
+            }
+        }
+        return nil
+    }
+
+    private static func normalizedCaseSide(_ raw: String?) -> String {
+        let side = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if side == "neg" || side == "negative" { return "neg" }
+        return "aff"
+    }
+
     private func parentStack(for todo: EducationTodo, tree: EducationTreeResponse?) -> [EducationRoute] {
         if let projectId = todo.projectId, !projectId.isEmpty,
            let project = tree?.projects?.first(where: { $0.id == projectId }) {
+            if project.isJypePortal || project.isDebatePortal { return [] }
             return [.projectDetail(project)]
         }
         if let classId = todo.classId, !classId.isEmpty,
@@ -269,6 +352,7 @@ final class EducationFocusStore: ObservableObject {
     private func parentStack(forDate date: EducationDate, tree: EducationTreeResponse?) -> [EducationRoute] {
         if let projectId = date.projectId, !projectId.isEmpty,
            let project = tree?.projects?.first(where: { $0.id == projectId }) {
+            if project.isJypePortal || project.isDebatePortal { return [] }
             return [.projectDetail(project)]
         }
         if let classId = date.classId, !classId.isEmpty,
@@ -280,17 +364,18 @@ final class EducationFocusStore: ObservableObject {
 
     /// Same shape as web `__eduUiContext` for `/api/education/agent/message`.
     func agentUiContext(tree: EducationTreeResponse?) -> AgentUiContext {
+        var ctx: AgentUiContext
         switch path.last {
         case nil:
-            return AgentUiContext(
+            ctx = AgentUiContext(
                 client: "ios",
                 view: "home",
-                title: isJype ? "JYPE home" : "Education home"
+                title: isDebate ? "Debate home" : (isJype ? "JYPE home" : "Education home")
             )
 
         case .classDetail(let cls):
             let live = tree?.classes?.first(where: { $0.id == cls.id }) ?? cls
-            return AgentUiContext(
+            ctx = AgentUiContext(
                 client: "ios",
                 view: "class",
                 title: live.contextDisplayName,
@@ -302,7 +387,7 @@ final class EducationFocusStore: ObservableObject {
 
         case .projectDetail(let project):
             let live = tree?.projects?.first(where: { $0.id == project.id }) ?? project
-            return AgentUiContext(
+            ctx = AgentUiContext(
                 client: "ios",
                 view: "project",
                 title: live.displayName,
@@ -312,7 +397,7 @@ final class EducationFocusStore: ObservableObject {
 
         case .todoDetail(let todo):
             let live = EducationTodoHelpers.flattenTodos(from: tree).first(where: { $0.id == todo.id }) ?? todo
-            var ctx = AgentUiContext(
+            ctx = AgentUiContext(
                 client: "ios",
                 view: "todo",
                 title: live.displayName,
@@ -331,12 +416,11 @@ final class EducationFocusStore: ObservableObject {
                 ctx.className = cls?.name ?? cls?.contextDisplayName
                 ctx.period = cls?.period?.uppercased()
             }
-            return ctx
 
         case .capsuleDetail(let todo, let capsule):
             let live = EducationTodoHelpers.flattenTodos(from: tree).first(where: { $0.id == todo.id }) ?? todo
             let liveCapsule = (live.capsules ?? []).first(where: { $0.id == capsule.id }) ?? capsule
-            var ctx = AgentUiContext(
+            ctx = AgentUiContext(
                 client: "ios",
                 view: "capsule",
                 title: liveCapsule.displayTitle,
@@ -363,11 +447,10 @@ final class EducationFocusStore: ObservableObject {
                 ctx.className = cls?.name ?? cls?.contextDisplayName
                 ctx.period = cls?.period?.uppercased()
             }
-            return ctx
 
         case .dateDetail(let date):
             let live = EducationDateHelpers.flattenDates(from: tree).first(where: { $0.id == date.id }) ?? date
-            var ctx = AgentUiContext(
+            ctx = AgentUiContext(
                 client: "ios",
                 view: "date",
                 title: live.displayName,
@@ -385,8 +468,24 @@ final class EducationFocusStore: ObservableObject {
                 ctx.className = cls?.name ?? cls?.contextDisplayName
                 ctx.period = cls?.period?.uppercased()
             }
-            return ctx
+
+        case .caseDetail(let debateCase, let side):
+            let sideKey = side.lowercased() == "neg" ? "neg" : "aff"
+            let sideLabel = sideKey == "neg" ? "Neg" : "Aff"
+            ctx = AgentUiContext(
+                client: "ios",
+                view: "case",
+                title: "\(debateCase.displayName) · \(sideLabel)",
+                site: "debate",
+                caseId: debateCase.id,
+                caseName: debateCase.name ?? debateCase.displayName,
+                caseSide: sideKey
+            )
         }
+        if isDebate {
+            ctx.site = "debate"
+        }
+        return ctx
     }
 }
 
@@ -405,10 +504,14 @@ struct AgentEducationNavigate: Decodable, Equatable {
     let todoId: String?
     let dateId: String?
     let capsuleId: String?
+    let site: String?
+    let path: String?
+    let caseId: String?
+    let caseSide: String?
 
     var dedupeKey: String {
         if let id, !id.isEmpty { return id }
-        return [view, classId, projectId, todoId, dateId, capsuleId]
+        return [view, classId, projectId, todoId, dateId, capsuleId, site, path, caseId, caseSide]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .joined(separator: "|")

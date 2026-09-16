@@ -6,6 +6,8 @@ Schedule files (weekly PDF / `schedule.json` / bells): Read `.cursor/skills/clas
 
 The live UI is `yanylevin.com/education` (`education/index.html`, `education/app.js`, `education/styles.css`, `education/chatbot.js`, `education/markdown.js`). Data lives under `education/<email>/`. Express `/api/education/data` (not this agent) is what the page reads. Git does not auto-deploy. If you change those UI files, run `npm run deploy:web` after push. Skip the deploy for `education/<email>/` data-only edits.
 
+Yan-only `/debate` (`debate/index.html`) reuses the same SPA and `/api/education`. Objects live under `education/you@example.com/projects/debate/` so they still show on `/education`. Chat is the Personal Agent (same history). Google login is `you@example.com` only. Do not copy the JYPE isolated workspace.
+
 Shared JYPE dashboard is `yanylevin.com/jype` (`jype/index.html` reuses the education SPA via `window.YL_EDU`). Data and files live under `education/projects/jype/` in the old GitHub class layout (`classes/<id>/class.json`, `projects/<id>/project.json`, `todos/`, `dates/`). Live HTML sites are `sites[]` URL tiles on the related class (or project if it is not a class), not a Notes project. Yan’s personal pages stay on his OneDrive class until he sends that URL to a JYPE member or the JYPE agent creates the page. No Canvas sync. Todos are agent-only. Chats: `education/projects/jype/.chat-history/`. Express `/api/jype/*`. Do not write Yan's personal `education/you@example.com/` tree unless Yan asks.
 
 Allowed users and write scope are in `.cursor/skills/personal-agent/SKILL.md`. Never delete fixture objects (`"fixture": true` or ids starting with `_example-`). Fixtures are hidden from `/api/education/data`; keep them on disk as the layout reference.
@@ -28,10 +30,13 @@ education/<email>/
   daily-briefing/           # Yan only: meta.json, profile.md, preferences.md, taste.md
   location/                 # Yan only: GPS stays/trips (not a dashboard object)
   classes/_example-dummy/   # fixture layout only. Real Yan classes live on OneDrive
-  projects/<projectId>/
+    projects/<projectId>/
     project.json + optional dropped files (e.g. CONTEXT.md, hidden from UI by default)
     todos/<todoId>/todo.json + optional dropped files
     dates/<dateId>/date.json + optional dropped files
+    cases/<caseId>/                 # Debate project only today
+      case.json                     # name; Aff/Neg are sides, not separate folders
+      todos/<todoId>/todo.json      # optional; still show on /debate home and /education home
 
 OneDrive (Yan, `meta.json` onedriveRoot + gradeFolder, currently `11th Grade`):
 
@@ -95,6 +100,8 @@ Yan’s Mac: `onedriveRoot` is `$HOME/Documents`; `onedriveWebRoot` is the Share
   - Same nested `todos/` + `dates/` folder layout as classes
   - Mirror `projects/_example-dummy/` when creating objects (skip `fixture` and `order` on a real project). After create, record the folder id in `.projects-opened.json` as opened now so it shows at the top of the unpinned list.
   - Home UI: Projects box sits below class day panels + Dates (web right column; iOS wide same; iOS single-column above Completed)
+  - Yan’s Debate tile uses `"href": "/debate/"`. JYPE uses `"/jype/"`.
+- **case.json** (only under `projects/debate/cases/<id>/`): `name`. Each case is one object with Aff and Neg sides (not two folders). `/debate` lists them as a stacked Aff/Neg pair above Dates. Clicking a side opens `/debate/case/<id>/aff` or `/neg` with the title only. Do **not** render a todo list on the case page. Nested `cases/<id>/todos/` still flatten onto the debate project so they show on `/debate` home and `/education` home. Case building is `.cursor/skills/debate-cases/SKILL.md`.
 - **todo.json:** `name`; optional `description` (always markdown when set); `dueDate` (YYYY-MM-DD), `dueTime` (HH:MM); `done` (boolean, default false); optional `completedAt` (ISO timestamp set when checked off, cleared when reopened — Completed list sorts by this, newest first); optional `createdAt` (ISO timestamp set when the todo is created — open TODO lists use this for same-due ties; API falls back to file birthtime when omitted); optional `tag`: `CW` | `HW` | `QA` | `MA` (omit for normal todos); optional `showInDates` (boolean — when true, the open todo also appears in Dates lists alongside important dates); optional `hiddenFromHome` (boolean — when true, omitted from home TODO/Completed and the unfiltered home widget; class and project pages still show it); optional `hiddenFiles` / `visibleFiles` / `filesTop` / `filesBottom` (string arrays); optional `sites` (URL tiles); optional `canvasLink` (https URL to the Canvas assignment/page — UI shows a Canvas button only when set; clear/omit to hide); optional `canvasId` (Canvas assignment id, set by Canvas sync so later runs match even if the title/due date changed); optional `kind`: `"dailyBriefing"` for the morning news todo (user-level only, no tag, `showInDates: false`, `capsules` array, per-capsule and top-level `citations`). Compiling the brief is the **daily-news** skill, not this file. When a news capsule is attached in chat, read that file and answer follow-ups; do not retag briefing todos as schoolwork. Canvas sync (personal-canvas skill) may create/update class todos from Canvas; it must **never** write `done` or `completedAt`.
   - Do not put CW/HW/QA/MA in `name`. Use `tag`. The UI shows that tag in accent blue at the same size as the title.
   - **Defaults:** `tag: "MA"` → `showInDates` defaults **on** (omit or `true`); any other todo → defaults **off**. `hiddenFromHome` defaults **off** (omit or `false`)
@@ -201,8 +208,8 @@ Call `open_education_page` when the user asks about **one** dashboard object, sa
 
 The jump happens **once**, when your final reply for this turn lands. Not when you call the tool. File writes and chat polls do not replay it. Last call in the turn wins. A later turn can jump again (same page or a different one) by calling the tool again.
 
-- `view`: `home` | `class` | `project` | `todo` | `date` | `capsule`
-- `todoId` / `dateId` / `classId` / `projectId` are **folder names on disk**, not the UI title. Class OneDrive todos look like `HW Sep 15 Title`. Class todos need `classId`. Project todos need `projectId`. Capsules need `todoId` + `capsuleId`.
+- `view`: `home` | `class` | `project` | `todo` | `date` | `capsule` | `case`
+- `todoId` / `dateId` / `classId` / `projectId` are **folder names on disk**, not the UI title. Class OneDrive todos look like `HW Sep 15 Title`. Class todos need `classId`. Project todos need `projectId`. Capsules need `todoId` + `capsuleId`. Debate cases need `caseId` plus `caseSide` (`aff` or `neg`). That opens `/debate`, not a nested `/education` project page.
 - After a create, call once the folder exists so clients can resolve it.
 - Skip if Live context is already that page. Skip lists of many items. Skip mail, news compile, fitness, and anything outside `/education`.
 - You can call it mid-turn (after you know the id). The page still waits until the turn ends. Do not mention the tool or tell them to refresh.

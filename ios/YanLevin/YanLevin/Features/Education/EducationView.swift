@@ -47,13 +47,17 @@ struct EducationView: View {
             }
             .educationTabReselectScroll(isActive: educationFocus.isShowingDashboard)
             .ylPageBackground()
-            .navigationTitle(educationFocus.isJype ? "JYPE" : "Education")
+            .navigationTitle(educationNavTitle)
             .navigationBarTitleDisplayMode(.large)
             .refreshable { await reloadAndRestartLiveSession() }
             .onChange(of: educationFocus.path) { _, path in
                 if case .projectDetail(let project) = path.last {
                     if project.isJypePortal {
                         educationFocus.enterJype()
+                        return
+                    }
+                    if project.isDebatePortal {
+                        educationFocus.enterDebate()
                         return
                     }
                     Task { await store.markProjectOpened(id: project.id, token: auth.session?.token) }
@@ -96,10 +100,13 @@ struct EducationView: View {
                         .environmentObject(auth)
                         .environmentObject(nav)
                         .ylSwipeBackHaptics()
+                case .caseDetail(let debateCase, let side):
+                    CaseDetailView(debateCase: debateCase, side: side)
+                        .ylSwipeBackHaptics()
                 }
             }
         }
-        .environment(\.ylPalette, educationFocus.isJype ? .jype : .standard)
+        .environment(\.ylPalette, educationPalette)
         .task(id: liveTaskID) {
             store.focus = educationFocus
             store.workspace = educationFocus.workspace
@@ -137,6 +144,22 @@ struct EducationView: View {
         }
     }
 
+    private var educationNavTitle: String {
+        if educationFocus.isJype { return "JYPE" }
+        if educationFocus.isDebate { return "Debate" }
+        return "Education"
+    }
+
+    private var educationPalette: YLPalette {
+        if educationFocus.isJype { return .jype }
+        if educationFocus.isDebate { return .debate }
+        return .standard
+    }
+
+    private var hidesTypeFilters: Bool {
+        educationFocus.isJype || educationFocus.isDebate
+    }
+
     @ViewBuilder
     private var educationPanels: some View {
         if store.isLoading && store.tree == nil {
@@ -157,6 +180,9 @@ struct EducationView: View {
                         jypeClassesPanel
                         projectsPanel
                         jypeDatesPanel
+                    } else if educationFocus.isDebate {
+                        casesPanel
+                        jypeDatesPanel
                     } else {
                         scheduleAndDatesPanels
                         projectsPanel
@@ -169,6 +195,13 @@ struct EducationView: View {
                 todoPanel
                 jypeClassesPanel
                 projectsPanel
+                jypeDatesPanel
+                completedPanel
+            }
+        } else if educationFocus.isDebate {
+            VStack(alignment: .leading, spacing: 14) {
+                todoPanel
+                casesPanel
                 jypeDatesPanel
                 completedPanel
             }
@@ -224,6 +257,19 @@ struct EducationView: View {
                         Button {
                             YLHaptics.tap()
                             educationFocus.enterJype()
+                        } label: {
+                            Text(project.displayName)
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(YLTheme.fg(colorScheme))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 8)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    } else if project.isDebatePortal {
+                        Button {
+                            YLHaptics.tap()
+                            educationFocus.enterDebate()
                         } label: {
                             Text(project.displayName)
                                 .font(.body.weight(.semibold))
@@ -297,6 +343,59 @@ struct EducationView: View {
         )
     }
 
+    private var debateProject: EducationProject? {
+        store.tree?.projects?.first(where: { $0.id.lowercased() == "debate" })
+    }
+
+    private var casesPanel: some View {
+        eduPanel(title: "Cases") {
+            let cases = debateProject?.cases ?? []
+            if cases.isEmpty {
+                emptyRow("Nothing here")
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(cases) { debateCase in
+                        debateCasePair(debateCase)
+                    }
+                }
+            }
+        }
+    }
+
+    private func debateCasePair(_ debateCase: EducationCase) -> some View {
+        VStack(spacing: 0) {
+            debateCaseSideRow(debateCase, side: "aff", label: "Aff")
+            Rectangle()
+                .fill(YLTheme.fg(colorScheme).opacity(0.12))
+                .frame(height: 1)
+            debateCaseSideRow(debateCase, side: "neg", label: "Neg")
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(YLTheme.fg(colorScheme).opacity(0.12), lineWidth: 1)
+        }
+    }
+
+    private func debateCaseSideRow(_ debateCase: EducationCase, side: String, label: String) -> some View {
+        NavigationLink(value: EducationRoute.caseDetail(debateCase, side: side)) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(debateCase.displayName)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(YLTheme.fg(colorScheme))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(YLTheme.muted(colorScheme))
+            }
+            .padding(.vertical, 10)
+            .padding(.horizontal, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .ylHapticNavigation()
+    }
+
     private var staticJypeClasses: [DayClass] {
         let today = store.tree?.todayKey ?? ""
         let schedule = store.tree?.schedule
@@ -328,7 +427,7 @@ struct EducationView: View {
     private func filteredTodos(done: Bool) -> [EducationTodo] {
         allTodos.filter { todo in
             (todo.done == true) == done
-                && (educationFocus.isJype || todoTypeFilters.contains(todo.filterTagKey))
+                && (hidesTypeFilters || todoTypeFilters.contains(todo.filterTagKey))
                 && !todo.isHiddenFromHome
         }
     }
@@ -349,7 +448,7 @@ struct EducationView: View {
             onToggleFilter: toggleTodoFilter,
             className: { className(for: $0) },
             onToggleDone: toggleDone,
-            showFilters: !educationFocus.isJype
+            showFilters: !hidesTypeFilters
         )
     }
 
@@ -471,7 +570,7 @@ struct EducationView: View {
             .buttonStyle(.plain)
             .ylHapticNavigation()
 
-            if !educationFocus.isJype {
+            if !educationFocus.isJype && !educationFocus.isDebate {
                 EducationCanvasScoreButton(
                     label: dayClass.cls.scoreLabel,
                     url: dayClass.cls.canvasURL
@@ -499,7 +598,11 @@ struct EducationView: View {
     }
 
     private var allTodos: [EducationTodo] {
-        EducationTodoHelpers.flattenTodos(from: store.tree)
+        if educationFocus.isDebate {
+            let project = debateProject
+            return (project?.todos ?? []).map { $0.withProjectId(project?.id ?? "debate") }
+        }
+        return EducationTodoHelpers.flattenTodos(from: store.tree)
     }
 
     private var todoClassNames: [String: String] {
@@ -518,9 +621,15 @@ struct EducationView: View {
     }
 
     private var visibleDateItems: [EducationDateItem] {
-        EducationDateHelpers.visibleItems(
-            EducationDateHelpers.collectItems(from: store.tree),
-            filters: educationFocus.isJype ? EducationDateFilter.allHome : dateFilters,
+        let collected: [EducationDateItem]
+        if educationFocus.isDebate {
+            collected = EducationDateHelpers.collectItems(from: store.tree, projectId: "debate")
+        } else {
+            collected = EducationDateHelpers.collectItems(from: store.tree)
+        }
+        return EducationDateHelpers.visibleItems(
+            collected,
+            filters: hidesTypeFilters ? EducationDateFilter.allHome : dateFilters,
             expanded: datesExpanded,
             todayKey: store.tree?.todayKey
         )
@@ -588,6 +697,31 @@ struct EducationView: View {
     private func reloadAndRestartLiveSession() async {
         liveSessionID += 1
         await reload()
+    }
+}
+
+// MARK: - Debate case detail
+
+struct CaseDetailView: View {
+    let debateCase: EducationCase
+    let side: String
+    @EnvironmentObject private var educationFocus: EducationFocusStore
+
+    private var sideLabel: String {
+        side.lowercased() == "neg" ? "Neg" : "Aff"
+    }
+
+    var body: some View {
+        ScrollView {
+            Color.clear
+                .frame(maxWidth: .infinity, minHeight: 1)
+        }
+        .educationTabReselectScroll(
+            isActive: educationFocus.isShowingCase(debateCase.id, side: side)
+        )
+        .ylPageBackground()
+        .navigationTitle("\(debateCase.displayName) · \(sideLabel)")
+        .navigationBarTitleDisplayMode(.large)
     }
 }
 

@@ -1,0 +1,44 @@
+/* Debate wash: muted gray-lavender in light, navy-gray-purple with a hint of blue in dark. */
+:root {
+  --bg-0: #e4e6ee;
+  --bg-1: #d8dae6;
+  --accent: #5c6490;
+  --bloom-a: rgba(92, 100, 144, 0.26);
+  --bloom-b: rgba(120, 126, 168, 0.16);
+  --bloom-c: rgba(70, 78, 118, 0.14);
+  --glow: rgba(236, 238, 248, 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-resolved-theme="light"]) {
+    --bg-0: #12141c;
+    --bg-1: #171a24;
+    --accent: #9a9db8;
+    --bloom-a: rgba(90, 96, 140, 0.28);
+    --bloom-b: rgba(70, 78, 120, 0.16);
+    --bloom-c: rgba(40, 46, 72, 0.22);
+    --glow: rgba(186, 190, 214, 0.08);
+    --lg-tint-rgb: 22, 24, 36;
+  }
+}
+
+html[data-resolved-theme="dark"] {
+  --bg-0: #12141c;
+  --bg-1: #171a24;
+  --accent: #9a9db8;
+  --bloom-a: rgba(90, 96, 140, 0.28);
+  --bloom-b: rgba(70, 78, 120, 0.16);
+  --bloom-c: rgba(40, 46, 72, 0.22);
+  --glow: rgba(186, 190, 214, 0.08);
+  --lg-tint-rgb: 22, 24, 36;
+}
+
+html[data-resolved-theme="light"] {
+  --bg-0: #e4e6ee;
+  --bg-1: #d8dae6;
+  --accent: #5c6490;
+  --bloom-a: rgba(92, 100, 144, 0.26);
+  --bloom-b: rgba(120, 126, 168, 0.16);
+  --bloom-c: rgba(70, 78, 118, 0.14);
+  --glow: rgba(236, 238, 248, 0.18);
+}

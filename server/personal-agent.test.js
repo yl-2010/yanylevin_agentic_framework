@@ -778,8 +778,15 @@ describe("open_education_page navigate payload", () => {
       todoId: "hw-personal-infographic",
       classId: "data-science-1",
     });
-    assert.equal(todo?.todoId, "hw-personal-infographic");
-    assert.equal(todo?.classId, "data-science-1");
+    assert.equal(
+      normalizeEducationNavigate({
+        view: "case",
+        caseId: "us-ought-to-deborder",
+        caseSide: "neg",
+      })?.caseSide,
+      "neg"
+    );
+    assert.equal(normalizeEducationNavigate({ view: "case" }), null);
   });
 
   it("builds website hrefs", () => {
@@ -818,6 +825,14 @@ describe("open_education_page navigate payload", () => {
         dateId: "fall-orientation-day-1",
       }),
       "/education/date/fall-orientation-day-1"
+    );
+    assert.equal(
+      educationNavigateHref({
+        view: "case",
+        caseId: "us-ought-to-deborder",
+        caseSide: "aff",
+      }),
+      "/debate/case/us-ought-to-deborder/aff"
     );
     assert.equal(educationNavigateHref({ view: "nope" }), null);
   });

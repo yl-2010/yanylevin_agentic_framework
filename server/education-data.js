@@ -40,6 +40,7 @@ const PROPERTY_JSON = new Set([
   "project.json",
   "todo.json",
   "date.json",
+  "case.json",
   "meta.json",
   "schedule.json",
 ]);
@@ -1221,6 +1222,52 @@ async function loadObjectFolder(
   return out;
 }
 
+/**
+ * Debate (and later) cases live under projects/<id>/cases/<caseId>/case.json.
+ * Todos nested under a case still belong to the project for home flatten.
+ * @param {string} projectDir
+ * @param {{ includeFixtures?: boolean, projectId?: string|null, officeOpen?: object }} opts
+ */
+async function loadProjectCases(
+  projectDir,
+  { includeFixtures = false, projectId = null, officeOpen = {} } = {}
+) {
+  const ids = await listDirs(join(projectDir, "cases"));
+  /** @type {object[]} */
+  const cases = [];
+  /** @type {object[]} */
+  const todos = [];
+  for (const dirName of ids) {
+    const id = objectDirId(dirName);
+    if (!id) continue;
+    const caseDir = join(projectDir, "cases", dirName);
+    const props = await readJsonFile(join(caseDir, "case.json"));
+    if (!props || typeof props !== "object") continue;
+    const row = { id, ...props };
+    if (!includeFixtures && isFixture(row)) continue;
+    const caseTodos = await loadObjectFolder(join(caseDir, "todos"), "todo", {
+      includeFixtures,
+      projectId,
+      officeOpen,
+    });
+    for (const t of caseTodos) {
+      t.caseId = id;
+      t.caseName = row.name || id;
+    }
+    cases.push({
+      id,
+      name: row.name || id,
+    });
+    todos.push(...caseTodos);
+  }
+  cases.sort((a, b) =>
+    String(a.name || a.id).localeCompare(String(b.name || b.id), undefined, {
+      sensitivity: "base",
+    })
+  );
+  return { cases, todos };
+}
+
 async function loadClassScopedObjects(entry, kind, opts) {
   const nestedName = kind === "todo" ? "todos" : "dates";
   /** @type {Map<string, object>} */
@@ -1817,6 +1864,10 @@ export async function readEducationTree(email, { includeFixtures = false, worksp
       "date",
       { includeFixtures, projectId, officeOpen }
     );
+    const { cases: projectCases, todos: caseTodos } = await loadProjectCases(
+      projectDir,
+      { includeFixtures, projectId, officeOpen }
+    );
     const projectFiles = [
       ...siteFilesFromProps(props),
       ...(await listContextFiles(projectDir, {
@@ -1828,8 +1879,9 @@ export async function readEducationTree(email, { includeFixtures = false, worksp
       ...project,
       _birthMs: birthMs,
       files: projectFiles,
-      todos: projectTodos,
+      todos: [...projectTodos, ...caseTodos],
       dates: projectDates,
+      ...(projectCases.length ? { cases: projectCases } : {}),
     });
   }
   const openedAt = mergeCreateOpenedAt(await readProjectsOpened(root), projects);

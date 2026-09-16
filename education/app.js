@@ -19,7 +19,13 @@
     showFilters: true,
     staticClasses: false,
     allowedAccess: ["full"],
+    allowedEmails: [],
     title: "Education",
+    site: "",
+    homeProjectId: "",
+    showCases: false,
+    hideSchedule: false,
+    hideProjects: false,
     ...(window.YL_EDU || {}),
   };
   const BASE = String(CFG.basePath || "/education").replace(/\/+$/, "") || "/education";
@@ -46,12 +52,23 @@
       capsuleId
     )}${q}`;
   }
+  function spaCase(id, side) {
+    const s = String(side || "aff").toLowerCase() === "neg" ? "neg" : "aff";
+    return `${BASE}/case/${encodeURIComponent(id)}/${s}`;
+  }
+  function debateCaseHref(id, side) {
+    const s = String(side || "aff").toLowerCase() === "neg" ? "neg" : "aff";
+    return `/debate/case/${encodeURIComponent(id)}/${s}`;
+  }
+  function homeScopeProjectId() {
+    return String(CFG.homeProjectId || "").trim() || "";
+  }
   function isSpaHref(href) {
     try {
       const u = new URL(href, window.location.origin);
       const p = u.pathname.replace(/\/+$/, "") || "/";
       if (p === BASE) return true;
-      return new RegExp(`^${BASE_RE}/(class|project|todo|date)/`).test(p);
+      return new RegExp(`^${BASE_RE}/(class|project|todo|date|case)/`).test(p);
     } catch {
       return false;
     }
@@ -64,9 +81,21 @@
    */
   function projectPortalHref(p) {
     const raw = String(p?.href || "").trim();
-    if (raw) return raw;
+    if (raw) {
+      try {
+        const u = new URL(raw, window.location.origin);
+        const path = (u.pathname.replace(/\/+$/, "") || "/") + "/";
+        if (path === `${BASE}/`) return "";
+      } catch {
+        /* keep raw */
+      }
+      return raw;
+    }
     if (!CFG.workspace && String(p?.id || "").toLowerCase() === "jype") {
       return "/jype/";
+    }
+    if (!CFG.workspace && String(p?.id || "").toLowerCase() === "debate") {
+      return "/debate/";
     }
     return "";
   }
@@ -359,6 +388,17 @@
         itemId: decodeURIComponent(m[1]),
       };
     }
+    m = path.match(new RegExp(`^${BASE_RE}/case/([^/]+)/(aff|neg)$`, "i"));
+    if (m) {
+      return {
+        view: "case",
+        classId: null,
+        projectId: homeScopeProjectId() || "debate",
+        itemId: null,
+        caseId: decodeURIComponent(m[1]),
+        caseSide: String(m[2] || "aff").toLowerCase(),
+      };
+    }
     return { view: "home", classId: null, projectId: null, itemId: null };
   }
 
@@ -392,6 +432,9 @@
     }
     if (view === "date" && r.itemId) {
       return spaDate(r.itemId, routeScrollQuery(r));
+    }
+    if (view === "case" && r.caseId) {
+      return spaCase(r.caseId, r.caseSide);
     }
     return spaHome();
   }
@@ -480,12 +523,19 @@
     const todoId = String(src.todoId || "").trim();
     const dateId = String(src.dateId || "").trim();
     const capsuleId = String(src.capsuleId || "").trim();
+    const caseId = String(src.caseId || "").trim();
+    const caseSide = String(src.caseSide || src.side || "aff").trim();
     const q = projectId
       ? `?project=${encodeURIComponent(projectId)}`
       : classId
         ? `?class=${encodeURIComponent(classId)}`
         : "";
-    if (view === "home") return spaHome();
+    if (view === "home") {
+      if (String(src.site || "").toLowerCase() === "debate" && BASE !== "/debate") {
+        return "/debate/";
+      }
+      return spaHome();
+    }
     if (view === "class" && classId) {
       return spaClass(classId);
     }
@@ -500,6 +550,10 @@
     }
     if (view === "capsule" && todoId && capsuleId) {
       return spaCapsule(todoId, capsuleId, q);
+    }
+    if (view === "case" && caseId) {
+      if (BASE === "/debate") return spaCase(caseId, caseSide);
+      return debateCaseHref(caseId, caseSide);
     }
     return null;
   }
@@ -517,6 +571,9 @@
     const href = educationNavigateHrefFromTarget(src);
     if (!href) return false;
     if (id) rememberAgentNavigateId(id);
+    if (href.startsWith("/debate") && BASE !== "/debate") {
+      return assignProjectPortal(href);
+    }
     if (sameEducationHref(href)) return false;
     navigate(href);
     return true;
@@ -530,7 +587,7 @@
     const href = String(rawHref || "").trim();
     if (!href) return null;
     try {
-      if (href.startsWith(BASE) || href.startsWith("/education") || href.startsWith("/jype")) {
+      if (href.startsWith(BASE) || href.startsWith("/education") || href.startsWith("/jype") || href.startsWith("/debate")) {
         const u = new URL(href, window.location.origin);
         if (isSpaHref(u.pathname + u.search)) return u.pathname + u.search;
       }
@@ -549,6 +606,10 @@
    * @returns {boolean}
    */
   function applyEducationNavigatePath(rawHref) {
+    const href = String(rawHref || "").trim();
+    if (href.startsWith("/debate") && BASE !== "/debate") {
+      return assignProjectPortal(href);
+    }
     const path = educationPathFromHref(rawHref);
     if (!path) return false;
     if (!sameEducationHref(path)) navigate(path);
@@ -1707,6 +1768,48 @@
     return panelHtml("Projects", listOrEmpty(rows), { filterId });
   }
 
+  function findCaseById(caseId) {
+    const id = String(caseId || "").trim();
+    if (!id) return null;
+    const projects = tree?.projects || [];
+    for (const p of projects) {
+      if (isFixture(p)) continue;
+      const hit = (p.cases || []).find((c) => c && String(c.id) === id);
+      if (hit) return { ...hit, projectId: p.id, projectName: p.name || p.id };
+    }
+    return null;
+  }
+
+  function debateCases() {
+    const scope = homeScopeProjectId();
+    const projects = (tree?.projects || []).filter((p) => !isFixture(p));
+    const p = scope
+      ? projects.find((x) => x.id === scope)
+      : projects.find((x) => Array.isArray(x.cases) && x.cases.length);
+    return ((p && p.cases) || []).filter((c) => c && !isFixture(c));
+  }
+
+  function casePairHtml(c) {
+    const name = escapeHtml(c.name || c.id);
+    const affHref = BASE === "/debate" ? spaCase(c.id, "aff") : debateCaseHref(c.id, "aff");
+    const negHref = BASE === "/debate" ? spaCase(c.id, "neg") : debateCaseHref(c.id, "neg");
+    return `<li class="edu-case">
+      <a class="edu-row edu-row-link edu-case-side" href="${escapeHtml(affHref)}">
+        <span class="edu-name">${name}</span>
+        <span class="edu-tag">Aff</span>
+      </a>
+      <a class="edu-row edu-row-link edu-case-side" href="${escapeHtml(negHref)}">
+        <span class="edu-name">${name}</span>
+        <span class="edu-tag">Neg</span>
+      </a>
+    </li>`;
+  }
+
+  function casesPanelHtml(filterId = "lg-edu-cases") {
+    const rows = debateCases().map(casePairHtml).join("");
+    return panelHtml("Cases", listOrEmpty(rows), { filterId });
+  }
+
   function classRowHtml(m, highlight) {
     const href = spaClass(m.class.id);
     const score = CFG.showGrades
@@ -2141,7 +2244,8 @@
   }
 
   function renderHome() {
-    const todos = flattenTodos(tree)
+    const scopeId = homeScopeProjectId();
+    const todos = flattenTodos(tree, scopeId ? { projectId: scopeId } : {})
       .filter(matchesFilter)
       .filter((t) => !todoHiddenFromHome(t));
     const open = todos
@@ -2168,8 +2272,12 @@
 
     const day1 = sections[0] ? dayPanel(sections[0], 0) : "";
     const day2 = sections[1] ? dayPanel(sections[1], 1) : "";
-    const datesPanel = datesPanelHtml({}, "lg-edu-dates");
-    const projectsPanel = projectsPanelHtml();
+    const datesPanel = datesPanelHtml(
+      scopeId ? { projectId: scopeId } : {},
+      "lg-edu-dates"
+    );
+    const projectsPanel = CFG.hideProjects ? "" : projectsPanelHtml();
+    const casesPanel = CFG.showCases ? casesPanelHtml() : "";
     const staticClasses = CFG.staticClasses
       ? panelHtml(
           "Classes",
@@ -2181,13 +2289,19 @@
           { filterId: "lg-edu-classes" }
         )
       : "";
-    const rightCol = CFG.staticClasses
-      ? `${staticClasses}${projectsPanel}${datesPanel}`
-      : day1 || day2
-        ? `${day1}${datesPanel}${day2}${projectsPanel}`
-        : `${panelHtml("Classes", `<p class="edu-empty">No school days</p>`, {
-            filterId: "lg-edu-classes",
-          })}${datesPanel}${projectsPanel}`;
+    let rightCol;
+    if (CFG.hideSchedule || scopeId) {
+      rightCol = `${casesPanel}${datesPanel}${CFG.hideProjects ? "" : projectsPanel}`;
+    } else if (CFG.staticClasses) {
+      rightCol = `${staticClasses}${projectsPanel}${casesPanel}${datesPanel}`;
+    } else {
+      rightCol =
+        day1 || day2
+          ? `${day1}${casesPanel}${datesPanel}${day2}${projectsPanel}`
+          : `${panelHtml("Classes", `<p class="edu-empty">No school days</p>`, {
+              filterId: "lg-edu-classes",
+            })}${casesPanel}${datesPanel}${projectsPanel}`;
+    }
 
     appEl.innerHTML = `
       <div class="edu-grid edu-grid--home">
@@ -2318,6 +2432,27 @@
           })}
         </div>
       </div>
+    `;
+  }
+
+  function renderCase() {
+    const c = findCaseById(route.caseId);
+    const side = route.caseSide === "neg" ? "Neg" : "Aff";
+    if (!c) {
+      appEl.innerHTML = `
+        <header class="edu-hero edu-hero--detail">
+          ${backLinkHtml(spaHome(), "lg-edu-back-case")}
+          <h1 class="edu-hero-title">Missing</h1>
+        </header>
+      `;
+      return;
+    }
+    const title = `${c.name || c.id} · ${side}`;
+    appEl.innerHTML = `
+      <header class="edu-hero edu-hero--detail">
+        ${backLinkHtml(spaHome(), "lg-edu-back-case")}
+        <h1 class="edu-hero-title">${escapeHtml(title)}</h1>
+      </header>
     `;
   }
 
@@ -2609,6 +2744,12 @@
       });
       return (d && (d.name || d.id)) || fallback;
     }
+    if (route.view === "case") {
+      const c = findCaseById(route.caseId);
+      const side = route.caseSide === "neg" ? "Neg" : "Aff";
+      if (!c) return fallback;
+      return `${c.name || c.id} · ${side}`;
+    }
     return fallback;
   }
 
@@ -2638,6 +2779,7 @@
     else if (route.view === "capsule") renderCapsuleDetail();
     else if (route.view === "todo") renderTodoDetail();
     else if (route.view === "date") renderDateDetail();
+    else if (route.view === "case") renderCase();
     else renderHome();
 
     didEntrance = true;
@@ -3282,6 +3424,13 @@
       userEmail = String(data.email || "")
         .trim()
         .toLowerCase();
+      const allowedEmails = (Array.isArray(CFG.allowedEmails) ? CFG.allowedEmails : [])
+        .map((e) => String(e || "").trim().toLowerCase())
+        .filter(Boolean);
+      if (allowedEmails.length && !allowedEmails.includes(userEmail)) {
+        show("denied");
+        return;
+      }
       if (CFG.title) document.title = CFG.title;
       show("full");
       bindAppClicks();
@@ -3316,6 +3465,7 @@
       view: r.view || "home",
     };
     if (CFG.workspace) ctx.workspace = CFG.workspace;
+    if (CFG.site) ctx.site = String(CFG.site);
     if (r.view === "class" && r.classId) {
       const cls = (tree?.classes || []).find((c) => c.id === r.classId);
       ctx.classId = r.classId;
@@ -3401,6 +3551,17 @@
         if (cls?.period) ctx.period = String(cls.period).toUpperCase();
       }
       ctx.title = d?.name || r.itemId;
+    } else if (r.view === "case" && r.caseId) {
+      const c = findCaseById(r.caseId);
+      const side = r.caseSide === "neg" ? "neg" : "aff";
+      ctx.caseId = r.caseId;
+      ctx.caseSide = side;
+      if (c?.name) ctx.caseName = c.name;
+      if (c?.projectId) {
+        ctx.projectId = c.projectId;
+        if (c.projectName) ctx.projectName = c.projectName;
+      }
+      ctx.title = `${c?.name || r.caseId} · ${side === "neg" ? "Neg" : "Aff"}`;
     } else {
       ctx.title = CFG.title ? `${CFG.title} home` : "Education home";
     }

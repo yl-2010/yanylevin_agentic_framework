@@ -11,6 +11,7 @@ const PROPERTY_JSON = new Set([
   "project.json",
   "todo.json",
   "date.json",
+  "case.json",
   "meta.json",
   "schedule.json",
 ]);

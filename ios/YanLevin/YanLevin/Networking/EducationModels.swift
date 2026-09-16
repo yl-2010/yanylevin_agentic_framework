@@ -305,6 +305,12 @@ struct EducationClass: Decodable, Identifiable, Hashable {
     }
 }
 
+struct EducationCase: Decodable, Identifiable, Hashable {
+    let id: String
+    let name: String?
+    var displayName: String { name ?? id }
+}
+
 struct EducationProject: Decodable, Identifiable, Hashable {
     let id: String
     let name: String?
@@ -314,9 +320,10 @@ struct EducationProject: Decodable, Identifiable, Hashable {
     let files: [EducationContextFile]?
     let todos: [EducationTodo]?
     let dates: [EducationDate]?
+    let cases: [EducationCase]?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, order, files, todos, dates, href
+        case id, name, order, files, todos, dates, href, cases
         case detail = "description"
     }
 
@@ -332,6 +339,12 @@ struct EducationProject: Decodable, Identifiable, Hashable {
         return raw == "/jype" || raw == "/jype/" || raw.hasPrefix("/jype?")
     }
 
+    var isDebatePortal: Bool {
+        if id.lowercased() == "debate" { return true }
+        let raw = (href ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return raw == "/debate" || raw == "/debate/" || raw.hasPrefix("/debate?")
+    }
+
     func mappingTodos(_ transform: (EducationTodo) -> EducationTodo) -> EducationProject {
         EducationProject(
             id: id,
@@ -341,7 +354,8 @@ struct EducationProject: Decodable, Identifiable, Hashable {
             href: href,
             files: files,
             todos: todos?.map(transform),
-            dates: dates
+            dates: dates,
+            cases: cases
         )
     }
 }

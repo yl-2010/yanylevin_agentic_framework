@@ -34,7 +34,7 @@
         --panel-bg: rgba(255, 255, 255, 0.5);
         --panel-brd: rgba(255, 255, 255, 0.6);
         --rim: rgba(255, 255, 255, 0.75);
-        --glow: rgba(255, 255, 255, 0.14);
+        --glow: rgba(255, 255, 255, 0.82);
         --bloom-a: rgba(24, 125, 145, 0.22);
         --bloom-b: rgba(206, 176, 122, 0.16);
         --bloom-c: rgba(70, 120, 200, 0.18);
@@ -53,7 +53,8 @@
         --ease: cubic-bezier(0.22, 1, 0.36, 1);
         --pointer-x: 50%;
         --pointer-y: 30%;
-        --pointer-glow-strength: 0.75;
+        --pointer-glow-strength: 0.58;
+        --pointer-glow-blend: soft-light;
       }
       @property --lg-read-blur {
         syntax: "<length>";
@@ -85,6 +86,8 @@
           --lg-outer-shadow: rgba(0, 0, 0, 0.5);
           --lg-fallback-tint: 0.14;
           --lg-fallback-shine: rgba(255, 255, 255, 0.3);
+          --pointer-glow-strength: 0.75;
+          --pointer-glow-blend: normal;
         }
       }
       html[data-resolved-theme="dark"] {
@@ -110,6 +113,8 @@
         --lg-outer-shadow: rgba(0, 0, 0, 0.5);
         --lg-fallback-tint: 0.14;
         --lg-fallback-shine: rgba(255, 255, 255, 0.3);
+        --pointer-glow-strength: 0.75;
+        --pointer-glow-blend: normal;
       }
       html[data-resolved-theme="light"] {
         --bg-0: #e8edf2;
@@ -121,7 +126,7 @@
         --panel-bg: rgba(255, 255, 255, 0.5);
         --panel-brd: rgba(255, 255, 255, 0.6);
         --rim: rgba(255, 255, 255, 0.75);
-        --glow: rgba(255, 255, 255, 0.14);
+        --glow: rgba(255, 255, 255, 0.82);
         --bloom-a: rgba(24, 125, 145, 0.22);
         --bloom-b: rgba(206, 176, 122, 0.16);
         --bloom-c: rgba(70, 120, 200, 0.18);
@@ -134,6 +139,8 @@
         --lg-outer-shadow: rgba(0, 0, 0, 0.18);
         --lg-fallback-tint: 0.2;
         --lg-fallback-shine: rgba(255, 255, 255, 0.5);
+        --pointer-glow-strength: 0.58;
+        --pointer-glow-blend: soft-light;
       }
       * { box-sizing: border-box; }
       html { scroll-behavior: smooth; }
@@ -142,6 +149,7 @@
         font-family: var(--body); font-size: 17px; line-height: 1.294;
         -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; min-height: 100vh;
         background: linear-gradient(180deg, var(--bg-0), var(--bg-1));
+        isolation: isolate;
       }
       /* Calm background for the glass to refract (from site #1) */
       body::before {
@@ -154,6 +162,7 @@
       body::after {
         content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
         opacity: var(--pointer-glow-strength);
+        mix-blend-mode: var(--pointer-glow-blend);
         background: radial-gradient(24rem 24rem at var(--pointer-x) var(--pointer-y), var(--glow), transparent 60%);
         transition: opacity 0.4s var(--ease);
       }

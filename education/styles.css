@@ -8,7 +8,7 @@
   --panel-bg: rgba(255, 255, 255, 0.5);
   --panel-brd: rgba(255, 255, 255, 0.6);
   --rim: rgba(255, 255, 255, 0.75);
-  --glow: rgba(255, 255, 255, 0.14);
+  --glow: rgba(255, 255, 255, 0.82);
   --bloom-a: rgba(24, 125, 145, 0.22);
   --bloom-b: rgba(206, 176, 122, 0.16);
   --bloom-c: rgba(70, 120, 200, 0.18);
@@ -39,7 +39,8 @@
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --pointer-x: 50%;
   --pointer-y: 30%;
-  --pointer-glow-strength: 0.75;
+  --pointer-glow-strength: 0.58;
+  --pointer-glow-blend: soft-light;
   --corner-pad: clamp(1rem, 2.5vw, 1.6rem);
   --corner-orb: 120px;
   --corner-orb-gap: 0.75rem;
@@ -81,6 +82,8 @@
     --lg-outer-shadow: rgba(0, 0, 0, 0.5);
     --lg-fallback-tint: 0.14;
     --lg-fallback-shine: rgba(255, 255, 255, 0.3);
+    --pointer-glow-strength: 0.75;
+    --pointer-glow-blend: normal;
   }
 }
 
@@ -107,6 +110,8 @@ html[data-resolved-theme="dark"] {
   --lg-outer-shadow: rgba(0, 0, 0, 0.5);
   --lg-fallback-tint: 0.14;
   --lg-fallback-shine: rgba(255, 255, 255, 0.3);
+  --pointer-glow-strength: 0.75;
+  --pointer-glow-blend: normal;
 }
 
 *,
@@ -146,6 +151,7 @@ body::after {
   z-index: -1;
   pointer-events: none;
   opacity: var(--pointer-glow-strength);
+  mix-blend-mode: var(--pointer-glow-blend);
   background: radial-gradient(24rem 24rem at var(--pointer-x) var(--pointer-y), var(--glow), transparent 60%);
   transition: opacity 0.4s var(--ease);
 }
@@ -1114,6 +1120,35 @@ html[data-resolved-theme="light"] .edu-filter.is-on {
 .edu-class-row .edu-row-link {
   flex-wrap: nowrap;
   align-items: center;
+}
+
+.edu-case {
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+  padding: 0;
+  gap: 0;
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
+}
+
+.edu-case .edu-case-side {
+  border-radius: 0;
+  width: 100%;
+}
+
+.edu-case .edu-case-side:first-child {
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+}
+
+.edu-case .edu-case-side:last-child {
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+.edu-case .edu-case-side + .edu-case-side {
+  border-top: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
 }
 
 .edu-name {

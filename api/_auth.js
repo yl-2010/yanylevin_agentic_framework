@@ -42,6 +42,7 @@ const ALLOWED_RETURN_PATHS = new Set([
   "/fitness/",
   "/dashboard/",
   "/jype/",
+  "/debate/",
 ]);
 
 function getAuthSecret() {

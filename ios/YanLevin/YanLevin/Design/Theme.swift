@@ -3,6 +3,7 @@ import SwiftUI
 enum YLPalette: Equatable {
     case standard
     case jype
+    case debate
 }
 
 private struct YLPaletteKey: EnvironmentKey {
@@ -42,9 +43,18 @@ enum YLTheme {
     static let jypeDarkBg1 = Color(red: 0x1D / 255, green: 0x11 / 255, blue: 0x14 / 255)
     static let jypeDarkAccent = Color(red: 0xE0 / 255, green: 0x7A / 255, blue: 0x82 / 255)
 
+    /// `/debate` wash (`debate/styles.css`).
+    static let debateLightBg0 = Color(red: 0xE4 / 255, green: 0xE6 / 255, blue: 0xEE / 255)
+    static let debateLightBg1 = Color(red: 0xD8 / 255, green: 0xDA / 255, blue: 0xE6 / 255)
+    static let debateLightAccent = Color(red: 0x5C / 255, green: 0x64 / 255, blue: 0x90 / 255)
+    static let debateDarkBg0 = Color(red: 0x12 / 255, green: 0x14 / 255, blue: 0x1C / 255)
+    static let debateDarkBg1 = Color(red: 0x17 / 255, green: 0x1A / 255, blue: 0x24 / 255)
+    static let debateDarkAccent = Color(red: 0x9A / 255, green: 0x9D / 255, blue: 0xB8 / 255)
+
     static func bg0(_ scheme: ColorScheme, palette: YLPalette = .standard) -> Color {
         switch palette {
         case .jype: return scheme == .dark ? jypeDarkBg0 : jypeLightBg0
+        case .debate: return scheme == .dark ? debateDarkBg0 : debateLightBg0
         case .standard: return scheme == .dark ? darkBg0 : lightBg0
         }
     }
@@ -52,6 +62,7 @@ enum YLTheme {
     static func bg1(_ scheme: ColorScheme, palette: YLPalette = .standard) -> Color {
         switch palette {
         case .jype: return scheme == .dark ? jypeDarkBg1 : jypeLightBg1
+        case .debate: return scheme == .dark ? debateDarkBg1 : debateLightBg1
         case .standard: return scheme == .dark ? darkBg1 : lightBg1
         }
     }
@@ -67,6 +78,7 @@ enum YLTheme {
     static func accent(_ scheme: ColorScheme, palette: YLPalette = .standard) -> Color {
         switch palette {
         case .jype: return scheme == .dark ? jypeDarkAccent : jypeLightAccent
+        case .debate: return scheme == .dark ? debateDarkAccent : debateLightAccent
         case .standard: return scheme == .dark ? darkAccent : lightAccent
         }
     }
@@ -74,7 +86,7 @@ enum YLTheme {
     static func chatSend(_ scheme: ColorScheme, palette: YLPalette = .standard) -> Color {
         switch palette {
         case .jype: return accent(scheme, palette: .jype)
-        case .standard: return scheme == .dark ? chatOrangeDark : chatOrange
+        case .debate, .standard: return scheme == .dark ? chatOrangeDark : chatOrange
         }
     }
 
@@ -122,6 +134,12 @@ enum YLTheme {
         t.userInterfaceStyle == .dark
             ? UIColor(YLTheme.jypeDarkAccent)
             : UIColor(YLTheme.jypeLightAccent)
+    }) }
+
+    static var debateAccent: Color { Color(uiColor: UIColor { t in
+        t.userInterfaceStyle == .dark
+            ? UIColor(YLTheme.debateDarkAccent)
+            : UIColor(YLTheme.debateLightAccent)
     }) }
 }
 

@@ -227,12 +227,19 @@ struct RootTabView: View {
     @State private var didApplyAuthorizedDefault = false
 
     private var chromePalette: YLPalette {
-        educationFocus.isJype && (nav.selectedTab == .education || nav.selectedTab == .chat)
-            ? .jype : .standard
+        if educationFocus.isJype && (nav.selectedTab == .education || nav.selectedTab == .chat) {
+            return .jype
+        }
+        if educationFocus.isDebate && nav.selectedTab == .education {
+            return .debate
+        }
+        return .standard
     }
 
     private var educationTabTitle: String {
-        educationFocus.isJype ? "JYPE" : "Education"
+        if educationFocus.isJype { return "JYPE" }
+        if educationFocus.isDebate { return "Debate" }
+        return "Education"
     }
 
     var body: some View {

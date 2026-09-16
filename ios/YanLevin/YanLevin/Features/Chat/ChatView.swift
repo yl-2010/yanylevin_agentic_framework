@@ -113,6 +113,7 @@ struct ChatView: View {
         auth.hasFullAccess && backend == .educationAgent
     }
 
+    /// JYPE tints chat. Debate stays on the personal agent (standard orange).
     private var palette: YLPalette {
         usesEducation && educationFocus.isJype ? .jype : .standard
     }

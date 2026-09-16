@@ -126,12 +126,14 @@ const ephemeralHideTimers = new Map();
  * One-shot education SPA / iOS stack target. Not stored in chat history.
  * @typedef {{
  *   id: string,
- *   view: 'home'|'class'|'project'|'todo'|'date'|'capsule',
+ *   view: 'home'|'class'|'project'|'todo'|'date'|'capsule'|'case',
  *   classId?: string,
  *   projectId?: string,
  *   todoId?: string,
  *   dateId?: string,
  *   capsuleId?: string,
+ *   caseId?: string,
+ *   caseSide?: string,
  * }} EducationNavigate
  */
 
@@ -524,11 +526,15 @@ export function normalizeEducationNavigate(raw) {
   const todoId = str("todoId", 200);
   const dateId = str("dateId", 200);
   const capsuleId = str("capsuleId");
+  const caseId = str("caseId");
+  const caseSideRaw = str("caseSide") || str("side");
+  const caseSide = caseSideRaw.toLowerCase() === "neg" ? "neg" : caseSideRaw ? "aff" : "";
   if (view === "class" && !classId) return null;
   if (view === "project" && !projectId) return null;
   if (view === "todo" && !todoId) return null;
   if (view === "date" && !dateId) return null;
   if (view === "capsule" && (!todoId || !capsuleId)) return null;
+  if (view === "case" && !caseId) return null;
   /** @type {Omit<EducationNavigate, 'id'> & { id?: string }} */
   const out = { view: /** @type {EducationNavigate['view']} */ (view) };
   if (classId) out.classId = classId;
@@ -536,6 +542,8 @@ export function normalizeEducationNavigate(raw) {
   if (todoId) out.todoId = todoId;
   if (dateId) out.dateId = dateId;
   if (capsuleId) out.capsuleId = capsuleId;
+  if (caseId) out.caseId = caseId;
+  if (view === "case") out.caseSide = caseSide === "neg" ? "neg" : "aff";
   const id = str("id", 80);
   if (id) out.id = id;
   return out;
@@ -569,6 +577,10 @@ export function educationNavigateHref(raw) {
       return `/education/todo/${encodeURIComponent(n.todoId || "")}/capsule/${encodeURIComponent(
         n.capsuleId || ""
       )}${q}`;
+    case "case": {
+      const side = n.caseSide === "neg" ? "neg" : "aff";
+      return `/debate/case/${encodeURIComponent(n.caseId || "")}/${side}`;
+    }
     default:
       return null;
   }
@@ -669,13 +681,13 @@ function openEducationPageTool(sid, session) {
   return {
     open_education_page: {
       description:
-        "Queue an education dashboard page to open once this turn finishes (website in place, iOS Education tab without leaving Chat). The jump happens when your final reply lands, not when you call this tool. Last call in the turn wins. Call when the user asks about one todo, class, project, date, or capsule, says show/take me there, or you just created that object. Skip if Live context is already that page, for lists of many items, or for mail/news/fitness. Call after the folder exists. Express/web/iOS only; not Cursor Desktop.",
+        "Queue an education dashboard page to open once this turn finishes (website in place, iOS Education tab without leaving Chat). The jump happens when your final reply lands, not when you call this tool. Last call in the turn wins. Call when the user asks about one todo, class, project, date, capsule, or debate case, says show/take me there, or you just created that object. Skip if Live context is already that page, for lists of many items, or for mail/news/fitness. Call after the folder exists. Express/web/iOS only; not Cursor Desktop.",
       inputSchema: {
         type: "object",
         properties: {
           view: {
             type: "string",
-            description: "home | class | project | todo | date | capsule",
+            description: "home | class | project | todo | date | capsule | case",
           },
           classId: { type: "string", description: "Class folder id" },
           projectId: { type: "string", description: "Project folder id" },
@@ -686,6 +698,8 @@ function openEducationPageTool(sid, session) {
           },
           dateId: { type: "string", description: "Date folder name on disk" },
           capsuleId: { type: "string", description: "Briefing capsule id" },
+          caseId: { type: "string", description: "Debate case folder id" },
+          caseSide: { type: "string", description: "aff or neg" },
         },
         required: ["view"],
       },
@@ -1026,6 +1040,7 @@ export const PERSONAL_SKILL_PATHS = {
   agent: ".cursor/skills/personal-agent/SKILL.md",
   soul: "SOUL.md",
   education: ".cursor/skills/personal-agent/education-dashboard.md",
+  debate: ".cursor/skills/debate-cases/SKILL.md",
   schedule: ".cursor/skills/class-schedule/SKILL.md",
   widgets: ".cursor/skills/chat-widgets/SKILL.md",
   mail: ".cursor/skills/personal-mail/SKILL.md",
@@ -1059,6 +1074,7 @@ const EDUCATION_VIEWS = new Set([
   "todo",
   "date",
   "capsule",
+  "case",
 ]);
 
 /**
@@ -1100,6 +1116,7 @@ export function systemPrompt(email, opts = {}) {
     "Do not preload other skills. Read only the file this turn needs:",
     `- Identity / permissions / reply style: ${PERSONAL_SKILL_PATHS.agent}`,
     `- Education dashboard (classes, todos, dates, projects, school attachments): ${PERSONAL_SKILL_PATHS.education}`,
+    `- Debate / case building: ${PERSONAL_SKILL_PATHS.debate}`,
     `- Class schedule: ${PERSONAL_SKILL_PATHS.schedule}`,
     `- Past chats: ${PERSONAL_SKILL_PATHS.chats}`,
     `- Chat widgets (map / html / image fences): ${PERSONAL_SKILL_PATHS.widgets}`,

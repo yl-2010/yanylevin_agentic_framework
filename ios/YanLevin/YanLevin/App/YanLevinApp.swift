@@ -25,6 +25,16 @@ struct YanLevinApp: App {
         PhoneLocationReporter.shared.restoreFromAppGroup()
     }
 
+    private var appTint: Color {
+        if educationFocus.isJype && (nav.selectedTab == .education || nav.selectedTab == .chat) {
+            return YLTheme.jypeAccent
+        }
+        if educationFocus.isDebate && nav.selectedTab == .education {
+            return YLTheme.debateAccent
+        }
+        return YLTheme.accent
+    }
+
     var body: some Scene {
         WindowGroup {
             ZStack {
@@ -39,10 +49,7 @@ struct YanLevinApp: App {
             .environmentObject(educationFocus)
             .environmentObject(nav)
             .preferredColorScheme(theme.preferredColorScheme)
-            .tint(
-                educationFocus.isJype && (nav.selectedTab == .education || nav.selectedTab == .chat)
-                    ? YLTheme.jypeAccent : YLTheme.accent
-            )
+            .tint(appTint)
             .onAppear {
                 YLHaptics.prepareSession()
                 nav.consumePendingNewChatIfNeeded()

@@ -12,7 +12,7 @@ description: >-
 
 Local Cursor agent (Express + Cursor Desktop on this repo). **Never** spawn a cloud agent.
 
-The public site chatbot and LM Studio wiring are separate. The **/education** website stays Yan's school dashboard; this agent is personal, and education data is one of the things it can manage. **/jype** is a separate shared workspace (Yan, Alex, Example Friend, Example Neighbor). Those chats live in `education/projects/jype/.chat-history/` and do not mix into personal history.
+The public site chatbot and LM Studio wiring are separate. The **/education** website stays Yan's school dashboard; this agent is personal, and education data is one of the things it can manage. **/debate** is Yan-only (`you@example.com`) and uses this same agent and chat history. Debate objects live under `education/you@example.com/projects/debate/`. **/jype** is a separate shared workspace (Yan, Alex, Example Friend, Example Neighbor). Those chats live in `education/projects/jype/.chat-history/` and do not mix into personal history.
 
 ## Scope
 
@@ -62,6 +62,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Every reply (cut AI tells) | `.cursor/skills/unslop/SKILL.md` (always; see above) |
 | Every reply (persona / vibe) | `SOUL.md` at repo root (always; see above) |
 | Classes, todos, dates, projects, `/education` dashboard, chat attachments into school folders | `.cursor/skills/personal-agent/education-dashboard.md` |
+| Debate case building (`/debate`, Aff/Neg, research a case) | `.cursor/skills/debate-cases/SKILL.md` |
 | Static HTML on a todo / date / project / class | `.cursor/skills/object-html/SKILL.md` |
 | Public yanylevin.com page (study guide, plan, blueprint, liquid-glass report) | `.cursor/skills/yanylevin-webpage-create/SKILL.md` |
 | Weekly PDF, `schedule.json`, bells, what class is now | `.cursor/skills/class-schedule/SKILL.md` |
