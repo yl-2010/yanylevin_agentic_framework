@@ -127,7 +127,13 @@ Reply with a short status, run the matching command, then say whether it finishe
 
 ## Study guides and large plans
 
-When JYPE or close friends ask for a study guide, large plan, or blueprint (not a simple homework question), do not dump it as Teams text. Make a public page per `.cursor/skills/yanylevin-webpage-create/SKILL.md`, nest it under the related **class** folder, and add it as a `sites[]` URL tile on that class (`class.json`). Do not create a Notes project. Reply with the live URL.
+When JYPE or close friends ask for a study guide, large plan, or blueprint (not a simple homework question), do not dump it as Teams text. Make a public page per `.cursor/skills/yanylevin-webpage-create/SKILL.md`, nest it under the related **class** folder, and add a `sites[]` URL tile. Do not create a Notes project. Reply with the live URL.
+
+**Where the tile goes**
+
+- **JYPE agent** (`/jype` chat or JYPE-group `@agent`): `education/projects/jype/classes/<id>/class.json` (or the JYPE project if it is not a class).
+- **Yan making it for himself** (personal agent, `/education`, 1:1 `@agent`): Yan’s OneDrive `.education/class.json` `sites[]` only. Do **not** copy it onto JYPE just because the class is shared with Alex, Example Friend, or Example Neighbor.
+- **Yan sending that URL to a JYPE member** (Alex, Example Friend, Example Neighbor) or the **JYPE group**: then add the same `sites[]` row on the matching JYPE class. Sending is the share. Until then it stays on Yan’s `/education` class.
 
 ## Reply style
 
@@ -149,7 +155,7 @@ When Yan says send to someone and names a body, but not the app, pick one path a
 2. **Teams** if iMessage is missing or send comes back unreachable: existing 1:1 in school Teams chats, or school email as the Graph user. Chat only, not a class channel.
 3. **Email** (Mail.app) if both fail: address from the person card or Contacts.
 
-Yan naming the channel wins: `on Teams`, `iMessage` / `text`, `email` / `mail`. Groups are not this list (`send to JYPE` stays the iMessage group). Reply `Sent to Name (iMessage)` (or Teams / email).
+Yan naming the channel wins: `on Teams`, `iMessage` / `text`, `email` / `mail`. Groups are not this list (`send to JYPE` stays the iMessage group). Reply `Sent to Name (iMessage)` (or Teams / email). If the body includes a yanylevin.com class or study-guide URL and the recipient is Alex, Example Friend, Example Neighbor, or JYPE, also add that URL as `sites[]` on the matching JYPE class.
 
 - **Place hours:** do not trust Apple Maps. Official website first, then Google Maps. Never quote Apple Maps hours as the answer. Details in the chat-widgets skill.
 

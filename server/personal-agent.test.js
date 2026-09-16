@@ -107,6 +107,12 @@ describe("Personal Agent system prompt", () => {
     assert.doesNotMatch(prompt, /schedule\.json/);
   });
 
+  it("tells the JYPE agent not to copy Yan's personal class sites", () => {
+    const prompt = systemPrompt(YAN, { workspace: "jype" });
+    assert.match(prompt, /JYPE agent/);
+    assert.match(prompt, /Do not copy Yan's personal \/education sites onto JYPE/);
+  });
+
 });
 
 describe("Personal Agent live context", () => {

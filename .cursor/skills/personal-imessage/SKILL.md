@@ -61,7 +61,7 @@ If to and body are clear, send. **Do not ask for confirmation.** Look up a phone
 The `/imessage/send` path and the server's @agent final-bubble delivery append `// Sent by Yan's Personal Agent`. Do not write that line in the request body, and never put it in Personal Agent app or website bubbles. Newlines in the body are kept. iMessage does not render markdown, so fake lists with • or dashes.
 
 
-`to` can be a phone, iMessage email, a unique Contacts name, or the display name of an **existing** group chat (`JYPE`). Look up numbers on the person card or in Contacts. Do not run `osascript` from Cursor for send.
+`to` can be a phone, iMessage email, a unique Contacts name, or the display name of an **existing** group chat (`JYPE`). Look up numbers on the person card or in Contacts. Do not run `osascript` from Cursor for send. If Yan is sending a yanylevin.com class or study-guide URL to Alex, Example Friend, Example Neighbor, or JYPE, also add that URL as `sites[]` on the matching JYPE class.
 
 ```bash
 curl -sS --unix-socket /tmp/personal-agent-local.sock \
