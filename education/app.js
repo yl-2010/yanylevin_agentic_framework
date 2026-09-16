@@ -1584,6 +1584,16 @@
     });
   }
 
+  function todoCheckHtml({ done, filterId }) {
+    return `<span class="edu-check-host"><button type="button" class="edu-check${
+      done ? " is-checked" : ""
+    }" data-liquid-glass="circle" data-filter-id="${escapeHtml(
+      filterId
+    )}" data-todo-toggle aria-pressed="${Boolean(
+      done
+    )}" aria-label="Mark done"><span class="edu-check-dot" aria-hidden="true"></span></button></span>`;
+  }
+
   function todoRowHtml(t) {
     const done = Boolean(t.done);
     const tag = todoTagKey(t);
@@ -1604,16 +1614,13 @@
     const projectAttr = t.projectId
       ? ` data-todo-project-id="${escapeHtml(t.projectId)}"`
       : "";
+    const checkFilterId = `lg-edu-check-${
+      t.projectId ? `p-${t.projectId}-${t.id}` : t.classId ? `${t.classId}-${t.id}` : t.id
+    }`;
     return `<li class="edu-row edu-todo${done ? " is-done" : ""}" data-todo-id="${escapeHtml(
       t.id
     )}" data-due-date="${escapeHtml(t.dueDate || "")}"${classAttr}${projectAttr}>
-      <button type="button" class="edu-check${done ? " is-checked" : ""}" data-liquid-glass="circle" data-filter-id="lg-edu-check-${escapeHtml(
-        t.projectId
-          ? `p-${t.projectId}-${t.id}`
-          : t.classId
-            ? `${t.classId}-${t.id}`
-            : t.id
-      )}" data-todo-toggle aria-pressed="${done}" aria-label="Mark done"><span class="edu-check-dot" aria-hidden="true"></span></button>
+      ${todoCheckHtml({ done, filterId: checkFilterId })}
       <a class="edu-row-link" href="${href}">
         <span class="edu-name">${taggedNameHtml(tag, t.name || t.id)}</span>
         ${klass}${due}
@@ -2335,9 +2342,7 @@
   function briefingStatusHtml(todo, { when, contextName }) {
     return `<section class="edu-panel edu-briefing-status" data-liquid-glass="rounded" data-filter-id="lg-edu-briefing-status">
         <div class="edu-detail-row">
-          <button type="button" class="edu-check${todo.done ? " is-checked" : ""}" data-liquid-glass="circle" data-filter-id="lg-edu-detail-check" data-todo-toggle aria-pressed="${Boolean(
-            todo.done
-          )}" aria-label="Mark done"><span class="edu-check-dot" aria-hidden="true"></span></button>
+          ${todoCheckHtml({ done: todo.done, filterId: "lg-edu-detail-check" })}
           <span class="edu-detail-status">${todo.done ? "Done" : "Open"}</span>
         </div>
         ${when ? `<p class="edu-detail-meta">${escapeHtml(when)}</p>` : ""}
@@ -2452,9 +2457,7 @@
     const body = `
       <div class="edu-detail" data-todo-id="${escapeHtml(t.id)}"${classAttr}${projectAttr}>
         <div class="edu-detail-row">
-          <button type="button" class="edu-check${t.done ? " is-checked" : ""}" data-liquid-glass="circle" data-filter-id="lg-edu-detail-check" data-todo-toggle aria-pressed="${Boolean(
-            t.done
-          )}" aria-label="Mark done"><span class="edu-check-dot" aria-hidden="true"></span></button>
+          ${todoCheckHtml({ done: t.done, filterId: "lg-edu-detail-check" })}
           <span class="edu-detail-status">${t.done ? "Done" : "Open"}</span>
         </div>
         ${when ? `<p class="edu-detail-meta">${escapeHtml(when)}</p>` : ""}

@@ -201,7 +201,7 @@ html.lg-chrome .edu-vote {
   will-change: auto;
 }
 
-html.lg-chrome .edu-row {
+html.lg-chrome .edu-row:not(.edu-todo) {
   content-visibility: auto;
   contain-intrinsic-size: auto 2.85rem;
 }
@@ -1056,6 +1056,7 @@ html[data-resolved-theme="light"] .edu-filter.is-on {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
+  overflow: visible;
 }
 
 .edu-day-sep {
@@ -1082,6 +1083,10 @@ html[data-resolved-theme="light"] .edu-filter.is-on {
 .edu-row.edu-class-row,
 .edu-row:has(.edu-score) {
   align-items: center;
+}
+
+.edu-row.edu-todo {
+  overflow: visible;
 }
 
 .edu-row:hover {
@@ -1245,10 +1250,26 @@ a.edu-score {
   color: color-mix(in srgb, var(--accent) 75%, var(--muted));
 }
 
+/* Shadow lives on the host, not the <button>. Buttons + border-radius clip
+   box-shadow to the square border box, so the halo looks cut on the sides. */
+.edu-check-host {
+  flex: 0 0 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: 0 3px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
+  pointer-events: none;
+  overflow: visible;
+}
+
 /* Liquid-glass circle checkbox */
 .edu-check {
   --lg-filter: none;
-  flex: 0 0 1.25rem;
   width: 1.25rem;
   height: 1.25rem;
   margin: 0;
@@ -1259,9 +1280,11 @@ a.edu-score {
   isolation: isolate;
   position: relative;
   background: transparent;
-  box-shadow: 0 3px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
+  box-shadow: none;
   appearance: none;
   -webkit-appearance: none;
+  pointer-events: auto;
+  overflow: visible;
 }
 
 .edu-check::before {
@@ -1304,8 +1327,10 @@ a.edu-score {
   align-items: center;
   gap: 0.65rem;
   margin-bottom: 0.75rem;
+  overflow: visible;
 }
 
+.edu-detail-row .edu-check-host,
 .edu-detail-row .edu-check {
   margin: 0;
 }
