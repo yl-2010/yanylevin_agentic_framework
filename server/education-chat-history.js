@@ -19,6 +19,8 @@ const PREVIEW_MAX = 80;
 const RECENT_LIMIT = 12;
 const LIST_MAX = 500;
 const CHAT_HISTORY_TZ = "America/Los_Angeles";
+/** iMessage/Teams @agent threads drop from the UI list this long after the last persist. */
+export const EPHEMERAL_HIDE_MS = 10 * 60 * 1000;
 
 /**
  * @param {string} email
@@ -130,19 +132,13 @@ export function sanitizeChatEphemeral(raw) {
 }
 
 /**
- * Hide an @agent thread from the UI list after the Seattle day it last
- * updated. Working sessions stay listed. Talking from web/iOS clears ephemeral.
+ * Hide an @agent thread from the UI list once the reply has sat idle.
+ * Working sessions stay listed. Talking from web/iOS clears ephemeral.
  * @param {{ sessionId?: string, ephemeral?: boolean, updated?: string }|null|undefined} row
  * @param {Date} [now]
  * @param {Iterable<string>|Set<string>|undefined} workingIds
- * @param {string} [timeZone]
  */
-export function chatHistoryIsEphemeralHidden(
-  row,
-  now = new Date(),
-  workingIds,
-  timeZone = CHAT_HISTORY_TZ
-) {
+export function chatHistoryIsEphemeralHidden(row, now = new Date(), workingIds) {
   if (!row?.ephemeral) return false;
   const sid = String(row.sessionId || "");
   const working =
@@ -150,32 +146,8 @@ export function chatHistoryIsEphemeralHidden(
   if (sid && working.has(sid)) return false;
   const updated = Date.parse(String(row.updated || ""));
   if (!Number.isFinite(updated)) return false;
-  const clock = now instanceof Date ? now : new Date();
-  return (
-    zonedDateKey(new Date(updated), timeZone) !== zonedDateKey(clock, timeZone)
-  );
-}
-
-/**
- * Instant the Seattle calendar day after `now` begins.
- * @param {Date} [now]
- * @param {string} [timeZone]
- * @returns {number}
- */
-export function nextZonedMidnightMs(now = new Date(), timeZone = CHAT_HISTORY_TZ) {
-  const clock = now instanceof Date ? now : new Date();
-  const today = zonedDateKey(clock, timeZone);
-  let lo = clock.getTime();
-  let hi = lo + 36 * 60 * 60 * 1000;
-  while (zonedDateKey(new Date(hi), timeZone) === today) {
-    hi += 24 * 60 * 60 * 1000;
-  }
-  while (hi - lo > 250) {
-    const mid = Math.floor((lo + hi) / 2);
-    if (zonedDateKey(new Date(mid), timeZone) === today) lo = mid;
-    else hi = mid;
-  }
-  return hi;
+  const t = now instanceof Date ? now.getTime() : Date.now();
+  return t - updated >= EPHEMERAL_HIDE_MS;
 }
 
 /**
@@ -908,7 +880,7 @@ function zonedDateKey(date, timeZone) {
 export function chatHistoryGroup(
   iso,
   now = new Date(),
-  timeZone = "America/Los_Angeles"
+  timeZone = CHAT_HISTORY_TZ
 ) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) {
@@ -944,7 +916,7 @@ export function chatHistoryGroup(
 export function groupChatHistory(
   chats,
   now = new Date(),
-  timeZone = "America/Los_Angeles"
+  timeZone = CHAT_HISTORY_TZ
 ) {
   const list = Array.isArray(chats) ? chats : [];
   /** @type {Map<string, { key: string, label: string, showAge: boolean, chats: typeof list }>} */

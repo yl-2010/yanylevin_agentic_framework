@@ -22,7 +22,7 @@ import {
   markChatHistoryRead,
   persistChatHistory,
   sanitizeSessionId,
-  nextZonedMidnightMs,
+  EPHEMERAL_HIDE_MS,
 } from "./education-chat-history.js";
 import { enqueueChatTitle, isStubChatTitle } from "./chat-title.js";
 import {
@@ -597,7 +597,7 @@ function clearEphemeralHideTimer(sid) {
 }
 
 /**
- * SSE/poll so an open history drawer drops the row at Seattle midnight.
+ * SSE/poll so an open history drawer drops the row at 10 minutes.
  * List filtering still uses the file's `updated` time if the process restarts.
  * @param {string} sid
  * @param {Session} session
@@ -607,7 +607,6 @@ function scheduleEphemeralHideNotify(sid, session, status) {
   clearEphemeralHideTimer(sid);
   if (shouldPersistChatEphemeral(session) !== true) return;
   if (String(status || "") === "running") return;
-  const delay = Math.max(1000, nextZonedMidnightMs() - Date.now());
   const t = setTimeout(() => {
     ephemeralHideTimers.delete(sid);
     if (session.ephemeralPinned) return;
@@ -616,7 +615,7 @@ function scheduleEphemeralHideNotify(sid, session, status) {
       sessionId: sid,
       status: "idle",
     });
-  }, delay);
+  }, EPHEMERAL_HIDE_MS);
   if (typeof t.unref === "function") t.unref();
   ephemeralHideTimers.set(sid, t);
 }
@@ -1584,8 +1583,8 @@ export async function startAgent(email, opts = {}) {
 
 /**
  * New Personal Agent thread whose first user message is an iMessage that
- * mentioned @agent. Listed in the app/website through the Seattle day it
- * last updated, then dropped unless Yan continues from web or iOS.
+ * mentioned @agent. Listed in the app/website for 10 minutes after the
+ * reply finishes, then dropped unless Yan continues from web or iOS.
  * @param {object} message
  */
 export async function startAgentFromIMessageMention(message) {
