@@ -12,11 +12,11 @@ description: >-
 
 Local Cursor agent (Express + Cursor Desktop on this repo). **Never** spawn a cloud agent.
 
-The public site chatbot and LM Studio wiring are separate. The **/education** website stays the school dashboard; this agent is personal, and education data is one of the things it can manage.
+The public site chatbot and LM Studio wiring are separate. The **/education** website stays Yan's school dashboard; this agent is personal, and education data is one of the things it can manage. **/jype** is a separate shared workspace (Yan, Alex, Example Friend, Example Neighbor). Those chats live in `education/projects/jype/.chat-history/` and do not mix into personal history.
 
 ## Scope
 
-- Allowed users: `you@example.com`, `you@example.com`
+- Allowed users: `you@example.com`, `you@example.com`. JYPE site/agent also allows `xujeffery9@gmail.com` and `everettedeng@gmail.com` (writes only under `education/projects/jype/`). JYPE site and JYPE-group `@agent` always use Grok 4.6 high with no hourly cap.
 - Web/iOS sessions inject the signed-in email; Cursor Desktop on Yan’s Mac defaults to Yan unless the user names Alex
 - **Yan (`you@example.com`):** full write access — any path in this repo **and** anywhere on the Mac Studio filesystem when asked. Do not refuse repo-wide or Mac-wide work. Mail.app, Calendar, Apple Home, Contacts, iMessage, Screen Time, Canvas, phone location, Apple Health dumps, school OneNote, and school Teams are Yan-only.
 - **Alex (`you@example.com`):** write **only** under `education/you@example.com/`. Read-only outside that folder is fine when needed. **Never** Mail.app / `osascript` mail. **Never** Apple Calendar, Apple Home, Contacts, Messages/`chat.db`, Screen Time/`knowledgeC.db`, Canvas, school OneNote, school Teams, or Yan’s `.location.json`, `location/`, `life-state/`, `health/`, `.canvas/`, `.chat-history/`, or `brain/`.
@@ -63,6 +63,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Every reply (persona / vibe) | `SOUL.md` at repo root (always; see above) |
 | Classes, todos, dates, projects, `/education` dashboard, chat attachments into school folders | `.cursor/skills/personal-agent/education-dashboard.md` |
 | Static HTML on a todo / date / project / class | `.cursor/skills/object-html/SKILL.md` |
+| Public yanylevin.com page (study guide, plan, blueprint, liquid-glass report) | `.cursor/skills/yanylevin-webpage-create/SKILL.md` |
 | Weekly PDF, `schedule.json`, bells, what class is now | `.cursor/skills/class-schedule/SKILL.md` |
 | Past Personal Agent transcripts | `.cursor/skills/past-chats/SKILL.md` |
 | Yan iPhone location (live + stays/trips) | `.cursor/skills/phone-location/SKILL.md` |
@@ -123,6 +124,10 @@ node --env-file=server/.env server/apple-mail-fill.js --keep-dump
 ```
 
 Reply with a short status, run the matching command, then say whether it finished. Canvas sync stays on the personal-canvas skill (fetch in-turn or `canvas-sync.js --force`).
+
+## Study guides and large plans
+
+When JYPE or close friends ask for a study guide, large plan, or blueprint (not a simple homework question), do not dump it as Teams text. Make a public page per `.cursor/skills/yanylevin-webpage-create/SKILL.md`, nest it under the related **class** folder, and add it as a `sites[]` URL tile on that class (`class.json`). Do not create a Notes project. Reply with the live URL.
 
 ## Reply style
 

@@ -15,6 +15,7 @@ import {
   fallbackChatTitle,
   loadChatHistory,
   patchChatHistoryTitle,
+  prefixChatTitle,
   sanitizeChatTitle,
 } from "./education-chat-history.js";
 
@@ -126,6 +127,8 @@ export function enqueueChatTitle(job) {
     email,
     sessionId,
     root: job?.root,
+    workspace: job?.workspace,
+    starter: job?.starter,
     attempt,
   });
   pumpTitleQueue().catch((err) => {
@@ -188,6 +191,8 @@ export async function generateAndStoreChatTitle(opts) {
           email: opts.email,
           sessionId: opts.sessionId,
           root: opts.root,
+          workspace: opts.workspace,
+          starter: opts.starter,
           attempt: 1,
         });
       }, 8_000);
@@ -197,11 +202,13 @@ export async function generateAndStoreChatTitle(opts) {
   }
   if (!title) return null;
   if (isStubChatTitle(title, firstUser) && loaded.title) return loaded.title;
+  const named = prefixChatTitle(title, opts.starter);
   return patchChatHistoryTitle({
     email: opts.email,
     sessionId: opts.sessionId,
-    title,
+    title: named || title,
     root: opts.root,
+    workspace: opts.workspace,
   });
 }
 

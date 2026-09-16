@@ -3,7 +3,7 @@
  * Dashboard class file tiles list these live; bytes stay in OneDrive.
  */
 
-import { readdir, stat } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, extname, join, relative, resolve, sep } from "node:path";
 
 const PROPERTY_JSON = new Set([
@@ -33,6 +33,93 @@ const PERIOD_PREFIX = /^[A-Ha-h]\.\s*/;
 const MAX_DEPTH = 8;
 const MATCH_MIN_SCORE = 55;
 const DEFAULT_UI_HIDDEN_FILES = new Set(["context.md", "deleted.md"]);
+
+const URL_TILE_MAX_BYTES = 8192;
+const URL_TILE_KEYS = new Set([
+  "kind",
+  "url",
+  "href",
+  "name",
+  "title",
+  "weburl",
+  "webviewurl",
+]);
+
+/**
+ * Link-only file tile. Click opens the URL. No download.
+ * Accepts `kind: "url"` or an object that is only name/title + url/href.
+ * @param {unknown} obj
+ * @param {string} [fallbackName]
+ * @returns {{ name: string, kind: string, url: string, webUrl: string, webViewUrl: string }|null}
+ */
+export function urlTileFromObject(obj, fallbackName) {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
+  const url = String(obj.url || obj.href || "").trim();
+  if (!/^https?:\/\//i.test(url)) return null;
+  const kind = String(obj.kind || "").trim().toLowerCase();
+  const keys = Object.keys(obj).map((k) => k.toLowerCase());
+  const onlyLinkKeys = keys.every((k) => URL_TILE_KEYS.has(k));
+  if (kind !== "url" && !onlyLinkKeys) return null;
+  const name =
+    String(obj.name || obj.title || fallbackName || url).trim() || url;
+  return {
+    name,
+    kind: "url",
+    url,
+    webUrl: url,
+    webViewUrl: url,
+  };
+}
+
+/**
+ * Windows/macOS Internet Shortcut (`.url`).
+ * @param {unknown} text
+ * @param {string} [fallbackName]
+ */
+export function urlTileFromInternetShortcut(text, fallbackName) {
+  const m = String(text || "").match(/^\s*URL\s*=\s*(\S+)/im);
+  if (!m) return null;
+  const url = String(m[1] || "").trim();
+  if (!/^https?:\/\//i.test(url)) return null;
+  const name = String(fallbackName || url).trim() || url;
+  return {
+    name,
+    kind: "url",
+    url,
+    webUrl: url,
+    webViewUrl: url,
+  };
+}
+
+/**
+ * Dropped `.json` link stub or `.url` shortcut in a class/project/todo/date folder.
+ * @param {string} abs
+ * @param {string} name
+ * @param {object} [extra]
+ */
+export async function urlTileFromDroppedFile(abs, name, extra = {}) {
+  const base = String(name || "").trim();
+  const lower = base.toLowerCase();
+  if (!lower.endsWith(".json") && !lower.endsWith(".url")) return null;
+  try {
+    const st = await stat(abs);
+    if (!st.isFile() || st.size > URL_TILE_MAX_BYTES) return null;
+    const text = await readFile(abs, "utf8");
+    const fallback = base.replace(/\.(json|url)$/i, "");
+    const tile = lower.endsWith(".json")
+      ? urlTileFromObject(JSON.parse(text), fallback)
+      : urlTileFromInternetShortcut(text, fallback);
+    if (!tile) return null;
+    return {
+      ...tile,
+      ...extra,
+      size: 0,
+      mtime: extra.mtime || new Date(st.mtimeMs).toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
 
 /** Word / Excel / PowerPoint. HTML, PDF, and everything else stay copy-open. */
 const OFFICE_SCHEME_BY_EXT = {
@@ -617,6 +704,16 @@ export async function listOnedriveTree(dir, opts = {}) {
         continue;
       }
       if (!entry.isFile() && !st.isFile()) continue;
+      const urlTile = await urlTileFromDroppedFile(abs, entry.name, {
+        source: "onedrive",
+        path: rel,
+        mtime,
+        mtimeMs,
+      });
+      if (urlTile) {
+        out.push(urlTile);
+        continue;
+      }
       out.push(
         attachOfficeOpenFields(
           {

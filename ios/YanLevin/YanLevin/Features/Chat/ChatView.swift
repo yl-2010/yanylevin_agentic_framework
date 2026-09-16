@@ -95,7 +95,7 @@ struct ChatView: View {
     private static let chatScrollEndID = "chat-scroll-end"
 
     private var liveTaskID: String {
-        "\(auth.session?.token ?? "")-\(liveSessionID)-\(usesEducation)"
+        "\(auth.session?.token ?? "")-\(liveSessionID)-\(usesEducation)-\(educationFocus.workspace)"
     }
 
     private var isWide: Bool {
@@ -367,6 +367,7 @@ struct ChatView: View {
         }
         .task(id: liveTaskID) {
             guard usesEducation, let token = auth.session?.token else { return }
+            educationStore.workspace = educationFocus.workspace
             consumeChatHandoff()
             if !educationStore.isStartingNewChat, !nav.chatHandoffStartNew {
                 await educationStore.resumeAgentChat(
@@ -374,8 +375,13 @@ struct ChatView: View {
                     token: token
                 )
             }
-            // Same live path as Education tab: SSE instant updates + 20s poll fallback.
+            await educationStore.loadChatList(token: token)
             await educationStore.runLiveSession(token: token)
+        }
+        .onChange(of: educationFocus.workspace) { _, ws in
+            educationStore.workspace = ws
+            educationStore.prepareNewChat()
+            liveSessionID += 1
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {

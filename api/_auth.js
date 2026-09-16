@@ -36,7 +36,13 @@ const SESSION_TTL_SEC = 60 * 60 * 24 * 14; // 14 days
 const STATE_TTL_SEC = 600;
 
 /** Allowed post-OAuth landing paths (gated sites + silent main-site unlock). */
-const ALLOWED_RETURN_PATHS = new Set(["/", "/education/", "/fitness/", "/dashboard/"]);
+const ALLOWED_RETURN_PATHS = new Set([
+  "/",
+  "/education/",
+  "/fitness/",
+  "/dashboard/",
+  "/jype/",
+]);
 
 function getAuthSecret() {
   return process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "";
@@ -60,6 +66,7 @@ function accessForEmail(email) {
   if (!email) return null;
   const normalized = canonicalizeEmail(email);
   if (FULL_ACCESS_EMAILS.has(normalized)) return "full";
+  if (JYPE_ACCESS_EMAILS.has(normalized)) return "jype";
   return "denied";
 }
 
@@ -138,6 +145,7 @@ function sanitizeReturnPath(raw, fallback = "/education/") {
   if (!path.startsWith("/")) return fallback;
   // Main site is exactly "/"; everything else gets a trailing slash.
   if (path === "/") return "/";
+  if (path === "/JYPE" || path === "/JYPE/") return "/jype/";
   if (!path.endsWith("/")) path = `${path}/`;
   if (ALLOWED_RETURN_PATHS.has(path)) return path;
   return fallback;
@@ -258,6 +266,7 @@ function readSession(req) {
 
 module.exports = {
   FULL_ACCESS_EMAILS,
+  JYPE_ACCESS_EMAILS,
   EMAIL_ALIASES,
   SESSION_COOKIE,
   STATE_COOKIE,

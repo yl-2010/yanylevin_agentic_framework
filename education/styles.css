@@ -1167,6 +1167,11 @@ html[data-resolved-theme="light"] .edu-filter.is-on {
   letter-spacing: -0.02em;
 }
 
+a.edu-score {
+  color: var(--accent);
+  text-decoration: none;
+}
+
 .edu-todo.is-done .edu-score,
 .edu-todo.is-done .edu-row-link .edu-score {
   opacity: 1;

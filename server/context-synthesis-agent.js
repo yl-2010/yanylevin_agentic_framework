@@ -816,8 +816,10 @@ export function extractUserQueriesFromTranscript(jsonl, opts = {}) {
  * @param {string} [root]
  */
 export async function listRecentPersonalAgentChats(sinceMs, root = REPO_ROOT) {
-  const relDir = chatHistoryDirRel(YAN_EMAIL);
-  const dir = join(root, relDir);
+  const dirs = [
+    chatHistoryDirRel(YAN_EMAIL),
+    chatHistoryDirRel(YAN_EMAIL, "jype"),
+  ];
   /** @type {{
     sessionId: string,
     title: string,
@@ -827,12 +829,21 @@ export async function listRecentPersonalAgentChats(sinceMs, root = REPO_ROOT) {
     markdown: string,
   }[]} */
   const chats = [];
+  for (const relDir of dirs) {
+    await collectRecentChatsFromDir(root, relDir, sinceMs, chats);
+  }
+  chats.sort((a, b) => Date.parse(b.updated) - Date.parse(a.updated));
+  return chats;
+}
+
+async function collectRecentChatsFromDir(root, relDir, sinceMs, chats) {
+  const dir = join(root, relDir);
   let names;
   try {
     names = await readdir(dir);
   } catch (err) {
     if (err && /** @type {{ code?: string }} */ (err).code === "ENOENT") {
-      return chats;
+      return;
     }
     throw err;
   }
@@ -856,8 +867,6 @@ export async function listRecentPersonalAgentChats(sinceMs, root = REPO_ROOT) {
       /* skip unreadable */
     }
   }
-  chats.sort((a, b) => Date.parse(b.updated) - Date.parse(a.updated));
-  return chats;
 }
 
 /**

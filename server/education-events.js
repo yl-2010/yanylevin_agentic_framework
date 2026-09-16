@@ -21,7 +21,8 @@ const listenersByEmail = new Map();
  * @param {object} [data]
  */
 export function notifyEducationClients(email, event = "change", data = {}) {
-  const key = canonicalizeEmail(email);
+  const workspace = String(data?.workspace || "").trim().toLowerCase();
+  const key = workspace === "jype" ? "jype" : canonicalizeEmail(email);
   const set = listenersByEmail.get(key);
   if (!set || !set.size) return;
   const payload = {
@@ -42,9 +43,11 @@ export function notifyEducationClients(email, event = "change", data = {}) {
  * @param {import('express').Response} res
  * @param {string} email
  */
-export function attachEducationEvents(req, res, email) {
+export function attachEducationEvents(req, res, email, opts = {}) {
+  const workspace = String(opts.workspace || "").trim().toLowerCase();
   const normalized = canonicalizeEmail(email);
-  const root = userEducationRoot(normalized);
+  const listenerKey = workspace === "jype" ? "jype" : normalized;
+  const root = userEducationRoot(normalized, { workspace });
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-store, no-cache");
@@ -57,12 +60,16 @@ export function attachEducationEvents(req, res, email) {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
-  if (!listenersByEmail.has(normalized)) {
-    listenersByEmail.set(normalized, new Set());
+  if (!listenersByEmail.has(listenerKey)) {
+    listenersByEmail.set(listenerKey, new Set());
   }
-  listenersByEmail.get(normalized).add(send);
+  listenersByEmail.get(listenerKey).add(send);
 
-  send("ready", { email: normalized, root: `education/${normalized}` });
+  send("ready", {
+    email: normalized,
+    workspace: workspace || "",
+    root: workspace === "jype" ? "education/projects/jype" : `education/${normalized}`,
+  });
 
   let timer = null;
   const bump = (filename) => {
@@ -126,10 +133,10 @@ export function attachEducationEvents(req, res, email) {
     } catch {
       /* ignore */
     }
-    const set = listenersByEmail.get(normalized);
+    const set = listenersByEmail.get(listenerKey);
     if (set) {
       set.delete(send);
-      if (!set.size) listenersByEmail.delete(normalized);
+      if (!set.size) listenersByEmail.delete(listenerKey);
     }
   };
 

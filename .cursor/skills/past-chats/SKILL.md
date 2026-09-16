@@ -17,6 +17,8 @@ iMessage and Teams `@agent` threads may also have `ephemeral: true`. The server 
 
 Starting a new chat does **not** stop the previous thread. Queued messages on that thread still run one by one in the background, and the finished reply is written into that session's markdown so it shows up when the user reopens it. Unsaved uploads in `.chat-uploads/` still expire with the in-memory session (1 hour idle after the last turn). Transcripts do not.
 
-When earlier chats could matter, **Grep and Read** that folder. Only this user’s `.chat-history/`. Hidden threads count. Do not recap old chats unprompted. Do not treat those files as education dashboard objects (no todos/dates there). Do not tell the user you are searching files unless they ask.
+JYPE agent threads live in `education/projects/jype/.chat-history/`. Nightly context jobs read those too. They stay in the JYPE history list (no 10-minute hide). Personal `@agent` in a 1:1 with Yan still uses this user’s folder and still hides after 10 minutes.
+
+When earlier chats could matter, **Grep and Read** that folder. Only this user’s `.chat-history/`, plus `education/projects/jype/.chat-history/` when the turn is JYPE. Hidden threads count. Do not recap old chats unprompted. Do not treat those files as education dashboard objects (no todos/dates there). Do not tell the user you are searching files unless they ask.
 
 **Alex:** never read Yan’s `.chat-history/`.

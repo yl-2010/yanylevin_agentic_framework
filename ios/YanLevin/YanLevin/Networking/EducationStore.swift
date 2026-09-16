@@ -80,6 +80,20 @@ final class EducationFocusStore: ObservableObject {
     @Published var scrollToTopGeneration = 0
     @Published var filePreviewPresented = false
     @Published var filePreviewDismissGeneration = 0
+    /// "" = Yan's personal education. "jype" = shared JYPE workspace.
+    @Published var workspace: String = ""
+
+    var isJype: Bool { workspace == "jype" }
+
+    func enterJype() {
+        workspace = "jype"
+        path = []
+    }
+
+    func exitJype() {
+        workspace = ""
+        path = []
+    }
 
     func handleTabReselect() {
         if filePreviewPresented {
@@ -88,6 +102,10 @@ final class EducationFocusStore: ObservableObject {
         }
         if !visiblePageIsAtTop {
             scrollToTopGeneration += 1
+            return
+        }
+        if path.isEmpty && isJype {
+            exitJype()
             return
         }
         guard !path.isEmpty else { return }
@@ -568,6 +586,15 @@ final class EducationStore: ObservableObject {
     @Published var agentNavigate: AgentEducationNavigate?
     @Published private(set) var treeEpoch = 0
     weak var focus: EducationFocusStore?
+    var workspace: String = ""
+
+    private var apiPrefix: String {
+        workspace == "jype" ? "api/jype" : "api/education"
+    }
+
+    private func api(_ suffix: String) -> String {
+        "\(apiPrefix)/\(suffix)"
+    }
 
     private let sse = MacSSEClient()
     private var liveToken: String?
@@ -592,8 +619,15 @@ final class EducationStore: ObservableObject {
 
     var isStartingNewChat: Bool { startingNewChat }
 
+    func resetTreeCache() {
+        lastEducationData = nil
+        tree = nil
+        errorText = nil
+    }
+
     private func chatDefaultsKey(email: String) -> String {
-        "edu-chat-v1:\(email.lowercased())"
+        let ws = workspace == "jype" ? "jype:" : ""
+        return "edu-chat-v1:\(ws)\(email.lowercased())"
     }
 
     /// Debounced persist for poll/SSE merges. Snapshot is taken when the wait fires.
@@ -781,7 +815,7 @@ final class EducationStore: ObservableObject {
 
     func startLiveUpdates(token: String) {
         liveToken = token
-        sse.start(path: "api/education/events", bearer: token) { [weak self] data in
+        sse.start(path: api("events"), bearer: token) { [weak self] data in
             self?.ingestSSEPayload(data)
             self?.scheduleReloadFromSSE()
         }
@@ -861,7 +895,7 @@ final class EducationStore: ObservableObject {
                 }
             }
             let (data, http) = try await APIClient.shared.requestRaw(
-                "api/education/data",
+                api("data"),
                 bearer: token,
                 query: query
             )
@@ -917,7 +951,7 @@ final class EducationStore: ObservableObject {
                 query.append(URLQueryItem(name: "projectId", value: projectId))
             }
             let _: TodoDoneResponse = try await APIClient.shared.request(
-                "api/education/todo/\(id)/done",
+                api("todo/\(id)/done"),
                 method: "PATCH",
                 body: TodoDoneBody(done: done, classId: classId, projectId: projectId),
                 bearer: token,
@@ -1039,7 +1073,7 @@ final class EducationStore: ObservableObject {
         lastOpenedProjectId = id
         lastOpenedAt = now
         _ = try? await APIClient.shared.requestRaw(
-            "api/education/project/\(id)/opened",
+            api("project/\(id)/opened"),
             method: "POST",
             bearer: token
         )
@@ -1062,7 +1096,7 @@ final class EducationStore: ObservableObject {
                 query.append(URLQueryItem(name: "projectId", value: projectId))
             }
             let _: CapsuleVoteResponse = try await APIClient.shared.request(
-                "api/education/todo/\(todoId)/capsule/\(capsuleId)/vote",
+                api("todo/\(todoId)/capsule/\(capsuleId)/vote"),
                 method: "PATCH",
                 body: CapsuleVoteBody(vote: vote, classId: classId, projectId: projectId),
                 bearer: token,
@@ -1106,7 +1140,7 @@ final class EducationStore: ObservableObject {
         }
 
         let (data, http) = try await APIClient.shared.requestRaw(
-            "api/education/file",
+            api("file"),
             bearer: token,
             query: query
         )
@@ -1137,7 +1171,7 @@ final class EducationStore: ObservableObject {
         guard gen == agentViewGen, !startingNewChat else { return }
         do {
             let active: AgentStateResponse = try await APIClient.shared.request(
-                "api/education/agent/active",
+                api("agent/active"),
                 bearer: token
             )
             guard gen == agentViewGen, !startingNewChat else { return }
@@ -1185,7 +1219,7 @@ final class EducationStore: ObservableObject {
     private func refreshAgentState(token: String, sessionId sid: String) async {
         do {
             let state: AgentStateResponse = try await APIClient.shared.request(
-                "api/education/agent/state",
+                api("agent/state"),
                 bearer: token,
                 query: [URLQueryItem(name: "sessionId", value: sid)]
             )
@@ -1235,7 +1269,7 @@ final class EducationStore: ObservableObject {
         if agentSessionId != nil { return }
         do {
             let res: AgentStartResponse = try await APIClient.shared.request(
-                "api/education/agent/start",
+                api("agent/start"),
                 method: "POST",
                 body: EmptyBody(),
                 bearer: token
@@ -1291,7 +1325,7 @@ final class EducationStore: ObservableObject {
 
         do {
             let res: AgentMessageResponse = try await APIClient.shared.request(
-                "api/education/agent/message",
+                api("agent/message"),
                 method: "POST",
                 body: AgentMessageBody(
                     sessionId: sid,
@@ -1346,7 +1380,7 @@ final class EducationStore: ObservableObject {
         clearLocalAgentChat()
         guard let sid else { return }
         _ = try? await APIClient.shared.requestRaw(
-            "api/education/agent/stop",
+            api("agent/stop"),
             method: "POST",
             body: AgentStopBody(sessionId: sid),
             bearer: token
@@ -1381,7 +1415,7 @@ final class EducationStore: ObservableObject {
         }
         do {
             let res: AgentStartResponse = try await APIClient.shared.request(
-                "api/education/agent/start",
+                api("agent/start"),
                 method: "POST",
                 body: EmptyBody(),
                 bearer: token
@@ -1409,7 +1443,7 @@ final class EducationStore: ObservableObject {
         defer { chatHistoryLoading = false }
         do {
             let res: AgentChatListResponse = try await APIClient.shared.request(
-                "api/education/agent/chats",
+                api("agent/chats"),
                 bearer: token
             )
             chatHistory = res.chats ?? []
@@ -1429,7 +1463,7 @@ final class EducationStore: ObservableObject {
         }
         do {
             let _: AgentReadResponse = try await APIClient.shared.request(
-                "api/education/agent/read",
+                api("agent/read"),
                 method: "POST",
                 body: AgentReadBody(sessionId: sid),
                 bearer: token
@@ -1452,7 +1486,7 @@ final class EducationStore: ObservableObject {
         agentBusy = false
         do {
             let res: AgentStateResponse = try await APIClient.shared.request(
-                "api/education/agent/resume",
+                api("agent/resume"),
                 method: "POST",
                 body: AgentResumeBody(sessionId: sid),
                 bearer: token

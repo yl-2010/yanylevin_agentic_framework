@@ -43,7 +43,7 @@ import { startContextSynthesisScheduler } from "./context-synthesis-agent.js";
 import { startChatTitleRefreshScheduler } from "./chat-title-refresh-agent.js";
 import { startLifeStateCleanupScheduler } from "./life-state-cleanup-agent.js";
 import { startCanvasSyncScheduler, applyLiveCanvasOverlay, seedLiveCanvasTodoDone, syncCanvasTodoDone, YAN_EMAIL } from "./canvas-sync.js";
-import { canonicalizeEmail } from "./identity.js";
+import { canonicalizeEmail, isJypeAccessEmail } from "./identity.js";
 import {
   revealOpenEducationObject,
   syncOnedriveObjectVisibility,
@@ -417,6 +417,18 @@ function requireEducationUser(req, res, next) {
     next();
   });
 }
+
+function requireJypeUser(req, res, next) {
+  requireAuth(req, res, () => {
+    if (!isJypeAccessEmail(req.user?.email)) {
+      res.status(403).json({ ok: false, error: "forbidden" });
+      return;
+    }
+    next();
+  });
+}
+
+const JYPE_WS = { workspace: "jype" };
 
 function bearerToken(req) {
   const header = req.headers.authorization || req.headers.Authorization;
@@ -841,6 +853,293 @@ app.post("/api/education/agent/stop", requireEducationUser, async (req, res) => 
     res.json(result);
   } catch (err) {
     console.error("[/api/education/agent/stop]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "agent stop failed",
+    });
+  }
+});
+
+app.get("/api/jype/data", requireJypeUser, async (req, res) => {
+  try {
+    const tree = await readEducationTree(req.user.email, JYPE_WS);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, ...tree, workspace: "jype" });
+  } catch (err) {
+    console.error("[/api/jype/data]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "jype data failed",
+    });
+  }
+});
+
+app.get("/api/jype/file", requireJypeUser, async (req, res) => {
+  try {
+    const file = await resolveContextFile(req.user.email, {
+      scope: req.query?.scope,
+      id: req.query?.id,
+      classId: req.query?.classId,
+      projectId: req.query?.projectId,
+      name: req.query?.name,
+      source: req.query?.source,
+      path: req.query?.path,
+      workspace: "jype",
+    });
+    sendContextFile(res, file);
+  } catch (err) {
+    console.error("[/api/jype/file]", err);
+    if (!res.headersSent) {
+      res.status(err.status || 500).json({
+        ok: false,
+        error: err.message || "file failed",
+      });
+    }
+  }
+});
+
+app.patch("/api/jype/todo/:id/done", requireJypeUser, async (req, res) => {
+  try {
+    const done = Boolean(req.body?.done);
+    const classId =
+      req.body?.classId != null && String(req.body.classId).trim() !== ""
+        ? String(req.body.classId).trim()
+        : req.query?.classId != null && String(req.query.classId).trim() !== ""
+          ? String(req.query.classId).trim()
+          : null;
+    const projectId =
+      req.body?.projectId != null && String(req.body.projectId).trim() !== ""
+        ? String(req.body.projectId).trim()
+        : req.query?.projectId != null && String(req.query.projectId).trim() !== ""
+          ? String(req.query.projectId).trim()
+          : null;
+    const props = await setTodoDone(req.user.email, req.params.id, done, {
+      classId,
+      projectId,
+      workspace: "jype",
+    });
+    res.setHeader("Cache-Control", "no-store");
+    res.json({
+      ok: true,
+      id: req.params.id,
+      classId: classId || null,
+      projectId: projectId || null,
+      todo: props,
+    });
+  } catch (err) {
+    console.error("[/api/jype/todo/done]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "todo update failed",
+    });
+  }
+});
+
+app.post("/api/jype/project/:id/opened", requireJypeUser, async (req, res) => {
+  try {
+    const result = await markProjectOpened(req.user.email, req.params.id, JYPE_WS);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error("[/api/jype/project/opened]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "project open failed",
+    });
+  }
+});
+
+app.patch(
+  "/api/jype/todo/:id/capsule/:capsuleId/vote",
+  requireJypeUser,
+  async (req, res) => {
+    try {
+      const classId =
+        req.body?.classId != null && String(req.body.classId).trim() !== ""
+          ? String(req.body.classId).trim()
+          : req.query?.classId != null && String(req.query.classId).trim() !== ""
+            ? String(req.query.classId).trim()
+            : null;
+      const projectId =
+        req.body?.projectId != null && String(req.body.projectId).trim() !== ""
+          ? String(req.body.projectId).trim()
+          : req.query?.projectId != null &&
+              String(req.query.projectId).trim() !== ""
+            ? String(req.query.projectId).trim()
+            : null;
+      const vote = Object.prototype.hasOwnProperty.call(req.body || {}, "vote")
+        ? req.body.vote
+        : null;
+      const props = await setCapsuleVote(
+        req.user.email,
+        req.params.id,
+        req.params.capsuleId,
+        vote,
+        { classId, projectId, workspace: "jype" }
+      );
+      res.setHeader("Cache-Control", "no-store");
+      res.json({
+        ok: true,
+        id: req.params.id,
+        capsuleId: req.params.capsuleId,
+        classId: classId || null,
+        projectId: projectId || null,
+        todo: props,
+      });
+    } catch (err) {
+      console.error("[/api/jype/todo/capsule/vote]", err);
+      res.status(err.status || 500).json({
+        ok: false,
+        error: err.message || "capsule vote failed",
+      });
+    }
+  }
+);
+
+app.get("/api/jype/events", requireJypeUser, (req, res) => {
+  try {
+    attachEducationEvents(req, res, req.user.email, JYPE_WS);
+  } catch (err) {
+    console.error("[/api/jype/events]", err);
+    if (!res.headersSent) {
+      res.status(err.status || 500).json({
+        ok: false,
+        error: err.message || "events failed",
+      });
+    }
+  }
+});
+
+app.post("/api/jype/agent/start", requireJypeUser, async (req, res) => {
+  try {
+    const result = await startAgent(req.user.email, JYPE_WS);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error("[/api/jype/agent/start]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "agent start failed",
+    });
+  }
+});
+
+app.post("/api/jype/agent/message", requireJypeUser, async (req, res) => {
+  try {
+    const result = await messageAgent(
+      req.body?.sessionId,
+      req.user.email,
+      req.body?.message,
+      req.body?.attachments,
+      req.body?.uiContext,
+      req.body?.interrupt
+    );
+    res.setHeader("Cache-Control", "no-store");
+    res.status(202).json(result);
+  } catch (err) {
+    console.error("[/api/jype/agent/message]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "agent message failed",
+    });
+  }
+});
+
+app.get("/api/jype/agent/state", requireJypeUser, (req, res) => {
+  try {
+    const result = getAgentState(req.query?.sessionId, req.user.email);
+    res.setHeader("Cache-Control", "no-store");
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/jype/agent/state]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "agent state failed",
+    });
+  }
+});
+
+app.get("/api/jype/agent/active", requireJypeUser, (req, res) => {
+  try {
+    const result = getActiveAgent(req.user.email, JYPE_WS);
+    res.setHeader("Cache-Control", "no-store");
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/jype/agent/active]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "agent active failed",
+    });
+  }
+});
+
+app.get("/api/jype/agent/running", requireJypeUser, async (req, res) => {
+  try {
+    const result = await getRunningAgents(req.user.email, JYPE_WS);
+    res.setHeader("Cache-Control", "no-store");
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/jype/agent/running]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "agent running failed",
+    });
+  }
+});
+
+app.get("/api/jype/agent/chats", requireJypeUser, async (req, res) => {
+  try {
+    const result = await listAgentChats(req.user.email, JYPE_WS);
+    res.setHeader("Cache-Control", "no-store");
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/jype/agent/chats]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "agent chats failed",
+    });
+  }
+});
+
+app.post("/api/jype/agent/resume", requireJypeUser, async (req, res) => {
+  try {
+    const result = await resumeAgent(req.body?.sessionId, req.user.email, JYPE_WS);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error("[/api/jype/agent/resume]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "agent resume failed",
+    });
+  }
+});
+
+app.post("/api/jype/agent/read", requireJypeUser, async (req, res) => {
+  try {
+    const result = await markAgentChatRead(
+      req.body?.sessionId,
+      req.user.email,
+      JYPE_WS
+    );
+    res.setHeader("Cache-Control", "no-store");
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/jype/agent/read]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "agent read failed",
+    });
+  }
+});
+
+app.post("/api/jype/agent/stop", requireJypeUser, async (req, res) => {
+  try {
+    const result = await stopAgent(req.body?.sessionId, req.user.email);
+    res.setHeader("Cache-Control", "no-store");
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/jype/agent/stop]", err);
     res.status(err.status || 500).json({
       ok: false,
       error: err.message || "agent stop failed",

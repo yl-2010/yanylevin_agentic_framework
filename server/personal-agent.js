@@ -9,7 +9,13 @@ import { dirname, join, basename, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isEducationUser, resolveNowScheduleContext } from "./education-data.js";
 import { notifyEducationClients } from "./education-events.js";
-import { canonicalizeEmail, isFullAccessEmail, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
+import { canonicalizeEmail, isJypeAccessEmail, isFullAccessEmail, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
+import {
+  jypeEmailForSlug,
+  jypeGivenName,
+  normalizeJypeWorkspace,
+  originIsJypeThread,
+} from "./jype.js";
 import { gitAddCommitPush } from "./git-publish.js";
 import { enqueueBrainExtraction } from "./brain-extraction.js";
 import { parseLocationPayload } from "./phone-location.js";
@@ -42,7 +48,9 @@ import {
   normalizeTeamsOrigin,
 } from "./teams-mention.js";
 import {
+  copyModelSpec,
   formatGuestUserBubble,
+  GUEST_GROK_SPEC,
   guestRunModels,
   platformLabel,
 } from "./guest-agent.js";
@@ -137,6 +145,39 @@ const sessions = new Map();
 /** Focused session id per user (the chat the UI last opened). Others may still run. */
 /** @type {Map<string, string>} */
 const activeByEmail = new Map();
+
+function sessionWorkspace(session) {
+  return normalizeJypeWorkspace(session?.workspace);
+}
+
+function focusKey(email, workspace) {
+  const normalized = canonicalizeEmail(email);
+  const ws = normalizeJypeWorkspace(workspace);
+  return ws ? `${ws}:${normalized}` : normalized;
+}
+
+function canUseAgent(email, workspace) {
+  const normalized = canonicalizeEmail(email);
+  if (normalizeJypeWorkspace(workspace) === "jype") {
+    return isJypeAccessEmail(normalized);
+  }
+  return isEducationUser(normalized);
+}
+
+function canAccessSession(session, email) {
+  const normalized = canonicalizeEmail(email);
+  if (!session) return false;
+  if (sessionWorkspace(session) === "jype") return isJypeAccessEmail(normalized);
+  return session.email === normalized;
+}
+
+function notifyAgentClients(session, email, data) {
+  const ws = sessionWorkspace(session);
+  notifyEducationClients(email || session?.email, "change", {
+    ...data,
+    ...(ws ? { workspace: ws } : {}),
+  });
+}
 
 const SESSION_TTL_MS = 60 * 60 * 1000;
 const MAX_ATTACHMENTS = 16;
@@ -750,6 +791,8 @@ function persistSessionHistory(sid, session) {
     sessionId: sid,
     messages: snap,
     markRead: shouldKeepChatHistoryRead(session, snap),
+    workspace: sessionWorkspace(session),
+    starter: session.starter || "",
   };
   if (ephemeral != null) opts.ephemeral = ephemeral;
   return persistChatHistory(opts)
@@ -758,7 +801,12 @@ function persistSessionHistory(sid, session) {
       // racing the live Grok turn (Teams @agent was getting the truncated
       // first message as the title).
       if (userTurns === 1 && hasAssistant) {
-        enqueueChatTitle({ email: session.email, sessionId: sid });
+        enqueueChatTitle({
+          email: session.email,
+          sessionId: sid,
+          workspace: sessionWorkspace(session),
+          starter: session.starter || "",
+        });
       }
     })
     .catch((err) => {
@@ -866,6 +914,7 @@ export function isUiChatClient(uiContext) {
  */
 export function shouldPersistChatEphemeral(session) {
   if (!session) return null;
+  if (sessionWorkspace(session) === "jype") return false;
   if (session.ephemeralPinned) return false;
   if (session.imessageOrigin || session.teamsOrigin) return true;
   return null;
@@ -928,8 +977,8 @@ function kickoffTurn(sid, session, opts) {
 async function disposeSession(id) {
   const s = sessions.get(id);
   sessions.delete(id);
-  if (s?.email && activeByEmail.get(s.email) === id) {
-    activeByEmail.delete(s.email);
+  if (s?.email && activeByEmail.get(focusKey(s.email, s.workspace)) === id) {
+    activeByEmail.delete(focusKey(s.email, s.workspace));
   }
   if (s?.uploadDirRel) {
     await rm(join(REPO_ROOT, s.uploadDirRel), {
@@ -1016,8 +1065,26 @@ const EDUCATION_VIEWS = new Set([
  * Slim establishing prompt. Recipes live in PERSONAL_SKILL_PATHS.
  * @param {string} email
  */
-export function systemPrompt(email) {
+export function systemPrompt(email, opts = {}) {
   const isOwner = isFullAccessEmail(email);
+  const isJype = normalizeJypeWorkspace(opts.workspace) === "jype";
+  if (isJype) {
+    const given = jypeGivenName(email) || "JYPE";
+    return [
+      "You are the JYPE agent for yanylevin.com/jype (shared by Yan, Alex, Example Friend, and Example Neighbor).",
+      `Signed-in user: ${email} (${given}).`,
+      "Yan: full write in this repo and on this Mac.",
+      "JYPE chats live in education/projects/jype/.chat-history/. They stay in the history list. No 10-minute hide.",
+      "Never spawn a Cursor cloud agent.",
+      "",
+      `Always Read and apply the unslop skill (${UNSLOP_SKILL_PATH}) on every turn.`,
+      `Always Read ${PERSONAL_SKILL_PATHS.soul} for persona and judgment.`,
+      `- JYPE dashboard (classes, todos, dates, projects): ${PERSONAL_SKILL_PATHS.education}`,
+      `- Static HTML on a JYPE object: ${PERSONAL_SKILL_PATHS.objectHtml || ".cursor/skills/object-html/SKILL.md"}`,
+      `- Public yanylevin.com page: ${PERSONAL_SKILL_PATHS.webpage || ".cursor/skills/yanylevin-webpage-create/SKILL.md"}`,
+      "File uploads can be stored in the matching JYPE class or project folder.",
+    ].join("\n");
+  }
   return [
     "You are the Personal Agent for yanylevin.com (iOS Chat tab person icon / /education chat) and Cursor Desktop on this Mac.",
     "The /education website is still the school dashboard. You are a personal agent that can manage that dashboard when asked, plus mail, news, location, and anything else the user asks.",
@@ -1078,6 +1145,7 @@ function normalizeUiContext(raw) {
   str("client", 40);
   str("path", 300);
   str("view", 40);
+  str("workspace", 16);
   str("classId", 120);
   str("className", 160);
   str("period", 8);
@@ -1537,33 +1605,47 @@ async function createPersonalCursorAgent(opts = {}) {
  * @param {string} email
  */
 export async function startAgent(email, opts = {}) {
+  const workspace = normalizeJypeWorkspace(opts.workspace);
   const normalized = canonicalizeEmail(email);
-  if (!isEducationUser(normalized)) {
+  if (!canUseAgent(normalized, workspace)) {
     const err = new Error("forbidden");
     err.status = 403;
     throw err;
   }
 
-  const agent = await createPersonalCursorAgent(opts);
+  const createOpts =
+    workspace === "jype"
+      ? { ...opts, model: opts.model || copyModelSpec(GUEST_GROK_SPEC) }
+      : opts;
+  const agent = await createPersonalCursorAgent(createOpts);
 
   const id =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
       : `pa-${Date.now().toString(36)}`;
 
+  const key = focusKey(normalized, workspace);
   // Switch focus. Running / queued threads keep working in the background.
-  const priorId = activeByEmail.get(normalized);
+  const priorId = activeByEmail.get(key);
   if (priorId && priorId !== id) {
     await releaseFocusFrom(priorId);
   }
 
+  const starter = String(opts.starter || jypeGivenName(normalized) || "").trim();
+  const uploadRoot =
+    workspace === "jype"
+      ? `education/projects/jype/.chat-uploads/${id}`
+      : `education/${normalized}/.chat-uploads/${id}`;
+
   sessions.set(id, {
     agent,
     email: normalized,
+    workspace,
+    starter,
     createdAt: Date.now(),
     lastUsedAt: Date.now(),
     uploads: [],
-    uploadDirRel: `education/${normalized}/.chat-uploads/${id}`,
+    uploadDirRel: uploadRoot,
     messages: [],
     status: "idle",
     workingLabel: null,
@@ -1574,11 +1656,11 @@ export async function startAgent(email, opts = {}) {
     teamsOrigin: null,
     teamsDeliverFinal: false,
     guestCaller: null,
-    ephemeralPinned: false,
+    ephemeralPinned: workspace === "jype",
   });
-  activeByEmail.set(normalized, id);
+  activeByEmail.set(key, id);
 
-  return { sessionId: id, email: normalized, status: "idle", messages: [] };
+  return { sessionId: id, email: normalized, status: "idle", messages: [], workspace };
 }
 
 /**
@@ -1603,7 +1685,27 @@ export async function startAgentFromIMessageMention(message) {
     err.status = 400;
     throw err;
   }
-  const started = await startAgent(YAN_EMAIL, guestAgentCreateOpts(guest));
+  const workspace = originIsJypeThread(origin) ? "jype" : "";
+  const startEmail =
+    workspace === "jype"
+      ? jypeEmailForSlug(guest?.slug) || YAN_EMAIL
+      : YAN_EMAIL;
+  const starter =
+    workspace === "jype"
+      ? String(guest?.displayName || "").split(/\s+/)[0] ||
+        jypeGivenName(startEmail) ||
+        "Yan"
+      : "";
+  const createOpts = guestAgentCreateOpts(
+    workspace === "jype"
+      ? { ...guest, model: copyModelSpec(GUEST_GROK_SPEC) }
+      : guest
+  );
+  const started = await startAgent(startEmail, {
+    ...createOpts,
+    workspace,
+    starter,
+  });
   const session = sessions.get(started.sessionId);
   if (!session) {
     const err = new Error("session not found");
@@ -1613,8 +1715,9 @@ export async function startAgentFromIMessageMention(message) {
   session.imessageOrigin = origin;
   session.imessageDeliverFinal = true;
   session.guestCaller = guest;
-  return messageAgent(started.sessionId, YAN_EMAIL, text, [], {
+  return messageAgent(started.sessionId, startEmail, text, [], {
     client: "imessage",
+    workspace,
   });
 }
 
@@ -1640,7 +1743,27 @@ export async function startAgentFromTeamsMention(message) {
     err.status = 400;
     throw err;
   }
-  const started = await startAgent(YAN_EMAIL, guestAgentCreateOpts(guest));
+  const workspace = originIsJypeThread(origin) ? "jype" : "";
+  const startEmail =
+    workspace === "jype"
+      ? jypeEmailForSlug(guest?.slug) || YAN_EMAIL
+      : YAN_EMAIL;
+  const starter =
+    workspace === "jype"
+      ? String(guest?.displayName || "").split(/\s+/)[0] ||
+        jypeGivenName(startEmail) ||
+        "Yan"
+      : "";
+  const createOpts = guestAgentCreateOpts(
+    workspace === "jype"
+      ? { ...guest, model: copyModelSpec(GUEST_GROK_SPEC) }
+      : guest
+  );
+  const started = await startAgent(startEmail, {
+    ...createOpts,
+    workspace,
+    starter,
+  });
   const session = sessions.get(started.sessionId);
   if (!session) {
     const err = new Error("session not found");
@@ -1650,8 +1773,9 @@ export async function startAgentFromTeamsMention(message) {
   session.teamsOrigin = origin;
   session.teamsDeliverFinal = true;
   session.guestCaller = guest;
-  return messageAgent(started.sessionId, YAN_EMAIL, text, [], {
+  return messageAgent(started.sessionId, startEmail, text, [], {
     client: "teams",
+    workspace,
   });
 }
 
@@ -1659,31 +1783,46 @@ export async function startAgentFromTeamsMention(message) {
  * List this user's persisted threads. Enqueues untitled files for titles.
  * @param {string} email
  */
-export async function listAgentChats(email) {
+export async function listAgentChats(email, opts = {}) {
+  const workspace = normalizeJypeWorkspace(opts.workspace);
   const normalized = canonicalizeEmail(email);
-  if (!isEducationUser(normalized)) {
+  if (!canUseAgent(normalized, workspace)) {
     const err = new Error("forbidden");
     err.status = 403;
     throw err;
   }
   const workingIds = new Set();
   for (const [sid, session] of sessions) {
-    if (session?.email === normalized && sessionHasBackgroundWork(session)) {
+    if (!sessionHasBackgroundWork(session)) continue;
+    if (workspace === "jype") {
+      if (sessionWorkspace(session) === "jype") workingIds.add(sid);
+      continue;
+    }
+    if (session?.email === normalized && sessionWorkspace(session) !== "jype") {
       workingIds.add(sid);
     }
   }
-  const chats = await listChatHistory({ email: normalized, workingIds });
+  const chats = await listChatHistory({
+    email: normalized,
+    workingIds,
+    workspace,
+  });
   for (const row of chats) {
     if (
       row?.sessionId &&
       (!row.title || isStubChatTitle(row.title, row.preview))
     ) {
-      enqueueChatTitle({ email: normalized, sessionId: row.sessionId });
+      enqueueChatTitle({
+        email: normalized,
+        sessionId: row.sessionId,
+        workspace,
+      });
     }
   }
   return {
     ok: true,
-    sessionId: activeByEmail.get(normalized) || null,
+    sessionId: activeByEmail.get(focusKey(normalized, workspace)) || null,
+    workspace,
     chats: applyChatWorkingStatus(chats, workingIds),
   };
 }
@@ -1693,9 +1832,10 @@ export async function listAgentChats(email) {
  * @param {unknown} sessionId
  * @param {string} email
  */
-export async function markAgentChatRead(sessionId, email) {
+export async function markAgentChatRead(sessionId, email, opts = {}) {
+  const workspace = normalizeJypeWorkspace(opts.workspace);
   const normalized = canonicalizeEmail(email);
-  if (!isEducationUser(normalized)) {
+  if (!canUseAgent(normalized, workspace)) {
     const err = new Error("forbidden");
     err.status = 403;
     throw err;
@@ -1709,11 +1849,13 @@ export async function markAgentChatRead(sessionId, email) {
   const lastRead = await markChatHistoryRead({
     email: normalized,
     sessionId: sid,
+    workspace,
   });
   notifyEducationClients(normalized, "change", {
     source: "agent",
     sessionId: sid,
     status: "read",
+    ...(workspace ? { workspace } : {}),
   });
   return { ok: true, sessionId: sid, lastRead };
 }
@@ -1723,9 +1865,10 @@ export async function markAgentChatRead(sessionId, email) {
  * @param {string} sessionId
  * @param {string} email
  */
-export async function resumeAgent(sessionId, email) {
+export async function resumeAgent(sessionId, email, opts = {}) {
+  const workspace = normalizeJypeWorkspace(opts.workspace);
   const normalized = canonicalizeEmail(email);
-  if (!isEducationUser(normalized)) {
+  if (!canUseAgent(normalized, workspace)) {
     const err = new Error("forbidden");
     err.status = 403;
     throw err;
@@ -1739,22 +1882,33 @@ export async function resumeAgent(sessionId, email) {
 
   const live = sessions.get(sid);
   if (live) {
-    if (live.email !== normalized) {
+    if (!canAccessSession(live, normalized)) {
       const err = new Error("forbidden");
       err.status = 403;
       throw err;
     }
     live.lastUsedAt = Date.now();
-    activeByEmail.set(normalized, sid);
+    activeByEmail.set(focusKey(normalized, workspace || sessionWorkspace(live)), sid);
     if (!live.messages?.length) {
       /* empty live session */
     }
-    await markChatHistoryRead({ email: normalized, sessionId: sid });
-    enqueueChatTitle({ email: normalized, sessionId: sid });
+    await markChatHistoryRead({
+      email: normalized,
+      sessionId: sid,
+      workspace: workspace || sessionWorkspace(live),
+    });
+    enqueueChatTitle({
+      email: normalized,
+      sessionId: sid,
+      workspace: workspace || sessionWorkspace(live),
+    });
     notifyEducationClients(normalized, "change", {
       source: "agent",
       sessionId: sid,
       status: live.status || "idle",
+      ...(workspace || sessionWorkspace(live)
+        ? { workspace: workspace || sessionWorkspace(live) }
+        : {}),
     });
     return {
       ok: true,
@@ -1765,19 +1919,25 @@ export async function resumeAgent(sessionId, email) {
     };
   }
 
-  const loaded = await loadChatHistory({ email: normalized, sessionId: sid });
+  const loaded = await loadChatHistory({
+    email: normalized,
+    sessionId: sid,
+    workspace,
+  });
   if (!loaded) {
     const err = new Error("session not found");
     err.status = 404;
     throw err;
   }
 
-  const priorId = activeByEmail.get(normalized);
+  const priorId = activeByEmail.get(focusKey(normalized, workspace));
   if (priorId && priorId !== sid) {
     await releaseFocusFrom(priorId);
   }
 
-  const agent = await createPersonalCursorAgent();
+  const agent = await createPersonalCursorAgent(
+    workspace === "jype" ? { model: copyModelSpec(GUEST_GROK_SPEC) } : {}
+  );
   /** @type {ChatMessage[]} */
   const messages = (loaded.messages || []).map((m) => {
     /** @type {ChatMessage} */
@@ -1786,13 +1946,20 @@ export async function resumeAgent(sessionId, email) {
     return row;
   });
 
+  const uploadRoot =
+    workspace === "jype"
+      ? `education/projects/jype/.chat-uploads/${sid}`
+      : `education/${normalized}/.chat-uploads/${sid}`;
+
   sessions.set(sid, {
     agent,
     email: normalized,
+    workspace,
+    starter: "",
     createdAt: Date.parse(loaded.started) || Date.now(),
     lastUsedAt: Date.now(),
     uploads: [],
-    uploadDirRel: `education/${normalized}/.chat-uploads/${sid}`,
+    uploadDirRel: uploadRoot,
     messages,
     status: "idle",
     workingLabel: null,
@@ -1804,21 +1971,22 @@ export async function resumeAgent(sessionId, email) {
     teamsOrigin: null,
     teamsDeliverFinal: false,
     guestCaller: null,
-    ephemeralPinned: !loaded.ephemeral,
+    ephemeralPinned: workspace === "jype" ? true : !loaded.ephemeral,
   });
-  activeByEmail.set(normalized, sid);
-  await markChatHistoryRead({ email: normalized, sessionId: sid });
+  activeByEmail.set(focusKey(normalized, workspace), sid);
+  await markChatHistoryRead({ email: normalized, sessionId: sid, workspace });
   const firstUser =
     loaded.messages?.find((m) => m.role === "user")?.content ||
     loaded.preview ||
     "";
   if (!loaded.title || isStubChatTitle(loaded.title, firstUser)) {
-    enqueueChatTitle({ email: normalized, sessionId: sid });
+    enqueueChatTitle({ email: normalized, sessionId: sid, workspace });
   }
   notifyEducationClients(normalized, "change", {
     source: "agent",
     sessionId: sid,
     status: "idle",
+    ...(workspace ? { workspace } : {}),
   });
   return {
     ok: true,
@@ -2123,7 +2291,7 @@ export async function messageAgent(
     err.status = 404;
     throw err;
   }
-  if (session.email !== normalized) {
+  if (!canAccessSession(session, normalized)) {
     const err = new Error("forbidden");
     err.status = 403;
     throw err;
@@ -2187,7 +2355,7 @@ export async function messageAgent(
 
   /** @type {string[]} */
   const promptParts = [
-    systemPrompt(normalized),
+    systemPrompt(normalized, { workspace: sessionWorkspace(session) }),
     "",
     formatLiveContextBlock(
       nowContext,
@@ -2283,7 +2451,7 @@ export async function messageAgent(
     session.teamsDeliverFinal = false;
   }
 
-  activeByEmail.set(normalized, sid);
+  activeByEmail.set(focusKey(normalized, sessionWorkspace(session)), sid);
 
   if (interrupting) {
     session.interrupting = true;
@@ -2358,7 +2526,7 @@ export function getAgentState(sessionId, email) {
     err.status = 404;
     throw err;
   }
-  if (session.email !== normalized) {
+  if (!canAccessSession(session, normalized)) {
     const err = new Error("forbidden");
     err.status = 403;
     throw err;
@@ -2385,20 +2553,22 @@ export function getAgentState(sessionId, email) {
 /**
  * @param {string} email
  */
-export function getActiveAgent(email) {
+export function getActiveAgent(email, opts = {}) {
+  const workspace = normalizeJypeWorkspace(opts.workspace);
   const normalized = canonicalizeEmail(email);
-  if (!isEducationUser(normalized)) {
+  if (!canUseAgent(normalized, workspace)) {
     const err = new Error("forbidden");
     err.status = 403;
     throw err;
   }
-  const sid = activeByEmail.get(normalized) || null;
+  const key = focusKey(normalized, workspace);
+  const sid = activeByEmail.get(key) || null;
   if (!sid) {
     return { ok: true, sessionId: null, status: null, messages: [] };
   }
   const session = sessions.get(sid);
   if (!session) {
-    activeByEmail.delete(normalized);
+    activeByEmail.delete(key);
     return { ok: true, sessionId: null, status: null, messages: [] };
   }
   session.lastUsedAt = Date.now();
@@ -2425,9 +2595,10 @@ export function getActiveAgent(email) {
  * Personal Agent threads that still have work (running or queued).
  * @param {string} email
  */
-export async function getRunningAgents(email) {
+export async function getRunningAgents(email, opts = {}) {
+  const workspace = normalizeJypeWorkspace(opts.workspace);
   const normalized = canonicalizeEmail(email);
-  if (!isEducationUser(normalized)) {
+  if (!canUseAgent(normalized, workspace)) {
     const err = new Error("forbidden");
     err.status = 403;
     throw err;
@@ -2435,7 +2606,11 @@ export async function getRunningAgents(email) {
   /** @type {{ sessionId: string, status: string, workingLabel: string, queueLength: number, lastUsedAt: number }[]} */
   const live = [];
   for (const [sid, session] of sessions) {
-    if (session?.email !== normalized) continue;
+    if (workspace === "jype") {
+      if (sessionWorkspace(session) !== "jype") continue;
+    } else if (session?.email !== normalized || sessionWorkspace(session) === "jype") {
+      continue;
+    }
     if (!sessionHasBackgroundWork(session)) continue;
     live.push({
       sessionId: sid,
@@ -2451,7 +2626,7 @@ export async function getRunningAgents(email) {
   live.sort((a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0));
   const workingIds = new Set(live.map((row) => row.sessionId));
   const chats = live.length
-    ? await listChatHistory({ email: normalized, workingIds })
+    ? await listChatHistory({ email: normalized, workingIds, workspace })
     : [];
   const titleById = new Map(
     (chats || []).map((row) => [
@@ -2478,22 +2653,25 @@ export async function getRunningAgents(email) {
  * @param {string} sessionId
  * @param {string} email
  */
-export async function stopAgent(sessionId, email) {
+export async function stopAgent(sessionId, email, opts = {}) {
+  const workspace = normalizeJypeWorkspace(opts.workspace);
   const normalized = canonicalizeEmail(email);
   const sid = String(sessionId || "").trim();
   const session = sessions.get(sid);
+  const key = focusKey(normalized, workspace || sessionWorkspace(session));
   if (!session) {
-    if (activeByEmail.get(normalized) === sid) {
-      activeByEmail.delete(normalized);
+    if (activeByEmail.get(key) === sid) {
+      activeByEmail.delete(key);
     }
     notifyEducationClients(normalized, "change", {
       source: "agent",
       sessionId: sid || null,
       status: "stopped",
+      ...(workspace ? { workspace } : {}),
     });
     return { ok: true, stopped: false };
   }
-  if (session.email !== normalized) {
+  if (!canAccessSession(session, normalized)) {
     const err = new Error("forbidden");
     err.status = 403;
     throw err;
@@ -2503,6 +2681,7 @@ export async function stopAgent(sessionId, email) {
     source: "agent",
     sessionId: sid,
     status: "stopped",
+    ...(sessionWorkspace(session) ? { workspace: sessionWorkspace(session) } : {}),
   });
   return { ok: true, stopped: true };
 }

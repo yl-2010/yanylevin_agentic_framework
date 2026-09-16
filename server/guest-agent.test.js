@@ -563,7 +563,7 @@ describe("evaluateGuestMention", () => {
         fromMe: false,
         from: "Sam Classmate",
         fromEmail: "sam@school.example",
-        chat: "JYPE",
+        chat: "Robotics",
         chatType: "group",
         text: "@agent hi",
       },
@@ -573,7 +573,7 @@ describe("evaluateGuestMention", () => {
     });
     assert.equal(otherGroup.action, "start");
     assert.equal(otherGroup.caller.audience.kind, "group");
-    assert.equal(otherGroup.caller.audience.threadLabel, "JYPE");
+    assert.equal(otherGroup.caller.audience.threadLabel, "Robotics");
 
     const groupStranger = await evaluateGuestMention({
       platform: "teams",
@@ -739,5 +739,46 @@ describe("evaluateGuestMention", () => {
     assert.match(sent[0].text, /hourly rate limit/);
     assert.match(sent[0].text, /Sent by Yan's Personal Agent/);
     assert.equal(sent[0].chatGuid, "guid-1");
+  });
+
+  it("gives JYPE thread members unlimited Grok and skips the hourly cap", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "guest-jype-"));
+    const statePath = join(dir, "limits.json");
+    const base = {
+      platform: "imessage",
+      message: {
+        fromMe: false,
+        handle: "+15555550111",
+        chatId: "chat-jype",
+        chat: "JYPE",
+        text: "@agent notes",
+      },
+      contacts: [contact("Alex", "+15555550111")],
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    };
+    for (let i = 0; i < FRIEND_HOURLY_LIMIT + 3; i += 1) {
+      const decision = await evaluateGuestMention(base);
+      assert.equal(decision.action, "start");
+      assert.equal(decision.caller.model.id, "grok-4.6");
+      assert.equal(decision.caller.workspace, "jype");
+    }
+
+    const stranger = await evaluateGuestMention({
+      platform: "imessage",
+      message: {
+        fromMe: false,
+        handle: "+15555550999",
+        chatId: "chat-jype",
+        chat: "JYPE",
+        text: "@agent hi",
+      },
+      contacts: [contact("Sam", "+15555550999")],
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(stranger.action, "ignore");
   });
 });

@@ -23,12 +23,16 @@ import {
   statOnedriveFile,
   attachOfficeOpenFields,
   officeOpenOptsFromMeta,
+  urlTileFromDroppedFile,
+  urlTileFromObject,
 } from "./education-onedrive.js";
 import {
   canonicalizeEmail,
   isFullAccessEmail,
+  isJypeAccessEmail,
   FULL_ACCESS_EMAILS,
 } from "./identity.js";
+import { JYPE_ROOT_REL, normalizeJypeWorkspace } from "./jype.js";
 
 /** Property JSON filenames that are never treated as context files. */
 const PROPERTY_JSON = new Set([
@@ -419,21 +423,33 @@ export async function listContextFiles(dir, opts = {}) {
     if (!visibleSet.has(n)) hiddenSet.add(n);
   }
   for (const n of visibleSet) hiddenSet.delete(n);
-  const visible = out
-    .filter((f) => !hiddenSet.has(f.name.toLowerCase()))
-    .map(({ name, size, mtime }) =>
+  /** @type {{ name: string, size?: number, mtime: string, kind: string, source: string, url?: string }[]} */
+  const visible = [];
+  for (const f of out) {
+    if (hiddenSet.has(f.name.toLowerCase())) continue;
+    const abs = join(dir, f.name);
+    const urlTile = await urlTileFromDroppedFile(abs, f.name, {
+      source: "education",
+      mtime: f.mtime,
+    });
+    if (urlTile) {
+      visible.push(urlTile);
+      continue;
+    }
+    visible.push(
       attachOfficeOpenFields(
         {
-          name,
-          size,
-          mtime,
+          name: f.name,
+          size: f.size,
+          mtime: f.mtime,
           kind: "file",
           source: "education",
         },
-        join(dir, name),
+        abs,
         opts
       )
     );
+  }
   if (opts?.skipPin) return visible;
   return pinContextFileOrder(visible, opts?.topNames, opts?.bottomNames);
 }
@@ -514,7 +530,7 @@ async function resolveOnedriveContextFile(root, opts) {
  * @returns {Promise<{ path: string, name: string, size: number, mtime: string }>}
  */
 export async function resolveContextFile(email, opts) {
-  const root = userEducationRoot(email);
+  const root = userEducationRoot(email, opts);
   const source = String(opts?.source || "").trim().toLowerCase();
   if (source === "onedrive") {
     return resolveOnedriveContextFile(root, opts);
@@ -746,9 +762,39 @@ export function isEducationUser(email) {
   return isFullAccessEmail(email);
 }
 
+/**
+ * Live URL tiles stored on class.json / project.json / todo.json / date.json `sites`.
+ * Click opens the URL. No file on disk. Same tiles as dropped `.json` / `.url` links.
+ * @param {object|null|undefined} props
+ */
+export function siteFilesFromProps(props) {
+  const sites = Array.isArray(props?.sites) ? props.sites : [];
+  /** @type {object[]} */
+  const out = [];
+  const seen = new Set();
+  for (const raw of sites) {
+    const tile = urlTileFromObject(raw);
+    if (!tile) continue;
+    const key = tile.url.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ ...tile, source: "site" });
+  }
+  return out;
+}
+
 /** @param {string} email */
-export function userEducationRoot(email) {
+export function userEducationRoot(email, opts = {}) {
+  const workspace = normalizeJypeWorkspace(opts.workspace);
   const normalized = canonicalizeEmail(email);
+  if (workspace === "jype") {
+    if (!isJypeAccessEmail(normalized)) {
+      const err = new Error("forbidden");
+      err.status = 403;
+      throw err;
+    }
+    return join(ROOT, JYPE_ROOT_REL);
+  }
   if (!isEducationUser(normalized)) {
     const err = new Error("forbidden");
     err.status = 403;
@@ -857,8 +903,8 @@ export async function listClassEntriesForRoot(root) {
 /**
  * @param {string} email
  */
-export async function listClassEntries(email) {
-  return listClassEntriesForRoot(userEducationRoot(email));
+export async function listClassEntries(email, opts = {}) {
+  return listClassEntriesForRoot(userEducationRoot(email, opts));
 }
 
 /**
@@ -881,6 +927,14 @@ export function isFixture(obj) {
   if (obj.fixture === true) return true;
   const id = String(obj.id || "");
   return id.startsWith("_example-");
+}
+
+/**
+ * User-hidden objects stay on disk; the education UI omits them.
+ * @param {{ hidden?: unknown }|null|undefined} obj
+ */
+export function isHiddenFromUi(obj) {
+  return Boolean(obj && typeof obj === "object" && obj.hidden === true);
 }
 
 const TRI_KEYS = ["fall", "winter", "spring"];
@@ -1147,10 +1201,21 @@ async function loadObjectFolder(
       if (typeof item.name === "string") item.name = stripTodoTagPrefix(item.name);
     }
     if (!includeFixtures && isFixture(item)) continue;
-    item.files = await listContextFiles(objectDir, {
+    const fileOpts = {
       ...contextFileListOpts(props),
       ...officeOpen,
-    });
+    };
+    item.files = pinContextFileOrder(
+      [
+        ...siteFilesFromProps(props),
+        ...(await listContextFiles(objectDir, {
+          ...fileOpts,
+          skipPin: true,
+        })),
+      ],
+      fileOpts.topNames,
+      fileOpts.bottomNames
+    );
     out.push(item);
   }
   return out;
@@ -1416,8 +1481,8 @@ export function classesForDayParts(schedule, classes, day, allowedIds) {
  * @param {string} email
  * @param {Date} [now]
  */
-export async function resolveNowScheduleContext(email, now = new Date()) {
-  const root = userEducationRoot(email);
+export async function resolveNowScheduleContext(email, now = new Date(), opts = {}) {
+  const root = userEducationRoot(email, opts);
   const schedule = (await readJsonFile(join(root, "schedule.json"))) || {};
   const clock = scheduleNowParts(schedule, now);
   const schedulePdf =
@@ -1616,8 +1681,8 @@ export function partitionClassTodos(todos) {
  *   When false (default), strip fixture + out-of-season classes for the web UI
  *   and omit trimester fields. Agents still read on-disk trees directly.
  */
-export async function readEducationTree(email, { includeFixtures = false } = {}) {
-  const root = userEducationRoot(email);
+export async function readEducationTree(email, { includeFixtures = false, workspace = "" } = {}) {
+  const root = userEducationRoot(email, { workspace });
   const meta = (await readJsonFile(join(root, "meta.json"))) || {};
   const schedule = (await readJsonFile(join(root, "schedule.json"))) || {};
   const todayKey = scheduleTodayKey(schedule);
@@ -1693,7 +1758,7 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
       });
     }
     const classFiles = pinContextFileOrder(
-      mergeContextFileLists(eduFiles, driveFiles),
+      [...siteFilesFromProps(props), ...mergeContextFileLists(eduFiles, driveFiles)],
       fileOpts.topNames,
       fileOpts.bottomNames
     );
@@ -1731,6 +1796,7 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
     const props = await readJsonFile(projectJson);
     if (!props || typeof props !== "object") continue;
     const project = { id: projectId, ...props };
+    if (isHiddenFromUi(project)) continue;
     if (!includeFixtures && isFixture(project)) continue;
 
     let birthMs = 0;
@@ -1751,10 +1817,13 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
       "date",
       { includeFixtures, projectId, officeOpen }
     );
-    const projectFiles = await listContextFiles(projectDir, {
-      ...contextFileListOpts(props),
-      ...officeOpen,
-    });
+    const projectFiles = [
+      ...siteFilesFromProps(props),
+      ...(await listContextFiles(projectDir, {
+        ...contextFileListOpts(props),
+        ...officeOpen,
+      })),
+    ];
     projects.push({
       ...project,
       _birthMs: birthMs,
@@ -1776,7 +1845,7 @@ export async function readEducationTree(email, { includeFixtures = false } = {})
   let nowContext = null;
   if (!includeFixtures) {
     try {
-      nowContext = await resolveNowScheduleContext(email);
+      nowContext = await resolveNowScheduleContext(email, new Date(), { workspace });
     } catch (err) {
       console.error("[education-data] nowContext", err);
     }
@@ -1831,9 +1900,9 @@ function isSafeObjectId(id) {
 export async function findTodo(
   email,
   todoId,
-  { classId = null, projectId = null } = {}
+  { classId = null, projectId = null, workspace = "" } = {}
 ) {
-  const root = userEducationRoot(email);
+  const root = userEducationRoot(email, { workspace });
   const id = isSafeObjectId(todoId);
   if (!id) return null;
 
@@ -1922,9 +1991,9 @@ export async function setTodoDone(
   email,
   todoId,
   done,
-  { classId = null, projectId = null } = {}
+  { classId = null, projectId = null, workspace = "" } = {}
 ) {
-  const found = await findTodo(email, todoId, { classId, projectId });
+  const found = await findTodo(email, todoId, { classId, projectId, workspace });
   if (!found) {
     const err = new Error("todo not found");
     err.status = 404;
@@ -1968,8 +2037,8 @@ export async function setTodoDone(
  * @param {string} email
  * @param {string} projectId
  */
-export async function markProjectOpened(email, projectId) {
-  const root = userEducationRoot(email);
+export async function markProjectOpened(email, projectId, opts = {}) {
+  const root = userEducationRoot(email, opts);
   const id = isSafeObjectId(projectId);
   if (!id) {
     const err = new Error("invalid project id");
@@ -2032,7 +2101,7 @@ export async function setCapsuleVote(
   todoId,
   capsuleId,
   vote,
-  { classId = null, projectId = null } = {}
+  { classId = null, projectId = null, workspace = "" } = {}
 ) {
   const capId = isSafeCapsuleId(capsuleId);
   if (!capId) {
@@ -2041,7 +2110,7 @@ export async function setCapsuleVote(
     throw err;
   }
   const nextVote = normalizeCapsuleVote(vote);
-  const found = await findTodo(email, todoId, { classId, projectId });
+  const found = await findTodo(email, todoId, { classId, projectId, workspace });
   if (!found) {
     const err = new Error("todo not found");
     err.status = 404;
@@ -2091,8 +2160,8 @@ export async function setCapsuleVote(
  * @param {string} email
  * @returns {Promise<number>} mtime ms of user tree root (best-effort)
  */
-export async function userTreeMtime(email) {
-  const root = userEducationRoot(email);
+export async function userTreeMtime(email, opts = {}) {
+  const root = userEducationRoot(email, opts);
   try {
     const s = await stat(root);
     return s.mtimeMs;

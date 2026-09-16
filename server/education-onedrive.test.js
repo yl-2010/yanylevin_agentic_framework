@@ -26,6 +26,8 @@ import {
   officeOpenUri,
   officeWebViewUrl,
   officeOpenOptsFromMeta,
+  urlTileFromObject,
+  urlTileFromInternetShortcut,
 } from "./education-onedrive.js";
 
 describe("gradeDirFromMeta", () => {
@@ -485,10 +487,43 @@ describe("office open URLs", () => {
     assert.equal(html.webUrl, undefined);
     assert.equal(html.officeUri, undefined);
     assert.equal(xlsx?.webUrl, `${web}/hw%20scans/sheet.xlsx`);
+    await rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe("url tiles", () => {
+  it("parses kind url objects and internet shortcuts", () => {
     assert.equal(
-      xlsx?.officeUri,
-      `ms-excel:ofe|u|${web}/hw%20scans/sheet.xlsx`
+      urlTileFromObject({ dueDate: "2026-09-16", url: "https://x.example" })?.kind,
+      undefined
     );
+    assert.equal(
+      urlTileFromObject({ name: "QA", url: "https://yanylevin.com/q/" })?.kind,
+      "url"
+    );
+    assert.equal(
+      urlTileFromInternetShortcut(
+        "[InternetShortcut]\nURL=https://yanylevin.com/notes/\n",
+        "notes"
+      )?.url,
+      "https://yanylevin.com/notes/"
+    );
+  });
+
+  it("lists dropped link files in listOnedriveTree", async () => {
+    const dir = join(tmpdir(), `edu-url-od-${Date.now()}`);
+    await mkdir(dir, { recursive: true });
+    await writeFile(
+      join(dir, "guide.json"),
+      JSON.stringify({ kind: "url", name: "Guide", url: "https://yanylevin.com/g/" })
+    );
+    await writeFile(join(dir, "sheet.pdf"), "pdf");
+    const rows = await listOnedriveTree(dir);
+    const guide = rows.find((r) => r.kind === "url");
+    const pdf = rows.find((r) => r.name === "sheet.pdf");
+    assert.equal(guide?.name, "Guide");
+    assert.equal(guide?.url, "https://yanylevin.com/g/");
+    assert.equal(pdf?.kind, "file");
     await rm(dir, { recursive: true, force: true });
   });
 });

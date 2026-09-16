@@ -10,6 +10,10 @@
 (() => {
   const root = document.getElementById("edu-chat");
   if (!root) return;
+  const API = String(window.YL_EDU?.apiPrefix || "/api/education").replace(
+    /\/+$/,
+    ""
+  ) || "/api/education";
 
   const pill = root.querySelector(".yan-chat-pill");
   const panel = root.querySelector(".yan-chat-panel");
@@ -667,7 +671,7 @@
     if (!historyEl || !window.YanMacApi) return;
     const fetchGen = ++historyFetchGen;
     try {
-      const res = await window.YanMacApi.macFetch("/api/education/agent/chats", {
+      const res = await window.YanMacApi.macFetch(`${API}/agent/chats`, {
         method: "GET",
         timeoutMs: 30_000,
       });
@@ -731,7 +735,7 @@
     const id = String(sid || "").trim();
     if (!id || !window.YanMacApi) return;
     try {
-      await window.YanMacApi.macFetch("/api/education/agent/read", {
+      await window.YanMacApi.macFetch(`${API}/agent/read`, {
         method: "POST",
         json: { sessionId: id },
         timeoutMs: 15_000,
@@ -754,7 +758,7 @@
     const gen = ++viewGen;
     stopPolling();
     try {
-      const res = await window.YanMacApi.macFetch("/api/education/agent/resume", {
+      const res = await window.YanMacApi.macFetch(`${API}/agent/resume`, {
         method: "POST",
         json: { sessionId: id },
         timeoutMs: 120_000,
@@ -1294,7 +1298,7 @@
     const requested = sessionId;
     const gen = viewGen;
     const res = await window.YanMacApi.macFetch(
-      `/api/education/agent/state?sessionId=${encodeURIComponent(requested)}`,
+      `${API}/agent/state?sessionId=${encodeURIComponent(requested)}`,
       { method: "GET", timeoutMs: 15_000 }
     );
     if (sessionId !== requested || gen !== viewGen) return;
@@ -1343,7 +1347,7 @@
     }
     starting = true;
     try {
-      const res = await window.YanMacApi.macFetch("/api/education/agent/start", {
+      const res = await window.YanMacApi.macFetch(`${API}/agent/start`, {
         method: "POST",
         json: {},
         timeoutMs: 120_000,
@@ -1421,7 +1425,7 @@
       }
 
       const res = await window.YanMacApi.macFetch(
-        "/api/education/agent/message",
+        `${API}/agent/message`,
         {
           method: "POST",
           json: body,
@@ -1544,7 +1548,7 @@
     setState(opts.open ? "open" : "closed");
     if (hadThread && window.YanMacApi) {
       try {
-        const res = await window.YanMacApi.macFetch("/api/education/agent/start", {
+        const res = await window.YanMacApi.macFetch(`${API}/agent/start`, {
           method: "POST",
           json: {},
           timeoutMs: 120_000,
@@ -1880,7 +1884,7 @@
     const gen = viewGen;
     try {
       const res = await window.YanMacApi.macFetch(
-        "/api/education/agent/active",
+        `${API}/agent/active`,
         { method: "GET", timeoutMs: 15_000 }
       );
       const data = await res.json().catch(() => ({}));

@@ -11,6 +11,7 @@ import {
   applyAgentSentFooter,
   isClassOf2028Thread,
   isGradeWideThread,
+  isJypeThread,
   normalizeIMessageOrigin,
   replyTargetForMessage,
 } from "./imessage-mention.js";
@@ -18,6 +19,11 @@ import { sendIMessage } from "./imessage-send.js";
 import { isDirectChatId } from "./imessage-read.js";
 import { sendTeamsMessage } from "./school-teams.js";
 import { normalizeTeamsOrigin } from "./teams-mention.js";
+import {
+  isJypeMember,
+  jypeEmailForSlug,
+  originIsJypeThread,
+} from "./jype.js";
 
 export const GUEST_LIMITS_PATH = "/tmp/yanylevin-guest-agent-limits.json";
 export const GUEST_TZ = "America/Los_Angeles";
@@ -542,6 +548,16 @@ function guestModelSpec(useGrok, slug, name) {
   return copyModelSpec(GUEST_COMPOSER_SPEC);
 }
 
+function messageIsJypeThread(message) {
+  return originIsJypeThread(message) || isJypeThread(message?.chat);
+}
+
+function isJypeGuestCaller(slug, email, name) {
+  if (jypeEmailForSlug(slug)) return true;
+  if (isJypeMember(email)) return true;
+  return TEAMS_CLASS_OF_2028_ALLOW_GIVEN.has(givenNameOf(name).toLowerCase());
+}
+
 /** Preferred + fallback for a guest @agent turn. Friends stay Fast if Grok fails. */
 export function guestRunModels(caller) {
   const friend = isFriendGuest(caller?.slug, caller?.displayName);
@@ -632,6 +648,26 @@ export async function evaluateGuestMention(opts) {
   }
   const personKey = quotaKeyFor(handle, slug);
   if (!personKey) return { action: "ignore" };
+
+  if (messageIsJypeThread(message)) {
+    if (!isJypeGuestCaller(slug, email, fromName)) {
+      return { action: "ignore" };
+    }
+    return {
+      action: "start",
+      platform,
+      caller: {
+        displayName,
+        slug,
+        platform,
+        handle,
+        inContacts,
+        audience: describeGuestAudience(platform, message),
+        model: withFast(GUEST_GROK_SPEC),
+        workspace: "jype",
+      },
+    };
+  }
 
   const slot = await takeGuestSlot({
     platform,

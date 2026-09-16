@@ -34,6 +34,18 @@ Apply Unslop to every heading and sentence on the page. No em dashes.
 
 Prefer **folder + `index.html`**, never a lone `foo/bar.html` at the repo root.
 
+## Study guides and large plans
+
+When JYPE, close friends, or Yan ask for a study guide, large plan, or blueprint (not a simple homework question or a one-line clarification), do not dump it as Teams or iMessage text.
+
+1. Ship a public page with this skill.
+2. Nest it under the class or group folder (`spanish4/fall-qa-1`, `jype/what-to-do-with-particle`).
+3. Add a `sites[]` URL tile on the related **class** (`class.json`). Update that class’s public index if one exists. The `/notes` hub can list the page, but do not create a Notes project.
+4. Breadcrumb every page: Home · Notes · Class.
+5. Reply with the live URL.
+
+Hub: `yanylevin.com/notes`. Homepage More and the gated Apps tile both point there. YL orb still goes home.
+
 Add a trailing-slash redirect in `vercel.json` next to the other app redirects:
 
 ```json

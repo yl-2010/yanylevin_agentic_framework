@@ -11,6 +11,51 @@
     full: document.getElementById("stage-full"),
   };
   const appEl = document.getElementById("edu-app");
+  const CFG = {
+    basePath: "/education",
+    apiPrefix: "/api/education",
+    workspace: "",
+    showGrades: true,
+    showFilters: true,
+    staticClasses: false,
+    allowedAccess: ["full"],
+    title: "Education",
+    ...(window.YL_EDU || {}),
+  };
+  const BASE = String(CFG.basePath || "/education").replace(/\/+$/, "") || "/education";
+  const API = String(CFG.apiPrefix || "/api/education").replace(/\/+$/, "") || "/api/education";
+  const BASE_RE = BASE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  function spaHome() {
+    return `${BASE}/`;
+  }
+  function spaClass(id) {
+    return `${BASE}/class/${encodeURIComponent(id)}`;
+  }
+  function spaProject(id) {
+    return `${BASE}/project/${encodeURIComponent(id)}`;
+  }
+  function spaTodo(id, q = "") {
+    return `${BASE}/todo/${encodeURIComponent(id)}${q}`;
+  }
+  function spaDate(id, q = "") {
+    return `${BASE}/date/${encodeURIComponent(id)}${q}`;
+  }
+  function spaCapsule(todoId, capsuleId, q = "") {
+    return `${BASE}/todo/${encodeURIComponent(todoId)}/capsule/${encodeURIComponent(
+      capsuleId
+    )}${q}`;
+  }
+  function isSpaHref(href) {
+    try {
+      const u = new URL(href, window.location.origin);
+      const p = u.pathname.replace(/\/+$/, "") || "/";
+      if (p === BASE) return true;
+      return new RegExp(`^${BASE_RE}/(class|project|todo|date)/`).test(p);
+    } catch {
+      return false;
+    }
+  }
 
   /** Circular Canvas LMS logomark (monochrome). */
   const CANVAS_ICON_SVG =
@@ -139,10 +184,16 @@
     return String(cls?.canvasScoreLabel || "").trim();
   }
 
-  function scoreHtml(label) {
+  function scoreHtml(label, canvasLink) {
     const text = String(label || "").trim();
     if (!text) return "";
-    return `<span class="edu-score">${escapeHtml(text)}</span>`;
+    const href = normalizeCanvasLink(canvasLink);
+    if (!href) return `<span class="edu-score">${escapeHtml(text)}</span>`;
+    return `<a class="edu-score" href="${escapeHtml(
+      href
+    )}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(
+      `Open in Canvas, ${text}`
+    )}">${escapeHtml(text)}</a>`;
   }
 
   /** Course gradebook from a Canvas assignment/syllabus/course URL. */
@@ -233,9 +284,9 @@
     const classFromQuery = params.get("class") || params.get("classId") || null;
     const projectFromQuery =
       params.get("project") || params.get("projectId") || null;
-    let m = path.match(/^\/education\/class\/([^/]+)$/);
+    let m = path.match(new RegExp(`^${BASE_RE}/class/([^/]+)$`));
     if (m) return { view: "class", classId: decodeURIComponent(m[1]), projectId: null, itemId: null, capsuleId: null };
-    m = path.match(/^\/education\/project\/([^/]+)$/);
+    m = path.match(new RegExp(`^${BASE_RE}/project/([^/]+)$`));
     if (m) {
       return {
         view: "project",
@@ -244,7 +295,7 @@
         itemId: null,
       };
     }
-    m = path.match(/^\/education\/todo\/([^/]+)\/capsule\/([^/]+)$/);
+    m = path.match(new RegExp(`^${BASE_RE}/todo/([^/]+)/capsule/([^/]+)$`));
     if (m) {
       return {
         view: "capsule",
@@ -256,7 +307,7 @@
         capsuleId: decodeURIComponent(m[2]),
       };
     }
-    m = path.match(/^\/education\/todo\/([^/]+)$/);
+    m = path.match(new RegExp(`^${BASE_RE}/todo/([^/]+)$`));
     if (m) {
       return {
         view: "todo",
@@ -267,7 +318,7 @@
         itemId: decodeURIComponent(m[1]),
       };
     }
-    m = path.match(/^\/education\/date\/([^/]+)$/);
+    m = path.match(new RegExp(`^${BASE_RE}/date/([^/]+)$`));
     if (m) {
       return {
         view: "date",
@@ -298,23 +349,21 @@
   function routeScrollKey(r = route) {
     const view = r?.view || "home";
     if (view === "class" && r.classId) {
-      return `/education/class/${encodeURIComponent(r.classId)}`;
+      return spaClass(r.classId);
     }
     if (view === "project" && r.projectId) {
-      return `/education/project/${encodeURIComponent(r.projectId)}`;
+      return spaProject(r.projectId);
     }
     if (view === "capsule" && r.itemId && r.capsuleId) {
-      return `/education/todo/${encodeURIComponent(r.itemId)}/capsule/${encodeURIComponent(
-        r.capsuleId
-      )}${routeScrollQuery(r)}`;
+      return spaCapsule(r.itemId, r.capsuleId, routeScrollQuery(r));
     }
     if (view === "todo" && r.itemId) {
-      return `/education/todo/${encodeURIComponent(r.itemId)}${routeScrollQuery(r)}`;
+      return spaTodo(r.itemId, routeScrollQuery(r));
     }
     if (view === "date" && r.itemId) {
-      return `/education/date/${encodeURIComponent(r.itemId)}${routeScrollQuery(r)}`;
+      return spaDate(r.itemId, routeScrollQuery(r));
     }
-    return "/education/";
+    return spaHome();
   }
 
   function captureScroll(key = routeScrollKey()) {
@@ -339,7 +388,7 @@
 
   function navigate(path, { replace = false, scroll = "top" } = {}) {
     captureScroll();
-    const url = path.startsWith("/") ? path : `/education/${path}`;
+    const url = path.startsWith("/") ? path : `${BASE}/${path}`;
     if (replace) history.replaceState({}, "", url);
     else history.pushState({}, "", url);
     route = parseRoute();
@@ -406,23 +455,21 @@
       : classId
         ? `?class=${encodeURIComponent(classId)}`
         : "";
-    if (view === "home") return "/education/";
+    if (view === "home") return spaHome();
     if (view === "class" && classId) {
-      return `/education/class/${encodeURIComponent(classId)}`;
+      return spaClass(classId);
     }
     if (view === "project" && projectId) {
-      return `/education/project/${encodeURIComponent(projectId)}`;
+      return spaProject(projectId);
     }
     if (view === "todo" && todoId) {
-      return `/education/todo/${encodeURIComponent(todoId)}${q}`;
+      return spaTodo(todoId, q);
     }
     if (view === "date" && dateId) {
-      return `/education/date/${encodeURIComponent(dateId)}${q}`;
+      return spaDate(dateId, q);
     }
     if (view === "capsule" && todoId && capsuleId) {
-      return `/education/todo/${encodeURIComponent(todoId)}/capsule/${encodeURIComponent(
-        capsuleId
-      )}${q}`;
+      return spaCapsule(todoId, capsuleId, q);
     }
     return null;
   }
@@ -453,15 +500,12 @@
     const href = String(rawHref || "").trim();
     if (!href) return null;
     try {
-      if (href.startsWith("/education")) {
+      if (href.startsWith(BASE) || href.startsWith("/education") || href.startsWith("/jype")) {
         const u = new URL(href, window.location.origin);
-        return u.pathname + u.search;
+        if (isSpaHref(u.pathname + u.search)) return u.pathname + u.search;
       }
       const u = new URL(href, window.location.origin);
-      if (
-        u.origin === window.location.origin &&
-        u.pathname.startsWith("/education")
-      ) {
+      if (u.origin === window.location.origin && isSpaHref(u.pathname + u.search)) {
         return u.pathname + u.search;
       }
     } catch {
@@ -496,7 +540,7 @@
     const mac = window.YanMacApi;
     if (!mac?.macFetch) return;
     mac
-      .macFetch(`/api/education/project/${encodeURIComponent(id)}/opened`, {
+      .macFetch(`${API}/project/${encodeURIComponent(id)}/opened`, {
         method: "POST",
         json: {},
         timeoutMs: 15_000,
@@ -1150,31 +1194,26 @@
   }
 
   function todoHref(t) {
-    const base = `/education/todo/${encodeURIComponent(t.id)}`;
-    if (t.projectId) {
-      return `${base}?project=${encodeURIComponent(t.projectId)}`;
-    }
-    return t.classId
-      ? `${base}?class=${encodeURIComponent(t.classId)}`
-      : base;
+    const q = t.projectId
+      ? `?project=${encodeURIComponent(t.projectId)}`
+      : t.classId
+        ? `?class=${encodeURIComponent(t.classId)}`
+        : "";
+    return spaTodo(t.id, q);
   }
 
   function dateHref(d) {
-    const base = `/education/date/${encodeURIComponent(d.id)}`;
-    if (d.projectId) {
-      return `${base}?project=${encodeURIComponent(d.projectId)}`;
-    }
-    return d.classId
-      ? `${base}?class=${encodeURIComponent(d.classId)}`
-      : base;
+    const q = d.projectId
+      ? `?project=${encodeURIComponent(d.projectId)}`
+      : d.classId
+        ? `?class=${encodeURIComponent(d.classId)}`
+        : "";
+    return spaDate(d.id, q);
   }
 
   function capsuleHref(todo, capsuleId) {
     const qs = todoHref(todo).split("?")[1];
-    const base = `/education/todo/${encodeURIComponent(todo.id)}/capsule/${encodeURIComponent(
-      capsuleId
-    )}`;
-    return qs ? `${base}?${qs}` : base;
+    return spaCapsule(todo.id, capsuleId, qs ? `?${qs}` : "");
   }
 
   function citationHost(url) {
@@ -1345,6 +1384,7 @@
         isMA,
         tag: todoTagKey(t),
         href: todoHref(t),
+        canvasLink: t.canvasLink || null,
         canvasWork: t.canvasWork || null,
       });
     });
@@ -1352,6 +1392,7 @@
   }
 
   function matchesFilter(t) {
+    if (!CFG.showFilters) return true;
     return typeFilter.has(todoTagKey(t));
   }
 
@@ -1411,11 +1452,9 @@
   }
 
   function backHrefForItem(item) {
-    if (item?.projectId) {
-      return `/education/project/${encodeURIComponent(item.projectId)}`;
-    }
-    if (item?.classId) return `/education/class/${encodeURIComponent(item.classId)}`;
-    return "/education/";
+    if (item?.projectId) return spaProject(item.projectId);
+    if (item?.classId) return spaClass(item.classId);
+    return spaHome();
   }
 
   function filterBarHtml() {
@@ -1481,7 +1520,9 @@
         : DATE_FILTERS_HOME;
     const today = todayKey();
     const upcoming = collectDateItems({ classId, projectId })
-      .filter((item) => dateFilter.has(dateItemFilterKey(item)))
+      .filter((item) =>
+        CFG.showFilters ? dateFilter.has(dateItemFilterKey(item)) : true
+      )
       .filter((item) => item.date && String(item.date) >= today)
       .sort((a, b) => dateItemSortKey(a).localeCompare(dateItemSortKey(b)));
     const visible = datesExpanded
@@ -1493,7 +1534,7 @@
     return panelHtml("Dates", listOrEmpty(visible.map(dateItemRowHtml).join("")), {
       filterId,
       titleHtml,
-      headExtra: dateFilterBarHtml(keys),
+      headExtra: CFG.showFilters ? dateFilterBarHtml(keys) : "",
     });
   }
 
@@ -1509,7 +1550,7 @@
     return panelHtml("TODO", listOrEmpty(todoListItemsHtml(visible)), {
       filterId,
       titleHtml,
-      headExtra: todoExpanded ? filterBarHtml() : "",
+      headExtra: CFG.showFilters && todoExpanded ? filterBarHtml() : "",
     });
   }
 
@@ -1547,7 +1588,7 @@
         <span class="edu-name">${taggedNameHtml(tag, t.name || t.id)}</span>
         ${klass}${due}
       </a>
-      ${scoreHtml(todoScoreLabel(t))}
+      ${scoreHtml(todoScoreLabel(t), t.canvasLink)}
     </li>`;
   }
 
@@ -1598,7 +1639,9 @@
             projectId: item.projectId || null,
           });
     const score =
-      item.source === "todo" ? scoreHtml(todoScoreLabel(item)) : "";
+      item.source === "todo"
+        ? scoreHtml(todoScoreLabel(item), item.canvasLink)
+        : "";
     return `<li class="edu-row">
       <a class="edu-row-link" href="${escapeHtml(href)}" data-date-item-source="${escapeHtml(
       item.source || "date"
@@ -1611,7 +1654,8 @@
   }
 
   function projectRowHtml(p) {
-    const href = `/education/project/${encodeURIComponent(p.id)}`;
+    const external = String(p.href || "").trim();
+    const href = external || spaProject(p.id);
     return `<li class="edu-row edu-class-row">
       <a class="edu-row-link" href="${escapeHtml(href)}">
         <span class="edu-name">${escapeHtml(p.name || p.id)}</span>
@@ -1626,14 +1670,34 @@
   }
 
   function classRowHtml(m, highlight) {
-    const href = `/education/class/${encodeURIComponent(m.class.id)}`;
+    const href = spaClass(m.class.id);
+    const score = CFG.showGrades
+      ? scoreHtml(classScoreLabel(m.class), classCanvasLink(m.class))
+      : "";
     return `<li class="edu-row edu-class-row${highlight ? " is-current" : ""}">
       <a class="edu-row-link" href="${href}">
         <span class="edu-tag edu-period">${escapeHtml(m.period)}</span>
         <span class="edu-name">${escapeHtml(classScheduleName(m.class))}</span>
-        ${scoreHtml(classScoreLabel(m.class))}
       </a>
+      ${score}
     </li>`;
+  }
+
+  function staticClassMeetings(classes) {
+    return [...(classes || [])]
+      .filter((c) => !isFixture(c))
+      .sort((a, b) => {
+        const ao = Number(a.order) || 99;
+        const bo = Number(b.order) || 99;
+        if (ao !== bo) return ao - bo;
+        const ap = classPeriodLetter(a, todayKey(), tree?.schedule || {}) || "";
+        const bp = classPeriodLetter(b, todayKey(), tree?.schedule || {}) || "";
+        return ap.localeCompare(bp);
+      })
+      .map((cls) => ({
+        class: cls,
+        period: classPeriodLetter(cls, todayKey(), tree?.schedule || {}) || "",
+      }));
   }
 
   /**
@@ -1896,6 +1960,16 @@
           (webUrl
             ? `${webUrl}${webUrl.includes("?") ? "&" : "?"}web=1`
             : "");
+        if (String(f?.kind || "") === "url" && (f.url || webUrl)) {
+          const href = String(f.url || webUrl).trim();
+          return `<a class="edu-file-tile" href="${escapeHtml(
+            href
+          )}" target="_blank" rel="noopener noreferrer" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
+            filterId
+          )}" title="${escapeHtml(name)}"><span class="edu-file-name">${escapeHtml(
+            name
+          )}</span></a>`;
+        }
         if (officeUri && webViewUrl) {
           return `<a class="edu-file-tile" href="${escapeHtml(
             webViewUrl
@@ -1907,7 +1981,7 @@
             name
           )}</span></a>`;
         }
-        return `<a class="edu-file-tile" href="/api/education/file?${escapeHtml(
+        return `<a class="edu-file-tile" href="${API}/file?${escapeHtml(
           qs
         )}" target="_blank" rel="noopener noreferrer" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
           filterId
@@ -1925,7 +1999,7 @@
     const mac = window.YanMacApi;
     if (!mac?.macFetch || !queryString) return;
     try {
-      const res = await mac.macFetch(`/api/education/file?${queryString}`, {
+      const res = await mac.macFetch(`${API}/file?${queryString}`, {
         timeoutMs: 120_000,
         headers: { Accept: "*/*" },
       });
@@ -2058,8 +2132,20 @@
     const day2 = sections[1] ? dayPanel(sections[1], 1) : "";
     const datesPanel = datesPanelHtml({}, "lg-edu-dates");
     const projectsPanel = projectsPanelHtml();
-    const rightCol =
-      day1 || day2
+    const staticClasses = CFG.staticClasses
+      ? panelHtml(
+          "Classes",
+          listOrEmpty(
+            staticClassMeetings(tree.classes || [])
+              .map((m) => classRowHtml(m, false))
+              .join("")
+          ),
+          { filterId: "lg-edu-classes" }
+        )
+      : "";
+    const rightCol = CFG.staticClasses
+      ? `${staticClasses}${projectsPanel}${datesPanel}`
+      : day1 || day2
         ? `${day1}${datesPanel}${day2}${projectsPanel}`
         : `${panelHtml("Classes", `<p class="edu-empty">No school days</p>`, {
             filterId: "lg-edu-classes",
@@ -2087,7 +2173,7 @@
     );
     if (!cls) {
       appEl.innerHTML = detailShell(
-        "/education/",
+        spaHome(),
         "Missing",
         `<p class="edu-empty">Class not found.</p>`,
         "lg-edu-missing"
@@ -2111,12 +2197,14 @@
       : "";
     const name = escapeHtml(classScheduleName(cls));
     const classDesc = String(cls.description || "").trim();
-    const canvas = canvasOrbHtml(classCanvasLink(cls), classScoreLabel(cls));
+    const canvas = CFG.showGrades
+      ? canvasOrbHtml(classCanvasLink(cls), classScoreLabel(cls))
+      : "";
 
     appEl.innerHTML = `
       <header class="edu-hero edu-hero--detail${canvas ? " edu-hero--detail-canvas" : ""}">
         <div class="edu-hero-lead">
-          ${backLinkHtml("/education/", "lg-edu-back-class")}
+          ${backLinkHtml(spaHome(), "lg-edu-back-class")}
           <h1 class="edu-hero-title edu-hero-title--class">${period}<span class="edu-hero-class-name">${name}</span></h1>
           ${
             nextWhen
@@ -2152,7 +2240,7 @@
     );
     if (!project) {
       appEl.innerHTML = detailShell(
-        "/education/",
+        spaHome(),
         "Missing",
         `<p class="edu-empty">Project not found.</p>`,
         "lg-edu-project-missing"
@@ -2173,7 +2261,7 @@
 
     appEl.innerHTML = `
       <header class="edu-hero edu-hero--detail">
-        ${backLinkHtml("/education/", "lg-edu-back-project")}
+        ${backLinkHtml(spaHome(), "lg-edu-back-project")}
         <h1 class="edu-hero-title">${name}</h1>
       </header>
       ${projectDesc ? markdownPanelHtml(projectDesc, "lg-edu-project-desc") : ""}
@@ -2279,7 +2367,7 @@
     });
     if (!t) {
       appEl.innerHTML = detailShell(
-        "/education/",
+        spaHome(),
         "Missing",
         `<p class="edu-empty">Todo not found.</p>`,
         "lg-edu-todo-missing"
@@ -2361,7 +2449,7 @@
     );
     if (!t || !cap) {
       appEl.innerHTML = detailShell(
-        t ? todoHref(t) : "/education/",
+        t ? todoHref(t) : spaHome(),
         "Missing",
         `<p class="edu-empty">News story not found.</p>`,
         "lg-edu-capsule-missing"
@@ -2405,7 +2493,7 @@
     });
     if (!d) {
       appEl.innerHTML = detailShell(
-        "/education/",
+        spaHome(),
         "Missing",
         `<p class="edu-empty">Date not found.</p>`,
         "lg-edu-date-missing"
@@ -2786,7 +2874,7 @@
     if (r.classId) qs.set("classId", r.classId);
     if (r.projectId) qs.set("projectId", r.projectId);
     const q = qs.toString();
-    const path = q ? `/api/education/data?${q}` : "/api/education/data";
+    const path = q ? `${API}/data?${q}` : `${API}/data`;
     const res = await mac.macFetch(path, {
       timeoutMs: live ? 45_000 : 30_000,
     });
@@ -2821,7 +2909,7 @@
           ? `?classId=${encodeURIComponent(classId)}`
           : "";
       const res = await mac.macFetch(
-        `/api/education/todo/${encodeURIComponent(todoId)}/done${qs}`,
+        `${API}/todo/${encodeURIComponent(todoId)}/done${qs}`,
         {
           method: "PATCH",
           json: {
@@ -2911,7 +2999,7 @@
           ? `?classId=${encodeURIComponent(classId)}`
           : "";
       const res = await mac.macFetch(
-        `/api/education/todo/${encodeURIComponent(todoId)}/capsule/${encodeURIComponent(
+        `${API}/todo/${encodeURIComponent(todoId)}/capsule/${encodeURIComponent(
           capsuleId
         )}/vote${qs}`,
         {
@@ -3072,7 +3160,7 @@
       const link = t.closest?.("a.edu-row-link, a.edu-back, a.edu-capsule-link");
       if (link && link instanceof HTMLAnchorElement) {
         const href = link.getAttribute("href") || "";
-        if (href.startsWith("/education") && isUnmodifiedLeftClick(event)) {
+        if (isSpaHref(href) && isUnmodifiedLeftClick(event)) {
           event.preventDefault();
           navigate(href, {
             scroll: link.classList.contains("edu-back") ? "restore" : "top",
@@ -3085,7 +3173,7 @@
   function subscribeEvents() {
     const mac = window.YanMacApi;
     if (!mac) return;
-    mac.subscribeEvents("/api/education/events", {
+    mac.subscribeEvents(`${API}/events`, {
       onEvent: (name, data) => {
         if (name !== "change") return;
         try {
@@ -3138,22 +3226,23 @@
         show("login");
         return;
       }
-      if (data.access !== "full") {
+      const allowed = Array.isArray(CFG.allowedAccess) ? CFG.allowedAccess : ["full"];
+      if (!allowed.includes(data.access)) {
         show("denied");
         return;
       }
       userEmail = String(data.email || "")
         .trim()
         .toLowerCase();
+      if (CFG.title) document.title = CFG.title;
       show("full");
       bindAppClicks();
       await fetchData();
       maybeTouchProjectOpened();
       subscribeEvents();
       fetchData({ live: true }).catch((err) => console.error("[edu live]", err));
-      // Normalize /education → /education/
-      if (window.location.pathname === "/education") {
-        navigate("/education/", { replace: true, scroll: "keep" });
+      if (window.location.pathname === BASE) {
+        navigate(spaHome(), { replace: true, scroll: "keep" });
       }
     } catch (_) {
       show("login");
@@ -3178,6 +3267,7 @@
       path: window.location.pathname + window.location.search,
       view: r.view || "home",
     };
+    if (CFG.workspace) ctx.workspace = CFG.workspace;
     if (r.view === "class" && r.classId) {
       const cls = (tree?.classes || []).find((c) => c.id === r.classId);
       ctx.classId = r.classId;

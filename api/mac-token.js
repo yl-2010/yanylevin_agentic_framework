@@ -36,7 +36,7 @@ module.exports = async function handler(req, res) {
         res.status(401).json({ ok: false, error: "unauthorized" });
         return;
       }
-      if (session.access !== "full") {
+      if (session.access !== "full" && session.access !== "jype") {
         res.status(403).json({ ok: false, error: "forbidden" });
         return;
       }

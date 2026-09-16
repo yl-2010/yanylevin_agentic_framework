@@ -26,7 +26,7 @@ enum APIConfig {
     /// Auth stays on Vercel; education/fitness hit the Mac API directly.
     static func usesMacAPI(_ path: String) -> Bool {
         let p = path.hasPrefix("/") ? String(path.dropFirst()) : path
-        return p.hasPrefix("api/education/") || p.hasPrefix("api/fitness/")
+        return p.hasPrefix("api/education/") || p.hasPrefix("api/fitness/") || p.hasPrefix("api/jype/")
     }
 }
 

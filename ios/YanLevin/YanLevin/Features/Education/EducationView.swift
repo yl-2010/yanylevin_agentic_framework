@@ -20,7 +20,7 @@ struct EducationView: View {
     private static let collapsedTodoLimit = 6
 
     private var liveTaskID: String {
-        "\(auth.session?.token ?? "")-\(liveSessionID)"
+        "\(auth.session?.token ?? "")-\(liveSessionID)-\(educationFocus.workspace)"
     }
 
     /// Match website desktop grid (and iPad / landscape phone).
@@ -46,15 +46,29 @@ struct EducationView: View {
             }
             .educationTabReselectScroll(isActive: educationFocus.isShowingDashboard)
             .ylPageBackground()
-            .navigationTitle("Education")
+            .navigationTitle(educationFocus.isJype ? "JYPE" : "Education")
             .navigationBarTitleDisplayMode(.large)
             .refreshable { await reloadAndRestartLiveSession() }
             .onChange(of: educationFocus.path) { _, path in
                 if case .projectDetail(let project) = path.last {
+                    if project.isJypePortal {
+                        educationFocus.enterJype()
+                        return
+                    }
                     Task { await store.markProjectOpened(id: project.id, token: auth.session?.token) }
                 }
                 Task {
                     guard let token = auth.session?.token else { return }
+                    await store.load(token: token, live: true)
+                }
+            }
+            .onChange(of: educationFocus.workspace) { _, ws in
+                store.workspace = ws
+                store.resetTreeCache()
+                liveSessionID += 1
+                Task {
+                    guard let token = auth.session?.token else { return }
+                    await store.load(token: token)
                     await store.load(token: token, live: true)
                 }
             }
@@ -86,6 +100,7 @@ struct EducationView: View {
         }
         .task(id: liveTaskID) {
             store.focus = educationFocus
+            store.workspace = educationFocus.workspace
             guard let token = auth.session?.token else { return }
             await store.load(token: token)
             applyEducationTodoHandoff()
@@ -128,7 +143,6 @@ struct EducationView: View {
         } else if let err = store.errorText, store.tree == nil {
             ContentUnavailableView("Education unavailable", systemImage: "wifi.exclamationmark", description: Text(err))
         } else if isWide {
-            // Website desktop: left = TODO + Completed; right = day1 → Dates → day2 → Projects
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 14) {
                     todoPanel
@@ -137,13 +151,26 @@ struct EducationView: View {
                 .frame(maxWidth: .infinity, alignment: .topLeading)
 
                 VStack(alignment: .leading, spacing: 14) {
-                    scheduleAndDatesPanels
-                    projectsPanel
+                    if educationFocus.isJype {
+                        jypeClassesPanel
+                        projectsPanel
+                        jypeDatesPanel
+                    } else {
+                        scheduleAndDatesPanels
+                        projectsPanel
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
+        } else if educationFocus.isJype {
+            VStack(alignment: .leading, spacing: 14) {
+                todoPanel
+                jypeClassesPanel
+                projectsPanel
+                jypeDatesPanel
+                completedPanel
+            }
         } else {
-            // Website mobile: TODO → day1 → Dates → day2 → Projects → Completed
             VStack(alignment: .leading, spacing: 14) {
                 todoPanel
                 scheduleAndDatesPanels
@@ -191,16 +218,31 @@ struct EducationView: View {
                 emptyRow("Nothing here")
             } else {
                 ForEach(projects) { project in
-                    NavigationLink(value: EducationRoute.projectDetail(project)) {
-                        Text(project.displayName)
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(YLTheme.fg(colorScheme))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 8)
-                            .contentShape(Rectangle())
+                    if project.isJypePortal {
+                        Button {
+                            YLHaptics.tap()
+                            educationFocus.enterJype()
+                        } label: {
+                            Text(project.displayName)
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(YLTheme.fg(colorScheme))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 8)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        NavigationLink(value: EducationRoute.projectDetail(project)) {
+                            Text(project.displayName)
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(YLTheme.fg(colorScheme))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 8)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .ylHapticNavigation()
                     }
-                    .buttonStyle(.plain)
-                    .ylHapticNavigation()
                 }
             }
         }
@@ -223,6 +265,57 @@ struct EducationView: View {
         }
     }
 
+    private var jypeClassesPanel: some View {
+        eduPanel(title: "Classes") {
+            let rows = staticJypeClasses
+            if rows.isEmpty {
+                emptyRow("Nothing here")
+            } else {
+                ForEach(rows) { dayClass in
+                    classRow(dayClass, isCurrent: false)
+                }
+            }
+        }
+    }
+
+    private var jypeDatesPanel: some View {
+        EducationDatesPanel(
+            items: visibleDateItems,
+            expanded: datesExpanded,
+            dateFilters: dateFilters,
+            filterKeys: EducationDateFilter.homeKeys,
+            use24Hour: use24Hour,
+            showFilters: false,
+            onToggleExpanded: {
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    datesExpanded.toggle()
+                }
+            },
+            onToggleFilter: toggleDateFilter
+        )
+    }
+
+    private var staticJypeClasses: [DayClass] {
+        let today = store.tree?.todayKey ?? ""
+        let schedule = store.tree?.schedule
+        return (store.tree?.classes ?? [])
+            .map { cls in
+                let period = cls.periodLetter(on: today, schedule: schedule)
+                return DayClass(
+                    cls: cls,
+                    period: period,
+                    start: nil,
+                    end: nil,
+                    startMin: nil,
+                    endMin: nil
+                )
+            }
+            .sorted {
+                if $0.period != $1.period { return $0.period < $1.period }
+                return $0.cls.displayName < $1.cls.displayName
+            }
+    }
+
     private var visibleOpenTodos: [EducationTodo] {
         let open = filteredTodos(done: false)
             .sorted { $0.dueSortKey < $1.dueSortKey }
@@ -233,7 +326,7 @@ struct EducationView: View {
     private func filteredTodos(done: Bool) -> [EducationTodo] {
         allTodos.filter { todo in
             (todo.done == true) == done
-                && todoTypeFilters.contains(todo.filterTagKey)
+                && (educationFocus.isJype || todoTypeFilters.contains(todo.filterTagKey))
                 && !todo.isHiddenFromHome
         }
     }
@@ -253,7 +346,8 @@ struct EducationView: View {
             },
             onToggleFilter: toggleTodoFilter,
             className: { className(for: $0) },
-            onToggleDone: toggleDone
+            onToggleDone: toggleDone,
+            showFilters: !educationFocus.isJype
         )
     }
 
@@ -358,20 +452,28 @@ struct EducationView: View {
         _ dayClass: DayClass,
         isCurrent: Bool
     ) -> some View {
-        let row = HStack(spacing: 10) {
-            Text(dayClass.period)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(YLTheme.accent(colorScheme))
-                .frame(width: 22, alignment: .leading)
-            Text(dayClass.cls.displayName)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(YLTheme.fg(colorScheme))
-            Spacer(minLength: 0)
-            if !dayClass.cls.scoreLabel.isEmpty {
-                Text(dayClass.cls.scoreLabel)
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(YLTheme.accent(colorScheme))
-                    .monospacedDigit()
+        HStack(spacing: 10) {
+            NavigationLink(value: EducationRoute.classDetail(dayClass.cls)) {
+                HStack(spacing: 10) {
+                    Text(dayClass.period)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(YLTheme.accent(colorScheme))
+                        .frame(width: 22, alignment: .leading)
+                    Text(dayClass.cls.displayName)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(YLTheme.fg(colorScheme))
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .ylHapticNavigation()
+
+            if !educationFocus.isJype {
+                EducationCanvasScoreButton(
+                    label: dayClass.cls.scoreLabel,
+                    url: dayClass.cls.canvasURL
+                )
             }
         }
         .padding(.vertical, 8)
@@ -382,12 +484,6 @@ struct EducationView: View {
                     .fill(YLTheme.accent(colorScheme).opacity(0.12))
             }
         }
-
-        return NavigationLink(value: EducationRoute.classDetail(dayClass.cls)) {
-            row
-        }
-        .buttonStyle(.plain)
-        .ylHapticNavigation()
     }
 
     private func className(for todo: EducationTodo) -> String? {
@@ -422,7 +518,7 @@ struct EducationView: View {
     private var visibleDateItems: [EducationDateItem] {
         EducationDateHelpers.visibleItems(
             EducationDateHelpers.collectItems(from: store.tree),
-            filters: dateFilters,
+            filters: educationFocus.isJype ? EducationDateFilter.allHome : dateFilters,
             expanded: datesExpanded,
             todayKey: store.tree?.todayKey
         )
@@ -585,7 +681,7 @@ struct ClassDetailView: View {
             await waitForClassTodoArchive()
         }
         .toolbar {
-            if let url = liveClass.canvasURL {
+            if store.workspace != "jype", let url = liveClass.canvasURL {
                 ToolbarItem(placement: .topBarTrailing) {
                     CanvasToolbarButton(webURL: url, scoreLabel: liveClass.scoreLabel)
                 }
@@ -670,7 +766,7 @@ struct ClassDetailView: View {
 
     private func filteredClassTodos(done: Bool) -> [EducationTodo] {
         classTodos.filter { todo in
-            todoTypeFilters.contains(todo.filterTagKey) &&
+            (store.workspace == "jype" || todoTypeFilters.contains(todo.filterTagKey)) &&
                 (done
                     ? todo.done == true && !classTodoStaysOpen(todo)
                     : todo.done != true || classTodoStaysOpen(todo))
@@ -704,7 +800,8 @@ struct ClassDetailView: View {
             },
             onToggleFilter: toggleTodoFilter,
             className: { className(for: $0) },
-            onToggleDone: toggleDone
+            onToggleDone: toggleDone,
+            showFilters: store.workspace != "jype"
         )
     }
 
@@ -733,6 +830,7 @@ struct ClassDetailView: View {
             dateFilters: dateFilters,
             filterKeys: EducationDateFilter.classKeys,
             use24Hour: use24Hour,
+            showFilters: store.workspace != "jype",
             onToggleExpanded: {
                 withAnimation(.easeInOut(duration: 0.22)) {
                     datesExpanded.toggle()
@@ -921,7 +1019,8 @@ struct ProjectDetailView: View {
 
     private func filteredTodos(done: Bool) -> [EducationTodo] {
         projectTodos.filter { todo in
-            (todo.done == true) == done && todoTypeFilters.contains(todo.filterTagKey)
+            (todo.done == true) == done &&
+                (store.workspace == "jype" || todoTypeFilters.contains(todo.filterTagKey))
         }
     }
 
@@ -940,7 +1039,8 @@ struct ProjectDetailView: View {
             },
             onToggleFilter: toggleTodoFilter,
             className: { _ in nil },
-            onToggleDone: toggleDone
+            onToggleDone: toggleDone,
+            showFilters: store.workspace != "jype"
         )
     }
 
@@ -971,6 +1071,7 @@ struct ProjectDetailView: View {
             dateFilters: dateFilters,
             filterKeys: EducationDateFilter.projectKeys,
             use24Hour: use24Hour,
+            showFilters: store.workspace != "jype",
             onToggleExpanded: {
                 withAnimation(.easeInOut(duration: 0.22)) {
                     datesExpanded.toggle()
@@ -1396,7 +1497,14 @@ private struct CanvasToolbarButton: View {
     }
 
     private func open() {
-        if let appURL = CanvasLMS.studentAppURL(from: webURL),
+        CanvasLMS.open(webURL)
+    }
+}
+
+extension CanvasLMS {
+    /// Canvas Student when installed, otherwise Safari.
+    static func open(_ webURL: URL) {
+        if let appURL = studentAppURL(from: webURL),
            UIApplication.shared.canOpenURL(appURL)
         {
             UIApplication.shared.open(appURL, options: [:]) { ok in
@@ -1405,6 +1513,41 @@ private struct CanvasToolbarButton: View {
             return
         }
         UIApplication.shared.open(webURL)
+    }
+}
+
+/// Row-view grade. Same destination as the Canvas circle on the object page.
+private struct EducationCanvasScoreButton: View {
+    let label: String
+    let url: URL?
+    var topPadding: CGFloat = 0
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        if label.isEmpty {
+            EmptyView()
+        } else if let url {
+            Button {
+                CanvasLMS.open(url)
+            } label: {
+                scoreText
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .ylHapticOnTap()
+            .accessibilityLabel("Open in Canvas, \(label)")
+        } else {
+            scoreText
+        }
+    }
+
+    private var scoreText: some View {
+        Text(label)
+            .font(.caption.weight(.bold))
+            .foregroundStyle(YLTheme.accent(colorScheme))
+            .monospacedDigit()
+            .strikethrough(false)
+            .padding(.top, topPadding)
     }
 }
 
@@ -1432,6 +1575,7 @@ private struct EducationTodoPanel: View {
     let onToggleFilter: (String) -> Void
     let className: (EducationTodo) -> String?
     let onToggleDone: (EducationTodo) -> Void
+    var showFilters: Bool = true
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -1450,7 +1594,7 @@ private struct EducationTodoPanel: View {
                 .accessibilityLabel(expanded ? "Collapse todos" : "Expand todos")
                 .accessibilityHint("Shows all todos and type filters when expanded")
 
-                if expanded {
+                if expanded && showFilters {
                     Spacer(minLength: 8)
                     EducationTodoFilterBar(typeFilters: typeFilters, onToggle: onToggleFilter)
                 }
@@ -1516,6 +1660,7 @@ private struct EducationDatesPanel: View {
     let use24Hour: Bool
     let onToggleExpanded: () -> Void
     let onToggleFilter: (String) -> Void
+    var showFilters: Bool = true
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -1534,7 +1679,7 @@ private struct EducationDatesPanel: View {
                 .accessibilityLabel(expanded ? "Collapse dates" : "Expand dates")
                 .accessibilityHint("Shows all dates and filters when expanded")
 
-                if expanded {
+                if expanded && showFilters {
                     Spacer(minLength: 8)
                     EducationDateFilterBar(
                         keys: filterKeys,
@@ -1569,67 +1714,68 @@ private struct EducationDateItemRow: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        Group {
+        HStack(alignment: .top, spacing: 10) {
+            Group {
+                if let todo = item.todoValue {
+                    // Todos in Dates deep-link to the normal todo detail (never /date/).
+                    NavigationLink(value: EducationRoute.todoDetail(todo)) {
+                        rowLabel
+                    }
+                    .buttonStyle(.plain)
+                    .ylHapticNavigation()
+                } else if let date = item.dateValue {
+                    NavigationLink(value: EducationRoute.dateDetail(date)) {
+                        rowLabel
+                    }
+                    .buttonStyle(.plain)
+                    .ylHapticNavigation()
+                } else {
+                    rowLabel
+                }
+            }
             if let todo = item.todoValue {
-                // Todos in Dates deep-link to the normal todo detail (never /date/).
-                NavigationLink(value: EducationRoute.todoDetail(todo)) {
-                    rowLabel
-                }
-                .buttonStyle(.plain)
-                .ylHapticNavigation()
-            } else if let date = item.dateValue {
-                NavigationLink(value: EducationRoute.dateDetail(date)) {
-                    rowLabel
-                }
-                .buttonStyle(.plain)
-                .ylHapticNavigation()
-            } else {
-                rowLabel
+                EducationCanvasScoreButton(
+                    label: todo.scoreLabel,
+                    url: todo.canvasURL,
+                    topPadding: 2
+                )
             }
         }
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
 
     private var rowLabel: some View {
         let when = NaturalWhen.format(date: item.date, time: item.time, use24Hour: use24Hour)
-        return HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: .leading, spacing: 4) {
-                if let todo = item.todoValue {
-                    EducationTodoTitle(todo: todo, font: .body.weight(.semibold))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    Text(item.name)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(YLTheme.fg(colorScheme))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                HStack(spacing: 8) {
-                    if let className = item.className, !className.isEmpty {
-                        Text(className)
-                            .font(.caption)
-                            .foregroundStyle(YLTheme.muted(colorScheme))
-                    } else if let projectName = item.projectName, !projectName.isEmpty {
-                        Text(projectName)
-                            .font(.caption)
-                            .foregroundStyle(YLTheme.muted(colorScheme))
-                    }
-                    if !when.isEmpty {
-                        Text(when)
-                            .font(.caption)
-                            .foregroundStyle(YLTheme.muted(colorScheme))
-                    }
-                }
+        return VStack(alignment: .leading, spacing: 4) {
+            if let todo = item.todoValue {
+                EducationTodoTitle(todo: todo, font: .body.weight(.semibold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Text(item.name)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(YLTheme.fg(colorScheme))
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            if let todo = item.todoValue, !todo.scoreLabel.isEmpty {
-                Text(todo.scoreLabel)
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(YLTheme.accent(colorScheme))
-                    .monospacedDigit()
-                    .strikethrough(false)
-                    .padding(.top, 2)
+
+            HStack(spacing: 8) {
+                if let className = item.className, !className.isEmpty {
+                    Text(className)
+                        .font(.caption)
+                        .foregroundStyle(YLTheme.muted(colorScheme))
+                } else if let projectName = item.projectName, !projectName.isEmpty {
+                    Text(projectName)
+                        .font(.caption)
+                        .foregroundStyle(YLTheme.muted(colorScheme))
+                }
+                if !when.isEmpty {
+                    Text(when)
+                        .font(.caption)
+                        .foregroundStyle(YLTheme.muted(colorScheme))
+                }
             }
         }
-        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
     }
@@ -1994,14 +2140,11 @@ private struct EducationTodoRow: View {
             .buttonStyle(.plain)
             .ylHapticNavigation()
 
-            if !todo.scoreLabel.isEmpty {
-                Text(todo.scoreLabel)
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(YLTheme.accent(colorScheme))
-                    .monospacedDigit()
-                    .strikethrough(false)
-                    .padding(.top, 3)
-            }
+            EducationCanvasScoreButton(
+                label: todo.scoreLabel,
+                url: todo.canvasURL,
+                topPadding: 3
+            )
         }
         .padding(.vertical, 8)
     }

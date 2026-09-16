@@ -253,6 +253,12 @@ export async function listChatTitleRefreshCandidates({
     const rows = await listChatHistoryFiles({ email, root });
     all.push(...rows);
   }
+  const jypeRows = await listChatHistoryFiles({
+    email: CHAT_TITLE_REFRESH_EMAILS[0],
+    root,
+    workspace: "jype",
+  });
+  all.push(...jypeRows);
   return selectChatTitleRefreshTargets(all, { backfill, sinceMs, beforeMs });
 }
 
@@ -304,6 +310,13 @@ export async function chatTitleRefreshGitPaths(root = REPO_ROOT) {
     } catch {
       /* no chats for this user yet */
     }
+  }
+  const jypeRel = chatHistoryDirRel(CHAT_TITLE_REFRESH_EMAILS[0], "jype");
+  try {
+    await stat(join(root, jypeRel));
+    paths.push(jypeRel);
+  } catch {
+    /* no jype chats yet */
   }
   paths.push(STATE_REL);
   return paths;

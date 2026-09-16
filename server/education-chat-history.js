@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { canonicalizeEmail } from "./identity.js";
 import { formatWidgetsAsFences, parseAgentReply } from "./chat-widgets.js";
 import { stripAgentSentFooter } from "./imessage-mention.js";
+import { JYPE_ROOT_REL, normalizeJypeWorkspace } from "./jype.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const CHAT_HISTORY_DIRNAME = ".chat-history";
@@ -26,7 +27,10 @@ export const EPHEMERAL_HIDE_MS = 10 * 60 * 1000;
  * @param {string} email
  * @returns {string}
  */
-export function chatHistoryDirRel(email) {
+export function chatHistoryDirRel(email, workspace) {
+  if (normalizeJypeWorkspace(workspace) === "jype") {
+    return `${JYPE_ROOT_REL}/${CHAT_HISTORY_DIRNAME}`;
+  }
   return `education/${canonicalizeEmail(email)}/${CHAT_HISTORY_DIRNAME}`;
 }
 
@@ -45,18 +49,18 @@ export function sanitizeSessionId(sessionId) {
  * @param {unknown} sessionId
  * @returns {string}
  */
-export function chatHistoryFileRel(email, sessionId) {
+export function chatHistoryFileRel(email, sessionId, workspace) {
   const sid = sanitizeSessionId(sessionId);
   if (!sid) return "";
-  return `${chatHistoryDirRel(email)}/${sid}.md`;
+  return `${chatHistoryDirRel(email, workspace)}/${sid}.md`;
 }
 
 /**
  * @param {string} email
  * @returns {string}
  */
-export function chatHistoryReadFileRel(email) {
-  return `${chatHistoryDirRel(email)}/${CHAT_HISTORY_READ_FILENAME}`;
+export function chatHistoryReadFileRel(email, workspace) {
+  return `${chatHistoryDirRel(email, workspace)}/${CHAT_HISTORY_READ_FILENAME}`;
 }
 
 /**
@@ -104,6 +108,15 @@ export function sanitizeChatTitle(raw) {
  */
 export function fallbackChatTitle(raw) {
   return sanitizeChatTitle(raw) || String(raw || "").replace(/\s+/g, " ").trim().slice(0, TITLE_MAX);
+}
+
+export function prefixChatTitle(title, starter) {
+  const t = sanitizeChatTitle(title);
+  const s = String(starter || "").trim();
+  if (!s || !t) return t;
+  const prefix = `${s}: `;
+  if (t.toLowerCase().startsWith(prefix.toLowerCase())) return t;
+  return sanitizeChatTitle(`${prefix}${t}`);
 }
 
 /**
@@ -182,6 +195,10 @@ export function formatChatHistoryMarkdown(opts) {
     `updated: ${updatedAt}`,
   ];
   if (title) lines.push(`title: ${title}`);
+  const workspace = normalizeJypeWorkspace(opts?.workspace);
+  if (workspace) lines.push(`workspace: ${workspace}`);
+  const starter = String(opts?.starter || "").trim();
+  if (starter) lines.push(`starter: ${starter}`);
   lines.push(`visibility: ${visibility}`);
   if (ephemeral) lines.push("ephemeral: true");
   lines.push("");
@@ -289,7 +306,7 @@ export function parseChatHistoryMessages(markdown) {
  */
 export function formatChatHistoryHint(opts) {
   const email = canonicalizeEmail(opts?.email);
-  const dir = chatHistoryDirRel(email);
+  const dir = chatHistoryDirRel(email, opts?.workspace);
   const current = sanitizeSessionId(opts?.currentSessionId);
   const recent = Array.isArray(opts?.recent) ? opts.recent : [];
   /** @type {string[]} */
@@ -350,7 +367,7 @@ export function chatHistoryIsUnread(updated, lastRead) {
 export async function loadChatLastReadMap(opts) {
   const email = canonicalizeEmail(opts?.email);
   if (!email) return {};
-  const abs = join(resolveRoot(opts?.root), chatHistoryReadFileRel(email));
+  const abs = join(resolveRoot(opts?.root), chatHistoryReadFileRel(email, opts?.workspace));
   let text;
   try {
     text = await readFile(abs, "utf8");
@@ -384,7 +401,7 @@ export async function loadChatLastReadMap(opts) {
 async function writeChatLastReadMap(opts) {
   const email = canonicalizeEmail(opts?.email);
   if (!email) return;
-  const rel = chatHistoryReadFileRel(email);
+  const rel = chatHistoryReadFileRel(email, opts?.workspace);
   const abs = join(resolveRoot(opts?.root), rel);
   await mkdir(dirname(abs), { recursive: true });
   const map = opts?.map && typeof opts.map === "object" ? opts.map : {};
@@ -488,7 +505,7 @@ export async function persistChatHistory(opts) {
   const messages = Array.isArray(opts?.messages) ? opts.messages : [];
   if (!email || !sessionId || !messages.length) return null;
 
-  const rel = chatHistoryFileRel(email, sessionId);
+  const rel = chatHistoryFileRel(email, sessionId, opts?.workspace);
   const abs = join(resolveRoot(opts?.root), rel);
   await mkdir(dirname(abs), { recursive: true });
 
@@ -534,6 +551,7 @@ export async function persistChatHistory(opts) {
       sessionId,
       at: updatedAt,
       root: opts?.root,
+      workspace: opts?.workspace,
     });
   } else {
     await rememberChatHistoryReadOnPersist({
@@ -543,6 +561,7 @@ export async function persistChatHistory(opts) {
       previousUpdated,
       updatedAt,
       root: opts?.root,
+      workspace: opts?.workspace,
     });
   }
 
@@ -555,6 +574,8 @@ export async function persistChatHistory(opts) {
     title,
     visibility: visibility || "showing",
     ephemeral: Boolean(ephemeral),
+    workspace: opts?.workspace,
+    starter: opts?.starter,
   });
   await writeFile(abs, markdown, "utf8");
   return rel;
@@ -573,7 +594,7 @@ export async function patchChatHistoryTitle(opts) {
   const email = canonicalizeEmail(opts?.email);
   const sessionId = sanitizeSessionId(opts?.sessionId);
   const title = sanitizeChatTitle(opts?.title);
-  const rel = chatHistoryFileRel(email, sessionId);
+  const rel = chatHistoryFileRel(email, sessionId, opts?.workspace);
   if (!email || !sessionId || !title || !rel) return null;
   const abs = join(resolveRoot(opts?.root), rel);
   let text;
@@ -613,7 +634,7 @@ export async function patchChatHistoryVisibility(opts) {
     .toLowerCase();
   if (requested !== "hidden" && requested !== "showing") return null;
   const visibility = sanitizeChatVisibility(requested);
-  const rel = chatHistoryFileRel(email, sessionId);
+  const rel = chatHistoryFileRel(email, sessionId, opts?.workspace);
   if (!email || !sessionId || !rel) return null;
   const abs = join(resolveRoot(opts?.root), rel);
   let text;
@@ -654,7 +675,7 @@ export async function patchChatHistoryVisibility(opts) {
 export async function loadChatHistory(opts) {
   const email = canonicalizeEmail(opts?.email);
   const sessionId = sanitizeSessionId(opts?.sessionId);
-  const rel = chatHistoryFileRel(email, sessionId);
+  const rel = chatHistoryFileRel(email, sessionId, opts?.workspace);
   if (!email || !sessionId || !rel) return null;
   const abs = join(resolveRoot(opts?.root), rel);
   let text;
@@ -690,7 +711,7 @@ export async function loadChatHistory(opts) {
 async function readChatHistoryRows(opts) {
   const email = canonicalizeEmail(opts?.email);
   const exclude = sanitizeSessionId(opts?.excludeSessionId);
-  const dir = join(resolveRoot(opts?.root), chatHistoryDirRel(email));
+  const dir = join(resolveRoot(opts?.root), chatHistoryDirRel(email, opts?.workspace));
   let names;
   try {
     names = await readdir(dir);
@@ -767,7 +788,7 @@ export function chatHistoryTouchMs(row) {
 export async function listChatHistoryFiles(opts) {
   const email = canonicalizeEmail(opts?.email);
   const rows = await readChatHistoryRows(opts);
-  const dir = chatHistoryDirRel(email);
+  const dir = chatHistoryDirRel(email, opts?.workspace);
   return rows.map((row) => ({
     ...row,
     email,

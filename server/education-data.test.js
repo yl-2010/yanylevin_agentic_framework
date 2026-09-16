@@ -17,6 +17,7 @@ import {
   isMeetingHighlighted,
   activeMeetingAt,
   partitionClassTodos,
+  siteFilesFromProps,
   stripTodoTagPrefix,
   uiPanelDateKeys,
 } from "./education-data.js";
@@ -253,6 +254,66 @@ describe("listContextFiles pin order", () => {
 describe("isSafeContextFileName", () => {
   it("rejects dotfiles", () => {
     assert.equal(isSafeContextFileName(".notes.pdf"), null);
+  });
+});
+
+describe("siteFilesFromProps", () => {
+  it("turns sites[] into kind url tiles", () => {
+    const files = siteFilesFromProps({
+      sites: [
+        { name: "QA #1", url: "https://yanylevin.com/spanish4/fall-qa-1/" },
+        { title: "dup", href: "https://yanylevin.com/spanish4/fall-qa-1/" },
+        { name: "skip", url: "ftp://nope.example" },
+        "nope",
+      ],
+    });
+    assert.deepEqual(files, [
+      {
+        name: "QA #1",
+        kind: "url",
+        source: "site",
+        url: "https://yanylevin.com/spanish4/fall-qa-1/",
+        webUrl: "https://yanylevin.com/spanish4/fall-qa-1/",
+        webViewUrl: "https://yanylevin.com/spanish4/fall-qa-1/",
+      },
+    ]);
+  });
+
+  it("returns empty when sites is missing", () => {
+    assert.deepEqual(siteFilesFromProps({}), []);
+    assert.deepEqual(siteFilesFromProps(null), []);
+  });
+});
+
+describe("listContextFiles url tiles", () => {
+  it("treats link json and .url shortcuts as kind url", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "edu-url-"));
+    await writeFile(
+      join(dir, "qa-1.json"),
+      JSON.stringify({
+        kind: "url",
+        name: "QA #1 Study Guide",
+        url: "https://yanylevin.com/spanish4/fall-qa-1/",
+      })
+    );
+    await writeFile(
+      join(dir, "notes.url"),
+      "[InternetShortcut]\nURL=https://yanylevin.com/notes/\n"
+    );
+    await writeFile(join(dir, "worksheet.pdf"), "bytes");
+    await writeFile(join(dir, "random.json"), JSON.stringify({ hello: "world" }));
+    const files = await listContextFiles(dir);
+    const qa = files.find((f) => f.url === "https://yanylevin.com/spanish4/fall-qa-1/");
+    const notes = files.find((f) => f.url === "https://yanylevin.com/notes/");
+    const pdf = files.find((f) => f.name === "worksheet.pdf");
+    const random = files.find((f) => f.name === "random.json");
+    assert.equal(qa?.kind, "url");
+    assert.equal(qa?.name, "QA #1 Study Guide");
+    assert.equal(notes?.kind, "url");
+    assert.equal(notes?.name, "notes");
+    assert.equal(pdf?.kind, "file");
+    assert.equal(random?.kind, "file");
+    await rm(dir, { recursive: true, force: true });
   });
 });
 
