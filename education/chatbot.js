@@ -478,11 +478,15 @@
     return root.dataset.state || "closed";
   }
 
-  function localDateKey(date) {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
+  const CHAT_HISTORY_TZ = "America/Los_Angeles";
+
+  function seattleDateKey(date) {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: CHAT_HISTORY_TZ,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(date);
   }
 
   function relativeChatAge(iso, now = new Date()) {
@@ -502,20 +506,22 @@
     if (Number.isNaN(d.getTime())) {
       return { key: "older", label: "Older", showAge: false };
     }
-    const that = localDateKey(d);
-    const today = localDateKey(now);
+    const that = seattleDateKey(d);
+    const today = seattleDateKey(now);
     if (that === today) return { key: "today", label: "Today", showAge: true };
-    const yest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-    if (that === localDateKey(yest)) {
-      return { key: "yesterday", label: "Yesterday", showAge: false };
+    const thatNoon = Date.parse(`${that}T12:00:00.000Z`);
+    const todayNoon = Date.parse(`${today}T12:00:00.000Z`);
+    const diffDays = Math.round((todayNoon - thatNoon) / 86400000);
+    if (diffDays === 1) {
+      return { key: that, label: "Yesterday", showAge: false };
     }
-    const startThat = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const diffDays = Math.round((startToday - startThat) / 86400000);
     if (diffDays > 1 && diffDays < 7) {
       return {
         key: that,
-        label: d.toLocaleDateString(undefined, { weekday: "long" }),
+        label: d.toLocaleDateString("en-US", {
+          timeZone: CHAT_HISTORY_TZ,
+          weekday: "long",
+        }),
         showAge: false,
       };
     }

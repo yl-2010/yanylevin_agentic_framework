@@ -42,6 +42,14 @@ enum ChatISODate {
 }
 
 enum ChatHistoryGrouping {
+    /// History buckets are Seattle calendar days, not the phone's zone.
+    private static let seattleCalendar: Calendar = {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "America/Los_Angeles") ?? .current
+        cal.locale = Locale(identifier: "en_US")
+        return cal
+    }()
+
     static func relativeAge(from iso: String, now: Date = Date()) -> String {
         guard let date = ChatISODate.parse(iso) else { return "" }
         let secs = now.timeIntervalSince(date)
@@ -56,7 +64,7 @@ enum ChatHistoryGrouping {
     static func sections(
         from chats: [AgentChatListItem],
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = seattleCalendar
     ) -> [ChatHistorySection] {
         var order: [String] = []
         var buckets: [String: (title: String, showAge: Bool, chats: [AgentChatListItem])] = [:]
@@ -106,6 +114,9 @@ enum ChatHistoryGrouping {
     private static let weekdayFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "EEEE"
+        f.calendar = seattleCalendar
+        f.locale = seattleCalendar.locale
+        f.timeZone = seattleCalendar.timeZone
         return f
     }()
 

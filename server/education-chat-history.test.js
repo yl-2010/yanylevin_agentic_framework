@@ -824,4 +824,16 @@ describe("grouping", () => {
     assert.equal(sections.at(-1)?.label, "Older");
     assert.equal(sections.at(-1)?.chats[0].sessionId, "d");
   });
+
+  it("keeps a Seattle morning chat in Today after UTC midnight", () => {
+    const evening = new Date("2026-09-16T04:01:00.000Z");
+    assert.equal(
+      chatHistoryGroup("2026-09-15T15:00:00.000Z", evening, tz).label,
+      "Today"
+    );
+    assert.equal(
+      chatHistoryGroup("2026-09-15T06:30:00.000Z", evening, tz).label,
+      "Yesterday"
+    );
+  });
 });

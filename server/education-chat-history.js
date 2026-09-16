@@ -862,6 +862,9 @@ function zonedDateKey(date, timeZone) {
 }
 
 /**
+ * Today / Yesterday / weekday buckets on Seattle calendar days.
+ * Device and UTC midnight must not move a morning chat into Yesterday.
+ *
  * @param {string} iso
  * @param {Date} [now]
  * @param {string} [timeZone]
