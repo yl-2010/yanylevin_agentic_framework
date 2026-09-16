@@ -60,6 +60,7 @@
 		7851F71BDF6DF7BFF0D7E8B2 /* NaturalWhen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C591473A552F86C4D658DD74 /* NaturalWhen.swift */; };
 		7B2B421F43E26A7BC8A2B21C /* markdown.js in Resources */ = {isa = PBXBuildFile; fileRef = 6C079B6112B2296F43A5F907 /* markdown.js */; };
 		7BF72D47663386A13338DA91 /* KaTeX_Size3-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 9EC3D1C27A611BCEB5A03A7D /* KaTeX_Size3-Regular.woff2 */; };
+		7FABD05D5D1BBC89B680FD9B /* PadTabBarPin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79A3148F43AFD9F3B55F1A43 /* PadTabBarPin.swift */; };
 		80F305A0D987798481E11086 /* KaTeX_Script-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 1E4FD5BD956FB8EDDCEA9EFC /* KaTeX_Script-Regular.woff2 */; };
 		824D6E2F1C587C1EFEBBF1E5 /* EducationContextFiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23283A3D071E6F63E623FD38 /* EducationContextFiles.swift */; };
 		826F6BD0C6720A6D4550B518 /* GlassChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4533B0C052E08A466A1A195A /* GlassChrome.swift */; };
@@ -177,6 +178,7 @@
 		697A904D8BE3400C45BC3787 /* AgentActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentActivityAttributes.swift; sourceTree = "<group>"; };
 		6C079B6112B2296F43A5F907 /* markdown.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = markdown.js; sourceTree = "<group>"; };
 		6DDA4E123B9105D7DC4FA3ED /* KaTeX_Typewriter-Regular.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Typewriter-Regular.woff2"; sourceTree = "<group>"; };
+		79A3148F43AFD9F3B55F1A43 /* PadTabBarPin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadTabBarPin.swift; sourceTree = "<group>"; };
 		7F860DE68210C9F4D65C0EAD /* katex.min.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = katex.min.css; sourceTree = "<group>"; };
 		80FC48973417CD8112FE819E /* AdaptiveLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdaptiveLayout.swift; sourceTree = "<group>"; };
 		82915689A31137AC9DA6206D /* OpenChatIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenChatIntent.swift; sourceTree = "<group>"; };
@@ -267,6 +269,7 @@
 				82915689A31137AC9DA6206D /* OpenChatIntent.swift */,
 				0C2AAC92030253A56EE90A26 /* OpenClassIntent.swift */,
 				499CB5F2593A83941A69B5D4 /* OpenTodoIntent.swift */,
+				79A3148F43AFD9F3B55F1A43 /* PadTabBarPin.swift */,
 				B414370293577E90FDB3BC95 /* RootTabView.swift */,
 				AB6D32A34C8B1C29DF15F180 /* TabReselectObserver.swift */,
 				BD7AE7215F57F3740AB87531 /* YanLevinApp.swift */,
@@ -637,6 +640,7 @@
 				6979410754B0AFC1FEC0CE72 /* OpenChatIntent.swift in Sources */,
 				FCD578D1578794C0352E389D /* OpenClassIntent.swift in Sources */,
 				536ABAA7AA545DDD9015486B /* OpenTodoIntent.swift in Sources */,
+				7FABD05D5D1BBC89B680FD9B /* PadTabBarPin.swift in Sources */,
 				A6296BB53F8F6B2A3F71EA80 /* PhoneLocationReporter.swift in Sources */,
 				BE062D44E3319A3659ABBE58 /* PortfolioContent.swift in Sources */,
 				C52595D82A1AB8D1201B44B3 /* RootTabView.swift in Sources */,

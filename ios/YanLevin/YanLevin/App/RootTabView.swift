@@ -244,6 +244,11 @@ struct RootTabView: View {
                 nav.noteTabReselect()
             }
         }
+        .background {
+            if AdaptiveLayout.isPad {
+                PadTabBarPin()
+            }
+        }
         .background(YLTheme.pageFill(colorScheme).ignoresSafeArea())
         // Keyboard avoidance is owned by `ylKeyboardAccessory` (UIKit guide pin).
         .ignoresSafeArea(.keyboard, edges: .bottom)
@@ -362,12 +367,20 @@ private struct AdaptiveTabStyleModifier: ViewModifier {
         // iPhone Max landscape is `.regular` width. `.sidebarAdaptable` there
         // writes UISplitViewController restoration state that crashes the next
         // portrait launch. Keep the adaptable chrome on iPad only. Compact
-        // top tabs are the default via `defaultAdaptableTabBarPlacement` on
-        // `padTabView` (not the giant sidebar).
+        // top tabs are the default (not the giant sidebar). `PadTabBarPin`
+        // re-applies that after a warm foreground; the default modifiers
+        // alone only stick on a cold launch.
         if AdaptiveLayout.isPad {
-            content
-                .tabViewStyle(.sidebarAdaptable)
-                .defaultAdaptableTabBarPlacement(.tabBar)
+            if #available(iOS 27, *) {
+                content
+                    .tabViewStyle(.sidebarAdaptable)
+                    .defaultAdaptableTabBarPlacement(.tabBar)
+                    .defaultTabBarPlacement(.tabBar)
+            } else {
+                content
+                    .tabViewStyle(.sidebarAdaptable)
+                    .defaultAdaptableTabBarPlacement(.tabBar)
+            }
         } else {
             content
         }

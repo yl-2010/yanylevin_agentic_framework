@@ -11,24 +11,18 @@ struct YanLevinApp: App {
     @State private var showLaunchCover = true
 
     init() {
-        Self.clearPoisonedTabRestoration()
+        // iPhone Max landscape used `.sidebarAdaptable` and wrote split
+        // column widths (including −FLT_MAX) plus UITabSidebar. Restoring
+        // that on the next portrait launch, or onto iPad's tab split,
+        // kills the process before the first frame. Strip it here, and
+        // again on iPad warm foreground in PadTabBarPin.
+        PadTabBarPin.clearPersistedSidebarState()
         UIWindow.appearance().backgroundColor = UIColor { traits in
             traits.userInterfaceStyle == .dark
                 ? UIColor(YLTheme.darkBg0)
                 : UIColor(YLTheme.lightBg0)
         }
         PhoneLocationReporter.shared.restoreFromAppGroup()
-    }
-
-    /// iPhone Max landscape used `.sidebarAdaptable`, which persists
-    /// `UISplitViewController` column widths (including −FLT_MAX sentinels)
-    /// and `UITabSidebar` into UserDefaults. Restoring that on the next
-    /// portrait launch, or onto iPad's tab split, kills the process before
-    /// the first frame. Strip it before TabView is built.
-    private static func clearPoisonedTabRestoration() {
-        let defaults = UserDefaults.standard
-        defaults.removeObject(forKey: "com.apple.UIKit.UISplitViewController.Root")
-        defaults.removeObject(forKey: "com.apple.UIKit.UITabSidebar")
     }
 
     var body: some Scene {

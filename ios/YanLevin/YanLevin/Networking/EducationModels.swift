@@ -5,10 +5,11 @@ enum OfficeDocument {
     static func url(from uri: String?) -> URL? {
         let trimmed = (uri ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        if let url = URL(string: trimmed) { return url }
-        var allowed = CharacterSet.urlFragmentAllowed
-        allowed.insert(charactersIn: "|")
-        return trimmed.addingPercentEncoding(withAllowedCharacters: allowed).flatMap(URL.init(string:))
+        // URL(string:) re-encodes %20 as %2520 and https: as https%3A. Word then
+        // shows Letter%20to%20teacher.docx and fails to open. Encode only the
+        // ofe|u| pipes; keep the SharePoint URL the same as the website.
+        let rfc = trimmed.replacingOccurrences(of: "|", with: "%7C")
+        return URL(string: rfc, encodingInvalidCharacters: false)
     }
 
     static func webURL(from raw: String?) -> URL? {
@@ -17,6 +18,7 @@ enum OfficeDocument {
 }
 
 /// Canvas LMS web URLs and the Student app's `canvas-courses://` scheme.
+enum CanvasLMS {
     static let studentAppScheme = "canvas-courses"
 
     /// Normalized http(s) Canvas URL, if present.
