@@ -23,6 +23,11 @@
       "source": "/dashboard",
       "destination": "/dashboard/",
       "permanent": true
+    },
+    {
+      "source": "/debate",
+      "destination": "/debate/",
+      "permanent": true
     }
   ],
   "rewrites": [
@@ -45,6 +50,30 @@
     {
       "source": "/education/date/:dateId",
       "destination": "/education/index.html"
+    },
+    {
+      "source": "/debate/class/:classId",
+      "destination": "/debate/index.html"
+    },
+    {
+      "source": "/debate/project/:projectId",
+      "destination": "/debate/index.html"
+    },
+    {
+      "source": "/debate/todo/:todoId/capsule/:capsuleId",
+      "destination": "/debate/index.html"
+    },
+    {
+      "source": "/debate/todo/:todoId",
+      "destination": "/debate/index.html"
+    },
+    {
+      "source": "/debate/date/:dateId",
+      "destination": "/debate/index.html"
+    },
+    {
+      "source": "/debate/case/:caseId/:side",
+      "destination": "/debate/index.html"
     },
     {
       "source": "/api/education/:path*",
