@@ -18,7 +18,7 @@ education/<email>/
   .projects-opened.json     # last-opened map (user clicks + agent creates). Gitignored. Write on project create; do not git add.
   schedule.json             # bells + weekdayPeriods + closedDates (from PDF)
   deleted.md                # agent-only: objects this user deleted on purpose; nightly jobs skip recreating them
-  .chat-history/            # Personal Agent transcripts (listed unless hidden, or expired iMessage/Teams @agent ephemeral)
+  .chat-history/            # Personal Agent transcripts (listed unless hidden, or iMessage/Teams @agent ephemeral after that Seattle day)
   .chat-uploads/            # attachment staging (expires with session)
   # optional user-level dropped files sit here (not a context/ subfolder)
   todos/<todoId>/todo.json + optional dropped files

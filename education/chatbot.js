@@ -481,12 +481,18 @@
   const CHAT_HISTORY_TZ = "America/Los_Angeles";
 
   function seattleDateKey(date) {
-    return new Intl.DateTimeFormat("en-CA", {
+    const parts = new Intl.DateTimeFormat("en-US", {
       timeZone: CHAT_HISTORY_TZ,
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
-    }).format(date);
+    }).formatToParts(date);
+    const pick = (type) => {
+      const raw = parts.find((p) => p.type === type)?.value || "";
+      const digits = raw.replace(/\D/g, "");
+      return digits.padStart(type === "year" ? 4 : 2, "0");
+    };
+    return `${pick("year")}-${pick("month")}-${pick("day")}`;
   }
 
   function relativeChatAge(iso, now = new Date()) {

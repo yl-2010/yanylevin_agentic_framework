@@ -408,7 +408,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /except the Class of 2028 Teams grade chat/);
     assert.match(agent, /only Yan, Alex, Example Friend, and Example Neighbor/);
     assert.match(agent, /keep that final bubble/);
-    assert.match(agent, /10 minutes after the reply finishes/);
+    assert.match(agent, /Seattle calendar day/);
     assert.match(agent, /fromMe/);
     assert.match(agent, /only `@agent`/);
     assert.match(agent, /Apple Contacts/);

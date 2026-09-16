@@ -29,7 +29,7 @@ import {
   sanitizeChatVisibility,
   sanitizeChatEphemeral,
   chatHistoryIsEphemeralHidden,
-  EPHEMERAL_HIDE_MS,
+  nextZonedMidnightMs,
   sanitizeSessionId,
 } from "./education-chat-history.js";
 
@@ -492,7 +492,7 @@ describe("persist/list", () => {
     }
   });
 
-  it("omits idle ephemeral @agent threads after 10 minutes", async () => {
+  it("omits idle ephemeral @agent threads after the Seattle day ends", async () => {
     const root = await mkdtemp(join(tmpdir(), "edu-chat-hist-"));
     const keepSid = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
     const finished = "2026-08-15T18:00:00.000Z";
@@ -526,7 +526,7 @@ describe("persist/list", () => {
       const stillFresh = await listChatHistory({
         root,
         email: EMAIL,
-        now: new Date("2026-08-15T18:09:00.000Z"),
+        now: new Date("2026-08-15T18:10:00.000Z"),
       });
       assert.equal(stillFresh.length, 2);
       assert.ok(stillFresh.some((row) => row.sessionId === SID));
@@ -534,7 +534,7 @@ describe("persist/list", () => {
       const expired = await listChatHistory({
         root,
         email: EMAIL,
-        now: new Date("2026-08-15T18:10:00.000Z"),
+        now: new Date("2026-08-16T07:00:00.000Z"),
       });
       assert.equal(expired.length, 1);
       assert.equal(expired[0].sessionId, keepSid);
@@ -542,7 +542,7 @@ describe("persist/list", () => {
       const working = await listChatHistory({
         root,
         email: EMAIL,
-        now: new Date("2026-08-15T18:30:00.000Z"),
+        now: new Date("2026-08-16T08:00:00.000Z"),
         workingIds: new Set([SID]),
       });
       assert.equal(working.length, 2);
@@ -781,21 +781,23 @@ describe("titles", () => {
     assert.equal(sanitizeChatEphemeral("true"), true);
     assert.equal(sanitizeChatEphemeral("TRUE"), true);
     assert.equal(sanitizeChatEphemeral("false"), false);
-    assert.equal(EPHEMERAL_HIDE_MS, 10 * 60 * 1000);
     assert.equal(
       chatHistoryIsEphemeralHidden(
         { sessionId: SID, ephemeral: true, updated: "2026-08-15T18:00:00.000Z" },
-        new Date("2026-08-15T18:09:59.000Z")
+        new Date("2026-08-16T06:59:00.000Z")
       ),
       false
     );
     assert.equal(
       chatHistoryIsEphemeralHidden(
         { sessionId: SID, ephemeral: true, updated: "2026-08-15T18:00:00.000Z" },
-        new Date("2026-08-15T18:10:00.000Z")
+        new Date("2026-08-16T07:00:00.000Z")
       ),
       true
     );
+    const midnight = nextZonedMidnightMs(new Date("2026-08-15T18:00:00.000Z"));
+    assert.ok(midnight > Date.parse("2026-08-16T06:59:00.000Z"));
+    assert.ok(midnight <= Date.parse("2026-08-16T07:01:00.000Z"));
   });
 });
 
