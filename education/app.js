@@ -2560,7 +2560,7 @@
   }
 
   function documentTitleForRoute() {
-    const fallback = "Education";
+    const fallback = CFG.title || "Education";
     if (!tree || !route) return fallback;
     if (route.view === "class") {
       const cls = (tree.classes || []).find(
@@ -3399,7 +3399,7 @@
       }
       ctx.title = d?.name || r.itemId;
     } else {
-      ctx.title = "Education home";
+      ctx.title = CFG.title ? `${CFG.title} home` : "Education home";
     }
     return ctx;
   };

@@ -108,6 +108,32 @@ html[data-resolved-theme="dark"] {
 
 Need both the media query **and** `html[data-resolved-theme="dark"]`. Desktop night with OS set to light only hits the attribute. Desktop day with OS set to dark is why the media query is `:not([data-resolved-theme="light"])`.
 
+**JYPE objects** (`education/projects/jype/…`) use the same layout with the red wash from `/jype/styles.css`, not lake/teal:
+
+```css
+:root {
+  --bg: #f2e7e8;
+  --accent: #c2273a;
+  --ok: #c2273a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-resolved-theme="light"]) {
+    --bg: #160c0f;
+    --accent: #e07a82;
+    --ok: #e07a82;
+    --card: rgba(40, 22, 26, 0.88);
+  }
+}
+html[data-resolved-theme="dark"] {
+  --bg: #160c0f;
+  --accent: #e07a82;
+  --ok: #e07a82;
+  --card: rgba(40, 22, 26, 0.88);
+}
+```
+
+`--fg`, `--muted`, `--line`, `--bad`, `--good` stay as above. Do not mix teal onto a JYPE page.
+
 ### Layout defaults (quotes.html)
 
 Keep these on every page. Dark mode does not restyle them.

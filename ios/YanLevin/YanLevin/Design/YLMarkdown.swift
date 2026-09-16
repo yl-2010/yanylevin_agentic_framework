@@ -559,16 +559,19 @@ struct YLMarkdownText: View, Equatable {
     var baseFont: Font = .body
     /// Optional explicit scheme so `.equatable()` still updates on light/dark.
     var scheme: ColorScheme? = nil
+    var palette: YLPalette = .standard
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ylPalette) private var envPalette
 
     static func == (lhs: YLMarkdownText, rhs: YLMarkdownText) -> Bool {
-        lhs.source == rhs.source && lhs.scheme == rhs.scheme
+        lhs.source == rhs.source && lhs.scheme == rhs.scheme && lhs.palette == rhs.palette
     }
 
     var body: some View {
         let resolved = scheme ?? colorScheme
+        let resolvedPalette = palette == .standard ? envPalette : palette
         let fg = YLTheme.fg(resolved)
-        let accent = YLTheme.accent(resolved)
+        let accent = YLTheme.accent(resolved, palette: resolvedPalette)
         Group {
             if YLMarkdown.containsMath(source) {
                 YLWebMarkdownText(source: source, fg: fg, accent: accent)

@@ -39,7 +39,10 @@ struct YanLevinApp: App {
             .environmentObject(educationFocus)
             .environmentObject(nav)
             .preferredColorScheme(theme.preferredColorScheme)
-            .tint(YLTheme.accent)
+            .tint(
+                educationFocus.isJype && (nav.selectedTab == .education || nav.selectedTab == .chat)
+                    ? YLTheme.jypeAccent : YLTheme.accent
+            )
             .onAppear {
                 YLHaptics.prepareSession()
                 nav.consumePendingNewChatIfNeeded()

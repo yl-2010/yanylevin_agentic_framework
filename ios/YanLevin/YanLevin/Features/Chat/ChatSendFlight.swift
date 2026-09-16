@@ -27,9 +27,10 @@ struct ChatSendFlightState: Equatable {
 struct ChatSendFlightBubble: View {
     let text: String
     let colorScheme: ColorScheme
+    @Environment(\.ylPalette) private var palette
 
     var body: some View {
-        let sendTint = YLTheme.chatSend(colorScheme)
+        let sendTint = YLTheme.chatSend(colorScheme, palette: palette)
             .opacity(colorScheme == .dark ? 0.26 : 0.16)
         Text(text)
             .foregroundStyle(YLTheme.fg(colorScheme))

@@ -1,5 +1,21 @@
 import SwiftUI
 
+enum YLPalette: Equatable {
+    case standard
+    case jype
+}
+
+private struct YLPaletteKey: EnvironmentKey {
+    static let defaultValue: YLPalette = .standard
+}
+
+extension EnvironmentValues {
+    var ylPalette: YLPalette {
+        get { self[YLPaletteKey.self] }
+        set { self[YLPaletteKey.self] = newValue }
+    }
+}
+
 enum YLTheme {
     /// Keep `LaunchBackground` in Assets.xcassets in sync with bg0.
     static let lightBg0 = Color(red: 0xE8 / 255, green: 0xED / 255, blue: 0xF2 / 255)
@@ -18,12 +34,26 @@ enum YLTheme {
     static let chatOrange = Color(red: 0xFD / 255, green: 0x58 / 255, blue: 0x02 / 255)
     static let chatOrangeDark = Color(red: 0xF4 / 255, green: 0x68 / 255, blue: 0x10 / 255)
 
-    static func bg0(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? darkBg0 : lightBg0
+    /// `/jype` wash (`jype/styles.css`).
+    static let jypeLightBg0 = Color(red: 0xF2 / 255, green: 0xE7 / 255, blue: 0xE8 / 255)
+    static let jypeLightBg1 = Color(red: 0xEA / 255, green: 0xD6 / 255, blue: 0xD8 / 255)
+    static let jypeLightAccent = Color(red: 0xC2 / 255, green: 0x27 / 255, blue: 0x3A / 255)
+    static let jypeDarkBg0 = Color(red: 0x16 / 255, green: 0x0C / 255, blue: 0x0F / 255)
+    static let jypeDarkBg1 = Color(red: 0x1D / 255, green: 0x11 / 255, blue: 0x14 / 255)
+    static let jypeDarkAccent = Color(red: 0xE0 / 255, green: 0x7A / 255, blue: 0x82 / 255)
+
+    static func bg0(_ scheme: ColorScheme, palette: YLPalette = .standard) -> Color {
+        switch palette {
+        case .jype: return scheme == .dark ? jypeDarkBg0 : jypeLightBg0
+        case .standard: return scheme == .dark ? darkBg0 : lightBg0
+        }
     }
 
-    static func bg1(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? darkBg1 : lightBg1
+    static func bg1(_ scheme: ColorScheme, palette: YLPalette = .standard) -> Color {
+        switch palette {
+        case .jype: return scheme == .dark ? jypeDarkBg1 : jypeLightBg1
+        case .standard: return scheme == .dark ? darkBg1 : lightBg1
+        }
     }
 
     static func fg(_ scheme: ColorScheme) -> Color {
@@ -34,18 +64,24 @@ enum YLTheme {
         scheme == .dark ? darkMuted : lightMuted
     }
 
-    static func accent(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? darkAccent : lightAccent
+    static func accent(_ scheme: ColorScheme, palette: YLPalette = .standard) -> Color {
+        switch palette {
+        case .jype: return scheme == .dark ? jypeDarkAccent : jypeLightAccent
+        case .standard: return scheme == .dark ? darkAccent : lightAccent
+        }
     }
 
-    static func chatSend(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? chatOrangeDark : chatOrange
+    static func chatSend(_ scheme: ColorScheme, palette: YLPalette = .standard) -> Color {
+        switch palette {
+        case .jype: return accent(scheme, palette: .jype)
+        case .standard: return scheme == .dark ? chatOrangeDark : chatOrange
+        }
     }
 
     /// Soft diagonal wash matching the site (`linear-gradient(165deg, bg-0, bg-1)`).
-    static func pageFill(_ scheme: ColorScheme) -> LinearGradient {
+    static func pageFill(_ scheme: ColorScheme, palette: YLPalette = .standard) -> LinearGradient {
         LinearGradient(
-            colors: [bg0(scheme), bg1(scheme)],
+            colors: [bg0(scheme, palette: palette), bg1(scheme, palette: palette)],
             startPoint: UnitPoint(x: 0.15, y: 0),
             endPoint: UnitPoint(x: 0.85, y: 1)
         )
@@ -80,6 +116,12 @@ enum YLTheme {
         t.userInterfaceStyle == .dark
             ? UIColor(YLTheme.darkAccent)
             : UIColor(YLTheme.lightAccent)
+    }) }
+
+    static var jypeAccent: Color { Color(uiColor: UIColor { t in
+        t.userInterfaceStyle == .dark
+            ? UIColor(YLTheme.jypeDarkAccent)
+            : UIColor(YLTheme.jypeLightAccent)
     }) }
 }
 
@@ -118,34 +160,36 @@ final class ThemeStore: ObservableObject {
 
 private struct YLPageBackgroundModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ylPalette) private var palette
 
     func body(content: Content) -> some View {
         content
             .background {
-                YLTheme.pageFill(colorScheme)
+                YLTheme.pageFill(colorScheme, palette: palette)
                     .ignoresSafeArea()
             }
             // Opaque nav chrome hides large titles on iOS 26+; keep liquid glass there.
-            .modifier(YLNavigationBarBackgroundModifier(colorScheme: colorScheme))
+            .modifier(YLNavigationBarBackgroundModifier(colorScheme: colorScheme, palette: palette))
     }
 }
 
 private struct YLNavigationBarBackgroundModifier: ViewModifier {
     let colorScheme: ColorScheme
+    var palette: YLPalette = .standard
 
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {
             content
         } else {
             content
-                .toolbarBackground(YLTheme.bg0(colorScheme), for: .navigationBar)
+                .toolbarBackground(YLTheme.bg0(colorScheme, palette: palette), for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
         }
     }
 }
 
 extension View {
-    /// Site-matching page wash (light blue-gray / dark blue-black) without orbs.
+    /// Site-matching page wash without orbs. Reads `ylPalette` (JYPE red when set).
     func ylPageBackground() -> some View {
         modifier(YLPageBackgroundModifier())
     }

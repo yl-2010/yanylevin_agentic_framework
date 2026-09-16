@@ -282,7 +282,11 @@ final class EducationFocusStore: ObservableObject {
     func agentUiContext(tree: EducationTreeResponse?) -> AgentUiContext {
         switch path.last {
         case nil:
-            return AgentUiContext(client: "ios", view: "home", title: "Education home")
+            return AgentUiContext(
+                client: "ios",
+                view: "home",
+                title: isJype ? "JYPE home" : "Education home"
+            )
 
         case .classDetail(let cls):
             let live = tree?.classes?.first(where: { $0.id == cls.id }) ?? cls

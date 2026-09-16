@@ -25,7 +25,7 @@ curl -sS https://api.yanylevin.com/health
 |-------|------|
 | `com.personalagent.server` | Yan Levin Express `:3004` (`node --env-file=.env index.js`) |
 | `com.personalagent.cloudflared` | Tunnel → `api.yanylevin.com` |
-| `com.personalagent.education-sync` | Auto push/pull education + fitness folders, ; optional OneDrive relaunch |
+| `com.personalagent.education-sync` | Auto push/pull education + fitness folders, JYPE workspace, ; optional OneDrive relaunch |
 
 Plists live in `~/Library/LaunchAgents/`.
 
@@ -34,6 +34,7 @@ Plists live in `~/Library/LaunchAgents/`.
 Keeps these paths in sync with `origin/main`:
 
 - `education/you@example.com`, `education/you@example.com`
+- `education/projects/jype` (shared /jype dashboard: chats, todos, classes)
 - `fitness/you@example.com`, `fitness/you@example.com`
 - 
 
@@ -49,7 +50,7 @@ Install / reload on each Mac (repo path `$HOME/yanylevin_agentic_framework`, Hom
 bash $HOME/yanylevin_agentic_framework/deploy/launchagents/install-education-sync.sh
 ```
 
-Logs: `/tmp/yanylevin-education-sync.log`. Those user-data commits never deploy the site. Git auto-deploy is off. Agents run `npm run deploy:web` for homepage, `/education` `/fitness` `/dashboard` UI, and `api/`, not for `education/<email>/` sync.
+Logs: `/tmp/yanylevin-education-sync.log`. Those user-data commits never deploy the site. Git auto-deploy is off. Agents run `npm run deploy:web` for homepage, `/education` `/fitness` `/dashboard` UI, and `api/`, not for `education/<email>/` or `education/projects/jype/` sync.
 
 ---
 

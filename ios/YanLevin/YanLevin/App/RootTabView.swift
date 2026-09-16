@@ -222,8 +222,18 @@ struct RootTabView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var theme: ThemeStore
     @EnvironmentObject private var nav: AppNavigationStore
+    @EnvironmentObject private var educationFocus: EducationFocusStore
     @Environment(\.colorScheme) private var colorScheme
     @State private var didApplyAuthorizedDefault = false
+
+    private var chromePalette: YLPalette {
+        educationFocus.isJype && (nav.selectedTab == .education || nav.selectedTab == .chat)
+            ? .jype : .standard
+    }
+
+    private var educationTabTitle: String {
+        educationFocus.isJype ? "JYPE" : "Education"
+    }
 
     var body: some View {
         Group {
@@ -239,6 +249,7 @@ struct RootTabView: View {
         // sidebar/split selection that is no longer in the tree
         // (Apple 164516837).
         .id(auth.hasFullAccess ? "tabs-full" : "tabs-guest")
+        .environment(\.ylPalette, chromePalette)
         .background {
             TabReselectObserver {
                 nav.noteTabReselect()
@@ -249,7 +260,7 @@ struct RootTabView: View {
                 PadTabBarPin()
             }
         }
-        .background(YLTheme.pageFill(colorScheme).ignoresSafeArea())
+        .background(YLTheme.pageFill(colorScheme, palette: chromePalette).ignoresSafeArea())
         // Keyboard avoidance is owned by `ylKeyboardAccessory` (UIKit guide pin).
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .onAppear { applyAuthorizedDefaultIfNeeded() }
@@ -282,7 +293,7 @@ struct RootTabView: View {
                 Tab("Fitness", systemImage: "dumbbell.fill", value: RootTab.fitness) {
                     GymView()
                 }
-                Tab("Education", systemImage: "graduationcap.fill", value: RootTab.education) {
+                Tab(educationTabTitle, systemImage: "graduationcap.fill", value: RootTab.education) {
                     EducationView()
                 }
             } else {
@@ -325,7 +336,7 @@ struct RootTabView: View {
                 Tab("Fitness", systemImage: "dumbbell.fill", value: RootTab.fitness) {
                     GymView()
                 }
-                Tab("Education", systemImage: "graduationcap.fill", value: RootTab.education) {
+                Tab(educationTabTitle, systemImage: "graduationcap.fill", value: RootTab.education) {
                     EducationView()
                 }
             } else {

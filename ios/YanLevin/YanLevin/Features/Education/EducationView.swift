@@ -8,6 +8,7 @@ struct EducationView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ylPalette) private var palette
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var store = EducationStore()
     @State private var todoExpanded = false
@@ -98,6 +99,7 @@ struct EducationView: View {
                 }
             }
         }
+        .environment(\.ylPalette, educationFocus.isJype ? .jype : .standard)
         .task(id: liveTaskID) {
             store.focus = educationFocus
             store.workspace = educationFocus.workspace
@@ -285,13 +287,13 @@ struct EducationView: View {
             dateFilters: dateFilters,
             filterKeys: EducationDateFilter.homeKeys,
             use24Hour: use24Hour,
-            showFilters: false,
             onToggleExpanded: {
                 withAnimation(.easeInOut(duration: 0.22)) {
                     datesExpanded.toggle()
                 }
             },
-            onToggleFilter: toggleDateFilter
+            onToggleFilter: toggleDateFilter,
+            showFilters: false
         )
     }
 
@@ -400,7 +402,7 @@ struct EducationView: View {
                 if let accentPrefix, !accentPrefix.isEmpty {
                     Text(accentPrefix)
                         .font(.title3.weight(.bold))
-                        .foregroundStyle(YLTheme.accent(colorScheme))
+                        .foregroundStyle(YLTheme.accent(colorScheme, palette: palette))
                 }
                 Text(title)
                     .font(.title3.weight(.bold))
@@ -457,7 +459,7 @@ struct EducationView: View {
                 HStack(spacing: 10) {
                     Text(dayClass.period)
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(YLTheme.accent(colorScheme))
+                        .foregroundStyle(YLTheme.accent(colorScheme, palette: palette))
                         .frame(width: 22, alignment: .leading)
                     Text(dayClass.cls.displayName)
                         .font(.body.weight(.semibold))
@@ -481,7 +483,7 @@ struct EducationView: View {
         .background {
             if isCurrent {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(YLTheme.accent(colorScheme).opacity(0.12))
+                    .fill(YLTheme.accent(colorScheme, palette: palette).opacity(0.12))
             }
         }
     }
@@ -600,6 +602,7 @@ struct ClassDetailView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ylPalette) private var palette
 
     @State private var todoExpanded = false
     @State private var todoTypeFilters: Set<String> = EducationTodoFilter.load()
@@ -699,7 +702,7 @@ struct ClassDetailView: View {
                 if let period = liveClass.period, !period.isEmpty {
                     Text(period.uppercased())
                         .font(.largeTitle.weight(.bold))
-                        .foregroundStyle(YLTheme.accent(colorScheme))
+                        .foregroundStyle(YLTheme.accent(colorScheme, palette: palette))
                 }
                 Text(liveClass.displayName)
                     .font(.largeTitle.weight(.bold))
@@ -830,13 +833,13 @@ struct ClassDetailView: View {
             dateFilters: dateFilters,
             filterKeys: EducationDateFilter.classKeys,
             use24Hour: use24Hour,
-            showFilters: store.workspace != "jype",
             onToggleExpanded: {
                 withAnimation(.easeInOut(duration: 0.22)) {
                     datesExpanded.toggle()
                 }
             },
-            onToggleFilter: toggleDateFilter
+            onToggleFilter: toggleDateFilter,
+            showFilters: store.workspace != "jype"
         )
     }
 
@@ -1071,13 +1074,13 @@ struct ProjectDetailView: View {
             dateFilters: dateFilters,
             filterKeys: EducationDateFilter.projectKeys,
             use24Hour: use24Hour,
-            showFilters: store.workspace != "jype",
             onToggleExpanded: {
                 withAnimation(.easeInOut(duration: 0.22)) {
                     datesExpanded.toggle()
                 }
             },
-            onToggleFilter: toggleDateFilter
+            onToggleFilter: toggleDateFilter,
+            showFilters: store.workspace != "jype"
         )
     }
 
@@ -1464,6 +1467,7 @@ private struct CanvasToolbarButton: View {
     let webURL: URL
     var scoreLabel: String = ""
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ylPalette) private var palette
 
     var body: some View {
         Button {
@@ -1480,7 +1484,7 @@ private struct CanvasToolbarButton: View {
                 } else {
                     Text(scoreLabel)
                         .font(.system(size: scoreLabel.count > 6 ? 9 : 11, weight: .bold))
-                        .foregroundStyle(YLTheme.accent(colorScheme))
+                        .foregroundStyle(YLTheme.accent(colorScheme, palette: palette))
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -1522,6 +1526,7 @@ private struct EducationCanvasScoreButton: View {
     let url: URL?
     var topPadding: CGFloat = 0
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ylPalette) private var palette
 
     var body: some View {
         if label.isEmpty {
@@ -1544,7 +1549,7 @@ private struct EducationCanvasScoreButton: View {
     private var scoreText: some View {
         Text(label)
             .font(.caption.weight(.bold))
-            .foregroundStyle(YLTheme.accent(colorScheme))
+                        .foregroundStyle(YLTheme.accent(colorScheme, palette: palette))
             .monospacedDigit()
             .strikethrough(false)
             .padding(.top, topPadding)
@@ -1785,6 +1790,7 @@ private struct EducationTodoFilterBar: View {
     let typeFilters: Set<String>
     let onToggle: (String) -> Void
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ylPalette) private var palette
 
     var body: some View {
         HStack(spacing: 6) {
@@ -1802,7 +1808,7 @@ private struct EducationTodoFilterBar: View {
                         // fill is opaque enough for white labels — same as Fitness.
                         .glassCircle(
                             interactive: true,
-                            tint: on ? EducationFilterChrome.selectedTint(colorScheme) : nil
+                            tint: on ? EducationFilterChrome.selectedTint(colorScheme, palette: palette) : nil
                         )
                         .contentShape(Circle())
                 }
@@ -1821,6 +1827,7 @@ private struct EducationDateFilterBar: View {
     let dateFilters: Set<String>
     let onToggle: (String) -> Void
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ylPalette) private var palette
 
     var body: some View {
         HStack(spacing: 6) {
@@ -1846,7 +1853,7 @@ private struct EducationDateFilterBar: View {
                     .frame(width: 32, height: 32)
                     .glassCircle(
                         interactive: true,
-                        tint: on ? EducationFilterChrome.selectedTint(colorScheme) : nil
+                        tint: on ? EducationFilterChrome.selectedTint(colorScheme, palette: palette) : nil
                     )
                     .contentShape(Circle())
                 }
@@ -1864,14 +1871,15 @@ private struct EducationDateFilterBar: View {
 
 /// Selected filter fill matches website `.edu-filter.is-on` tint opacities.
 private enum EducationFilterChrome {
-    static func selectedTint(_ scheme: ColorScheme) -> Color {
-        YLTheme.accent(scheme).opacity(scheme == .dark ? 0.55 : 0.72)
+    static func selectedTint(_ scheme: ColorScheme, palette: YLPalette = .standard) -> Color {
+        YLTheme.accent(scheme, palette: palette).opacity(scheme == .dark ? 0.55 : 0.72)
     }
 }
 
 private struct EducationCitationsBox: View {
     let citations: [EducationCitation]
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ylPalette) private var palette
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1884,7 +1892,7 @@ private struct EducationCitationsBox: View {
                         Link(destination: url) {
                             Text(cite.displayName)
                                 .font(.body)
-                                .foregroundStyle(YLTheme.accent(colorScheme))
+                                .foregroundStyle(YLTheme.accent(colorScheme, palette: palette))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .buttonStyle(.plain)
@@ -1910,6 +1918,7 @@ private struct EducationBriefingCapsule: View {
     var navigates: Bool = false
     let onVote: (String) -> Void
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ylPalette) private var palette
 
     private var allowsVote: Bool { capsule.noVote != true }
     private var allowsNavigation: Bool { navigates && allowsVote }
@@ -1989,7 +1998,7 @@ private struct EducationBriefingCapsule: View {
                 .foregroundStyle(on ? Color.white : YLTheme.muted(colorScheme))
                 .ylSizedGlassCircle(
                     side: 32,
-                    tint: on ? EducationFilterChrome.selectedTint(colorScheme) : nil
+                    tint: on ? EducationFilterChrome.selectedTint(colorScheme, palette: palette) : nil
                 )
         }
         .buttonStyle(.plain)
@@ -2150,19 +2159,20 @@ private struct EducationTodoRow: View {
     }
 }
 
-/// Title with CW/HW/QA/MA in accent blue at the same size as the name.
+/// Title with CW/HW/QA/MA in accent at the same size as the name.
 private struct EducationTodoTitle: View {
     let todo: EducationTodo
     var font: Font
     var done: Bool = false
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ylPalette) private var palette
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             if let tag = todo.displayTag {
                 Text(tag)
                     .font(font)
-                    .foregroundStyle(done ? YLTheme.muted(colorScheme) : YLTheme.accent(colorScheme))
+                    .foregroundStyle(done ? YLTheme.muted(colorScheme) : YLTheme.accent(colorScheme, palette: palette))
             }
             Text(todo.displayName)
                 .font(font)
@@ -2177,6 +2187,7 @@ private struct EducationTodoCheckbox: View {
     let done: Bool
     let action: () -> Void
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ylPalette) private var palette
 
     static let size: CGFloat = 22
 
@@ -2190,7 +2201,7 @@ private struct EducationTodoCheckbox: View {
         } label: {
             Image(systemName: done ? "checkmark.circle.fill" : "circle")
                 .font(.system(size: Self.size, weight: .medium))
-                .foregroundStyle(done ? YLTheme.accent(colorScheme) : YLTheme.muted(colorScheme))
+                .foregroundStyle(done ? YLTheme.accent(colorScheme, palette: palette) : YLTheme.muted(colorScheme))
                 .frame(width: Self.size, height: Self.size)
                 .contentShape(Rectangle())
         }

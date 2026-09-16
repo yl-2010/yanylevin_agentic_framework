@@ -33,7 +33,7 @@ const execFileAsync = promisify(execFile);
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OWNER = (process.env.OWNER_EMAIL || "you@example.com").trim().toLowerCase();
-const PATHS = [
+export const PATHS = [
   `education/${OWNER}`,
   `fitness/${OWNER}`,
 ];
@@ -419,7 +419,13 @@ async function main() {
   }, POLL_MS);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+const isMain =
+  Boolean(process.argv[1]) &&
+  fileURLToPath(import.meta.url) === process.argv[1];
+
+if (isMain) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

@@ -113,6 +113,10 @@ struct ChatView: View {
         auth.hasFullAccess && backend == .educationAgent
     }
 
+    private var palette: YLPalette {
+        usesEducation && educationFocus.isJype ? .jype : .standard
+    }
+
     private var messages: [ChatMessage] {
         usesEducation ? educationStore.agentMessages : visitorStore.messages
     }
@@ -141,7 +145,7 @@ struct ChatView: View {
 
     /// Same tint Fitness uses on `.ylGlassCircleButton` (colors the glyph, not the glass).
     private var composerControlTint: Color {
-        YLTheme.chatSend(colorScheme)
+        YLTheme.chatSend(colorScheme, palette: palette)
             .opacity(colorScheme == .dark ? 0.4 : 0.42)
     }
 
@@ -293,7 +297,11 @@ struct ChatView: View {
             }
             .ylPageBackground()
             .ylBusyHaptics(isBusy)
-            .navigationTitle(usesEducation ? "Personal Agent" : "Chat about Yan")
+            .navigationTitle(
+                usesEducation
+                    ? (educationFocus.isJype ? "JYPE" : "Personal Agent")
+                    : "Chat about Yan"
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if auth.hasFullAccess {
@@ -408,6 +416,7 @@ struct ChatView: View {
                 }
             }
         }
+        .environment(\.ylPalette, palette)
     }
 
     @ViewBuilder
@@ -420,6 +429,7 @@ struct ChatView: View {
             showCopyMenu: copyMenuMessageID == msg.id,
             copyMenuBelow: msg.id == firstUserMessageID,
             colorScheme: colorScheme,
+            palette: palette,
             reportsBubbleFrame: flying,
             onShowCopyMenu: {
                 YLHaptics.medium()
@@ -955,7 +965,7 @@ struct ChatView: View {
                     width: IMessageComposer.sendWidth,
                     height: IMessageComposer.sendHeight
                 )
-                .background(YLTheme.chatSend(colorScheme), in: shape)
+                .background(YLTheme.chatSend(colorScheme, palette: palette), in: shape)
                 .contentShape(shape)
                 .scaleEffect(sendHoldArmed ? 1.12 : 1)
                 .animation(.spring(response: 0.28, dampingFraction: 0.72), value: sendHoldArmed)
@@ -1466,6 +1476,7 @@ private struct ChatBubbleView: View, Equatable {
     let showCopyMenu: Bool
     let copyMenuBelow: Bool
     let colorScheme: ColorScheme
+    var palette: YLPalette = .standard
     var reportsBubbleFrame: Bool = false
     var onShowCopyMenu: () -> Void
     var onDismissCopyMenu: () -> Void
@@ -1479,12 +1490,13 @@ private struct ChatBubbleView: View, Equatable {
             && lhs.showCopyMenu == rhs.showCopyMenu
             && lhs.copyMenuBelow == rhs.copyMenuBelow
             && lhs.colorScheme == rhs.colorScheme
+            && lhs.palette == rhs.palette
             && lhs.reportsBubbleFrame == rhs.reportsBubbleFrame
     }
 
     var body: some View {
         let isUser = msg.role == "user"
-        let sendTint = YLTheme.chatSend(colorScheme)
+        let sendTint = YLTheme.chatSend(colorScheme, palette: palette)
             .opacity(colorScheme == .dark ? 0.26 : 0.16)
         let copyable = !msg.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let showWidgets = usesEducation && !isUser && !msg.widgets.isEmpty
@@ -1494,7 +1506,7 @@ private struct ChatBubbleView: View, Equatable {
                 if copyable {
                     Group {
                         if usesEducation && !isUser {
-                            YLMarkdownText(source: msg.content, scheme: colorScheme)
+                            YLMarkdownText(source: msg.content, scheme: colorScheme, palette: palette)
                                 .equatable()
                         } else {
                             Text(msg.content)

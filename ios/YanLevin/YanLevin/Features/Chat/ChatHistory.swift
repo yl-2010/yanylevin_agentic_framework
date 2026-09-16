@@ -245,12 +245,13 @@ private struct ChatHistoryRowButtonStyle: ButtonStyle {
 private struct ChatHistoryStatusDot: View {
     let working: Bool
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ylPalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dimmed = false
 
     var body: some View {
         Circle()
-            .fill(YLTheme.chatSend(colorScheme))
+            .fill(YLTheme.chatSend(colorScheme, palette: palette))
             .frame(width: 8, height: 8)
             .opacity(working && !reduceMotion && dimmed ? 0.25 : 1)
             .onAppear(perform: syncPulse)
