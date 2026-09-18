@@ -8,7 +8,7 @@
   --panel-bg: rgba(255, 255, 255, 0.5);
   --panel-brd: rgba(255, 255, 255, 0.6);
   --rim: rgba(255, 255, 255, 0.75);
-  --glow: rgba(255, 255, 255, 0.82);
+  --glow: rgba(255, 255, 255, 0.92);
   --bloom-a: rgba(24, 125, 145, 0.22);
   --bloom-b: rgba(206, 176, 122, 0.16);
   --bloom-c: rgba(70, 120, 200, 0.18);
@@ -39,7 +39,7 @@
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --pointer-x: 50%;
   --pointer-y: 30%;
-  --pointer-glow-strength: 0.58;
+  --pointer-glow-strength: 0.72;
   --pointer-glow-blend: soft-light;
   --corner-pad: clamp(1rem, 2.5vw, 1.6rem);
   --corner-orb: 120px;

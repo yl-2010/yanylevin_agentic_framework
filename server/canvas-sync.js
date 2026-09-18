@@ -38,7 +38,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_BASE = "https://canvas.instructure.com";
 const META_PATH = join(ROOT, "education", YAN_EMAIL, "daily-briefing", "meta.json");
 const LOCK_PATH = "/tmp/yanylevin-canvas-sync.lock";
-const LOCK_STALE_MS = 90 * 60 * 1000;
+export const CANVAS_LOCK_STALE_MS = 90 * 60 * 1000;
+export const CANVAS_LOCK_RETRY_MS = 3 * 60 * 1000;
 const SKILL_PATH = ".cursor/skills/personal-canvas/SKILL.md";
 
 export const CANVAS_SYNC_MODEL_SPEC = {
@@ -170,6 +171,53 @@ export function nextLocalHmAt(meta, hm, now = new Date()) {
 
 export function nextCanvasSyncAt(meta, now = new Date()) {
   return nextLocalHmAt(meta, canvasSyncHm(meta), now);
+}
+
+/**
+ * Signal 0 existence check. EPERM means the process exists.
+ * @param {unknown} pid
+ * @param {(pid: number, signal: number) => void} [killFn]
+ */
+export function lockPidIsAlive(pid, killFn = (p, s) => process.kill(p, s)) {
+  const n = Number.parseInt(String(pid ?? "").trim(), 10);
+  if (!Number.isFinite(n) || n <= 0) return false;
+  try {
+    killFn(n, 0);
+    return true;
+  } catch (err) {
+    return Boolean(err && err.code === "EPERM");
+  }
+}
+
+/**
+ * True when the file lock should block a new canvas-sync.
+ * Dead PIDs never block. Live PIDs block until mtime is stale.
+ * @param {{ pid?: unknown, mtimeMs?: number, nowMs?: number, staleMs?: number, pidAlive?: boolean }} [opts]
+ */
+export function canvasLockIsBlocking({
+  pid,
+  mtimeMs,
+  nowMs = Date.now(),
+  staleMs = CANVAS_LOCK_STALE_MS,
+  pidAlive,
+} = {}) {
+  const alive = pidAlive != null ? Boolean(pidAlive) : lockPidIsAlive(pid);
+  if (!alive) return false;
+  if (!Number.isFinite(mtimeMs)) return true;
+  return nowMs - mtimeMs <= staleMs;
+}
+
+/**
+ * In-flight lock skip retries soon. Anything else stays on the next 01:00.
+ * @param {{ reason?: string } | null | undefined} result
+ * @param {object} meta
+ * @param {Date} [now]
+ */
+export function nextCanvasSyncRetryAt(result, meta, now = new Date()) {
+  if (result?.reason === "in-flight") {
+    return new Date(now.getTime() + CANVAS_LOCK_RETRY_MS);
+  }
+  return nextCanvasSyncAt(meta, now);
 }
 
 /**
@@ -1282,25 +1330,46 @@ export async function applyLiveCanvasOverlay(tree, { force = false } = {}) {
   return tree;
 }
 
+async function writeLock() {
+  const handle = await open(LOCK_PATH, "wx");
+  await handle.writeFile(String(process.pid));
+  return handle;
+}
+
+async function stealLock(reason) {
+  console.log(`[canvas-sync] stealing lock (${reason})`);
+  await rm(LOCK_PATH, { force: true });
+  return writeLock();
+}
+
 async function acquireLock() {
   try {
-    const handle = await open(LOCK_PATH, "wx");
-    await handle.writeFile(String(process.pid));
-    return handle;
+    return await writeLock();
   } catch (err) {
     if (!err || err.code !== "EEXIST") throw err;
     try {
+      const raw = await readFile(LOCK_PATH, "utf8");
       const st = await stat(LOCK_PATH);
-      if (Date.now() - st.mtimeMs > LOCK_STALE_MS) {
-        await rm(LOCK_PATH, { force: true });
-        const handle = await open(LOCK_PATH, "wx");
-        await handle.writeFile(String(process.pid));
-        return handle;
+      const pid = String(raw || "").trim();
+      if (
+        canvasLockIsBlocking({
+          pid,
+          mtimeMs: st.mtimeMs,
+        })
+      ) {
+        return null;
       }
+      const alive = lockPidIsAlive(pid);
+      return await stealLock(
+        alive ? `stale mtime pid=${pid || "none"}` : `dead pid=${pid || "none"}`
+      );
     } catch {
-      /* still locked */
+      try {
+        return await stealLock("unreadable");
+      } catch {
+        return null;
+      }
     }
-    return null;
   }
 }
 
@@ -1608,44 +1677,65 @@ async function maybeRunMissed() {
   }
 }
 
-function armTimer(meta) {
+function armTimer(meta, result = null) {
   if (timer) clearTimeout(timer);
-  const when = nextCanvasSyncAt(meta);
+  const when = nextCanvasSyncRetryAt(result, meta);
   const delay = Math.max(1000, when.getTime() - Date.now());
   const capped = Math.min(delay, 24 * 60 * 60 * 1000);
+  const label = result?.reason === "in-flight" ? "retry" : "next agent";
   console.log(
-    `[canvas-sync] next agent ${when.toISOString()} (in ${Math.round(capped / 60000)} min)`
+    `[canvas-sync] ${label} ${when.toISOString()} (in ${Math.round(capped / 60000)} min)`
   );
   timer = setTimeout(() => {
     runCanvasSync({ force: true })
-      .catch((err) => console.error("[canvas-sync] scheduled run failed", err))
-      .finally(() => {
+      .then((next) => {
         readMeta()
-          .then((m) => armTimer(m))
+          .then((m) => armTimer(m, next))
           .catch((err) => {
             console.error("[canvas-sync] reschedule failed", err);
+            timer = setTimeout(() => startCanvasSyncScheduler(), 60 * 60 * 1000);
+          });
+      })
+      .catch((err) => {
+        console.error("[canvas-sync] scheduled run failed", err);
+        readMeta()
+          .then((m) => armTimer(m))
+          .catch((armErr) => {
+            console.error("[canvas-sync] reschedule failed", armErr);
             timer = setTimeout(() => startCanvasSyncScheduler(), 60 * 60 * 1000);
           });
       });
   }, capped);
 }
 
-function armHourlyTimer(meta) {
+function armHourlyTimer(meta, result = null) {
   if (hourlyTimer) clearTimeout(hourlyTimer);
-  const when = nextCanvasHourlyAt(meta);
+  const when =
+    result?.reason === "in-flight"
+      ? new Date(Date.now() + CANVAS_LOCK_RETRY_MS)
+      : nextCanvasHourlyAt(meta);
   const delay = Math.max(1000, when.getTime() - Date.now());
   const capped = Math.min(delay, 3 * 60 * 60 * 1000);
+  const label = result?.reason === "in-flight" ? "retry" : "next agent";
   console.log(
-    `[canvas-hourly] next agent ${when.toISOString()} (in ${Math.round(capped / 60000)} min)`
+    `[canvas-hourly] ${label} ${when.toISOString()} (in ${Math.round(capped / 60000)} min)`
   );
   hourlyTimer = setTimeout(() => {
     runCanvasHourlySync({ force: false })
-      .catch((err) => console.error("[canvas-hourly] scheduled run failed", err))
-      .finally(() => {
+      .then((next) => {
         readMeta()
-          .then((m) => armHourlyTimer(m))
+          .then((m) => armHourlyTimer(m, next))
           .catch((err) => {
             console.error("[canvas-hourly] reschedule failed", err);
+            hourlyTimer = setTimeout(() => startCanvasHourlyScheduler(), 60 * 60 * 1000);
+          });
+      })
+      .catch((err) => {
+        console.error("[canvas-hourly] scheduled run failed", err);
+        readMeta()
+          .then((m) => armHourlyTimer(m))
+          .catch((armErr) => {
+            console.error("[canvas-hourly] reschedule failed", armErr);
             hourlyTimer = setTimeout(() => startCanvasHourlyScheduler(), 60 * 60 * 1000);
           });
       });

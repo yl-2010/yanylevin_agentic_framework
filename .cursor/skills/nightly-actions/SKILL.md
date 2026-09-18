@@ -76,6 +76,7 @@ Skip only:
 - "we should hang out" with no day named
 - A similar title already on that local day (duplicate check below)
 - A `deleted.md` calendar row (judgement, not exact clocks)
+- EPS Ventures outings unless Yan has a signup confirmation (form receipt or he said he signed up). Student News / Weekly News announcements are not enough
 
 Do not invent a clock. Use the time they named, or all-day.
 

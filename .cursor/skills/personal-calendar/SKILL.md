@@ -71,6 +71,6 @@ If `yl-calendar` returns Calendar access denied, Calendar.app osascript still wo
 
 Do not duplicate the EPS bell schedule (`schedule.json`) as Calendar events unless asked.
 
-Before creating, list overlapping events that day. Skip if a **similar title** already sits on that local day, not only a byte-identical string. Similar means the same event: lowercase, strip year tokens (`2026`, `2026-27`), treat advisor/advisory as one word, singular/plural on the last word. Also skip if it looks like a `deleted.md` calendar row. Nightly actions uses this same rule.
+Before creating, list overlapping events that day. Skip if a **similar title** already sits on that local day, not only a byte-identical string. Similar means the same event: lowercase, strip year tokens (`2026`, `2026-27`), treat advisor/advisory as one word, singular/plural on the last word. Also skip if it looks like a `deleted.md` calendar row. Nightly actions uses this same rule. Skip EPS Ventures unless there is a signup confirmation (form receipt or Yan said he signed up). A Student News or Weekly News announcement is not enough.
 
 Express live context already lists today + tomorrow. Open this skill when you need other days, or to create/change events.

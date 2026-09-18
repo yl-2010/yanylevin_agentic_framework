@@ -6,6 +6,11 @@ import {
   canvasConfig,
   localDueParts,
   nextCanvasSyncAt,
+  nextCanvasSyncRetryAt,
+  lockPidIsAlive,
+  canvasLockIsBlocking,
+  CANVAS_LOCK_STALE_MS,
+  CANVAS_LOCK_RETRY_MS,
   CANVAS_SYNC_MODEL_SPEC,
   CANVAS_HOURLY_MODEL_SPEC,
   dashboardClassMatchesCanvasCourse,
@@ -119,6 +124,94 @@ describe("nextCanvasSyncAt", () => {
       new Date("2026-08-16T20:00:00-05:00")
     );
     assert.equal(when.toISOString(), "2026-08-17T06:00:00.000Z");
+  });
+});
+
+describe("canvas lock", () => {
+  it("treats a missing or dead pid as not alive", () => {
+    assert.equal(lockPidIsAlive(""), false);
+    assert.equal(lockPidIsAlive("0"), false);
+    assert.equal(
+      lockPidIsAlive("99999", () => {
+        const err = new Error("no process");
+        err.code = "ESRCH";
+        throw err;
+      }),
+      false
+    );
+  });
+
+  it("treats EPERM as alive", () => {
+    assert.equal(
+      lockPidIsAlive("1", () => {
+        const err = new Error("denied");
+        err.code = "EPERM";
+        throw err;
+      }),
+      true
+    );
+    assert.equal(
+      lockPidIsAlive("12", () => undefined),
+      true
+    );
+    assert.equal(lockPidIsAlive(process.pid), true);
+  });
+
+  it("does not block on a dead pid even when mtime is fresh", () => {
+    const now = 1_000_000;
+    assert.equal(
+      canvasLockIsBlocking({
+        pid: "99999",
+        mtimeMs: now,
+        nowMs: now,
+        pidAlive: false,
+      }),
+      false
+    );
+  });
+
+  it("blocks a live pid until the lock is stale", () => {
+    const now = 1_000_000;
+    assert.equal(
+      canvasLockIsBlocking({
+        pid: "12",
+        mtimeMs: now,
+        nowMs: now,
+        pidAlive: true,
+      }),
+      true
+    );
+    assert.equal(
+      canvasLockIsBlocking({
+        pid: "12",
+        mtimeMs: now - CANVAS_LOCK_STALE_MS - 1,
+        nowMs: now,
+        pidAlive: true,
+      }),
+      false
+    );
+  });
+});
+
+describe("nextCanvasSyncRetryAt", () => {
+  it("retries in 3 minutes after an in-flight skip", () => {
+    const now = new Date("2026-09-18T08:00:00.000Z");
+    const when = nextCanvasSyncRetryAt(
+      { reason: "in-flight" },
+      { timezone: "America/Los_Angeles", nightlyAgentsLocalTime: "01:00" },
+      now
+    );
+    assert.equal(when.getTime() - now.getTime(), CANVAS_LOCK_RETRY_MS);
+  });
+
+  it("stays on the next 01:00 for other results", () => {
+    const now = new Date("2026-09-18T08:05:00.000Z");
+    const when = nextCanvasSyncRetryAt(
+      { reason: "already-synced" },
+      { timezone: "America/Los_Angeles", nightlyAgentsLocalTime: "01:00" },
+      now
+    );
+    assert.equal(when.toISOString(), "2026-09-19T08:00:00.000Z");
   });
 });
 

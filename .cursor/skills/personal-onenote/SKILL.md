@@ -75,6 +75,12 @@ Output is JSON. Use `id` from pages when reading a body. Summarize.
 Do not print tokens. Do not dump huge HTML (`page` already returns text;
 `--html` only if you must see markup).
 
+**Ink (written HW).** Graph HTML comments say `InkNode is not supported` and
+`page` text will look empty. That is not a dead end. Fetch the page with
+`?includeInkML=true`, extract the InkML, convert himetric traces
+(`* 96 / 2540`) to CSS px, and overlay them on the `data-options="printout"`
+images. That is how PS2 ink was read. Do not tell Yan ink is unreadable.
+
 If `signedIn` is false or the payload says `not signed in`, run login on the
 Mac Studio. Chrome opens **Graph Explorer**, not Outlook. The script clicks
 `owner@school.example` on the Microsoft account picker, then Run query.
