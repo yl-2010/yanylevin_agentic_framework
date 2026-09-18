@@ -152,7 +152,7 @@ export function buildHealthBrainPrompt({ dateKey, timezone, force }) {
     "Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} (timezone ${timezone}).`,
     `Read ${hist}/takeaways.md, ${hist}/history-patterns.md, and skim ${hist}/workouts.md. Skip ${hist}/raw/apple-export-*.json.`,
-    "Also read /tmp/yanylevin-context-life-state.json. Sleeping spans there are the real overnight tell after 2026-08-30 (Health-app sleep is inflated). Do not copy 5-minute samples onto health.md.",
+    "Also read /tmp/yanylevin-context-life-state.json for rooms, gym, and computer. Health dump sleep in takeaways is actual overnight. Do not copy 5-minute samples onto health.md.",
     `Write only ${brain}/health.md. Do not edit patterns.md, journal, takeaways.md, workouts.md, or history-patterns.md.`,
     "Identity-shaped page: rewrite freely, standing bullets, inferred lines labeled. Keep it smaller than history-patterns.md.",
     "Cover typical sleep band, RHR/HRV band, training era (swim then strength), late-session vs short-sleep tell.",

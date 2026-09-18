@@ -31,10 +31,12 @@ Skip: generated `people/index.md`, `people/graph.md`, `brain/education/**`, chat
 
 Life-state: `/tmp/yanylevin-context-life-state.json` or
 `node server/life-state.js day <journalKey>`. The 01:30 cleanup already
-rewrote yesterday's JSONL. Check claims about class, shower, gym, sleep, or
-driving against that timeline. Prefer correcting journal / takeaways for
-activity. `places.md` is name, address, times only. Do not dump JSONL into
-cards. Do not rewrite the log.
+rewrote yesterday's JSONL. Check claims about class, shower, gym, or
+driving against that timeline. Sleep hours prefer Apple Health
+(`health/takeaways.md` / the dump). Dump sleep is actual. Do not "correct"
+takeaways down to a shorter life-state sleeping span. Prefer correcting
+journal / takeaways for activity. `places.md` is name, address, times only.
+Do not dump JSONL into cards. Do not rewrite the log.
 
 Find tonight's files with `git log` / `git diff` on those trees since 01:00 local, plus `git status`.
 

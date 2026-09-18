@@ -40,7 +40,7 @@ Showering: Bathroom Boolean on plus a shower tell, or a fresh `phoneSignals.goin
 2. Older than 10 minutes, missing, or Yan asked for a fresh guess: run `node server/life-state-snapshot.js`, read `/tmp/yanylevin-life-state-snapshot.json` plus the last few samples (`node server/life-state.js recent 3`), infer, then `node server/life-state.js append /tmp/yanylevin-life-state-guess.json` after writing that guess file. Set `"model": "on-demand"`.
 3. Historical ("what was I doing Tuesday at 3"): `node server/life-state.js at 2026-09-08T22:00:00Z` (or a local time he named). Do not start a new Composer job.
 
-Do not open Mail, OneNote, Teams, Canvas, journal, or people cards for this. Do not use Apple Health sleep.
+Do not open Mail, OneNote, Teams, Canvas, journal, or people cards for this. Do not use Apple Health sleep on this live 5-minute tick. Dumps are not live. Nightly cleanup does use dump sleep.
 
 ## Nightly jobs
 

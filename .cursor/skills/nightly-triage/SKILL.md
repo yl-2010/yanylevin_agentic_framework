@@ -74,9 +74,10 @@ only phase that reads every source. You write nothing to the brain.
   `.cursor/skills/life-state/SKILL.md`.
 - **Health** (required): `education/you@example.com/health/takeaways.md`
   and `workouts.md` (the 01:00 Composer takeaways job already ran). Workouts,
-  sleep, and recovery tells for the day. Open a `raw/*.json` dump only if
-  those files look incomplete. Gym machine stacks under `fitness/` are a
-  different log.
+  sleep, and recovery tells for the day. Dump sleep hours are actual sleep.
+  Do not prefer life-state sleeping spans over the dump. Open a `raw/*.json`
+  dump only if those files look incomplete. Gym machine stacks under
+  `fitness/` are a different log.
 - **People dumps**: contacts `/tmp/yanylevin-context-contacts.json`, iMessage
   people `/tmp/yanylevin-context-imessage-people.json`, mail correspondents
   `/tmp/yanylevin-context-mail-people.json`, school names

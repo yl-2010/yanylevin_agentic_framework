@@ -36,6 +36,8 @@ describe("health brain prompt", () => {
     assert.match(prompt, /brain\/health\.md/);
     assert.match(prompt, /takeaways\.md/);
     assert.match(prompt, /life-state/);
+    assert.match(prompt, /Health dump sleep in takeaways is actual overnight/);
+    assert.doesNotMatch(prompt, /inflated/);
     assert.match(prompt, /history-patterns\.md/);
     assert.match(prompt, /apple-export/);
     assert.match(prompt, /Do not edit patterns\.md/);

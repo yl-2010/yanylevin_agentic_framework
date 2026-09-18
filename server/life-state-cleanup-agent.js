@@ -173,7 +173,7 @@ export function buildLifeStateCleanupPrompt({
     weekDateHelper(dateKey, timezone),
     `Dump: ${LIFE_STATE_CLEANUP_DAY_PATH} (segments plus every sample for ${journalKey}).`,
     "Read education/you@example.com/life-state/schema.md and heuristics.md.",
-    "Use Screen Time, iMessage, school Teams, Calendar, location places.md/trips.md, schedule.json, gym entries, Shortcut signals, and chat history. Unix socket for Screen Time and iMessage. Do not use Health-app sleep.",
+    "Use Screen Time, iMessage, school Teams, Calendar, location places.md/trips.md, schedule.json, gym entries, Shortcut signals, chat history, and Apple Health dump sleep (takeaways.md). Unix socket for Screen Time and iMessage. Health dump sleep is actual overnight.",
     "Keep every existing at/local/dateKey. Do not invent or delete ticks. Fix flicker and wrong kinds (lone sleeping between awake, Home while GPS was at school, leftover-fan shower).",
     `Write ${LIFE_STATE_CLEANUP_PATCH_PATH} as { dateKey: "${journalKey}", corrections: [...] }. Empty corrections if the day is clean.`,
     `Then: node server/life-state.js rewrite-day ${journalKey} ${LIFE_STATE_CLEANUP_PATCH_PATH}`,

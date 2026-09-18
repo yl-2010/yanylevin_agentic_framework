@@ -69,8 +69,9 @@ Read the matching skill, then query. Cursor shells often cannot open `knowledgeC
 | Gym | `.cursor/skills/fitness-os/SKILL.md` — yesterday's machine entries |
 | Chat history | `.cursor/skills/past-chats/SKILL.md` if he told the agent where he was |
 | Mail | `.cursor/skills/personal-mail/SKILL.md` only for ride receipts that settle driving vs robotaxi / uber |
+| Apple Health sleep | `.cursor/skills/personal-health/SKILL.md` — `health/takeaways.md` and that day's dump. Dump sleep hours are actual overnight. Use them when a sleeping vs awake stretch is in doubt. |
 
-Do not use Apple Health sleep (parent-facing after 2026-08-30). Ignore Health workouts unless a dump landed that day. Do not open OneNote.
+Ignore Health workouts unless a dump landed that day. Do not open OneNote.
 
 Evidence tokens stay short and greppable. Add source tokens you actually used (`screen:tiktok`, `imessage:from-me`, `teams:from-me`, `gps:eps`, `place:pro-club`). The CLI adds `cleanup:corrected` on changed rows. No coordinates, UUIDs, or message text in `notes`.
 
@@ -110,6 +111,6 @@ Do not git commit. Do not edit brain, journal, location markdown, or any file ou
 - Inventing a 5-minute tick that was never logged
 - Deleting a tick because it was ugly
 - Copying Screen Time tables or iMessage bodies into `activity` / `notes`
-- Treating Health-app sleep as real
+- Ignoring Health dump sleep for overnight spans
 - Using Home lights while GPS is away
 - Flattening a real shower, drive, class, or gym stop into the neighbors

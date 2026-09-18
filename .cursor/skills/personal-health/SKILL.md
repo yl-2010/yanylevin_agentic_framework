@@ -28,6 +28,8 @@ Open `raw/*.json` only when the markdown is missing a day or the question needs 
 
 `raw/apple-export-YYYY.json` is the compact full Apple Health XML archive (2022–2026). Same schema as a Shortcut dump, one year per file. Do not JSON.parse a whole year into the prompt. For history, start with `workouts.md`. If you need a series (swim yards, workout effort, daylight, physical effort), read that year's file with a script or a tight query, not by pasting it.
 
+Treat Health dump sleep hours as how he actually slept. Life-state is rooms, screens, and movement. Do not throw out Watch sleep because a 5-minute tick still said office or bedroom-awake.
+
 Gym stack weights live under `fitness/you@example.com/` (fitness-os skill). Different log. Use both when he asks about "the gym" in a way that could mean machines or Watch workouts.
 
 ## Staleness

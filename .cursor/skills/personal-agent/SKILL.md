@@ -76,7 +76,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | School Teams `owner@school.example` (nightly + on demand, send) | `.cursor/skills/personal-school-teams/SKILL.md` |
 | Compile Daily Briefing, news sources, thumbs, `preferences.md` | `.cursor/skills/daily-news/SKILL.md` |
 | Gym / machines / weights | `.cursor/skills/fitness-os/SKILL.md` |
-| Apple Health / workouts / sleep / HR (Yan only) | `.cursor/skills/personal-health/SKILL.md` |
+| Apple Health / workouts / sleep / HR (Yan only) | `.cursor/skills/personal-health/SKILL.md`. Dump sleep is actual sleep. |
 | Apple Calendar on the Studio (read/write) | `.cursor/skills/personal-calendar/SKILL.md` |
 | Apple Home accessories / lights / sensors (Yan only) | `.cursor/skills/personal-home/SKILL.md` |
 | EPS Canvas sync (hourly Composer + nightly Grok + manual) | `.cursor/skills/personal-canvas/SKILL.md` |

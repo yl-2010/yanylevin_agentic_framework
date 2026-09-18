@@ -36,9 +36,9 @@ Gym stack weights are a different log (`fitness/you@example.com/`). Leave them a
 
 1. Read `state.json` if it exists (`lastTakeawaysAt`). Missing cursor means all raw files are new, but still merge into existing takeaways.md instead of wiping it.
 2. Read shortcut raw JSON files newer than that cursor, plus `workouts.md` and the current `takeaways.md`. Ignore `raw/apple-export-*.json`.
-3. Also read `/tmp/yanylevin-context-life-state.json` or `node server/life-state.js day <the takeaways day>`. Life-state `sleeping` / `at_gym` / `on_computer` is the activity clock. After 2026-08-30, Health-app sleep is parent-facing, not real; prefer life-state sleeping spans over those hours. `.cursor/skills/life-state/SKILL.md`.
+3. Also read `/tmp/yanylevin-context-life-state.json` or `node server/life-state.js day <the takeaways day>`. Life-state `sleeping` / `at_gym` / `on_computer` is rooms and movement. Health dump sleep hours are actual sleep. Prefer dump onset, wake, and stages for overnight duration. Use life-state for office vs class vs gym vs screens. `.cursor/skills/life-state/SKILL.md`.
 4. If nothing is new, stop without rewriting markdown.
-5. For each local calendar day that has new evidence, write a short take: what he did with his body, not a spreadsheet. Workouts by name, duration, and effort. Sleep as hours plus anything that looks off (short night, lots of awake). Steps / RHR / HRV only when they moved versus the surrounding days.
+5. For each local calendar day that has new evidence, write a short take: what he did with his body, not a spreadsheet. Workouts by name, duration, and effort. Sleep as hours plus anything that looks off (short night, lots of awake). Write dump sleep as how he slept. Steps / RHR / HRV only when they moved versus the surrounding days.
 6. Merge into `takeaways.md`. Newest day on top. Update that day's section; do not rewrite older days unless the new dump clearly corrects one.
 7. Write `state.json` keeping `lastIngestAt` and `timezone`, and set `lastTakeawaysAt` to now.
 
@@ -70,6 +70,7 @@ The weekday in the heading must match that `YYYY-MM-DD` in America/Los_Angeles (
 - Pasting raw sample arrays into the markdown
 - Mixing gym machine stack weights into Apple Watch workouts
 - Copying a weekday, rest/lift flag, or RHR onto the neighboring day
+- Preferring life-state sleeping spans over Health dump sleep
 - Git commit (the Node wrapper does that)
 
 ## Verify
