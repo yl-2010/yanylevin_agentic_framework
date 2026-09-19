@@ -1,0 +1,794 @@
+/**
+ * Canvas assignment files on Yan's OneDrive class todos.
+ * Pull teacher attachments into the todo folder. Submit Yan's file
+ * from that folder (or a chat upload stored there first). Yan only.
+ */
+
+import { randomBytes } from "node:crypto";
+import { createWriteStream } from "node:fs";
+import { mkdir, open, readdir, readFile, rm, stat, writeFile, copyFile } from "node:fs/promises";
+import { basename, dirname, extname, isAbsolute, join, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import {
+  canvasConfig,
+  canvasFetch,
+  parseCanvasFileRefs,
+  patchLiveAssignmentSubmitted,
+  readCanvasSnapshot,
+  YAN_EMAIL,
+} from "./canvas-sync.js";
+import { canvasAssignmentIdFromLink, canvasCourseIdFromLink } from "./canvas-grades.js";
+import { listClassEntriesForRoot } from "./education-data.js";
+import { objectDirId } from "./education-onedrive.js";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const SKIP_SUBMIT_NAMES = new Set([
+  "todo.json",
+  "date.json",
+  "class.json",
+  "context.md",
+  "deleted.md",
+]);
+const JUNK_BASE =
+  /^(scanned document(?: \d+)?|scan(?:ned)?(?: \d+)?|img[_-]?\d+|dsc[_-]?\d+|screenshot(?: \d+)?|untitled(?: \d+)?|photo[_-]?\d+|image[_-]?\d+)$/i;
+
+const MIME_BY_EXT = {
+  ".pdf": "application/pdf",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".heic": "image/heic",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".txt": "text/plain",
+  ".csv": "text/csv",
+  ".rtf": "application/rtf",
+  ".zip": "application/zip",
+  ".doc": "application/msword",
+  ".docx":
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".ppt": "application/vnd.ms-powerpoint",
+  ".pptx":
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ".xls": "application/vnd.ms-excel",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".pages": "application/vnd.apple.pages",
+  ".numbers": "application/vnd.apple.numbers",
+  ".key": "application/vnd.apple.keynote",
+  ".mov": "video/quicktime",
+  ".mp4": "video/mp4",
+};
+
+function yanRoot() {
+  return join(ROOT, "education", YAN_EMAIL);
+}
+
+async function readJsonFile(path) {
+  try {
+    const raw = await readFile(path, "utf8");
+    return JSON.parse(raw);
+  } catch (err) {
+    if (err && (err.code === "ENOENT" || err instanceof SyntaxError)) return null;
+    throw err;
+  }
+}
+
+function sanitizeFileBase(raw) {
+  let s = String(raw || "")
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  s = s.replace(/^\.+/, "").replace(/\.+$/, "").trim();
+  if (s.length > 120) {
+    const cut = s.slice(0, 120).replace(/ \S*$/, "").trim();
+    s = cut.length >= 16 ? cut : s.slice(0, 120).trim();
+  }
+  return s;
+}
+
+/**
+ * Readable filename for a chat upload. Junk scanner names and kebab/snake
+ * become spaces. Proper titles stay.
+ * @param {unknown} originalName
+ * @param {unknown} [fallbackTitle]
+ */
+export function displayUploadName(originalName, fallbackTitle = "") {
+  const raw = String(originalName || "").trim();
+  const ext = extname(raw) || extname(String(fallbackTitle || "")) || "";
+  const base = basename(raw, extname(raw));
+  if (base && !JUNK_BASE.test(base) && !/[_-]/.test(base)) {
+    const keep = sanitizeFileBase(base);
+    return keep ? `${keep}${ext}` : `${sanitizeFileBase(fallbackTitle) || "Upload"}${ext}`;
+  }
+  if (base && !JUNK_BASE.test(base) && /[_-]/.test(base)) {
+    const spaced = sanitizeFileBase(base.replace(/[_-]+/g, " "));
+    if (spaced) return `${spaced}${ext}`;
+  }
+  const fb = sanitizeFileBase(fallbackTitle) || "Upload";
+  return `${fb}${ext || ".pdf"}`;
+}
+
+/**
+ * @param {{ name?: string, path?: string }[]} entries
+ * @param {{ canvasFileNames?: unknown[], chatNames?: unknown[] }} [opts]
+ */
+export function pickSubmitFiles(entries, { canvasFileNames = [], chatNames = [] } = {}) {
+  const canvasSet = new Set(
+    (Array.isArray(canvasFileNames) ? canvasFileNames : [])
+      .map((n) => String(n || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const chatSet = new Set(
+    (Array.isArray(chatNames) ? chatNames : [])
+      .map((n) => String(n || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const usable = (Array.isArray(entries) ? entries : []).filter((row) => {
+    const name = String(row?.name || "").trim();
+    const lower = name.toLowerCase();
+    if (!name || name.startsWith(".")) return false;
+    if (SKIP_SUBMIT_NAMES.has(lower)) return false;
+    if (lower.endsWith(".url")) return false;
+    if (canvasSet.has(lower)) return false;
+    return true;
+  });
+  if (chatSet.size) {
+    const hits = usable.filter((row) => chatSet.has(String(row.name).toLowerCase()));
+    if (hits.length) return { ok: true, reason: "chat", files: hits };
+    return { ok: false, reason: "missing-chat", files: usable };
+  }
+  if (!usable.length) return { ok: false, reason: "none", files: [] };
+  if (usable.length === 1) return { ok: true, reason: "single", files: usable };
+  return { ok: false, reason: "ambiguous", files: usable };
+}
+
+async function listTodoFiles(dir) {
+  /** @type {{ name: string, path: string, mtimeMs: number, size: number }[]} */
+  const out = [];
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch (err) {
+    if (err?.code === "ENOENT") return [];
+    throw err;
+  }
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const path = join(dir, entry.name);
+    try {
+      const st = await stat(path);
+      if (!st.isFile()) continue;
+      out.push({
+        name: entry.name,
+        path,
+        mtimeMs: st.mtimeMs,
+        size: st.size,
+      });
+    } catch {
+      /* skip */
+    }
+  }
+  return out;
+}
+
+/**
+ * Copy into a OneDrive folder with a temp+rename+fsync so the File Provider
+ * actually notices the new file.
+ * @param {string} dir
+ * @param {string} name
+ * @param {string} srcPath
+ */
+export async function writeFileIntoFolder(dir, name, srcPath) {
+  const safe = basename(String(name || "").trim());
+  if (!safe || safe.startsWith(".") || safe.includes("/") || safe.includes("\\")) {
+    throw new Error("Bad destination filename");
+  }
+  await mkdir(dir, { recursive: true });
+  const dest = join(dir, safe);
+  const tmp = join(
+    tmpdir(),
+    `yl-canvas-${process.pid}-${randomBytes(4).toString("hex")}${extname(safe) || ".bin"}`
+  );
+  try {
+    await copyFile(srcPath, tmp);
+    const fh = await open(tmp, "r+");
+    try {
+      await fh.sync();
+    } finally {
+      await fh.close();
+    }
+    await copyFile(tmp, dest);
+    const destFh = await open(dest, "r+");
+    try {
+      await destFh.sync();
+    } finally {
+      await destFh.close();
+    }
+  } finally {
+    await rm(tmp, { force: true }).catch(() => {});
+  }
+  return dest;
+}
+
+function safeDownloadName(raw, fileId) {
+  const baseRaw = basename(String(raw || "").trim()) || `canvas-${fileId}`;
+  const ext = extname(baseRaw);
+  const stem = sanitizeFileBase(basename(baseRaw, ext)) || `canvas-${fileId}`;
+  return `${stem}${ext}`;
+}
+
+export async function findYanTodoByCanvasId(canvasId) {
+  const want = Number(canvasId);
+  if (!Number.isFinite(want) || want <= 0) return null;
+  const entries = await listClassEntriesForRoot(yanRoot());
+  for (const entry of entries) {
+    if (entry.source !== "onedrive") continue;
+    const classFolder = entry.classFolder;
+    let dirs;
+    try {
+      dirs = await readdir(classFolder, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const d of dirs) {
+      if (!d.isDirectory()) continue;
+      if (d.name === ".education" || d.name === ".Trash") continue;
+      const jsonPath = join(classFolder, d.name, "todo.json");
+      const props = await readJsonFile(jsonPath);
+      if (!props || typeof props !== "object") continue;
+      const id = Number(props.canvasId);
+      if (id !== want) continue;
+      return {
+        path: jsonPath,
+        dir: join(classFolder, d.name),
+        props,
+        classId: entry.id,
+        todoId: objectDirId(d.name),
+        onedriveFolder: entry.onedriveFolder,
+      };
+    }
+  }
+  return null;
+}
+
+export async function findYanTodoByFolder({ classId, todoId } = {}) {
+  const cid = String(classId || "").trim();
+  const tid = String(todoId || "").trim();
+  if (!cid || !tid) return null;
+  const entries = await listClassEntriesForRoot(yanRoot());
+  const entry = entries.find((e) => e.id === cid && e.source === "onedrive");
+  if (!entry) return null;
+  const names = [tid, tid.startsWith(".") ? tid.slice(1) : `.${tid}`];
+  for (const name of names) {
+    const jsonPath = join(entry.classFolder, name, "todo.json");
+    const props = await readJsonFile(jsonPath);
+    if (props && typeof props === "object") {
+      return {
+        path: jsonPath,
+        dir: join(entry.classFolder, name),
+        props,
+        classId: entry.id,
+        todoId: objectDirId(name),
+        onedriveFolder: entry.onedriveFolder,
+      };
+    }
+  }
+  return null;
+}
+
+async function mergeCanvasFiles(todoPath, files) {
+  const props = await readJsonFile(todoPath);
+  if (!props || typeof props !== "object") return;
+  /** @type {Map<number, { id: number, name: string }>} */
+  const byId = new Map();
+  for (const row of Array.isArray(props.canvasFiles) ? props.canvasFiles : []) {
+    const id = Number(row?.id);
+    if (!Number.isFinite(id) || id <= 0) continue;
+    byId.set(id, { id, name: String(row?.name || "") });
+  }
+  for (const row of files || []) {
+    const id = Number(row?.id);
+    if (!Number.isFinite(id) || id <= 0) continue;
+    const prev = byId.get(id);
+    byId.set(id, { id, name: String(row?.name || prev?.name || "") });
+  }
+  const next = [...byId.values()].sort((a, b) => a.id - b.id);
+  const prevJson = JSON.stringify(props.canvasFiles || []);
+  if (JSON.stringify(next) === prevJson) return;
+  props.canvasFiles = next;
+  await writeFile(todoPath, `${JSON.stringify(props, null, 2)}\n`, "utf8");
+}
+
+function mimeForName(name) {
+  const ext = extname(String(name || "")).toLowerCase();
+  return MIME_BY_EXT[ext] || "application/octet-stream";
+}
+
+function assignmentAllowsUpload(types) {
+  const list = Array.isArray(types) ? types.map((t) => String(t).toLowerCase()) : [];
+  return list.includes("online_upload");
+}
+
+async function canvasFormPost(base, token, path, params, { timeoutMs } = {}) {
+  const url = path.startsWith("http") ? path : `${base}${path}`;
+  const body = new URLSearchParams();
+  for (const [key, value] of Object.entries(params || {})) {
+    if (Array.isArray(value)) {
+      for (const item of value) body.append(key, String(item));
+    } else if (value != null) {
+      body.append(key, String(value));
+    }
+  }
+  /** @type {RequestInit} */
+  const init = {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  };
+  const ms = Number(timeoutMs);
+  if (Number.isFinite(ms) && ms > 0) init.signal = AbortSignal.timeout(ms);
+  const res = await fetch(url, init);
+  if (!res.ok) {
+    const err = new Error(`Canvas ${res.status} ${path}`);
+    err.status = res.status;
+    throw err;
+  }
+  const text = await res.text();
+  if (!text.trim()) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
+
+async function downloadUrlToFile(url, dest, token) {
+  const tryOnce = async (withAuth) => {
+    /** @type {RequestInit} */
+    const init = { redirect: "follow" };
+    if (withAuth) {
+      init.headers = { Authorization: `Bearer ${token}` };
+    }
+    const res = await fetch(url, init);
+    if (!res.ok || !res.body) {
+      const err = new Error(`Canvas download ${res.status}`);
+      err.status = res.status;
+      throw err;
+    }
+    await pipeline(Readable.fromWeb(res.body), createWriteStream(dest));
+  };
+  try {
+    await tryOnce(true);
+  } catch (err) {
+    if (err && err.status === 401) {
+      await tryOnce(false);
+      return;
+    }
+    throw err;
+  }
+}
+
+async function canvasFileMeta(base, token, fileId) {
+  const { data } = await canvasFetch(base, token, `/api/v1/files/${fileId}`);
+  return data && typeof data === "object" ? data : null;
+}
+
+/**
+ * Store a local file into a class todo OneDrive folder.
+ * @param {{ src: string, canvasId?: unknown, classId?: string, todoId?: string, name?: string }} opts
+ */
+export async function storeClassFile(opts) {
+  const src = resolveSrc(opts?.src);
+  const st = await stat(src);
+  if (!st.isFile()) {
+    return { ok: false, reason: "not-a-file" };
+  }
+  const todo = opts?.canvasId
+    ? await findYanTodoByCanvasId(opts.canvasId)
+    : await findYanTodoByFolder({ classId: opts?.classId, todoId: opts?.todoId });
+  if (!todo) return { ok: false, reason: "todo-not-found" };
+  const wanted =
+    String(opts?.name || "").trim() ||
+    displayUploadName(basename(src), todo.props?.name || "");
+  const name = basename(wanted);
+  const dest = await writeFileIntoFolder(todo.dir, name, src);
+  return {
+    ok: true,
+    path: dest,
+    name,
+    dir: todo.dir,
+    classId: todo.classId,
+    todoId: todo.todoId,
+    canvasId: Number(todo.props?.canvasId) || null,
+  };
+}
+
+function resolveSrc(raw) {
+  const s = String(raw || "").trim();
+  if (!s) throw new Error("Missing --src / --file");
+  return isAbsolute(s) ? s : resolve(ROOT, s);
+}
+
+async function liveAssignment(snapshot, canvasId, courseId) {
+  const id = Number(canvasId);
+  const fromSnap = (snapshot?.assignments || []).find((a) => Number(a?.id) === id);
+  const { base, token, configured } = canvasConfig();
+  if (!configured) return fromSnap || null;
+  const course = Number(courseId || fromSnap?.courseId);
+  if (!Number.isFinite(course) || !Number.isFinite(id)) return fromSnap || null;
+  try {
+    const { data } = await canvasFetch(
+      base,
+      token,
+      `/api/v1/courses/${course}/assignments/${id}`
+    );
+    if (!data || typeof data !== "object") return fromSnap || null;
+    const types = Array.isArray(data.submission_types) ? data.submission_types : [];
+    const files = parseCanvasFileRefs(data.description, data.attachments);
+    return {
+      ...(fromSnap || {}),
+      id,
+      courseId: course,
+      types,
+      files: files.length ? files : fromSnap?.files || [],
+      htmlUrl: data.html_url || fromSnap?.htmlUrl,
+    };
+  } catch (err) {
+    console.error("[canvas-files] assignment lookup", err);
+    return fromSnap || null;
+  }
+}
+
+/**
+ * Upload files already on disk to Canvas as an online_upload submission.
+ * @param {{
+ *   canvasId?: unknown,
+ *   classId?: string,
+ *   todoId?: string,
+ *   files?: string[],
+ *   src?: string,
+ *   name?: string,
+ * }} opts
+ */
+export async function submitCanvasAssignment(opts = {}) {
+  const { base, token, configured } = canvasConfig();
+  if (!configured) return { ok: false, reason: "not configured" };
+
+  const todo = opts.canvasId
+    ? await findYanTodoByCanvasId(opts.canvasId)
+    : await findYanTodoByFolder({ classId: opts.classId, todoId: opts.todoId });
+  if (!todo) return { ok: false, reason: "todo-not-found" };
+
+  const storedNames = [];
+  /** @type {string[]} */
+  const extraPaths = [];
+  const incoming = [
+    ...(opts.src ? [opts.src] : []),
+    ...(Array.isArray(opts.files) ? opts.files : []),
+  ];
+  const todoDir = resolve(todo.dir);
+  for (const one of incoming) {
+    const abs = resolveSrc(one);
+    if (abs === join(todoDir, basename(abs)) || abs.startsWith(`${todoDir}/`)) {
+      storedNames.push(basename(abs));
+      extraPaths.push(abs);
+      continue;
+    }
+    const stored = await storeClassFile({
+      src: abs,
+      canvasId: todo.props?.canvasId || opts.canvasId,
+      classId: todo.classId,
+      todoId: todo.todoId,
+      name: opts.name,
+    });
+    if (!stored.ok) return stored;
+    extraPaths.push(stored.path);
+    storedNames.push(stored.name);
+  }
+
+  const canvasId =
+    Number(todo.props?.canvasId) ||
+    canvasAssignmentIdFromLink(todo.props?.canvasLink);
+  const courseId = canvasCourseIdFromLink(todo.props?.canvasLink);
+  if (!Number.isFinite(canvasId) || !Number.isFinite(courseId)) {
+    return { ok: false, reason: "missing-canvas-ids" };
+  }
+
+  const snapshot = await readCanvasSnapshot();
+  const assignment = await liveAssignment(snapshot, canvasId, courseId);
+  const types = assignment?.types || [];
+  if (!assignmentAllowsUpload(types)) {
+    return {
+      ok: false,
+      reason: "not-online-upload",
+      types,
+      canvasId,
+    };
+  }
+
+  const folderFiles = await listTodoFiles(todo.dir);
+  const canvasFileNames = (todo.props?.canvasFiles || []).map((row) => row?.name);
+  const picked = pickSubmitFiles(folderFiles, {
+    canvasFileNames,
+    chatNames: storedNames,
+  });
+  if (!picked.ok) {
+    return {
+      ok: false,
+      reason: picked.reason,
+      candidates: picked.files.map((f) => f.name),
+      dir: todo.dir,
+      canvasId,
+    };
+  }
+
+  /** @type {number[]} */
+  const fileIds = [];
+  for (const row of picked.files) {
+    const uploaded = await uploadSubmissionFile({
+      base,
+      token,
+      courseId,
+      assignmentId: canvasId,
+      filePath: row.path,
+      name: row.name,
+    });
+    const id = Number(uploaded?.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return { ok: false, reason: "upload-failed", file: row.name };
+    }
+    fileIds.push(id);
+  }
+
+  await canvasFormPost(
+    base,
+    token,
+    `/api/v1/courses/${courseId}/assignments/${canvasId}/submissions`,
+    {
+      "submission[submission_type]": "online_upload",
+      "submission[file_ids][]": fileIds,
+    }
+  );
+  patchLiveAssignmentSubmitted(canvasId);
+  return {
+    ok: true,
+    canvasId,
+    courseId,
+    names: picked.files.map((f) => f.name),
+    fileIds,
+    extraPaths,
+  };
+}
+
+async function uploadSubmissionFile({
+  base,
+  token,
+  courseId,
+  assignmentId,
+  filePath,
+  name,
+}) {
+  const size = (await stat(filePath)).size;
+  const contentType = mimeForName(name);
+  const start = await canvasFormPost(
+    base,
+    token,
+    `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/self/files`,
+    {
+      name,
+      size: String(size),
+      content_type: contentType,
+      on_duplicate: "overwrite",
+      submit_assignment: "false",
+    }
+  );
+  if (start && start.id && !start.upload_url) return start;
+  if (!start?.upload_url) {
+    throw new Error("Canvas file upload did not return upload_url");
+  }
+  const form = new FormData();
+  for (const [key, value] of Object.entries(start.upload_params || {})) {
+    form.append(key, String(value));
+  }
+  const buf = await readFile(filePath);
+  form.append("file", new Blob([buf], { type: contentType }), name);
+  const up = await fetch(start.upload_url, {
+    method: "POST",
+    body: form,
+    redirect: "manual",
+  });
+  if (up.status >= 300 && up.status < 400) {
+    const loc = up.headers.get("location");
+    if (!loc) throw new Error("Canvas upload missing Location");
+    const confirm = await fetch(loc, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
+    if (!confirm.ok) {
+      const err = new Error(`Canvas upload confirm ${confirm.status}`);
+      err.status = confirm.status;
+      throw err;
+    }
+    return confirm.json();
+  }
+  if (!up.ok) {
+    const err = new Error(`Canvas upload ${up.status}`);
+    err.status = up.status;
+    throw err;
+  }
+  const text = await up.text();
+  if (!text.trim()) return start;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return start;
+  }
+}
+
+/**
+ * Download teacher-attached files into mapped OneDrive todos.
+ * @param {{ snapshot?: object|null }} [opts]
+ */
+export async function pullCanvasAssignmentFiles(opts = {}) {
+  const { base, token, configured } = canvasConfig();
+  if (!configured) return { ok: false, reason: "not configured" };
+  const snapshot = opts.snapshot || (await readCanvasSnapshot());
+  if (!snapshot) return { ok: false, reason: "no-snapshot" };
+
+  let downloaded = 0;
+  let skipped = 0;
+  let missingTodo = 0;
+  const assignments = Array.isArray(snapshot.assignments) ? snapshot.assignments : [];
+  for (const row of assignments) {
+    const files = Array.isArray(row?.files) ? row.files : [];
+    if (!files.length) continue;
+    const todo = await findYanTodoByCanvasId(row.id);
+    if (!todo) {
+      missingTodo += 1;
+      continue;
+    }
+    const existing = await listTodoFiles(todo.dir);
+    const byName = new Map(existing.map((f) => [f.name.toLowerCase(), f]));
+    /** @type {{ id: number, name: string }[]} */
+    const written = [];
+    for (const ref of files) {
+      const id = Number(ref?.id);
+      if (!Number.isFinite(id) || id <= 0) continue;
+      let meta = null;
+      try {
+        meta = await canvasFileMeta(base, token, id);
+      } catch (err) {
+        console.error(`[canvas-files] file ${id}`, err);
+        continue;
+      }
+      const finalName = safeDownloadName(
+        ref.name || meta?.display_name || meta?.filename,
+        id
+      );
+      const prior = byName.get(finalName.toLowerCase());
+      const size = Number(meta?.size);
+      if (prior && Number.isFinite(size) && prior.size === size) {
+        skipped += 1;
+        written.push({ id, name: finalName });
+        continue;
+      }
+      const url = String(meta?.url || "").trim();
+      if (!url) continue;
+      const tmp = join(
+        tmpdir(),
+        `yl-canvas-${process.pid}-${randomBytes(4).toString("hex")}${extname(finalName) || ".bin"}`
+      );
+      try {
+        await mkdir(todo.dir, { recursive: true });
+        await downloadUrlToFile(url, tmp, token);
+        const dest = join(todo.dir, finalName);
+        await copyFile(tmp, dest);
+        const fh = await open(dest, "r+");
+        try {
+          await fh.sync();
+        } finally {
+          await fh.close();
+        }
+        downloaded += 1;
+        written.push({ id, name: finalName });
+        byName.set(finalName.toLowerCase(), { name: finalName, path: dest, size });
+      } catch (err) {
+        console.error(`[canvas-files] download ${id}`, err);
+      } finally {
+        await rm(tmp, { force: true }).catch(() => {});
+      }
+    }
+    if (written.length) await mergeCanvasFiles(todo.path, written);
+  }
+  return {
+    ok: true,
+    downloaded,
+    skipped,
+    missingTodo,
+  };
+}
+
+function argValue(argv, name) {
+  const i = argv.indexOf(name);
+  if (i < 0) return "";
+  return String(argv[i + 1] || "").trim();
+}
+
+function argList(argv, name) {
+  /** @type {string[]} */
+  const out = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === name && argv[i + 1]) {
+      out.push(String(argv[i + 1]).trim());
+      i += 1;
+    }
+  }
+  return out.filter(Boolean);
+}
+
+async function runCli(argv = process.argv.slice(2)) {
+  const cmd = String(argv[0] || "").trim();
+  if (cmd === "pull" || argv.includes("--pull-files")) {
+    return pullCanvasAssignmentFiles();
+  }
+  if (cmd === "store") {
+    return storeClassFile({
+      src: argValue(argv, "--src") || argValue(argv, "--file"),
+      canvasId: argValue(argv, "--canvas-id"),
+      classId: argValue(argv, "--class"),
+      todoId: argValue(argv, "--todo"),
+      name: argValue(argv, "--name"),
+    });
+  }
+  if (cmd === "submit" || argv.includes("--submit")) {
+    return submitCanvasAssignment({
+      canvasId: argValue(argv, "--canvas-id"),
+      classId: argValue(argv, "--class"),
+      todoId: argValue(argv, "--todo"),
+      src: argValue(argv, "--src"),
+      files: argList(argv, "--file"),
+      name: argValue(argv, "--name"),
+    });
+  }
+  return {
+    ok: false,
+    reason: "usage",
+    usage: [
+      "node --env-file=server/.env server/canvas-files.js submit --canvas-id ID",
+      "node --env-file=server/.env server/canvas-files.js submit --canvas-id ID --file /path.pdf",
+      "node --env-file=server/.env server/canvas-files.js store --src /path.pdf --canvas-id ID",
+      "node --env-file=server/.env server/canvas-files.js pull",
+    ],
+  };
+}
+
+const isMain = (() => {
+  const arg = process.argv[1];
+  if (!arg) return false;
+  try {
+    return pathToFileURL(arg).href === import.meta.url;
+  } catch {
+    return false;
+  }
+})();
+
+if (isMain) {
+  runCli()
+    .then((result) => {
+      console.log("[canvas-files]", result);
+      if (!result?.ok) process.exitCode = 1;
+    })
+    .catch((err) => {
+      console.error("[canvas-files] failed", err);
+      process.exitCode = 1;
+    });
+}

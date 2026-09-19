@@ -79,7 +79,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Apple Health / workouts / sleep / HR (Yan only) | `.cursor/skills/personal-health/SKILL.md`. Dump sleep is actual sleep. |
 | Apple Calendar on the Studio (read/write) | `.cursor/skills/personal-calendar/SKILL.md` |
 | Apple Home accessories / lights / sensors (Yan only) | `.cursor/skills/personal-home/SKILL.md` |
-| EPS Canvas sync (hourly Composer + nightly Grok + manual) | `.cursor/skills/personal-canvas/SKILL.md` |
+| EPS Canvas (sync, submit, teacher files) | `.cursor/skills/personal-canvas/SKILL.md` |
 | iMessage read and send | `.cursor/skills/personal-imessage/SKILL.md` |
 | Apple Screen Time / app usage (Yan only) | `.cursor/skills/personal-screentime/SKILL.md` |
 | Contacts lookup (sqlite, no Contacts.app) | `.cursor/skills/personal-contacts/SKILL.md` |

@@ -13,6 +13,7 @@
     "life-state-cleanup": "node --env-file=.env life-state-cleanup-agent.js",
     "location-enrichment": "node --env-file=.env location-enrichment-agent.js",
     "canvas-sync": "node --env-file=.env canvas-sync.js",
+    "canvas-files": "node --env-file=.env canvas-files.js",
     "school-mail": "node school-mail.js",
     "school-onenote": "node school-onenote.js",
     "school-teams": "node school-teams.js",

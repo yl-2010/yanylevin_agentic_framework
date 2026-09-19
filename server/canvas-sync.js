@@ -5,6 +5,8 @@
  * Live overlay: page-open GET of submissions + grades. Token from
  * server/.env (never commit). Agents never write done into todo.json.
  * Express may POST planner overrides when Yan checks off a Canvas todo.
+ * Yan saying submit uses canvas-files.js (OneDrive file → Canvas upload).
+ * Hourly/nightly agents still do not POST submissions.
  */
 
 import { mkdir, open, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -120,6 +122,54 @@ function stripHtml(html, max = 4000) {
     .replace(/\s+/g, " ")
     .trim();
   return text.slice(0, max);
+}
+
+function looksLikeFilename(raw) {
+  const s = String(raw || "").trim();
+  if (!s || s.length > 180) return false;
+  if (/^(download|preview|view|file)$/i.test(s)) return false;
+  return /\.[a-z0-9]{2,8}$/i.test(s);
+}
+
+/**
+ * Teacher-attached files from assignment HTML and any `attachments` array.
+ * @param {unknown} html
+ * @param {unknown} attachments
+ * @returns {{ id: number, name: string }[]}
+ */
+export function parseCanvasFileRefs(html, attachments = []) {
+  /** @type {Map<number, { id: number, name: string }>} */
+  const out = new Map();
+  const add = (rawId, rawName = "") => {
+    const id = Number(rawId);
+    if (!Number.isFinite(id) || id <= 0) return;
+    const name = looksLikeFilename(rawName) ? String(rawName).trim() : "";
+    const prev = out.get(id);
+    if (!prev) {
+      out.set(id, { id, name });
+      return;
+    }
+    if (name && !prev.name) prev.name = name;
+  };
+  if (Array.isArray(attachments)) {
+    for (const row of attachments) {
+      add(
+        row?.id ?? row?.attachment_id,
+        row?.display_name || row?.filename || row?.name || ""
+      );
+    }
+  }
+  const raw = String(html || "");
+  const re = /\/files\/(\d+)/gi;
+  let m;
+  while ((m = re.exec(raw))) {
+    const start = Math.max(0, m.index - 240);
+    const slice = raw.slice(start, m.index + 280);
+    const titled = slice.match(/title="([^"]+)"/i);
+    const linked = slice.match(/>([^<]{1,180})<\/a>/i);
+    add(m[1], (titled && titled[1]) || (linked && linked[1].trim()) || "");
+  }
+  return [...out.values()].sort((a, b) => a.id - b.id);
 }
 
 function addDaysToDateKey(dateKey, days) {
@@ -480,6 +530,23 @@ async function writePlannerOverrideId(canvasId, overrideId) {
   );
 }
 
+export function patchLiveAssignmentSubmitted(canvasId, submittedAt = new Date().toISOString()) {
+  const id = Number(canvasId);
+  if (!Number.isFinite(id) || !liveCache?.snapshot) return;
+  const rows = Array.isArray(liveCache.snapshot.assignments)
+    ? liveCache.snapshot.assignments
+    : [];
+  let row = rows.find((a) => Number(a?.id) === id);
+  if (!row) {
+    row = { id };
+    rows.push(row);
+    liveCache.snapshot.assignments = rows;
+  }
+  row.submittedAt = submittedAt;
+  row.workflowState = "submitted";
+  liveCache.at = Date.now();
+}
+
 export function patchLiveAssignmentComplete(canvasId, complete, overrideId) {
   const id = Number(canvasId);
   if (!Number.isFinite(id)) return;
@@ -611,7 +678,7 @@ export function localDueParts(iso, timeZone) {
   }
 }
 
-async function canvasFetch(base, token, path, { timeoutMs } = {}) {
+export async function canvasFetch(base, token, path, { timeoutMs } = {}) {
   const url = path.startsWith("http") ? path : `${base}${path}`;
   /** @type {RequestInit} */
   const init = {
@@ -747,6 +814,8 @@ function assignmentRow(item, course, timeZone) {
   const types = Array.isArray(item?.submission_types)
     ? item.submission_types.map((t) => clip(t, 40)).filter(Boolean)
     : [];
+  const html = item?.description || "";
+  const files = parseCanvasFileRefs(html, item?.attachments);
   const points = Number(item?.points_possible);
   const sub =
     item?.submission && typeof item.submission === "object"
@@ -777,7 +846,8 @@ function assignmentRow(item, course, timeZone) {
     plannerComplete: Boolean(item?.planner_override?.marked_complete),
     plannerOverrideId: clip(item?.planner_override?.id, 24),
     types,
-    description: stripHtml(item?.description, 1500),
+    files,
+    description: stripHtml(html, 1500),
   };
 }
 
@@ -1256,6 +1326,7 @@ export function buildCanvasSyncPrompt({
     "Pull major syllabus / calendar-event dates onto date.json with canvasLink.",
     "NEVER write done or completedAt from Canvas. New todos start done false. Updates leave those keys untouched. Page-load overlay paints completion in the API; you still must not persist it.",
     "Do not POST to Canvas. Do not delete education todos just because Canvas dropped a row.",
+    "Leave canvasFiles on todo.json alone. Express downloads teacher attachments into the OneDrive todo folder after you finish.",
     "Do not recreate a todo or date that looks like a manually deleted.md row. Judgement, not exact due clocks. canvasId is a strong hint.",
     rebuild,
     hourly,
@@ -1279,6 +1350,7 @@ export function buildCanvasHourlyPrompt({ dateKey, hourKey, timezone, deletedBlo
     "For every snapshot assignment whose courseId is already in course-map.json: create or update the class todo (canvasId, canvasLink, tag, name without CW/HW/QA/MA prefix, dueDate/dueTime). Same Adv Calc HW due shift and yoga hiddenFromHome rules.",
     "If the snapshot matches existing todos, do nothing.",
     "NEVER write done or completedAt from Canvas. Do not POST to Canvas. Do not delete todos because Canvas dropped a row. Do not recreate deleted.md rows.",
+    "Leave canvasFiles on todo.json alone. Express downloads teacher attachments into the OneDrive todo folder after you finish.",
     deleted,
   ]
     .filter(Boolean)
@@ -1427,7 +1499,8 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
     const fetched = await fetchCanvasSnapshot({ timeZone: timezone });
     if (!fetched.ok) return fetched;
     if (fetchOnly) {
-      return { ok: true, fetchOnly: true, dateKey, ...fetched };
+      const files = await pullCanvasAssignmentFiles(fetched.snapshot);
+      return { ok: true, fetchOnly: true, dateKey, ...fetched, files };
     }
 
     const classNames = await listDashboardClassNames();
@@ -1503,6 +1576,7 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
     }
 
     laterAuthRetry.clear();
+    const files = await pullCanvasAssignmentFiles(fetched.snapshot);
     await writeLastAgentSync(dir, {
       dateKey,
       at: new Date().toISOString(),
@@ -1520,6 +1594,7 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
       courses: fetched.courses,
       assignments: fetched.assignments,
       events: fetched.events,
+      files,
     };
   } finally {
     if (handle) await releaseLock(handle);
@@ -1636,6 +1711,7 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
     }
 
     hourlyLaterAuthRetry.clear();
+    const files = await pullCanvasAssignmentFiles(fetched.snapshot);
     await writeLastHourlySync(dir, {
       dateKey,
       hourKey,
@@ -1655,9 +1731,26 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
       status: result?.status || "finished",
       courses: fetched.courses,
       assignments: fetched.assignments,
+      files,
     };
   } finally {
     await releaseLock(handle);
+  }
+}
+
+async function pullCanvasAssignmentFiles(snapshot) {
+  try {
+    const { pullCanvasAssignmentFiles: pull } = await import("./canvas-files.js");
+    const result = await pull({ snapshot });
+    if (result?.downloaded || result?.skipped) {
+      console.log(
+        `[canvas-sync] assignment files downloaded=${result.downloaded || 0} skipped=${result.skipped || 0}`
+      );
+    }
+    return result;
+  } catch (err) {
+    console.error("[canvas-sync] assignment files", err);
+    return { ok: false, reason: err instanceof Error ? err.message : "pull failed" };
   }
 }
 
@@ -1789,19 +1882,31 @@ if (isMain) {
   const force = process.argv.includes("--force");
   const fetchOnly = process.argv.includes("--fetch-only");
   const hourly = process.argv.includes("--hourly");
-  const run = hourly
-    ? runCanvasHourlySync({ force: true })
-    : runCanvasSync({ force, fetchOnly });
+  const pullFiles = process.argv.includes("--pull-files");
+  const run = pullFiles
+    ? import("./canvas-files.js").then((m) => m.pullCanvasAssignmentFiles())
+    : hourly
+      ? runCanvasHourlySync({ force: true })
+      : runCanvasSync({ force, fetchOnly });
   run
     .then((result) => {
-      console.log(
-        hourly ? "[canvas-hourly]" : "[canvas-sync]",
-        result && { ...result, snapshot: undefined }
-      );
+      const tag = pullFiles
+        ? "[canvas-files]"
+        : hourly
+          ? "[canvas-hourly]"
+          : "[canvas-sync]";
+      console.log(tag, result && { ...result, snapshot: undefined });
       if (!result?.ok && !result?.skipped) process.exitCode = 1;
     })
     .catch((err) => {
-      console.error(hourly ? "[canvas-hourly] failed" : "[canvas-sync] failed", err);
+      console.error(
+        pullFiles
+          ? "[canvas-files] failed"
+          : hourly
+            ? "[canvas-hourly] failed"
+            : "[canvas-sync] failed",
+        err
+      );
       process.exitCode = 1;
     });
 }

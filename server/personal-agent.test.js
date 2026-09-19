@@ -83,6 +83,7 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.calendar));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.home));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.canvas));
+    assert.match(prompt, /Class files go on OneDrive/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.imessage));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.screentime));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.contacts));
@@ -222,6 +223,7 @@ describe("Personal Agent skill files", () => {
     assert.match(dashboard, /similar name/);
     assert.match(dashboard, /showInDates/);
     assert.match(dashboard, /hiddenFromHome/);
+    assert.match(dashboard, /canvas-files\.js store/);
     assert.doesNotMatch(dashboard, /```widget map/);
     assert.doesNotMatch(dashboard, /osascript/);
 
@@ -360,6 +362,8 @@ describe("Personal Agent skill files", () => {
     assert.match(canvas, /course-map\.json/);
     assert.match(canvas, /stop immediately/);
     assert.match(canvas, /not published on Canvas yet/);
+    assert.match(canvas, /canvas-files\.js/);
+    assert.match(canvas, /online_upload/);
 
     const imessage = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.imessage), "utf8");
     assert.match(imessage, /imessage-read\.js/);

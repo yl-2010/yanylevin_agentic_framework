@@ -1106,7 +1106,7 @@ export function systemPrompt(email, opts = {}) {
     "You are the Personal Agent for yanylevin.com (iOS Chat tab person icon / /education chat) and Cursor Desktop on this Mac.",
     "The /education website is still the school dashboard. You are a personal agent that can manage that dashboard when asked, plus mail, news, location, and anything else the user asks.",
     `Signed-in user email: ${email}`,
-    "Yan: full write in this repo and on this Mac. Do not refuse repo-wide or Mac-wide work.",
+    "Yan: full write in this repo and on this Mac. Do not refuse repo-wide or Mac-wide work. Class files go on OneDrive (education-dashboard skill), never under education/you@example.com/ except .chat-uploads staging.",
     "Never spawn a Cursor cloud agent. Never edit main-site chatbot.js / /api/chat / LM Studio unless Yan explicitly asks.",
     "",
     `Always Read and apply the unslop skill (${UNSLOP_SKILL_PATH}) on every turn. Do not skip it. Do not inline the whole skill here.`,
@@ -2351,6 +2351,7 @@ export async function messageAgent(
   const sessionFiles = session.uploads;
   const hasSessionFiles = sessionFiles.length > 0;
   const hasNewAttachments = newFiles.length > 0;
+  const isOwner = normalized === "you@example.com";
 
   let nowContext = null;
   try {
@@ -2407,8 +2408,8 @@ export async function messageAgent(
     promptParts.push(
       "",
       hasNewAttachments
-        ? "Chat attachments available this session (still on disk — copy from these paths when storing context; earlier files remain usable on later turns):"
-        : "Previously attached files still available this session (still on disk — copy from these paths; do not ask the user to re-send):"
+        ? "Chat attachments available this session (still on disk, copy from these paths when storing context; earlier files remain usable on later turns):"
+        : "Previously attached files still available this session (still on disk, copy from these paths; do not ask the user to re-send):"
     );
     for (const f of sessionFiles) {
       const tag = newFiles.some((n) => n.relPath === f.relPath)
@@ -2420,7 +2421,7 @@ export async function messageAgent(
     }
     promptParts.push(
       `When storing long-term dashboard context, Read ${PERSONAL_SKILL_PATHS.education} then copy identical bytes into the matching object folder.`,
-      `User-level / "main education folder" = education/${normalized}/ (next to meta.json / schedule.json).`
+      `Yan class files: that class's OneDrive todo/date folder (meta.json onedriveRoot + gradeFolder + onedriveFolder). Do not write class files under education/${normalized}/ except .chat-uploads. Prefer: node --env-file=server/.env server/canvas-files.js store --src <abs or repo-rel path> --class <id> --todo "<Finder folder>". Submit to Canvas only when Yan says submit: node --env-file=server/.env server/canvas-files.js submit --canvas-id <id> (add --file <path> when this turn attached a file). Ask if more than one student file could be the upload.`
     );
   }
 
