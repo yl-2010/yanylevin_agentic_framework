@@ -33,6 +33,14 @@ private enum IMessageComposer {
     static let meltSpacing: CGFloat = 6
 }
 
+private enum ChatAttachmentLimits {
+    /// Match Mac personal-agent MAX_ATTACHMENT_BYTES / MAX_TOTAL_ATTACHMENT_BYTES.
+    static let maxFileBytes = 64 * 1024 * 1024
+    static let maxTotalBytes = 64 * 1024 * 1024
+    /// Soft JPEG target under Grok ~20MiB image input.
+    static let imageSoftBytes = 18 * 1024 * 1024
+}
+
 struct ChatView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var educationFocus: EducationFocusStore
@@ -1234,8 +1242,9 @@ struct ChatView: View {
                 continue
             }
             let compressed = Self.compressImageDataIfNeeded(data) ?? data
-            // Match Mac personal-agent MAX_ATTACHMENT_BYTES (12MB).
-            guard compressed.count <= 12_000_000 else { continue }
+            let used = pendingAttachments.reduce(0) { $0 + $1.data.count }
+            guard compressed.count <= ChatAttachmentLimits.maxFileBytes else { continue }
+            guard used + compressed.count <= ChatAttachmentLimits.maxTotalBytes else { break }
             let name = "photo-\(pendingAttachments.count + 1).jpg"
             pendingAttachments.append(
                 PendingChatAttachment(name: name, mimeType: "image/jpeg", data: compressed)
@@ -1290,7 +1299,9 @@ struct ChatView: View {
                 finalData = data
                 mime = Self.mimeType(for: url) ?? "application/octet-stream"
             }
-            guard finalData.count <= 12_000_000 else { continue }
+            let used = pendingAttachments.reduce(0) { $0 + $1.data.count }
+            guard finalData.count <= ChatAttachmentLimits.maxFileBytes else { continue }
+            guard used + finalData.count <= ChatAttachmentLimits.maxTotalBytes else { break }
             pendingAttachments.append(
                 PendingChatAttachment(name: name, mimeType: mime, data: finalData)
             )
@@ -1301,8 +1312,8 @@ struct ChatView: View {
         guard let image = UIImage(data: data) else { return nil }
         var quality: CGFloat = 0.82
         var out = image.jpegData(compressionQuality: quality)
-        // Soft target under the 12MB hard cap (JSON+base64 to Mac API).
-        while let bytes = out, bytes.count > 11_000_000, quality > 0.35 {
+        // Soft target under Grok ~20MiB; hard cap is 64MB on the Mac API.
+        while let bytes = out, bytes.count > ChatAttachmentLimits.imageSoftBytes, quality > 0.35 {
             quality -= 0.12
             out = image.jpegData(compressionQuality: quality)
         }

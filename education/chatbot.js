@@ -46,8 +46,9 @@
   /** @type {{ id: string, file: File }[]} */
   let pendingFiles = [];
   const MAX_FILES = 16;
-  /** Match server MAX_ATTACHMENT_BYTES (JSON+base64 path to Mac API). */
-  const MAX_FILE_BYTES = 12 * 1024 * 1024;
+  /** Match server MAX_ATTACHMENT_BYTES / MAX_TOTAL_ATTACHMENT_BYTES. */
+  const MAX_FILE_BYTES = 64 * 1024 * 1024;
+  const MAX_TOTAL_BYTES = 64 * 1024 * 1024;
   const MAX_QUEUED = 8;
   const POLL_MS = 2000;
 
@@ -171,13 +172,22 @@
    */
   function addFiles(list) {
     const files = Array.from(list || []);
+    let pendingTotal = pendingFiles.reduce((n, p) => n + p.file.size, 0);
     for (const file of files) {
       if (!file || !(file instanceof File)) continue;
       if (pendingFiles.length >= MAX_FILES) break;
       if (file.size > MAX_FILE_BYTES) {
         appendBubble(
           "assistant",
-          `“${file.name}” is too large (max ~12MB per file).`
+          `“${file.name}” is too large (max 64MB per file).`
+        );
+        setState("panel");
+        continue;
+      }
+      if (pendingTotal + file.size > MAX_TOTAL_BYTES) {
+        appendBubble(
+          "assistant",
+          `“${file.name}” would exceed 64MB total per message.`
         );
         setState("panel");
         continue;
@@ -190,6 +200,7 @@
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         file,
       });
+      pendingTotal += file.size;
     }
     if (pendingFiles.length && showingHistory) {
       hideHistory({ markVisibleRead: true });
@@ -1429,8 +1440,8 @@
         {
           method: "POST",
           json: body,
-          // Staging attachments can take a bit; agent run itself is async.
-          timeoutMs: 120_000,
+          // Staging attachments can take a bit; 64MB JSON+base64 is slow on cellular.
+          timeoutMs: 300_000,
         }
       );
       const data = await res.json().catch(() => ({}));

@@ -183,10 +183,11 @@ function notifyAgentClients(session, email, data) {
 
 const SESSION_TTL_MS = 60 * 60 * 1000;
 const MAX_ATTACHMENTS = 16;
-/** Per-file cap — under Grok/xAI ~20MiB image input; base64 fits Express JSON. */
-const MAX_ATTACHMENT_BYTES = 12 * 1024 * 1024;
-/** Total decoded bytes per message; ~24MB raw → ~32MB base64 + JSON under Express 40mb. */
-const MAX_TOTAL_ATTACHMENT_BYTES = 24 * 1024 * 1024;
+/** Per-file and per-message decoded caps. JSON+base64 is ~4/3 on the wire (~86MB at 64MB), under Express 100mb and Cloudflare ~100MB. */
+const MAX_ATTACHMENT_BYTES = 64 * 1024 * 1024;
+const MAX_TOTAL_ATTACHMENT_BYTES = 64 * 1024 * 1024;
+/** Grok/xAI image input is ~20MiB; larger images still stage on disk, just skip inline. */
+const MAX_GROK_IMAGE_BYTES = 20 * 1024 * 1024;
 /** Max user messages waiting behind the in-flight Personal Agent turn. */
 export const MAX_QUEUED_TURNS = 8;
 
@@ -1479,7 +1480,9 @@ function normalizeAttachments(raw) {
     }
     total += buf.length;
     if (total > MAX_TOTAL_ATTACHMENT_BYTES) {
-      const err = new Error("attachments total size too large");
+      const err = new Error(
+        `attachments total size exceeds ${Math.round(MAX_TOTAL_ATTACHMENT_BYTES / (1024 * 1024))}MB`
+      );
       err.status = 400;
       throw err;
     }
@@ -2438,6 +2441,7 @@ export async function messageAgent(
       try {
         await access(f.absPath, fsConstants.R_OK);
         const diskBuf = await readFile(f.absPath);
+        if (diskBuf.length > MAX_GROK_IMAGE_BYTES) continue;
         images.push({
           data: diskBuf.toString("base64"),
           mimeType: f.mimeType === "image/jpg" ? "image/jpeg" : f.mimeType,

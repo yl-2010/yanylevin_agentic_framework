@@ -138,8 +138,8 @@ app.use(
     credentials: true,
   })
 );
-/** 40mb: education attachments are JSON+base64 (~4/3 wire size); see personal-agent caps. */
-app.use(express.json({ limit: "40mb" }));
+/** 100mb: education attachments are JSON+base64 (~4/3 wire size); 64MB raw ≈ 86MB on the wire. */
+app.use(express.json({ limit: "100mb" }));
 
 app.get("/health", async (_req, res) => {
   const lm = await probeLmStudio();
