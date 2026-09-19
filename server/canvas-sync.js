@@ -5,8 +5,10 @@
  * Live overlay: page-open GET of submissions + grades. Token from
  * server/.env (never commit). Agents never write done into todo.json.
  * Express may POST planner overrides when Yan checks off a Canvas todo.
- * Yan saying submit uses canvas-files.js (OneDrive file → Canvas upload).
+ * Yan saying submit uses canvas-files.js (OneDrive file, text, or URL).
  * Hourly/nightly agents still do not POST submissions.
+ * Full fetch also dumps comments, pages, modules, and course files into
+ * .canvas/ for the agent. Not education UI.
  */
 
 import { mkdir, open, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -101,14 +103,14 @@ export function canvasDir(override) {
   return join(ROOT, CANVAS_REL);
 }
 
-function clip(raw, max = 200) {
+export function clip(raw, max = 200) {
   return String(raw || "")
     .trim()
     .replace(/\s+/g, " ")
     .slice(0, max);
 }
 
-function stripHtml(html, max = 4000) {
+export function stripHtml(html, max = 4000) {
   const text = String(html || "")
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
@@ -711,7 +713,7 @@ export async function canvasFetch(base, token, path, { timeoutMs } = {}) {
   return { data, next: next ? next[1] : "" };
 }
 
-async function canvasGetAll(base, token, path, { timeoutMs, maxPages } = {}) {
+export async function canvasGetAll(base, token, path, { timeoutMs, maxPages } = {}) {
   /** @type {unknown[]} */
   const out = [];
   let url = path;
@@ -773,32 +775,44 @@ function firstStudentEnrollment(course, extra = null) {
   return extra || student || listed[0] || null;
 }
 
-function courseScores(course, extraEnrollment = null) {
+function finiteScore(...values) {
+  for (const value of values) {
+    if (value == null || value === "") continue;
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+/**
+ * Student-facing course total. Canvas `current_score` is what the grades
+ * page shows (n/a until something is posted). `final_score` treats missing
+ * work as 0, so History looked like 12% / F while Canvas still said n/a.
+ */
+export function courseScores(course, extraEnrollment = null) {
   const enrollment = firstStudentEnrollment(course, extraEnrollment) || {};
   const grades =
     enrollment.grades && typeof enrollment.grades === "object"
       ? enrollment.grades
       : enrollment;
-  const currentScore = Number(
-    grades.current_score ??
-      grades.final_score ??
-      enrollment.computed_current_score ??
-      enrollment.computed_final_score ??
-      enrollment.current_period_computed_current_score ??
-      course?.current_score
+  const currentScore = finiteScore(
+    grades.current_score,
+    enrollment.computed_current_score,
+    enrollment.current_period_computed_current_score,
+    course?.current_score
   );
-  const letter =
+  const letter = String(
     grades.current_grade ||
-    grades.final_grade ||
-    enrollment.computed_current_grade ||
-    enrollment.computed_final_grade ||
-    "";
+      enrollment.computed_current_grade ||
+      enrollment.current_period_computed_current_grade ||
+      ""
+  ).trim();
   return {
     grade: clip(
-      letter || (Number.isFinite(currentScore) ? String(currentScore) : ""),
+      letter || (currentScore != null ? String(currentScore) : ""),
       24
     ),
-    currentScore: Number.isFinite(currentScore) ? currentScore : null,
+    currentScore,
   };
 }
 
@@ -1242,6 +1256,38 @@ export async function fetchCanvasSnapshot(opts = {}) {
     events,
   };
 
+  /** @type {object|null} */
+  let context = null;
+  if (!light) {
+    try {
+      const {
+        fetchCanvasContext,
+        persistCanvasContext,
+      } = await import("./canvas-context.js");
+      const dumped = await fetchCanvasContext(
+        base,
+        token,
+        snapshot.courses,
+        fetchOpts
+      );
+      if (persist) {
+        context = await persistCanvasContext(dir, {
+          ...dumped,
+          updatedAt: snapshot.updatedAt,
+        });
+      } else {
+        context = {
+          comments: dumped.comments.length,
+          pages: dumped.pages.length,
+          modules: dumped.modules.length,
+          files: dumped.files.length,
+        };
+      }
+    } catch (err) {
+      console.error("[canvas-sync] context dump", err);
+    }
+  }
+
   rememberLiveSnapshot(snapshot);
   if (persist) {
     await mkdir(dir, { recursive: true });
@@ -1254,6 +1300,7 @@ export async function fetchCanvasSnapshot(opts = {}) {
     skippedCourses: skip.length,
     assignments: assignments.length,
     events: events.length,
+    context,
     snapshot,
   };
 }
@@ -1319,6 +1366,8 @@ export function buildCanvasSyncPrompt({
     "Yan only (you@example.com). Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} (timezone ${timezone}).`,
     `Snapshot: ${CANVAS_REL}/snapshot.json (also assignments.md). Optional map: ${CANVAS_REL}/course-map.json.`,
+    `Agent context dumps (not UI): ${CANVAS_REL}/comments.md, comments-new.md, pages.md, modules.md, files.md (and the matching .json).`,
+    "Read comments-new.md. Fold new teacher comments into that class or todo CONTEXT.md on OneDrive (hidden from the education UI). Skip a comment already in CONTEXT.md. Do not copy comments into todo.json description. Do not create dashboard tiles from pages, modules, or course files. Use those dumps when writing todo descriptions or class CONTEXT.md if they explain the work.",
     `Hourly Composer log: ${CANVAS_REL}/last-hourly-sync.json. Read it. Fix mistakes those daytime Composer 2.5 passes made (wrong tags, HW: prefixes left on names, Adv Calc HW dues pulled back to Canvas time, yoga CW hiddenFromHome, missing canvasId, duplicate todos, course-map drift).`,
     "Yan is a 2026-27 junior. Those academic dashboard classes are often missing from Canvas until school publishes them. That is expected.",
     "FIRST: map snapshot courses to Yan's class folders (OneDrive `.education` under the grade folder, skip free-period shells and fixtures). The snapshot already dropped non-dashboard enrollments. If ZERO dashboard classes appear in Canvas, STOP immediately. Do not invent Class of 2028, EPS Library, Iceland EBC, Graphic Design, or prior-year shells. Do not create todos. One short note is enough.",
@@ -1347,6 +1396,7 @@ export function buildCanvasHourlyPrompt({ dateKey, hourKey, timezone, deletedBlo
     `Today's date key: ${dateKey} hour ${hourKey} (timezone ${timezone}).`,
     `Snapshot: ${CANVAS_REL}/snapshot.json (light, mapped courses only). Map: ${CANVAS_REL}/course-map.json.`,
     "Do not look for new classes. Do not create class folders. Do not edit course-map.json. Do not mine syllabi or invent dates from empty events.",
+    "Do not fold Canvas comments, pages, modules, or course files on the hourly pass. That is nightly / manual.",
     "For every snapshot assignment whose courseId is already in course-map.json: create or update the class todo (canvasId, canvasLink, tag, name without CW/HW/QA/MA prefix, dueDate/dueTime). Same Adv Calc HW due shift and yoga hiddenFromHome rules.",
     "If the snapshot matches existing todos, do nothing.",
     "NEVER write done or completedAt from Canvas. Do not POST to Canvas. Do not delete todos because Canvas dropped a row. Do not recreate deleted.md rows.",
@@ -1577,6 +1627,15 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
 
     laterAuthRetry.clear();
     const files = await pullCanvasAssignmentFiles(fetched.snapshot);
+    try {
+      const { markCanvasCommentsSeen, readCanvasContext } = await import(
+        "./canvas-context.js"
+      );
+      const ctx = await readCanvasContext(dir);
+      await markCanvasCommentsSeen(dir, ctx.comments);
+    } catch (err) {
+      console.error("[canvas-sync] mark comments seen", err);
+    }
     await writeLastAgentSync(dir, {
       dateKey,
       at: new Date().toISOString(),

@@ -2,9 +2,9 @@
 name: personal-canvas
 description: >-
   Sync Yan's EPS Canvas into the education dashboard (assignments, syllabus
-  dates, canvasLink), submit files when Yan asks, pull teacher attachments
-  into OneDrive todos. Nightly Grok job and manual "sync Canvas" turns.
-  Yan only. 
+  dates, canvasLink), submit file/text/URL when Yan asks, pull teacher
+  attachments into OneDrive todos. Nightly also dumps comments, pages,
+  modules, and course files for agent context (not UI). Yan only.
 disable-model-invocation: true
 ---
 
@@ -20,15 +20,19 @@ This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how
 
 - **Page open (Express, not you):** `/api/education/data?live=1` fetches submissions, planner complete, and grades for mapped courses and overlays `done` + `canvasWork` in the API. That does **not** write `todo.json`. You still never persist completion.
 - **Checkoff (Express, not you):** Yan checking off a Canvas-linked todo writes a planner override (`marked_complete`) so Canvas To-Do matches. Local-only todos stay local. You still never POST planner overrides.
-- **Submit (you, only when Yan says submit / turn in / upload this to Canvas):** identify the assignment, rename+store the chat file on OneDrive if he attached one, then `canvas-files.js submit`. Save / put this in / handle the file never submits. Ask only if the assignment is actually unclear.
+- **Submit (you, only when Yan says submit / turn in / upload this to Canvas):** identify the assignment, rename+store the chat file on OneDrive if he attached one, then `canvas-files.js submit` (file, `--text` / `--text-file`, or `--url`). Save / put this in / handle the file never submits. Ask only if the assignment is actually unclear.
 - **Hourly:** Express runs a light fetch + this skill (mapped classes only, no new-class hunt) at **:00** in the briefing timezone, except the 01:00 nightly window. Restarts wait for the next :00. Writes `last-hourly-sync.json`. After the agent, Express pulls teacher files into OneDrive todos.
-- **Nightly:** Express runs the full fetch + this skill at **01:00** (`nightlyAgentsLocalTime` in `education/you@example.com/daily-briefing/meta.json`). Same slot as location compose/enrichment. Context synthesis is later (02:30). Daily briefing is 06:00. **Re-read what hourly Composer wrote during the day and fix mistakes.** Then Express pulls teacher files.
+- **Nightly:** Express runs the full fetch + this skill at **01:00** (`nightlyAgentsLocalTime` in `education/you@example.com/daily-briefing/meta.json`). Same slot as location compose/enrichment. Context synthesis is later (02:30). Daily briefing is 06:00. **Re-read what hourly Composer wrote during the day and fix mistakes.** Fold new teacher comments into class/todo `CONTEXT.md`. Then Express pulls teacher files.
 - **Manual (Personal Agent):** Yan says sync / pull / update Canvas. First fetch, then apply this skill **in this turn** (full nightly rules, including class map). Do not spawn a nested Cursor agent. After writes, Express pull still runs on the next hourly/fetch; you may also `canvas-files.js pull`.
 
 ```bash
 node --env-file=server/.env server/canvas-sync.js --fetch-only
 node --env-file=server/.env server/canvas-files.js submit --canvas-id 40335975
 node --env-file=server/.env server/canvas-files.js submit --canvas-id 40335975 --file education/you@example.com/.chat-uploads/<session>/scan.pdf
+node --env-file=server/.env server/canvas-files.js submit --canvas-id 40073386 --text "here is the paragraph"
+node --env-file=server/.env server/canvas-files.js submit --canvas-id 40073386 --text-file /tmp/body.txt
+node --env-file=server/.env server/canvas-files.js submit --canvas-id 40073386 --url https://example.com/doc
+node --env-file=server/.env server/canvas-files.js comments --canvas-id 40335975
 node --env-file=server/.env server/canvas-files.js store --src <path> --class physics --todo "HW Sep 17 Motion Diagram Warm-Up"
 node --env-file=server/.env server/canvas-files.js pull
 ```
@@ -43,6 +47,11 @@ If `.canvas/snapshot.json` is missing and the fetch CLI fails, say Canvas is not
 education/you@example.com/.canvas/
   snapshot.json         # only dashboard / junior-year classes (assignments, events, syllabi)
   assignments.md        # readable index of that same subset
+  comments.json / comments.md / comments-new.md
+  pages.json / pages.md
+  modules.json / modules.md
+  files.json / files.md
+  seen-comment-ids.json # Express marks after a successful nightly agent
   course-map.json       # Canvas course id → education class folder id (you maintain this on nightly; hourly must not edit it)
   last-agent-sync.json  # written by the nightly runner, not by you
   last-hourly-sync.json # written by the hourly Composer runner
@@ -62,7 +71,7 @@ Dashboard schema: `.cursor/skills/personal-agent/education-dashboard.md`.
 
 ## Hourly pass (Composer)
 
-When the runner says hourly: **do not** map new classes, **do not** create class folders, **do not** edit `course-map.json`, **do not** mine syllabi. Only create/update todos for snapshot assignments whose `courseId` is already in `course-map.json`. Same Adv Calc HW due shift, yoga `hiddenFromHome`, tagging, and deleted.md rules. If nothing changed, stop.
+When the runner says hourly: **do not** map new classes, **do not** create class folders, **do not** edit `course-map.json`, **do not** mine syllabi, **do not** fold comments/pages/modules/files. Only create/update todos for snapshot assignments whose `courseId` is already in `course-map.json`. Same Adv Calc HW due shift, yoga `hiddenFromHome`, tagging, and deleted.md rules. If nothing changed, stop.
 
 ## Map courses first (nightly / manual only)
 
@@ -114,22 +123,36 @@ Read each mapped course `syllabus` plus snapshot `events[]`. Create/update **imp
 - Set `date`, optional `time`, markdown `description` when there are real facts, `canvasLink` (event url or course `syllabusUrl`), optional `canvasId`.
 - Do not turn syllabus fluff into dates.
 
+## Comments, pages, modules, course files (agent only)
+
+Full fetch (nightly, `--fetch-only`, manual sync) writes those dumps. Hourly does not. **Never** show them on `/education` or iOS. Do not copy them into `todo.json` `description`. Do not download course-file dumps into OneDrive class folders (assignment attachments still use `canvas-files.js pull`).
+
+**Comments.** Read `comments.md` anytime Yan asks what a teacher said, or `canvas-files.js comments --canvas-id <id>` for a live pull. Nightly / manual: read `comments-new.md`. Fold new **teacher** comments into that class or todo OneDrive `CONTEXT.md` (hidden from tiles). Skip if that comment is already there. Skip Yan's own comments unless they matter. One short dated line per comment is enough (`2026-09-18 Seeley on Average Speed Write-up: …`).
+
+**Pages and modules.** Read `pages.md` / `modules.md` when a todo is thin, locked, or clearly a module item. Copy a useful fact into class `CONTEXT.md` if it will help later (unit name, locked until score). Do not invent dates from every module item.
+
+**Course files.** `files.md` is the Files tab index (`folder/name` plus `[file id]`). Use it to know a PDF exists. Do not create UI tiles from it.
+
 ## Submit (Personal Agent, Yan asked)
 
 Turn in and save are different jobs.
 
-**Turn in / submit / upload this to Canvas** (file in this chat is enough; he does not have to name the assignment):
+**Turn in / submit / upload this to Canvas** (a file, a pasted paragraph, or a URL in this chat is enough; he does not have to name the assignment):
 
 1. Identify the assignment. Prefer Live context (open todo/class). Then filename vs todo names, due-soon Canvas rows, the class he is in. Ask only if two assignments are equally plausible.
-2. Rename junk upload names (`Scanned Document 17.pdf` → a real title, spaces, keep extension).
-3. Store in that todo's OneDrive folder (`canvas-files.js store` or `submit --file`, which stores first).
-4. Submit that file to Canvas.
+2. Look at snapshot `types` (or live assignment). File, text, and URL are different submits.
+3. **File:** rename junk upload names (`Scanned Document 17.pdf` → a real title, spaces, keep extension). Store in that todo's OneDrive folder (`canvas-files.js store` or `submit --file`, which stores first). Then submit.
+4. **Text:** `submit --text '…'` or `--text-file` when the assignment allows `online_text_entry` (History paragraphs, some Data Sci). Do not wrap it in a fake PDF if text is allowed.
+5. **URL:** `submit --url https://…` when the assignment allows `online_url`.
 
 ```bash
 node --env-file=server/.env server/canvas-files.js submit --canvas-id <id> --file <abs or repo-rel path>
+node --env-file=server/.env server/canvas-files.js submit --canvas-id <id> --text 'the paragraph'
+node --env-file=server/.env server/canvas-files.js submit --canvas-id <id> --text-file /tmp/body.txt
+node --env-file=server/.env server/canvas-files.js submit --canvas-id <id> --url https://example.com/doc
 ```
 
-No chat file: submit the student file already in that OneDrive folder. Skip `todo.json`, `CONTEXT.md`, and `canvasFiles` (teacher attachments). One leftover student file: submit it. None or two+: ask.
+No chat file and no text/URL: submit the student file already in that OneDrive folder. Skip `todo.json`, `CONTEXT.md`, and `canvasFiles` (teacher attachments). One leftover student file: submit it. None or two+: ask.
 
 **Save / put this in / handle / store** (and any file request that does not say submit / turn in / upload to Canvas): identify the todo the same way, rename if needed, store on OneDrive. Stop. Do not call `submit`.
 
@@ -139,7 +162,7 @@ node --env-file=server/.env server/canvas-files.js store --src <path> --canvas-i
 node --env-file=server/.env server/canvas-files.js store --src <path> --class physics --todo "HW Sep 17 Motion Diagram Warm-Up"
 ```
 
-If Canvas only accepts a quiz, URL, or on-paper (`not-online-upload`), tell Yan. Do not fake a file submit. Do not write `done` / `completedAt` into `todo.json`. The live overlay picks up `submitted`. Do not curl Canvas yourself.
+If Canvas only accepts a quiz or on-paper (`unsupported` / `not-online-upload` with no text or URL type), tell Yan. Do not fake a file submit. A `need-text` or `need-url` result means ask him for the paragraph or link. Do not write `done` / `completedAt` into `todo.json`. The live overlay picks up `submitted`. Do not curl Canvas yourself.
 
 ## Teacher files (Express)
 
@@ -154,10 +177,11 @@ Hourly/nightly/fetch-only download assignment attachments into the matching OneD
 - **Never** touch fixtures (`"fixture": true` or ids starting `_example-`).
 - **Never** put Canvas rows on projects or user-level todos. Class folders only.
 - **Never** mix this with Fitness OS gym logs.
+- **Never** put Canvas comments, pages, modules, or course-file dumps on the education UI.
 
 ## Nightly review of hourly Composer
 
-Read `last-hourly-sync.json`. Walk mapped class todos against the **full** snapshot. Fix wrong tags, `HW:` prefixes left on names, Adv Calc HW dues pulled back to Canvas time, yoga CW `hiddenFromHome`, missing `canvasId`/`canvasLink`, duplicates, and course-map drift. Then do the usual full map (new junior-year courses may have appeared).
+Read `last-hourly-sync.json`. Walk mapped class todos against the **full** snapshot. Fix wrong tags, `HW:` prefixes left on names, Adv Calc HW dues pulled back to Canvas time, yoga CW `hiddenFromHome`, missing `canvasId`/`canvasLink`, duplicates, and course-map drift. Then do the usual full map (new junior-year courses may have appeared). Then fold `comments-new.md` into class/todo `CONTEXT.md` as above.
 
 ## After writes
 

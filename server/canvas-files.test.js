@@ -6,6 +6,7 @@ import { join } from "node:path";
 import {
   displayUploadName,
   pickSubmitFiles,
+  pickCanvasSubmitKind,
   writeFileIntoFolder,
 } from "./canvas-files.js";
 import { parseCanvasFileRefs } from "./canvas-sync.js";
@@ -108,5 +109,58 @@ describe("writeFileIntoFolder", () => {
     const dest = await writeFileIntoFolder(dir, "Motion Diagram Warm Up.pdf", src);
     assert.equal(dest, join(dir, "Motion Diagram Warm Up.pdf"));
     assert.equal(await readFile(dest, "utf8"), "hello canvas");
+  });
+});
+
+describe("pickCanvasSubmitKind", () => {
+  const both = ["online_text_entry", "online_upload"];
+
+  it("prefers an attached file when upload is allowed", () => {
+    assert.equal(
+      pickCanvasSubmitKind({
+        types: both,
+        text: "paragraph",
+        hasFile: true,
+      }),
+      "online_upload"
+    );
+  });
+
+  it("submits text when that is what Yan gave", () => {
+    assert.equal(
+      pickCanvasSubmitKind({
+        types: both,
+        text: "paragraph",
+        hasFile: false,
+      }),
+      "online_text_entry"
+    );
+  });
+
+  it("submits a URL when allowed", () => {
+    assert.equal(
+      pickCanvasSubmitKind({
+        types: ["online_url"],
+        url: "https://example.com/doc",
+      }),
+      "online_url"
+    );
+  });
+
+  it("asks for text when the assignment is text-only", () => {
+    assert.equal(
+      pickCanvasSubmitKind({ types: ["online_text_entry"] }),
+      "need-text"
+    );
+  });
+
+  it("rejects a file on a text-only assignment", () => {
+    assert.equal(
+      pickCanvasSubmitKind({
+        types: ["online_text_entry"],
+        hasFile: true,
+      }),
+      "not-online-upload"
+    );
   });
 });

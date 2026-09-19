@@ -16,6 +16,14 @@ function finiteFrom(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+function assignmentHasPostedScore(row, courseId) {
+  if (Number(row?.courseId) !== Number(courseId)) return false;
+  if (row?.excused) return true;
+  const state = String(row?.workflowState || "").toLowerCase();
+  if (state !== "graded") return false;
+  return finiteFrom(row?.score) != null;
+}
+
 export function formatCourseScoreLabel(score) {
   if (score == null || score === "") return "";
   const n = Number(score);
@@ -157,15 +165,13 @@ export function attachCanvasGrades(tree, snapshot, courseMap = null) {
     const fromMap = classByCanvas.get(String(cls.id || ""));
     const courseId = fromLink != null ? fromLink : fromMap;
     const course = courseId != null ? coursesById.get(Number(courseId)) : null;
-    const rawScore = course?.currentScore;
-    const score = Number(rawScore);
-    const hasPostedWork = (snapshot.assignments || []).some((row) => {
-      if (Number(row?.courseId) !== Number(courseId)) return false;
-      if (row?.score == null || row.score === "") return false;
-      return Number.isFinite(Number(row.score));
-    });
-    // Canvas reports 0 before anything is scored. Don't paint a fake F.
-    if (Number.isFinite(score) && !(score === 0 && !hasPostedWork)) {
+    const score = finiteFrom(course?.currentScore);
+    const hasPostedWork = (snapshot.assignments || []).some((row) =>
+      assignmentHasPostedScore(row, courseId)
+    );
+    // Canvas current_score is n/a until a grade is posted. Don't paint a
+    // leftover final_score (History 12% / F) or a 0 with nothing graded.
+    if (score != null && hasPostedWork) {
       cls.canvasScore = score;
       cls.canvasScoreLabel = formatCourseScoreLabel(score);
     }

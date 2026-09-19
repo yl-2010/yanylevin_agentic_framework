@@ -151,7 +151,7 @@ describe("attachCanvasGrades", () => {
       {
         courses: [{ id: 1, currentScore: 97.5 }],
         assignments: [
-          { id: 9, score: 4, pointsPossible: 5, workflowState: "graded" },
+          { id: 9, courseId: 1, score: 4, pointsPossible: 5, workflowState: "graded" },
         ],
       },
       { 1: "advanced-calculus" }
@@ -167,6 +167,43 @@ describe("attachCanvasGrades", () => {
     attachCanvasGrades(tree, {
       courses: [{ id: 2, currentScore: 0 }],
       assignments: [{ id: 1, courseId: 2, pointsPossible: 5, score: null }],
+    });
+    assert.equal(tree.classes[0].canvasScoreLabel, undefined);
+  });
+
+  it("hides a leftover final_score when Canvas current is still n/a", () => {
+    const tree = {
+      classes: [
+        { id: "us-history", canvasLink: "https://canvas.instructure.com/courses/3" },
+      ],
+    };
+    attachCanvasGrades(tree, {
+      courses: [{ id: 3, currentScore: 12 }],
+      assignments: [
+        {
+          id: 1,
+          courseId: 3,
+          score: 4,
+          pointsPossible: 5,
+          workflowState: "pending_review",
+        },
+      ],
+    });
+    assert.equal(tree.classes[0].canvasScoreLabel, undefined);
+    assert.equal(tree.classes[0].canvasScore, undefined);
+  });
+
+  it("does not treat a null currentScore as 0%", () => {
+    const tree = {
+      classes: [
+        { id: "us-history", canvasLink: "https://canvas.instructure.com/courses/3" },
+      ],
+    };
+    attachCanvasGrades(tree, {
+      courses: [{ id: 3, currentScore: null }],
+      assignments: [
+        { id: 1, courseId: 3, score: 4, pointsPossible: 5, workflowState: "graded" },
+      ],
     });
     assert.equal(tree.classes[0].canvasScoreLabel, undefined);
   });

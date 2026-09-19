@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   canvasDueSoonCount,
+  courseScores,
   formatCanvasAssignmentsMarkdown,
   canvasConfig,
   localDueParts,
@@ -50,6 +51,60 @@ describe("canvasDueSoonCount", () => {
 
   it("returns 0 without a snapshot", () => {
     assert.equal(canvasDueSoonCount(null), 0);
+  });
+});
+
+describe("courseScores", () => {
+  it("ignores final_score when Canvas current is still n/a", () => {
+    const scores = courseScores({
+      enrollments: [
+        {
+          type: "StudentEnrollment",
+          grades: {
+            current_score: null,
+            current_grade: null,
+            final_score: 12,
+            final_grade: "F",
+          },
+        },
+      ],
+    });
+    assert.equal(scores.currentScore, null);
+    assert.equal(scores.grade, "");
+  });
+
+  it("keeps the current percent and does not fall through to final F", () => {
+    const scores = courseScores({
+      enrollments: [
+        {
+          type: "student",
+          grades: {
+            current_score: 100,
+            current_grade: "A",
+            final_score: 1.6,
+            final_grade: "F",
+          },
+        },
+      ],
+    });
+    assert.equal(scores.currentScore, 100);
+    assert.equal(scores.grade, "A");
+  });
+
+  it("reads computed_current_score when grades is missing", () => {
+    const scores = courseScores({
+      enrollments: [
+        {
+          type: "student",
+          computed_current_score: null,
+          computed_final_score: 12,
+          computed_current_grade: null,
+          computed_final_grade: "F",
+        },
+      ],
+    });
+    assert.equal(scores.currentScore, null);
+    assert.equal(scores.grade, "");
   });
 });
 
@@ -444,6 +499,8 @@ describe("buildCanvasSyncPrompt", () => {
     assert.match(prompt, /classes\/lit\/todos\/essay/);
     assert.match(prompt, /last-hourly-sync/);
     assert.match(prompt, /Fix mistakes/);
+    assert.match(prompt, /comments-new\.md/);
+    assert.match(prompt, /pages\.md/);
   });
 });
 
@@ -459,5 +516,6 @@ describe("buildCanvasHourlyPrompt", () => {
     assert.match(prompt, /Do not look for new classes/);
     assert.match(prompt, /Do not edit course-map\.json/);
     assert.match(prompt, /NEVER write done/);
+    assert.match(prompt, /Do not fold Canvas comments/);
   });
 });

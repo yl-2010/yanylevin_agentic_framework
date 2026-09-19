@@ -1,7 +1,7 @@
 /**
  * Canvas assignment files on Yan's OneDrive class todos.
- * Pull teacher attachments into the todo folder. Submit Yan's file
- * from that folder (or a chat upload stored there first). Yan only.
+ * Pull teacher attachments into the todo folder. Submit Yan's file,
+ * text, or URL. Yan only.
  */
 
 import { randomBytes } from "node:crypto";
@@ -21,6 +21,7 @@ import {
   YAN_EMAIL,
 } from "./canvas-sync.js";
 import { canvasAssignmentIdFromLink, canvasCourseIdFromLink } from "./canvas-grades.js";
+import { fetchAssignmentComments } from "./canvas-context.js";
 import { listClassEntriesForRoot } from "./education-data.js";
 import { objectDirId } from "./education-onedrive.js";
 
@@ -307,9 +308,41 @@ function mimeForName(name) {
   return MIME_BY_EXT[ext] || "application/octet-stream";
 }
 
-function assignmentAllowsUpload(types) {
-  const list = Array.isArray(types) ? types.map((t) => String(t).toLowerCase()) : [];
-  return list.includes("online_upload");
+function normalizeSubmitTypes(types) {
+  return (Array.isArray(types) ? types : []).map((t) => String(t).toLowerCase());
+}
+
+export function assignmentAllowsUpload(types) {
+  return normalizeSubmitTypes(types).includes("online_upload");
+}
+
+export function assignmentAllowsText(types) {
+  return normalizeSubmitTypes(types).includes("online_text_entry");
+}
+
+export function assignmentAllowsUrl(types) {
+  return normalizeSubmitTypes(types).includes("online_url");
+}
+
+/**
+ * Pick how to submit. An attached file wins over text/url when upload is allowed.
+ * @param {{ types?: unknown, text?: string, url?: string, hasFile?: boolean }} opts
+ */
+export function pickCanvasSubmitKind(opts = {}) {
+  const types = normalizeSubmitTypes(opts.types);
+  const text = String(opts.text || "").trim();
+  const url = String(opts.url || "").trim();
+  const hasFile = Boolean(opts.hasFile);
+  if (hasFile && types.includes("online_upload")) return "online_upload";
+  if (url && types.includes("online_url")) return "online_url";
+  if (text && types.includes("online_text_entry")) return "online_text_entry";
+  if (hasFile) return "not-online-upload";
+  if (url) return "not-online-url";
+  if (text) return "not-online-text";
+  if (types.includes("online_upload")) return "need-file";
+  if (types.includes("online_text_entry")) return "need-text";
+  if (types.includes("online_url")) return "need-url";
+  return "unsupported";
 }
 
 async function canvasFormPost(base, token, path, params, { timeoutMs } = {}) {
@@ -461,18 +494,80 @@ export async function submitCanvasAssignment(opts = {}) {
   const { base, token, configured } = canvasConfig();
   if (!configured) return { ok: false, reason: "not configured" };
 
+  const text = String(opts.text || "").trim();
+  const url = String(opts.url || "").trim();
+  const incoming = [
+    ...(opts.src ? [opts.src] : []),
+    ...(Array.isArray(opts.files) ? opts.files : []),
+  ].filter(Boolean);
+
   const todo = opts.canvasId
     ? await findYanTodoByCanvasId(opts.canvasId)
     : await findYanTodoByFolder({ classId: opts.classId, todoId: opts.todoId });
-  if (!todo) return { ok: false, reason: "todo-not-found" };
+  const snapshot = await readCanvasSnapshot();
+  const canvasId =
+    Number(todo?.props?.canvasId) ||
+    canvasAssignmentIdFromLink(todo?.props?.canvasLink) ||
+    Number(opts.canvasId);
+  const fromSnap = (snapshot?.assignments || []).find(
+    (a) => Number(a?.id) === canvasId
+  );
+  const courseId =
+    canvasCourseIdFromLink(todo?.props?.canvasLink) ||
+    Number(fromSnap?.courseId) ||
+    Number(opts.courseId);
+  if (!Number.isFinite(canvasId) || !Number.isFinite(courseId)) {
+    return { ok: false, reason: todo ? "missing-canvas-ids" : "todo-not-found" };
+  }
+
+  const assignment = await liveAssignment(snapshot, canvasId, courseId);
+  const types = assignment?.types || [];
+  const kind = pickCanvasSubmitKind({
+    types,
+    text,
+    url,
+    hasFile: incoming.length > 0,
+  });
+  if (kind === "online_url") {
+    await canvasFormPost(
+      base,
+      token,
+      `/api/v1/courses/${courseId}/assignments/${canvasId}/submissions`,
+      {
+        "submission[submission_type]": "online_url",
+        "submission[url]": url,
+      }
+    );
+    patchLiveAssignmentSubmitted(canvasId);
+    return { ok: true, canvasId, courseId, kind, url };
+  }
+  if (kind === "online_text_entry") {
+    await canvasFormPost(
+      base,
+      token,
+      `/api/v1/courses/${courseId}/assignments/${canvasId}/submissions`,
+      {
+        "submission[submission_type]": "online_text_entry",
+        "submission[body]": text,
+      }
+    );
+    patchLiveAssignmentSubmitted(canvasId);
+    return {
+      ok: true,
+      canvasId,
+      courseId,
+      kind,
+      chars: text.length,
+    };
+  }
+  if (kind !== "online_upload" && kind !== "need-file") {
+    return { ok: false, reason: kind, types, canvasId, courseId };
+  }
+  if (!todo) return { ok: false, reason: "todo-not-found", canvasId, courseId };
 
   const storedNames = [];
   /** @type {string[]} */
   const extraPaths = [];
-  const incoming = [
-    ...(opts.src ? [opts.src] : []),
-    ...(Array.isArray(opts.files) ? opts.files : []),
-  ];
   const todoDir = resolve(todo.dir);
   for (const one of incoming) {
     const abs = resolveSrc(one);
@@ -493,17 +588,6 @@ export async function submitCanvasAssignment(opts = {}) {
     storedNames.push(stored.name);
   }
 
-  const canvasId =
-    Number(todo.props?.canvasId) ||
-    canvasAssignmentIdFromLink(todo.props?.canvasLink);
-  const courseId = canvasCourseIdFromLink(todo.props?.canvasLink);
-  if (!Number.isFinite(canvasId) || !Number.isFinite(courseId)) {
-    return { ok: false, reason: "missing-canvas-ids" };
-  }
-
-  const snapshot = await readCanvasSnapshot();
-  const assignment = await liveAssignment(snapshot, canvasId, courseId);
-  const types = assignment?.types || [];
   if (!assignmentAllowsUpload(types)) {
     return {
       ok: false,
@@ -561,6 +645,7 @@ export async function submitCanvasAssignment(opts = {}) {
     ok: true,
     canvasId,
     courseId,
+    kind: "online_upload",
     names: picked.files.map((f) => f.name),
     fileIds,
     extraPaths,
@@ -740,6 +825,12 @@ async function runCli(argv = process.argv.slice(2)) {
   if (cmd === "pull" || argv.includes("--pull-files")) {
     return pullCanvasAssignmentFiles();
   }
+  if (cmd === "comments") {
+    return readAssignmentCommentsCli({
+      canvasId: argValue(argv, "--canvas-id"),
+      courseId: argValue(argv, "--course-id"),
+    });
+  }
   if (cmd === "store") {
     return storeClassFile({
       src: argValue(argv, "--src") || argValue(argv, "--file"),
@@ -750,6 +841,10 @@ async function runCli(argv = process.argv.slice(2)) {
     });
   }
   if (cmd === "submit" || argv.includes("--submit")) {
+    const textFile = argValue(argv, "--text-file");
+    const textFromFile = textFile
+      ? await readFile(resolveSrc(textFile), "utf8")
+      : "";
     return submitCanvasAssignment({
       canvasId: argValue(argv, "--canvas-id"),
       classId: argValue(argv, "--class"),
@@ -757,6 +852,8 @@ async function runCli(argv = process.argv.slice(2)) {
       src: argValue(argv, "--src"),
       files: argList(argv, "--file"),
       name: argValue(argv, "--name"),
+      text: argValue(argv, "--text") || argValue(argv, "--body") || textFromFile,
+      url: argValue(argv, "--url"),
     });
   }
   return {
@@ -765,10 +862,40 @@ async function runCli(argv = process.argv.slice(2)) {
     usage: [
       "node --env-file=server/.env server/canvas-files.js submit --canvas-id ID",
       "node --env-file=server/.env server/canvas-files.js submit --canvas-id ID --file /path.pdf",
+      "node --env-file=server/.env server/canvas-files.js submit --canvas-id ID --text 'paragraph'",
+      "node --env-file=server/.env server/canvas-files.js submit --canvas-id ID --text-file /tmp/body.txt",
+      "node --env-file=server/.env server/canvas-files.js submit --canvas-id ID --url https://example.com",
+      "node --env-file=server/.env server/canvas-files.js comments --canvas-id ID",
       "node --env-file=server/.env server/canvas-files.js store --src /path.pdf --canvas-id ID",
       "node --env-file=server/.env server/canvas-files.js pull",
     ],
   };
+}
+
+async function readAssignmentCommentsCli(opts) {
+  const { base, token, configured } = canvasConfig();
+  if (!configured) return { ok: false, reason: "not configured" };
+  const snapshot = await readCanvasSnapshot();
+  const canvasId = Number(opts.canvasId);
+  const fromSnap = (snapshot?.assignments || []).find(
+    (a) => Number(a?.id) === canvasId
+  );
+  const todo = Number.isFinite(canvasId)
+    ? await findYanTodoByCanvasId(canvasId)
+    : null;
+  const courseId =
+    Number(opts.courseId) ||
+    canvasCourseIdFromLink(todo?.props?.canvasLink) ||
+    Number(fromSnap?.courseId);
+  if (!Number.isFinite(canvasId) || !Number.isFinite(courseId)) {
+    return { ok: false, reason: "missing-canvas-ids" };
+  }
+  return fetchAssignmentComments(base, token, {
+    courseId,
+    assignmentId: canvasId,
+    course: fromSnap?.course || "",
+    assignmentName: fromSnap?.title || todo?.props?.name || "",
+  });
 }
 
 const isMain = (() => {
