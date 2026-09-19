@@ -20,7 +20,7 @@ This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how
 
 - **Page open (Express, not you):** `/api/education/data?live=1` fetches submissions, planner complete, and grades for mapped courses and overlays `done` + `canvasWork` in the API. That does **not** write `todo.json`. You still never persist completion.
 - **Checkoff (Express, not you):** Yan checking off a Canvas-linked todo writes a planner override (`marked_complete`) so Canvas To-Do matches. Local-only todos stay local. You still never POST planner overrides.
-- **Submit (you, only when Yan says submit / turn in / upload to Canvas):** run `canvas-files.js submit`. Default looks in that assignment's OneDrive folder for a student file. A chat upload this turn is stored there first (rename junk names), then submitted. Ask if more than one file could be the work. Express also downloads teacher attachments into that folder; skip those (`todo.json` `canvasFiles`).
+- **Submit (you, only when Yan says submit / turn in / upload this to Canvas):** identify the assignment, rename+store the chat file on OneDrive if he attached one, then `canvas-files.js submit`. Save / put this in / handle the file never submits. Ask only if the assignment is actually unclear.
 - **Hourly:** Express runs a light fetch + this skill (mapped classes only, no new-class hunt) at **:00** in the briefing timezone, except the 01:00 nightly window. Restarts wait for the next :00. Writes `last-hourly-sync.json`. After the agent, Express pulls teacher files into OneDrive todos.
 - **Nightly:** Express runs the full fetch + this skill at **01:00** (`nightlyAgentsLocalTime` in `education/you@example.com/daily-briefing/meta.json`). Same slot as location compose/enrichment. Context synthesis is later (02:30). Daily briefing is 06:00. **Re-read what hourly Composer wrote during the day and fix mistakes.** Then Express pulls teacher files.
 - **Manual (Personal Agent):** Yan says sync / pull / update Canvas. First fetch, then apply this skill **in this turn** (full nightly rules, including class map). Do not spawn a nested Cursor agent. After writes, Express pull still runs on the next hourly/fetch; you may also `canvas-files.js pull`.
@@ -116,22 +116,30 @@ Read each mapped course `syllabus` plus snapshot `events[]`. Create/update **imp
 
 ## Submit (Personal Agent, Yan asked)
 
-Only when Yan says submit / turn in / upload this to Canvas. Not hourly. Not nightly. Not a checkoff.
+Turn in and save are different jobs.
 
-1. Identify the class todo (`canvasId` / `canvasLink` / Live context page).
-2. If this turn (or this chat) attached a file: store it in that todo's OneDrive folder first. Rename junk upload names (`Scanned Document 17.pdf` → a real title, spaces, keep extension). Then submit that file.
-3. If there is no chat file: look in the OneDrive todo folder. Skip `todo.json`, `CONTEXT.md`, and names in `canvasFiles` (those are teacher attachments Express already downloaded). If exactly one student file remains, submit it. If none, or two+, ask.
-4. Run:
+**Turn in / submit / upload this to Canvas** (file in this chat is enough; he does not have to name the assignment):
+
+1. Identify the assignment. Prefer Live context (open todo/class). Then filename vs todo names, due-soon Canvas rows, the class he is in. Ask only if two assignments are equally plausible.
+2. Rename junk upload names (`Scanned Document 17.pdf` → a real title, spaces, keep extension).
+3. Store in that todo's OneDrive folder (`canvas-files.js store` or `submit --file`, which stores first).
+4. Submit that file to Canvas.
 
 ```bash
-node --env-file=server/.env server/canvas-files.js submit --canvas-id <id>
-# or, with a chat upload:
 node --env-file=server/.env server/canvas-files.js submit --canvas-id <id> --file <abs or repo-rel path>
 ```
 
-That CLI copies into OneDrive when needed, then POSTs `online_upload`. If Canvas only accepts a quiz, URL, or on-paper, it returns `not-online-upload`. Tell Yan. Do not fake a file submit. Do not write `done` / `completedAt` into `todo.json`. The live overlay picks up `submitted`.
+No chat file: submit the student file already in that OneDrive folder. Skip `todo.json`, `CONTEXT.md`, and `canvasFiles` (teacher attachments). One leftover student file: submit it. None or two+: ask.
 
-Do not curl Canvas yourself.
+**Save / put this in / handle / store** (and any file request that does not say submit / turn in / upload to Canvas): identify the todo the same way, rename if needed, store on OneDrive. Stop. Do not call `submit`.
+
+```bash
+node --env-file=server/.env server/canvas-files.js store --src <path> --canvas-id <id>
+# or
+node --env-file=server/.env server/canvas-files.js store --src <path> --class physics --todo "HW Sep 17 Motion Diagram Warm-Up"
+```
+
+If Canvas only accepts a quiz, URL, or on-paper (`not-online-upload`), tell Yan. Do not fake a file submit. Do not write `done` / `completedAt` into `todo.json`. The live overlay picks up `submitted`. Do not curl Canvas yourself.
 
 ## Teacher files (Express)
 

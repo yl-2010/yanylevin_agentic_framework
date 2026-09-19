@@ -224,6 +224,7 @@ describe("Personal Agent skill files", () => {
     assert.match(dashboard, /showInDates/);
     assert.match(dashboard, /hiddenFromHome/);
     assert.match(dashboard, /canvas-files\.js store/);
+    assert.match(dashboard, /handle this file" is store only/);
     assert.doesNotMatch(dashboard, /```widget map/);
     assert.doesNotMatch(dashboard, /osascript/);
 
@@ -363,7 +364,9 @@ describe("Personal Agent skill files", () => {
     assert.match(canvas, /stop immediately/);
     assert.match(canvas, /not published on Canvas yet/);
     assert.match(canvas, /canvas-files\.js/);
-    assert.match(canvas, /online_upload/);
+    assert.match(canvas, /not-online-upload/);
+    assert.match(canvas, /Turn in and save are different jobs/);
+    assert.match(canvas, /never submits/);
 
     const imessage = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.imessage), "utf8");
     assert.match(imessage, /imessage-read\.js/);
