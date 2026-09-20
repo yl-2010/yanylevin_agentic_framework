@@ -53,6 +53,7 @@ import {
   GUEST_GROK_SPEC,
   guestRunModels,
   platformLabel,
+  withoutFast,
 } from "./guest-agent.js";
 import {
   AUTO_MODEL_SELECTION,
@@ -1569,12 +1570,31 @@ function guestAgentCreateOpts(guest) {
   };
 }
 
-function guestTurnModelSpec(session, hasSessionFiles) {
-  const guestFirstTurn =
-    Boolean(session.guestCaller?.model) &&
-    (Boolean(session.imessageDeliverFinal) || Boolean(session.teamsDeliverFinal));
-  const run = guestRunModels(session.guestCaller);
-  if (guestFirstTurn && run.preferred) return run.preferred;
+/** @agent iMessage/Teams first turn: same models as live chat, Fast off. */
+function mentionAgentCreateOpts(guest, workspace) {
+  if (workspace === "jype") {
+    return guestAgentCreateOpts({
+      ...(guest && typeof guest === "object" ? guest : {}),
+      model: copyModelSpec(GUEST_GROK_SPEC),
+    });
+  }
+  if (guest) return guestAgentCreateOpts(guest);
+  return {
+    model: withoutFast(DEFAULT_MODEL_SPEC),
+    fallbackModel: AUTO_MODEL_SELECTION,
+  };
+}
+
+export function guestTurnModelSpec(session, hasSessionFiles) {
+  const mentionFirstTurn =
+    Boolean(session.imessageDeliverFinal) || Boolean(session.teamsDeliverFinal);
+  if (mentionFirstTurn) {
+    const run = guestRunModels(session.guestCaller);
+    if (run.preferred) return run.preferred;
+    return withoutFast(
+      hasSessionFiles ? ATTACHMENT_MODEL_SPEC : DEFAULT_MODEL_SPEC
+    );
+  }
   return hasSessionFiles ? ATTACHMENT_MODEL_SPEC : DEFAULT_MODEL_SPEC;
 }
 
@@ -1636,7 +1656,7 @@ export async function startAgent(email, opts = {}) {
 
   const createOpts =
     workspace === "jype"
-      ? { ...opts, model: opts.model || copyModelSpec(GUEST_GROK_SPEC) }
+      ? { ...opts, model: opts.model || copyModelSpec(DEFAULT_MODEL_SPEC) }
       : opts;
   const agent = await createPersonalCursorAgent(createOpts);
 
@@ -1717,11 +1737,7 @@ export async function startAgentFromIMessageMention(message) {
         jypeGivenName(startEmail) ||
         "Yan"
       : "";
-  const createOpts = guestAgentCreateOpts(
-    workspace === "jype"
-      ? { ...guest, model: copyModelSpec(GUEST_GROK_SPEC) }
-      : guest
-  );
+  const createOpts = mentionAgentCreateOpts(guest, workspace);
   const started = await startAgent(startEmail, {
     ...createOpts,
     workspace,
@@ -1775,11 +1791,7 @@ export async function startAgentFromTeamsMention(message) {
         jypeGivenName(startEmail) ||
         "Yan"
       : "";
-  const createOpts = guestAgentCreateOpts(
-    workspace === "jype"
-      ? { ...guest, model: copyModelSpec(GUEST_GROK_SPEC) }
-      : guest
-  );
+  const createOpts = mentionAgentCreateOpts(guest, workspace);
   const started = await startAgent(startEmail, {
     ...createOpts,
     workspace,
@@ -1957,7 +1969,7 @@ export async function resumeAgent(sessionId, email, opts = {}) {
   }
 
   const agent = await createPersonalCursorAgent(
-    workspace === "jype" ? { model: copyModelSpec(GUEST_GROK_SPEC) } : {}
+    workspace === "jype" ? { model: copyModelSpec(DEFAULT_MODEL_SPEC) } : {}
   );
   /** @type {ChatMessage[]} */
   const messages = (loaded.messages || []).map((m) => {

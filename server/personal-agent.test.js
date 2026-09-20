@@ -9,6 +9,7 @@ import {
   ATTACHMENT_MODEL_SPEC,
   DEFAULT_MODEL_SPEC,
   EMPTY_TURN_REPLY,
+  guestTurnModelSpec,
   formatLiveContextBlock,
   buildYanLiveAppendix,
   isTruthyFlag,
@@ -46,6 +47,44 @@ describe("Personal Agent models", () => {
       { id: "effort", value: "high" },
       { id: "fast", value: "true" },
     ]);
+  });
+
+  it("turns Fast off for the first @agent turn, then back on in the app", () => {
+    const yanMention = guestTurnModelSpec(
+      { imessageDeliverFinal: true, guestCaller: null },
+      false
+    );
+    assert.equal(yanMention.id, "grok-4.6");
+    assert.deepEqual(yanMention.params, [
+      { id: "effort", value: "high" },
+      { id: "fast", value: "false" },
+    ]);
+    const later = guestTurnModelSpec(
+      { imessageDeliverFinal: false, guestCaller: null },
+      false
+    );
+    assert.deepEqual(later.params, DEFAULT_MODEL_SPEC.params);
+    const guestMention = guestTurnModelSpec(
+      {
+        imessageDeliverFinal: true,
+        guestCaller: {
+          slug: "alex-rivera",
+          displayName: "Alex",
+          model: {
+            id: "grok-4.6",
+            params: [
+              { id: "effort", value: "high" },
+              { id: "fast", value: "false" },
+            ],
+          },
+        },
+      },
+      false
+    );
+    assert.equal(
+      guestMention.params.find((p) => p.id === "fast")?.value,
+      "false"
+    );
   });
 });
 

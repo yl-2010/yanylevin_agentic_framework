@@ -70,14 +70,15 @@ export const GUEST_COMPOSER_SPEC = {
 
 export const GUEST_FRIEND_COMPOSER_SPEC = {
   id: "composer-2.5",
-  params: [{ id: "fast", value: "true" }],
+  params: [{ id: "fast", value: "false" }],
 };
 
+/** Grok for @agent (iMessage / Teams / JYPE group). Fast off. */
 export const GUEST_GROK_SPEC = {
   id: "grok-4.6",
   params: [
     { id: "effort", value: "high" },
-    { id: "fast", value: "true" },
+    { id: "fast", value: "false" },
   ],
 };
 
@@ -92,11 +93,11 @@ export function copyModelSpec(spec) {
   };
 }
 
-/** Fast on, keep other params (effort, etc.). */
-export function withFast(spec) {
+/** Fast off, keep other params (effort, etc.). */
+export function withoutFast(spec) {
   const next = copyModelSpec(spec);
   next.params = next.params.filter((p) => p.id !== "fast");
-  next.params.push({ id: "fast", value: "true" });
+  next.params.push({ id: "fast", value: "false" });
   return next;
 }
 
@@ -543,8 +544,8 @@ function getCachedPeople(deps = {}) {
 
 function guestModelSpec(useGrok, slug, name) {
   const friend = isFriendGuest(slug, name);
-  if (useGrok && friend) return withFast(GUEST_GROK_SPEC);
-  if (friend) return withFast(GUEST_FRIEND_COMPOSER_SPEC);
+  if (useGrok && friend) return copyModelSpec(GUEST_GROK_SPEC);
+  if (friend) return copyModelSpec(GUEST_FRIEND_COMPOSER_SPEC);
   return copyModelSpec(GUEST_COMPOSER_SPEC);
 }
 
@@ -558,17 +559,13 @@ function isJypeGuestCaller(slug, email, name) {
   return TEAMS_CLASS_OF_2028_ALLOW_GIVEN.has(givenNameOf(name).toLowerCase());
 }
 
-/** Preferred + fallback for a guest @agent turn. Friends stay Fast if Grok fails. */
+/** Preferred + fallback for a guest @agent turn. Friends stay on Composer if Grok fails. */
 export function guestRunModels(caller) {
   const friend = isFriendGuest(caller?.slug, caller?.displayName);
-  const preferred = caller?.model
-    ? friend
-      ? withFast(caller.model)
-      : copyModelSpec(caller.model)
-    : null;
+  const preferred = caller?.model ? copyModelSpec(caller.model) : null;
   return {
     preferred,
-    fallback: friend ? withFast(GUEST_FRIEND_COMPOSER_SPEC) : null,
+    fallback: friend ? copyModelSpec(GUEST_FRIEND_COMPOSER_SPEC) : null,
   };
 }
 
@@ -663,7 +660,7 @@ export async function evaluateGuestMention(opts) {
         handle,
         inContacts,
         audience: describeGuestAudience(platform, message),
-        model: withFast(GUEST_GROK_SPEC),
+        model: copyModelSpec(GUEST_GROK_SPEC),
         workspace: "jype",
       },
     };

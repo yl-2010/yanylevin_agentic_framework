@@ -29,7 +29,7 @@ import {
   takeGuestSlot,
   isTeamsClassOf2028Chat,
   isAllowedTeamsClassOf2028Caller,
-  withFast,
+  withoutFast,
 } from "./guest-agent.js";
 
 const PRASHAM = {
@@ -335,11 +335,11 @@ describe("guest-agent limits", () => {
     assert.equal(GUEST_GROK_SPEC.id, "grok-4.6");
     assert.equal(
       GUEST_GROK_SPEC.params.find((p) => p.id === "fast")?.value,
-      "true"
+      "false"
     );
     assert.equal(GUEST_COMPOSER_SPEC.id, "composer-2.5");
     assert.equal(GUEST_COMPOSER_SPEC.params[0].value, "false");
-    assert.equal(GUEST_FRIEND_COMPOSER_SPEC.params[0].value, "true");
+    assert.equal(GUEST_FRIEND_COMPOSER_SPEC.params[0].value, "false");
   });
 
   it("gives Alex, Example Friend, and Example Neighbor 20 turns per clock hour", async () => {
@@ -366,18 +366,18 @@ describe("guest-agent limits", () => {
     assert.equal(blocked.overHourly, true);
   });
 
-  it("forces Fast on Grok and Composer for the three friends", () => {
+  it("keeps Fast off on Grok and Composer for the three friends", () => {
     assert.equal(isFriendGuest("example-friend", ""), true);
     assert.equal(isFriendGuest("", "Example Neighbor"), true);
     assert.equal(isFriendGuest("", "Sam"), false);
-    const grok = withFast({
+    const grok = withoutFast({
       id: "grok-4.6",
       params: [
         { id: "effort", value: "high" },
-        { id: "fast", value: "false" },
+        { id: "fast", value: "true" },
       ],
     });
-    assert.equal(grok.params.find((p) => p.id === "fast")?.value, "true");
+    assert.equal(grok.params.find((p) => p.id === "fast")?.value, "false");
     assert.equal(grok.params.find((p) => p.id === "effort")?.value, "high");
     const run = guestRunModels({
       slug: "alex-rivera",
@@ -385,9 +385,9 @@ describe("guest-agent limits", () => {
       model: GUEST_GROK_SPEC,
     });
     assert.equal(run.preferred.id, "grok-4.6");
-    assert.equal(run.preferred.params.find((p) => p.id === "fast")?.value, "true");
+    assert.equal(run.preferred.params.find((p) => p.id === "fast")?.value, "false");
     assert.equal(run.fallback.id, "composer-2.5");
-    assert.equal(run.fallback.params.find((p) => p.id === "fast")?.value, "true");
+    assert.equal(run.fallback.params.find((p) => p.id === "fast")?.value, "false");
   });
 });
 
@@ -455,7 +455,7 @@ describe("evaluateGuestMention", () => {
     assert.equal(decision.caller.model.id, "grok-4.6");
     assert.equal(
       decision.caller.model.params.find((p) => p.id === "fast")?.value,
-      "true"
+      "false"
     );
     assert.equal(
       formatGuestUserBubble({
@@ -467,7 +467,7 @@ describe("evaluateGuestMention", () => {
     );
   });
 
-  it("uses Composer Fast for Example Friend after half the hourly Grok cap", async () => {
+  it("uses Composer for Example Friend after half the hourly Grok cap", async () => {
     const dir = await mkdtemp(join(tmpdir(), "guest-eval-"));
     const statePath = join(dir, "limits.json");
     const base = {
@@ -487,10 +487,10 @@ describe("evaluateGuestMention", () => {
     }
     const composer = await evaluateGuestMention(base);
     assert.equal(composer.caller.model.id, "composer-2.5");
-    assert.equal(composer.caller.model.params[0].value, "true");
+    assert.equal(composer.caller.model.params[0].value, "false");
   });
 
-  it("keeps Fast on for Example Friend even without a people-card slug", async () => {
+  it("keeps Fast off for Example Friend even without a people-card slug", async () => {
     const dir = await mkdtemp(join(tmpdir(), "guest-eval-"));
     const decision = await evaluateGuestMention({
       platform: "imessage",
@@ -508,7 +508,7 @@ describe("evaluateGuestMention", () => {
     assert.equal(decision.caller.model.id, "composer-2.5");
     assert.equal(
       decision.caller.model.params.find((p) => p.id === "fast")?.value,
-      "true"
+      "false"
     );
   });
 
@@ -762,6 +762,10 @@ describe("evaluateGuestMention", () => {
       const decision = await evaluateGuestMention(base);
       assert.equal(decision.action, "start");
       assert.equal(decision.caller.model.id, "grok-4.6");
+      assert.equal(
+        decision.caller.model.params.find((p) => p.id === "fast")?.value,
+        "false"
+      );
       assert.equal(decision.caller.workspace, "jype");
     }
 
