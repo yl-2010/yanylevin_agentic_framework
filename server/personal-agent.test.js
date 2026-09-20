@@ -36,20 +36,20 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const YAN = "you@example.com";
 
 describe("Personal Agent models", () => {
-  it("uses grok-4.6 high Fast for text and attachments", () => {
+  it("uses grok-4.6 high with Fast off for text and attachments", () => {
     assert.equal(DEFAULT_MODEL_SPEC.id, "grok-4.6");
     assert.deepEqual(DEFAULT_MODEL_SPEC.params, [
       { id: "effort", value: "high" },
-      { id: "fast", value: "true" },
+      { id: "fast", value: "false" },
     ]);
     assert.equal(ATTACHMENT_MODEL_SPEC.id, "grok-4.6");
     assert.deepEqual(ATTACHMENT_MODEL_SPEC.params, [
       { id: "effort", value: "high" },
-      { id: "fast", value: "true" },
+      { id: "fast", value: "false" },
     ]);
   });
 
-  it("turns Fast off for the first @agent turn, then back on in the app", () => {
+  it("keeps Fast off for @agent first turns and later app turns", () => {
     const yanMention = guestTurnModelSpec(
       { imessageDeliverFinal: true, guestCaller: null },
       false
