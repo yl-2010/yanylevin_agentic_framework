@@ -15,3 +15,11 @@ scripts/
 
 data/chat-log.md
 data/login-log.md
+
+# Local build junk. Vercel CLI does not honor nested gitignores, so the
+# electives scraper venv/cache was riding along in every production deploy.
+**/.venv/
+**/venv/
+**/__pycache__/
+prasham-schedule-options/build/
+Illustrator/

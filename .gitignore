@@ -24,6 +24,9 @@ ios/shortcuts/**/workflow.filled.shortcut
 ios/shortcuts/**/workflow.json
 education/*/.projects-opened.json
 data/headlines-assignments.json
+**/.venv/
+**/venv/
+**/__pycache__/
 
 # Operator data that must never be committed from a fork
 education/*/health/
