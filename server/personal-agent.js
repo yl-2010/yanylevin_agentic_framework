@@ -27,6 +27,7 @@ import {
   loadChatHistory,
   markChatHistoryRead,
   persistChatHistory,
+  resolveChatStarter,
   sanitizeSessionId,
   EPHEMERAL_HIDE_MS,
 } from "./education-chat-history.js";
@@ -97,6 +98,8 @@ const PA_ERROR_REPLY =
  * @typedef {{
  *   agent: any,
  *   email: string,
+ *   workspace?: string,
+ *   starter?: string,
  *   createdAt: number,
  *   lastUsedAt: number,
  *   uploads: StagedFile[],
@@ -1672,7 +1675,12 @@ export async function startAgent(email, opts = {}) {
     await releaseFocusFrom(priorId);
   }
 
-  const starter = String(opts.starter || jypeGivenName(normalized) || "").trim();
+  const starter = resolveChatStarter({
+    workspace,
+    email: normalized,
+    starter: opts.starter,
+    guest: opts.guest || opts.guestCaller,
+  });
   const uploadRoot =
     workspace === "jype"
       ? `education/projects/jype/.chat-uploads/${id}`
@@ -1731,17 +1739,11 @@ export async function startAgentFromIMessageMention(message) {
     workspace === "jype"
       ? jypeEmailForSlug(guest?.slug) || YAN_EMAIL
       : YAN_EMAIL;
-  const starter =
-    workspace === "jype"
-      ? String(guest?.displayName || "").split(/\s+/)[0] ||
-        jypeGivenName(startEmail) ||
-        "Yan"
-      : "";
   const createOpts = mentionAgentCreateOpts(guest, workspace);
   const started = await startAgent(startEmail, {
     ...createOpts,
     workspace,
-    starter,
+    guest,
   });
   const session = sessions.get(started.sessionId);
   if (!session) {
@@ -1785,17 +1787,11 @@ export async function startAgentFromTeamsMention(message) {
     workspace === "jype"
       ? jypeEmailForSlug(guest?.slug) || YAN_EMAIL
       : YAN_EMAIL;
-  const starter =
-    workspace === "jype"
-      ? String(guest?.displayName || "").split(/\s+/)[0] ||
-        jypeGivenName(startEmail) ||
-        "Yan"
-      : "";
   const createOpts = mentionAgentCreateOpts(guest, workspace);
   const started = await startAgent(startEmail, {
     ...createOpts,
     workspace,
-    starter,
+    guest,
   });
   const session = sessions.get(started.sessionId);
   if (!session) {
@@ -1988,7 +1984,12 @@ export async function resumeAgent(sessionId, email, opts = {}) {
     agent,
     email: normalized,
     workspace,
-    starter: "",
+    starter: resolveChatStarter({
+      workspace,
+      email: normalized,
+      starter: loaded.starter,
+      firstUserMessage: messages.find((m) => m.role === "user")?.content,
+    }),
     createdAt: Date.parse(loaded.started) || Date.now(),
     lastUsedAt: Date.now(),
     uploads: [],

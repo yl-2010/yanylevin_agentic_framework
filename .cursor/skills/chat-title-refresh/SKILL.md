@@ -1,15 +1,16 @@
 ---
 name: chat-title-refresh
 description: >-
-  Nightly Grok 4.6 high job: retitle Personal Agent chats from the full
-  transcript in short keyword style for the narrow past-chats list.
+  Nightly Grok 4.6 high job: retitle Personal Agent chats (yanylevin, not
+  JYPE) from the full transcript in short keyword style. Never prefix Yan:.
+  Guest @agent threads in this folder keep Name: via the Node wrapper.
   Also used for a one-shot historical backfill. Not live first-message titles.
 disable-model-invocation: true
 ---
 
-# Chat title refresh
+# Chat title refresh (Personal Agent)
 
-**Gate:** local Cursor agent only. Never spawn a cloud agent. Only rewrite `title:` lines in listed `education/<email>/.chat-history/<sessionId>.md` files. Do not edit messages, widgets, or other users' folders that were not listed.
+**Gate:** local Cursor agent only. Never spawn a cloud agent. Only rewrite `title:` lines in listed `education/<email>/.chat-history/<sessionId>.md` files. Do not edit messages, widgets, or other users' folders that were not listed. JYPE chats are a different skill: `.cursor/skills/jype-chat-title-refresh/SKILL.md`. You will not be given those files.
 
 Model: **grok-4.6 high** (effort=high, fast=false).
 
@@ -26,17 +27,19 @@ No quotes. No trailing punctuation. No em dashes. No explanation.
 
 The iOS/web past-chats drawer is a **narrow single line** with ellipsis. Front-load the words Yan would scan for.
 
+This is Yan's personal history. **Never start a title with `Yan:`.** Do not write `Name:` yourself. Keep the `starter:` header if the file already has one. The Node wrapper adds `Name:` only when `starter:` is someone else (guest `@agent` in a non-JYPE chat that lands here instead of JYPE history).
+
 Examples:
 
 - `Calculate Exact API Cost` → `API cost vs plan`
+- `Yan: Robotaxi rides from email plates` → `robotaxi email plates`
 - `Simple Hello Greeting` → `hi`
-- `Robotaxi rides from email plates` → `robotaxi email plates`
 - `Example Friend not Jeffrey` → `Example Friend spelling`
 
 ## Steps
 
 1. Use only the file list in the prompt (path + current title). Do not glob `.chat-history/`.
 2. For each listed file: Read the full markdown. Infer a title from the entire User/Assistant conversation, not the first message alone.
-3. Rewrite only the `title: …` line (add it after `updated:` if missing). Keep session, email, started, updated, visibility, ephemeral, and every `## User` / `## Assistant` block unchanged.
+3. Rewrite only the `title: …` line (add it after `updated:` if missing). Keep session, email, started, updated, visibility, ephemeral, starter, workspace, and every `## User` / `## Assistant` block unchanged.
 4. If the thread is empty or only "hi" with no topic, a tiny keyword (`hi`) is fine. Do not invent a topic that is not in the transcript.
 5. Stop when every listed file has a keyword title. Do not git commit (the Node wrapper does that).

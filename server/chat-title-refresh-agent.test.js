@@ -58,6 +58,7 @@ describe("chat title refresh prompt", () => {
       ],
     });
     assert.match(prompt, /chat-title-refresh skill/);
+    assert.match(prompt, /Never start with Yan/);
     assert.match(prompt, /Never spawn a Cursor cloud agent/);
     assert.match(prompt, /\.chat-history\/aaaa1111-bbbb-4ccc-8ddd-eeeeffff0001\.md/);
     assert.match(prompt, /Nearby Places to Eat/);
@@ -76,6 +77,28 @@ describe("chat title refresh prompt", () => {
     });
     assert.match(prompt, /Backfill:/);
     assert.doesNotMatch(prompt, /last 24 hours/);
+  });
+
+  it("uses the JYPE skill and keeps starter", () => {
+    const prompt = buildChatTitleRefreshPrompt({
+      dateKey: "2026-08-18",
+      timezone: "America/Chicago",
+      kind: "jype",
+      chats: [
+        {
+          path: "education/projects/jype/.chat-history/aaaa1111-bbbb-4ccc-8ddd-eeeeffff0001.md",
+          email: "you@example.com",
+          starter: "Alex",
+          updated: "2026-08-17T20:00:00.000Z",
+          title: "Alex: English homework BS",
+        },
+      ],
+    });
+    assert.match(prompt, /jype-chat-title-refresh skill/);
+    assert.match(prompt, /jype-chat-title-refresh\/SKILL\.md/);
+    assert.match(prompt, /Keep starter:/);
+    assert.match(prompt, /starter=Alex/);
+    assert.doesNotMatch(prompt, /Never start with Yan/);
   });
 });
 

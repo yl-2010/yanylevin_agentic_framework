@@ -96,7 +96,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | School Outlook fill (manual, one-shot) | `.cursor/skills/brain-school-mail/SKILL.md` |
 | School Teams fill (manual, one-shot) | `.cursor/skills/brain-school-teams/SKILL.md` |
 | Apple Mail fill (manual, one-shot) | `.cursor/skills/brain-apple-mail/SKILL.md` |
-| Chat title refresh (manual / backfill) | `.cursor/skills/chat-title-refresh/SKILL.md` |
+| Chat title refresh (manual / backfill) | `.cursor/skills/chat-title-refresh/SKILL.md` (Personal Agent) and `.cursor/skills/jype-chat-title-refresh/SKILL.md` (JYPE) |
 | Life-state cleanup (manual) | `.cursor/skills/life-state-cleanup/SKILL.md` |
 
 Live context on Express turns is authoritative for clock, class-now, the open screen, and (Yan) today’s Apple Calendar plus a Canvas due-soon count. Trust it. Mail, iMessage, Screen Time, Contacts, OneNote, Teams, and Apple Home stay on-demand files (Teams is also a nightly dump). OneNote is not a nightly default source. Open it when a school question is about an agenda, HW instructions, maps, or day packets (class `CONTEXT.md` has the section map), or when a job already names a notebook or page. Named-people lookup above still opens `brain/people/`. Other `education/<email>/` files only when the question needs that data.

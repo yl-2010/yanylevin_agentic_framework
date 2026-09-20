@@ -23,6 +23,8 @@ describe("titleFromAgentReply", () => {
     assert.match(TITLE_PROMPT, /24-36 characters/);
     assert.match(TITLE_PROMPT, /@agent/);
     assert.doesNotMatch(TITLE_PROMPT, /3 to 6 words/);
+    assert.match(TITLE_PROMPT, /Do not prefix/);
+    assert.doesNotMatch(TITLE_PROMPT, /Keep the person's name/);
     assert.equal(TITLE_MODEL.id, "composer-2.5");
     assert.equal(
       TITLE_MODEL.params.find((p) => p.id === "fast")?.value,

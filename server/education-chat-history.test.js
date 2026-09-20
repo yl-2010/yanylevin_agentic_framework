@@ -23,7 +23,10 @@ import {
   patchChatHistoryTitle,
   patchChatHistoryVisibility,
   persistChatHistory,
+  applyChatTitleStarter,
   applyChatWorkingStatus,
+  resolveChatStarter,
+  reapplyChatTitleStarters,
   relativeChatAge,
   sanitizeChatTitle,
   sanitizeChatVisibility,
@@ -35,6 +38,72 @@ import {
 
 const SID = "7f3a91c2-abcd-4ef0-8123-456789abcdef";
 const EMAIL = "you@example.com";
+
+describe("chat title starter", () => {
+  it("skips Yan: on personal chats and keeps guest names", () => {
+    assert.equal(resolveChatStarter({ email: EMAIL, starter: "Yan" }), "");
+    assert.equal(
+      resolveChatStarter({ email: EMAIL, starter: "Alex" }),
+      "Alex"
+    );
+    assert.equal(
+      resolveChatStarter({
+        email: EMAIL,
+        firstUserMessage: "From Example Friend on Teams:\n\n@agent hi",
+      }),
+      "Example Friend"
+    );
+    assert.equal(
+      applyChatTitleStarter("API cost vs plan", { email: EMAIL, starter: "Yan" }),
+      "API cost vs plan"
+    );
+    assert.equal(
+      applyChatTitleStarter("Yan: API cost vs plan", { email: EMAIL }),
+      "API cost vs plan"
+    );
+    assert.equal(
+      applyChatTitleStarter("High school video grade F", {
+        email: EMAIL,
+        firstUserMessage: "From Example Friend on Teams:\n\n@agent the assignment",
+      }),
+      "Example Friend: High school video grade F"
+    );
+  });
+
+  it("always prefixes JYPE with who started", () => {
+    assert.equal(
+      resolveChatStarter({
+        workspace: "jype",
+        email: EMAIL,
+        starter: "Yan",
+      }),
+      "Yan"
+    );
+    assert.equal(
+      applyChatTitleStarter("eBay SEO title", {
+        workspace: "jype",
+        email: EMAIL,
+        starter: "Yan",
+      }),
+      "Yan: eBay SEO title"
+    );
+    assert.equal(
+      applyChatTitleStarter("Alex: Alex English homework BS", {
+        workspace: "jype",
+        email: "you@example.com",
+        starter: "Alex",
+      }),
+      "Alex: English homework BS"
+    );
+    assert.equal(
+      applyChatTitleStarter("caber hard verb", {
+        workspace: "jype",
+        email: "everettedeng@gmail.com",
+      }),
+      "Example Neighbor: caber hard verb"
+    );
+  });
+});
 
 describe("sanitizeSessionId", () => {
   it("keeps UUIDs and edu ids", () => {
@@ -156,6 +225,22 @@ describe("format/parse markdown", () => {
     const meta = parseChatHistoryMeta(md);
     assert.equal(meta.title, "Calc homework due Friday");
     assert.match(md, /^title: Calc homework due Friday$/m);
+  });
+
+  it("round-trips starter and workspace", () => {
+    const md = formatChatHistoryMarkdown({
+      email: EMAIL,
+      sessionId: SID,
+      title: "Yan: eBay SEO title",
+      workspace: "jype",
+      starter: "Yan",
+      messages: [{ role: "user", content: "@agent ebay" }],
+    });
+    const meta = parseChatHistoryMeta(md);
+    assert.equal(meta.workspace, "jype");
+    assert.equal(meta.starter, "Yan");
+    assert.match(md, /^workspace: jype$/m);
+    assert.match(md, /^starter: Yan$/m);
   });
 
   it("parses messages and widget fences", () => {
@@ -422,6 +507,108 @@ describe("persist/list", () => {
       const all = await listChatHistory({ root, email: EMAIL });
       assert.equal(all.length, 1);
       assert.equal(all[0].title, "Friday calc HW");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("strips Yan: on personal persist and prefixes guest @agent", async () => {
+    const root = await mkdtemp(join(tmpdir(), "edu-chat-starter-"));
+    const guestSid = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    try {
+      await persistChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        title: "Yan: API cost vs plan",
+        starter: "Yan",
+        messages: [{ role: "user", content: "what does the API cost" }],
+      });
+      const yan = await loadChatHistory({ root, email: EMAIL, sessionId: SID });
+      assert.equal(yan?.title, "API cost vs plan");
+      assert.equal(yan?.starter, "");
+
+      await persistChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: guestSid,
+        title: "High school video grade F",
+        starter: "Yan",
+        messages: [
+          {
+            role: "user",
+            content: "From Example Friend on Teams:\n\n@agent high school",
+          },
+        ],
+      });
+      const guest = await loadChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: guestSid,
+      });
+      assert.equal(guest?.title, "Example Friend: High school video grade F");
+      assert.equal(guest?.starter, "Example Friend");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps Name: on JYPE persist and nightly reapply", async () => {
+    const root = await mkdtemp(join(tmpdir(), "edu-chat-jype-starter-"));
+    try {
+      await persistChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        workspace: "jype",
+        starter: "Yan",
+        title: "eBay SEO title",
+        messages: [{ role: "user", content: "@agent ebay title" }],
+      });
+      const loaded = await loadChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        workspace: "jype",
+      });
+      assert.equal(loaded?.title, "Yan: eBay SEO title");
+      assert.equal(loaded?.starter, "Yan");
+
+      await patchChatHistoryTitle({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        workspace: "jype",
+        title: "battery steps redo",
+      });
+      const wiped = await loadChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        workspace: "jype",
+      });
+      assert.equal(wiped?.title, "battery steps redo");
+
+      const changed = await reapplyChatTitleStarters(
+        [
+          {
+            email: EMAIL,
+            sessionId: SID,
+            workspace: "jype",
+            starter: "Yan",
+          },
+        ],
+        root
+      );
+      assert.equal(changed, 1);
+      const restored = await loadChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        workspace: "jype",
+      });
+      assert.equal(restored?.title, "Yan: battery steps redo");
+      assert.equal(restored?.starter, "Yan");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

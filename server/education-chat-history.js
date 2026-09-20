@@ -10,7 +10,11 @@ import { fileURLToPath } from "node:url";
 import { canonicalizeEmail } from "./identity.js";
 import { formatWidgetsAsFences, parseAgentReply } from "./chat-widgets.js";
 import { stripAgentSentFooter } from "./imessage-mention.js";
-import { JYPE_ROOT_REL, normalizeJypeWorkspace } from "./jype.js";
+import {
+  JYPE_ROOT_REL,
+  jypeGivenName,
+  normalizeJypeWorkspace,
+} from "./jype.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const CHAT_HISTORY_DIRNAME = ".chat-history";
@@ -110,6 +114,77 @@ export function fallbackChatTitle(raw) {
   return sanitizeChatTitle(raw) || String(raw || "").replace(/\s+/g, " ").trim().slice(0, TITLE_MAX);
 }
 
+export const CHAT_GUEST_WRAP_RE = /^From\s+(.+?)\s+on\s+(Teams|iMessage):\s*/i;
+
+function escapeRegExp(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * First given name from a guest @agent caller object.
+ * @param {{ displayName?: string }|null|undefined} guest
+ */
+export function chatStarterFromGuest(guest) {
+  return String(guest?.displayName || "")
+    .trim()
+    .split(/\s+/)[0] || "";
+}
+
+/**
+ * Guest @agent first bubbles start with "From Name on Teams/iMessage:".
+ * @param {unknown} raw
+ */
+export function starterFromGuestUserMessage(raw) {
+  const s = String(raw || "").trim();
+  const wrap = s.match(CHAT_GUEST_WRAP_RE);
+  if (!wrap) return "";
+  return String(wrap[1] || "")
+    .trim()
+    .split(/\s+/)[0] || "";
+}
+
+/**
+ * Who the title should be attributed to.
+ * JYPE always prefixes the person who started the thread.
+ * Personal Agent only prefixes someone other than the folder owner
+ * (guest @agent in a non-JYPE chat that lands in Yan's history).
+ * @param {{
+ *   workspace?: string,
+ *   email?: string,
+ *   starter?: string,
+ *   guest?: { displayName?: string }|null,
+ *   firstUserMessage?: string,
+ * }} [opts]
+ */
+export function resolveChatStarter(opts = {}) {
+  const workspace = normalizeJypeWorkspace(opts.workspace);
+  const email = canonicalizeEmail(opts.email);
+  const fromGuest = chatStarterFromGuest(opts.guest);
+  const fromMessage = starterFromGuestUserMessage(opts.firstUserMessage);
+  const named = String(fromGuest || fromMessage || opts.starter || "").trim();
+  if (workspace === "jype") {
+    return named || jypeGivenName(email) || "";
+  }
+  const owner = jypeGivenName(email);
+  if (!named) return "";
+  if (owner && named.toLowerCase() === owner.toLowerCase()) return "";
+  return named;
+}
+
+export function stripChatTitlePrefix(title, starter) {
+  const t = sanitizeChatTitle(title);
+  const s = String(starter || "").trim();
+  if (!s || !t) return t;
+  const escaped = escapeRegExp(s);
+  const colon = new RegExp(`^${escaped}:\\s*`, "i");
+  let next = t.replace(colon, "").trim();
+  if (next !== t) {
+    next = next.replace(colon, "").trim();
+    next = next.replace(new RegExp(`^${escaped}\\s+`, "i"), "").trim();
+  }
+  return next;
+}
+
 export function prefixChatTitle(title, starter) {
   const t = sanitizeChatTitle(title);
   const s = String(starter || "").trim();
@@ -117,6 +192,29 @@ export function prefixChatTitle(title, starter) {
   const prefix = `${s}: `;
   if (t.toLowerCase().startsWith(prefix.toLowerCase())) return t;
   return sanitizeChatTitle(`${prefix}${t}`);
+}
+
+/**
+ * Final list title: JYPE always `Name: …`. Personal Agent never `Yan:`.
+ * Guest @agent in Yan's personal history keeps `Name:`.
+ * @param {unknown} title
+ * @param {{
+ *   workspace?: string,
+ *   email?: string,
+ *   starter?: string,
+ *   guest?: { displayName?: string }|null,
+ *   firstUserMessage?: string,
+ * }} [opts]
+ */
+export function applyChatTitleStarter(title, opts = {}) {
+  const resolved = resolveChatStarter(opts);
+  let t = sanitizeChatTitle(title);
+  if (resolved) {
+    return prefixChatTitle(stripChatTitlePrefix(t, resolved), resolved);
+  }
+  const owner = jypeGivenName(opts.email);
+  if (owner) t = stripChatTitlePrefix(t, owner);
+  return t;
 }
 
 /**
@@ -229,6 +327,8 @@ export function formatChatHistoryMarkdown(opts) {
  *   visibility: 'showing'|'hidden',
  *   ephemeral: boolean,
  *   preview: string,
+ *   workspace: string,
+ *   starter: string,
  * }}
  */
 export function parseChatHistoryMeta(markdown) {
@@ -255,6 +355,8 @@ export function parseChatHistoryMeta(markdown) {
     title: sanitizeChatTitle(titleMatch ? titleMatch[1] : ""),
     visibility: sanitizeChatVisibility(field("visibility")),
     ephemeral: sanitizeChatEphemeral(field("ephemeral")),
+    workspace: normalizeJypeWorkspace(field("workspace")),
+    starter: field("starter"),
     preview,
   };
 }
@@ -525,6 +627,7 @@ export async function persistChatHistory(opts) {
   }
   let previousUpdated = "";
   let isNew = false;
+  let starter = String(opts?.starter || "").trim();
   try {
     const existing = await readFile(abs, "utf8");
     const meta = parseChatHistoryMeta(existing);
@@ -533,8 +636,25 @@ export async function persistChatHistory(opts) {
     if (!title) title = meta.title;
     if (!visibility) visibility = meta.visibility;
     if (ephemeral == null) ephemeral = meta.ephemeral;
+    if (!starter) starter = meta.starter;
   } catch {
     isNew = true;
+  }
+  const firstUser =
+    messages.find((m) => m.role === "user")?.content || "";
+  starter = resolveChatStarter({
+    email,
+    workspace: opts?.workspace,
+    starter,
+    firstUserMessage: firstUser,
+  });
+  if (title) {
+    title = applyChatTitleStarter(title, {
+      email,
+      workspace: opts?.workspace,
+      starter,
+      firstUserMessage: firstUser,
+    });
   }
 
   const updatedAtRaw = new Date();
@@ -575,7 +695,7 @@ export async function persistChatHistory(opts) {
     visibility: visibility || "showing",
     ephemeral: Boolean(ephemeral),
     workspace: opts?.workspace,
-    starter: opts?.starter,
+    starter,
   });
   await writeFile(abs, markdown, "utf8");
   return rel;
@@ -606,15 +726,88 @@ export async function patchChatHistoryTitle(opts) {
     }
     throw err;
   }
-  let next;
-  if (/^title:\s+/m.test(text)) {
-    next = text.replace(/^title:\s+.*$/m, `title: ${title}`);
+  let next = text;
+  if (/^title:\s+/m.test(next)) {
+    next = next.replace(/^title:\s+.*$/m, `title: ${title}`);
   } else {
-    next = text.replace(/^(updated:\s+\S+)\s*$/m, `$1\ntitle: ${title}`);
+    next = next.replace(/^(updated:\s+\S+)\s*$/m, `$1\ntitle: ${title}`);
+  }
+  if (Object.prototype.hasOwnProperty.call(opts, "starter")) {
+    const starter = String(opts.starter || "").trim();
+    if (starter) {
+      if (/^starter:\s+/m.test(next)) {
+        next = next.replace(/^starter:\s+.*$/m, `starter: ${starter}`);
+      } else if (/^workspace:\s+/m.test(next)) {
+        next = next.replace(/^(workspace:\s+\S+)\s*$/m, `$1\nstarter: ${starter}`);
+      } else if (/^title:\s+/m.test(next)) {
+        next = next.replace(/^(title:\s+.*)$/m, `$1\nstarter: ${starter}`);
+      } else {
+        next = next.replace(/^(updated:\s+\S+)\s*$/m, `$1\nstarter: ${starter}`);
+      }
+    } else {
+      next = next.replace(/^starter:\s+.*\r?\n/m, "");
+    }
   }
   if (next === text) return title;
   await writeFile(abs, next, "utf8");
   return title;
+}
+
+/**
+ * After a title rewrite, put `Name:` back (or strip `Yan:` on personal chats).
+ * @param {{
+ *   email?: string,
+ *   sessionId?: string,
+ *   workspace?: string,
+ *   starter?: string,
+ * }[]} rows
+ * @param {string} [root]
+ */
+export async function reapplyChatTitleStarters(rows, root) {
+  let changed = 0;
+  for (const row of rows || []) {
+    const email = canonicalizeEmail(row.email);
+    const sessionId = sanitizeSessionId(row.sessionId);
+    const workspace = normalizeJypeWorkspace(row.workspace);
+    if (!email || !sessionId) continue;
+    const loaded = await loadChatHistory({
+      email,
+      sessionId,
+      workspace,
+      root,
+    });
+    if (!loaded) continue;
+    const firstUser =
+      loaded.messages.find((m) => m.role === "user")?.content ||
+      loaded.preview ||
+      "";
+    const starter = resolveChatStarter({
+      email,
+      workspace,
+      starter: loaded.starter || row.starter,
+      firstUserMessage: firstUser,
+    });
+    const title = applyChatTitleStarter(loaded.title, {
+      email,
+      workspace,
+      starter,
+      firstUserMessage: firstUser,
+    });
+    if (!title) continue;
+    if (title === loaded.title && starter === (loaded.starter || "")) {
+      continue;
+    }
+    const patched = await patchChatHistoryTitle({
+      email,
+      sessionId,
+      title,
+      starter,
+      root,
+      workspace,
+    });
+    if (patched) changed += 1;
+  }
+  return changed;
 }
 
 /**
@@ -696,6 +889,8 @@ export async function loadChatHistory(opts) {
     started: meta.started,
     updated: meta.updated,
     preview: meta.preview,
+    workspace: meta.workspace || normalizeJypeWorkspace(opts?.workspace),
+    starter: meta.starter,
     messages: parseChatHistoryMessages(text),
   };
 }
@@ -749,6 +944,8 @@ async function readChatHistoryRows(opts) {
         updated: meta.updated || new Date(st.mtimeMs).toISOString(),
         preview: meta.preview,
         started: meta.started,
+        starter: meta.starter,
+        workspace: meta.workspace || normalizeJypeWorkspace(opts?.workspace),
         mtimeMs: st.mtimeMs,
       });
     } catch {
@@ -787,11 +984,13 @@ export function chatHistoryTouchMs(row) {
  */
 export async function listChatHistoryFiles(opts) {
   const email = canonicalizeEmail(opts?.email);
+  const workspace = normalizeJypeWorkspace(opts?.workspace);
   const rows = await readChatHistoryRows(opts);
-  const dir = chatHistoryDirRel(email, opts?.workspace);
+  const dir = chatHistoryDirRel(email, workspace);
   return rows.map((row) => ({
     ...row,
     email,
+    workspace: row.workspace || workspace,
     path: `${dir}/${row.sessionId}.md`,
   }));
 }

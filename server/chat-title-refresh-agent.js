@@ -19,7 +19,9 @@ import {
   chatHistoryDirRel,
   chatHistoryTouchMs,
   listChatHistoryFiles,
+  reapplyChatTitleStarters,
 } from "./education-chat-history.js";
+import { normalizeJypeWorkspace } from "./jype.js";
 import { gitAddCommitPush } from "./git-publish.js";
 import { FULL_ACCESS_EMAILS, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
 import {
@@ -208,6 +210,11 @@ export function selectChatTitleRefreshTargets(rows, opts = {}) {
  * @param {number} [opts.batch]
  * @param {number} [opts.batchCount]
  */
+export const PERSONAL_CHAT_TITLE_SKILL =
+  ".cursor/skills/chat-title-refresh/SKILL.md";
+export const JYPE_CHAT_TITLE_SKILL =
+  ".cursor/skills/jype-chat-title-refresh/SKILL.md";
+
 export function buildChatTitleRefreshPrompt({
   dateKey,
   timezone,
@@ -215,24 +222,31 @@ export function buildChatTitleRefreshPrompt({
   chats,
   batch = 1,
   batchCount = 1,
+  kind = "personal",
 }) {
+  const jype = kind === "jype";
+  const skill = jype ? JYPE_CHAT_TITLE_SKILL : PERSONAL_CHAT_TITLE_SKILL;
   const lines = (chats || []).map((row) => {
     const path = String(row.path || "").trim();
     const title = String(row.title || "").trim() || "(none)";
     const email = String(row.email || "").trim();
     const updated = String(row.updated || "").trim();
-    return `- ${path}  email=${email}  updated=${updated}  title=${title}`;
+    const starter = String(row.starter || "").trim() || "(none)";
+    return `- ${path}  email=${email}  starter=${starter}  updated=${updated}  title=${title}`;
   });
   const window = backfill
     ? "Backfill: every listed thread is from before local today. Skip chats that are only from today."
     : "Nightly window: listed threads were updated in the last 24 hours.";
+  const who = jype
+    ? "Retitle JYPE agent chats from the full transcript. Keep starter:. The wrapper restores Name: after you finish."
+    : "Retitle Personal Agent chats from the full transcript. Never start with Yan:. The wrapper adds Name: only for guest @agent threads.";
   return [
-    "Follow the chat-title-refresh skill (.cursor/skills/chat-title-refresh/SKILL.md).",
-    "Retitle Personal Agent chats from the full transcript. Local only. Never spawn a Cursor cloud agent.",
+    `Follow the ${jype ? "jype-chat-title-refresh" : "chat-title-refresh"} skill (${skill}).`,
+    `${who} Local only. Never spawn a Cursor cloud agent.`,
     `Today's date key: ${dateKey} (timezone ${timezone}). Batch ${batch} of ${batchCount}.`,
     window,
     CHAT_TITLE_STYLE,
-    "Read each listed file. Rewrite only the title: line. Keep visibility and ephemeral. Do not change messages. Do not glob .chat-history/. Do not git commit.",
+    "Read each listed file. Rewrite only the title: line. Keep visibility, ephemeral, starter, and workspace. Do not change messages. Do not glob .chat-history/. Do not git commit.",
     "Listed chats:",
     lines.join("\n") || "(none)",
   ].join("\n");
@@ -395,44 +409,74 @@ async function runChatTitleRefreshOnce({
       apiKey,
       CHAT_TITLE_REFRESH_MODEL_SPEC
     );
-    const batches = chunkArray(chats, CHAT_TITLE_REFRESH_BATCH_SIZE);
+    const personalChats = chats.filter(
+      (row) => normalizeJypeWorkspace(row.workspace) !== "jype"
+    );
+    const jypeChats = chats.filter(
+      (row) => normalizeJypeWorkspace(row.workspace) === "jype"
+    );
+    const personalBatches = chunkArray(
+      personalChats,
+      CHAT_TITLE_REFRESH_BATCH_SIZE
+    );
+    const jypeBatches = chunkArray(jypeChats, CHAT_TITLE_REFRESH_BATCH_SIZE);
+    const batchCount = personalBatches.length + jypeBatches.length;
     console.log(
-      `[chat-title-refresh] ${dateKey} tz=${timezone} model=${model.id} chats=${chats.length} batches=${batches.length}${backfill ? " backfill" : ""}`
+      `[chat-title-refresh] ${dateKey} tz=${timezone} model=${model.id} chats=${chats.length} personal=${personalChats.length} jype=${jypeChats.length} batches=${batchCount}${backfill ? " backfill" : ""}`
     );
 
     let lastResult = null;
-    for (let i = 0; i < batches.length; i++) {
-      const prompt = buildChatTitleRefreshPrompt({
-        dateKey,
-        timezone,
-        backfill,
-        chats: batches[i],
-        batch: i + 1,
-        batchCount: batches.length,
-      });
-      const { result, authFailed, capacityFailed, transientFailed, usedFallback } =
-        await promptWithAuthRetry({
+    let batchNum = 0;
+    const runKind = async (kind, batches) => {
+      for (const batchChats of batches) {
+        batchNum += 1;
+        const prompt = buildChatTitleRefreshPrompt({
+          dateKey,
+          timezone,
+          backfill,
+          chats: batchChats,
+          batch: batchNum,
+          batchCount,
+          kind,
+        });
+        const {
+          result,
+          authFailed,
+          capacityFailed,
+          transientFailed,
+          usedFallback,
+        } = await promptWithAuthRetry({
           prefix: "chat-title-refresh",
           prompt,
           model,
           cwd: REPO_ROOT,
         });
-      lastResult = result;
-      if (usedFallback) {
-        console.warn("[chat-title-refresh] used auto after preferred-model retries");
+        lastResult = result;
+        if (usedFallback) {
+          console.warn(
+            "[chat-title-refresh] used auto after preferred-model retries"
+          );
+        }
+        if (transientFailed) {
+          laterAuthRetry.schedule(dateKey);
+          return {
+            ok: false,
+            dateKey,
+            backfill,
+            status: result?.status || "error",
+            reason: authFailed ? "auth" : capacityFailed ? "capacity" : "error",
+            count: chats.length,
+          };
+        }
       }
-      if (transientFailed) {
-        laterAuthRetry.schedule(dateKey);
-        return {
-          ok: false,
-          dateKey,
-          backfill,
-          status: result?.status || "error",
-          reason: authFailed ? "auth" : capacityFailed ? "capacity" : "error",
-          count: chats.length,
-        };
-      }
-    }
+      return null;
+    };
+    const personalFail = await runKind("personal", personalBatches);
+    if (personalFail) return personalFail;
+    const jypeFail = await runKind("jype", jypeBatches);
+    if (jypeFail) return jypeFail;
+
+    await reapplyChatTitleStarters(chats, root);
 
     const prev = await readState(root);
     const nextState = {
@@ -461,7 +505,7 @@ async function runChatTitleRefreshOnce({
       backfill,
       status: lastResult?.status || "finished",
       count: chats.length,
-      batches: batches.length,
+      batches: batchCount,
     };
   } finally {
     await releaseLock(handle);
