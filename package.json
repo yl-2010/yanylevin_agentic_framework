@@ -24,6 +24,7 @@
     "context-synthesis": "npm run context-synthesis --prefix server",
     "chat-title-refresh": "npm run chat-title-refresh --prefix server",
     "brain-person-imessage": "npm run brain-person-imessage --prefix server",
+    "typesafe": "npm run typesafe --prefix server",
     "test:server": "npm test --prefix server",
     "oss:export": "node scripts/export-oss.mjs",
     "oss:scan": "node scripts/oss-scan.mjs",

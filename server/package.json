@@ -31,10 +31,12 @@
     "health-apple-export": "node --env-file=.env health-apple-export.js",
     "context-synthesis": "node --env-file=.env context-synthesis-agent.js",
     "chat-title-refresh": "node --env-file=.env chat-title-refresh-agent.js",
+    "typesafe": "node --env-file=.env typesafe.js ping",
     "test": "node --test"
   },
   "dependencies": {
     "@cursor/sdk": "^1.0.26",
+    "@typesafe-ai/sdk": "^0.6.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "jose": "^6.1.0",
