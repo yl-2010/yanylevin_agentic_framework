@@ -275,7 +275,8 @@ export function formatIMessageOriginBlock(origin, opts = {}) {
   );
   if (opts.deliverFinal !== false) {
     lines.push(
-      "The server delivers your final bubble to that same iMessage chat. Do not also sendIMessage that same final text."
+      "The server delivers your final bubble to that same iMessage chat. Do not also sendIMessage that same final text.",
+      "This is a full Personal Agent turn. You can send native iMessage files (photos, PDFs, anything on disk). Never a yanylevin.com stand-in. Files are never in the same message as text. If this reply includes files, decide the text first, then POST /imessage/send with files and attachToReply true (no text) to this same chat as the last action, then write that text as the final bubble. The server sends each file as its own message, then the text, immediately. Extra sends to someone else still use files + text in one /imessage/send (files first, then text)."
     );
   } else {
     lines.push(

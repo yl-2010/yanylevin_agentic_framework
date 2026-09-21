@@ -4,6 +4,11 @@ import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  queueIMessageReplyFiles,
+  resetIMessageReplyFiles,
+  takeIMessageReplyFiles,
+} from "./imessage-send.js";
+import {
   PERSONAL_SKILL_PATHS,
   UNSLOP_SKILL_PATH,
   FOUR11_SKILL_PATH,
@@ -118,6 +123,7 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.schoolTeams));
     assert.match(prompt, /school-teams\.js/);
     assert.match(prompt, /iMessage, then Teams, then email/);
+    assert.match(prompt, /native attachments/);
     assert.ok(prompt.length < 5600, `prompt length ${prompt.length}`);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.chats));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.location));
@@ -433,6 +439,8 @@ describe("Personal Agent skill files", () => {
     assert.match(imessage, /JYPE \(iMessage or Teams\)/);
     assert.match(imessage, /\/\/ Sent by Yan's Personal Agent/);
     assert.match(imessage, /does not render markdown/);
+    assert.match(imessage, /attachToReply/);
+    assert.match(imessage, /--attach /);
 
     const screentime = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.screentime), "utf8");
     assert.match(screentime, /screentime-read\.js/);
@@ -481,6 +489,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /cannot send into a different group chat/);
     assert.match(agent, /JYPE \(iMessage or Teams\)/);
     assert.match(agent, /iMessage first, then Teams, then email|iMessage, then Teams, then email/);
+    assert.match(agent, /attachToReply/);
     assert.match(agent, /unslop/);
     assert.match(agent, /SOUL\.md/);
     assert.match(agent, /identity-school\.md/);
@@ -952,6 +961,14 @@ describe("iMessage final reply delivery", () => {
     assert.equal(empty.skipped, "empty");
     const missing = await deliverIMessageFinalReply({}, "On it");
     assert.equal(missing.skipped, "no-target");
+  });
+
+  it("drops queued files when the final reply is skipped", async () => {
+    resetIMessageReplyFiles();
+    queueIMessageReplyFiles({ to: "+14255550100" }, ["/tmp/a.jpg"]);
+    const empty = await deliverIMessageFinalReply({ to: "+14255550100" }, "   ");
+    assert.equal(empty.skipped, "empty");
+    assert.deepEqual(takeIMessageReplyFiles({ to: "+14255550100" }), []);
   });
 });
 

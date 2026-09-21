@@ -4,9 +4,9 @@
  */
 
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { mkdtemp, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { applyAgentSentFooter } from "./imessage-mention.js";
@@ -15,11 +15,150 @@ const execFileAsync = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)));
 export const IMESSAGE_SEND_SCRIPT = join(ROOT, "imessage-send.applescript");
 const MAX_TEXT_CHARS = 24_000;
+export const MAX_SEND_FILES = 16;
+export const MAX_SEND_FILE_BYTES = 100 * 1024 * 1024;
+export const MAX_SEND_FILES_TOTAL = 200 * 1024 * 1024;
+
+/** @type {Map<string, string[]>} */
+const replyFilesByKey = new Map();
 
 function statusError(message, status) {
   const err = new Error(message);
   err.status = status;
   return err;
+}
+
+export function expandUserPath(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return "";
+  if (s === "~") return homedir();
+  if (s.startsWith("~/")) return join(homedir(), s.slice(2));
+  return s;
+}
+
+/**
+ * @param {unknown} raw
+ * @returns {string[]}
+ */
+export function normalizeSendFiles(raw) {
+  const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  /** @type {string[]} */
+  const out = [];
+  for (const item of list) {
+    const s = String(item || "").trim();
+    if (s) out.push(s);
+  }
+  return out;
+}
+
+/**
+ * @param {object|null|undefined} origin
+ * @returns {string[]}
+ */
+export function iMessageReplyFileKeys(origin) {
+  /** @type {string[]} */
+  const keys = [];
+  const guid = String(origin?.chatGuid || "").trim();
+  if (guid) keys.push(`guid:${guid}`);
+  for (const raw of [origin?.to, origin?.chatId, origin?.handle, origin?.chat]) {
+    const s = String(raw || "").trim().toLowerCase();
+    if (s) keys.push(`to:${s}`);
+  }
+  return [...new Set(keys)];
+}
+
+/**
+ * Hold files for the @agent final bubble. Server sends each file, then text.
+ * @param {object|null|undefined} origin
+ * @param {string[]} files
+ */
+export function queueIMessageReplyFiles(origin, files) {
+  const paths = Array.isArray(files) ? files.filter(Boolean) : [];
+  const keys = iMessageReplyFileKeys(origin);
+  if (!keys.length || !paths.length) return keys;
+  for (const key of keys) replyFilesByKey.set(key, [...paths]);
+  return keys;
+}
+
+/**
+ * @param {object|null|undefined} origin
+ * @returns {string[]}
+ */
+export function takeIMessageReplyFiles(origin) {
+  const keys = iMessageReplyFileKeys(origin);
+  /** @type {string[]} */
+  let files = [];
+  for (const key of keys) {
+    if (replyFilesByKey.has(key)) {
+      files = replyFilesByKey.get(key) || [];
+      break;
+    }
+  }
+  for (const key of keys) replyFilesByKey.delete(key);
+  return files;
+}
+
+export function resetIMessageReplyFiles() {
+  replyFilesByKey.clear();
+}
+
+/**
+ * @param {unknown} raw
+ * @param {{
+ *   stat?: typeof stat,
+ *   realpath?: typeof realpath,
+ * }} [deps]
+ * @returns {Promise<string[]>}
+ */
+export async function resolveSendFiles(raw, deps = {}) {
+  const list = normalizeSendFiles(raw);
+  if (!list.length) return [];
+  if (list.length > MAX_SEND_FILES) {
+    throw statusError(`at most ${MAX_SEND_FILES} files`, 400);
+  }
+  const statFn = deps.stat || stat;
+  const realpathFn = deps.realpath || realpath;
+  /** @type {string[]} */
+  const out = [];
+  let total = 0;
+  for (const item of list) {
+    const expanded = expandUserPath(item);
+    const abs = isAbsolute(expanded) ? expanded : resolve(expanded);
+    let resolved = abs;
+    try {
+      resolved = await realpathFn(abs);
+    } catch {
+      throw statusError(`file not found: ${abs}`, 400);
+    }
+    let st;
+    try {
+      st = await statFn(resolved);
+    } catch {
+      throw statusError(`file not found: ${resolved}`, 400);
+    }
+    if (!st?.isFile?.()) {
+      throw statusError(`not a file: ${resolved}`, 400);
+    }
+    const bytes = Number(st.size) || 0;
+    if (bytes <= 0) {
+      throw statusError(`file is empty: ${resolved}`, 400);
+    }
+    if (bytes > MAX_SEND_FILE_BYTES) {
+      throw statusError(
+        `file exceeds ${Math.round(MAX_SEND_FILE_BYTES / (1024 * 1024))}MB: ${resolved}`,
+        400
+      );
+    }
+    total += bytes;
+    if (total > MAX_SEND_FILES_TOTAL) {
+      throw statusError(
+        `files total size exceeds ${Math.round(MAX_SEND_FILES_TOTAL / (1024 * 1024))}MB`,
+        400
+      );
+    }
+    out.push(resolved);
+  }
+  return out;
 }
 
 export function normalizeHandle(raw) {
@@ -194,7 +333,13 @@ export async function findNamedChat(name, deps = {}) {
 }
 
 /**
- * @param {{ to?: string, text?: string, chatGuid?: string }} opts
+ * @param {{
+ *   to?: string,
+ *   text?: string,
+ *   chatGuid?: string,
+ *   files?: unknown,
+ *   attachments?: unknown,
+ * }} opts
  * @param {{
  *   execFile?: typeof execFileAsync,
  *   resolveHandle?: typeof resolveHandle,
@@ -202,12 +347,17 @@ export async function findNamedChat(name, deps = {}) {
  *   findNamedChat?: typeof findNamedChat,
  *   listContacts?: () => Promise<unknown>,
  *   queryMessages?: (sql: string) => Promise<object[]>,
+ *   resolveSendFiles?: typeof resolveSendFiles,
  * }} [deps]
  */
 export async function sendIMessage(opts = {}, deps = {}) {
   const text = String(opts.text || "");
   if (!String(opts.to || "").trim()) throw statusError("to is required", 400);
-  if (!text.trim()) throw statusError("text is required", 400);
+  const resolveFiles = deps.resolveSendFiles || resolveSendFiles;
+  const files = await resolveFiles(opts.files ?? opts.attachments);
+  if (!text.trim() && !files.length) {
+    throw statusError("text or files required", 400);
+  }
   if (text.length > MAX_TEXT_CHARS) {
     throw statusError(`text exceeds ${MAX_TEXT_CHARS} characters`, 400);
   }
@@ -250,13 +400,12 @@ export async function sendIMessage(opts = {}, deps = {}) {
 
   const dir = await mkdtemp(join(tmpdir(), "yanylevin-imessage-send-"));
   const bodyPath = join(dir, "body.txt");
-  await writeFile(bodyPath, text, "utf8");
+  await writeFile(bodyPath, text.trim() ? text : "", "utf8");
   const exec = deps.execFile || execFileAsync;
-  const args = [IMESSAGE_SEND_SCRIPT, handle, bodyPath];
-  if (chatGuid) args.push(chatGuid);
+  const args = [IMESSAGE_SEND_SCRIPT, handle, bodyPath, chatGuid || "", ...files];
   try {
     const { stdout, stderr } = await exec("osascript", args, {
-      timeout: 45_000,
+      timeout: files.length ? 120_000 : 45_000,
       maxBuffer: 1024 * 1024,
     });
     const how = String(stdout || "")
@@ -267,6 +416,7 @@ export async function sendIMessage(opts = {}, deps = {}) {
       to: handle,
       via: how || "osascript",
       chatGuid: chatGuid || undefined,
+      files,
       warning: String(stderr || "").trim() || undefined,
     };
   } catch (err) {
@@ -283,8 +433,8 @@ export async function sendIMessage(opts = {}, deps = {}) {
 }
 
 function parseCliArgs(argv) {
-  /** @type {{ to: string, text: string, textFile: string }} */
-  const out = { to: "", text: "", textFile: "" };
+  /** @type {{ to: string, text: string, textFile: string, files: string[] }} */
+  const out = { to: "", text: "", textFile: "", files: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = argv[i + 1];
@@ -296,6 +446,9 @@ function parseCliArgs(argv) {
       i += 1;
     } else if ((a === "--text-file" || a === "--file") && next != null) {
       out.textFile = next;
+      i += 1;
+    } else if ((a === "--attach" || a === "--attachment") && next != null) {
+      out.files.push(next);
       i += 1;
     }
   }
@@ -315,6 +468,7 @@ if (isCli) {
     return sendIMessage({
       to: parsed.to,
       text: applyAgentSentFooter(text, { chat: parsed.to, handle: parsed.to }),
+      files: parsed.files,
     });
   };
   run()

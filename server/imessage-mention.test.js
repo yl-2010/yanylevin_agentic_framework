@@ -172,6 +172,9 @@ describe("imessage-mention", () => {
     assert.match(block, /server appends that footer on the iMessage only/);
     assert.match(block, /server delivers your final bubble/);
     assert.match(block, /keep that final bubble/);
+    assert.match(block, /full Personal Agent turn/);
+    assert.match(block, /attachToReply/);
+    assert.match(block, /native iMessage files/);
     assert.match(block, /send_chat_message first with a short status/);
     assert.doesNotMatch(block, /send confirmation/);
     assert.doesNotMatch(

@@ -70,14 +70,26 @@ curl -sS --unix-socket /tmp/personal-agent-local.sock \
   http://localhost/imessage/send
 ```
 
+Native files (photos, PDFs, anything on disk). Not a URL stand-in. Decide the text first. One send with `files` and `text` sends each file as its own message, then the text, immediately. Never put a file in the same message as the caption.
+
+```bash
+curl -sS --unix-socket /tmp/personal-agent-local.sock \
+  -H "Content-Type: application/json" \
+  -d '{"to":"Alex","text":"Body here","files":["/abs/path/photo.jpg"]}' \
+  http://localhost/imessage/send
+```
+
+@agent final reply that includes files: last action is the same POST with `files` and `attachToReply: true` (no text) to this chat, then write the final bubble. The server sends those files, then that text. Do not also sendIMessage the final text.
+
 CLI from Terminal.app or the LaunchAgent:
 
 ```bash
 node server/imessage-send.js --to "Alex" --text "Body here"
 node server/imessage-send.js --to "+14255550100" --text-file /tmp/body.txt
+node server/imessage-send.js --to "Alex" --text "Body here" --attach /abs/path/photo.jpg
 ```
 
-Text only. No attachments. No new group chats. Sending to an existing named group is allowed. SMS (green bubble) only if the iPhone is forwarding to this Mac.
+No new group chats. Sending to an existing named group is allowed. SMS (green bubble) only if the iPhone is forwarding to this Mac. Use absolute paths (chat-upload `absPath`, `previewPath` from a thread, or any file on this Mac).
 
 ## @agent
 
@@ -87,8 +99,8 @@ Other people in Apple Contacts can also `@agent` in a 1:1 or any group. Not in C
 
 Guests cannot send into a different group chat than the one they called from. The only exception is JYPE (iMessage or Teams): an @agent from anywhere may post there. Class of 2028 and every other group: they have to @agent in that same chat. Yan's own words can still send anywhere.
 
-The server sends the agent's final bubble back to the same thread. The app and website keep that final bubble (the answer or what you did), plus any `send_chat_message` intermediates from the same turn. Those intermediates never go to iMessage. Do not write Sent on iMessage in the app. A message that is only `@agent` means read the surrounding thread and infer the job from it.
+The server sends the agent's final bubble back to the same thread. The app and website keep that final bubble (the answer or what you did), plus any `send_chat_message` intermediates from the same turn. Those intermediates never go to iMessage. Do not write Sent on iMessage in the app. A message that is only `@agent` means read the surrounding thread and infer the job from it. Same tools as a typed Personal Agent chat, including native file sends. If the reply includes files, POST `attachToReply: true` with those paths as the last action, then write the final text. The server sends each file, then that text.
 
-Do not put `@agent` in outgoing texts. That would start another session. Extra sends during the turn are only for texts that are not that final bubble.
+Do not put `@agent` in outgoing texts. That would start another session. Extra sends during the turn are only for texts or files that are not that final bubble.
 
 App and website bubbles never include `Sent by Yan's Personal Agent`. That line is only on the iMessage, email, and Teams. iMessage and Teams use `// Sent by Yan's Personal Agent`. Email stays `Sent by Yan's Personal Agent` with no `//`.

@@ -51,6 +51,57 @@ describe("local ipc", () => {
     assert.equal(res.out.body.ok, true);
     assert.equal(got.to, "Example Friend");
     assert.match(got.text, /^hi\n\n\/\/ Sent by Yan's Personal Agent$/);
+    assert.deepEqual(got.files, []);
+  });
+
+  it("queues iMessage files for the @agent final reply", async () => {
+    let queued = null;
+    const handler = createLocalIpcHandler({
+      resolveSendFiles: async (raw) => raw,
+      queueIMessageReplyFiles: (origin, files) => {
+        queued = { origin, files };
+        return ["to:prasham"];
+      },
+      sendIMessage: async () => {
+        throw new Error("should not send yet");
+      },
+    });
+    const res = mockRes();
+    await handler(
+      mockReq("POST", "/imessage/send", {
+        to: "Alex",
+        files: ["/tmp/a.jpg"],
+        attachToReply: true,
+      }),
+      res
+    );
+    assert.equal(res.out.status, 200);
+    assert.equal(res.out.body.queued, true);
+    assert.deepEqual(queued.files, ["/tmp/a.jpg"]);
+    assert.equal(queued.origin.to, "Alex");
+  });
+
+  it("passes files through on a normal iMessage send", async () => {
+    let got = null;
+    const handler = createLocalIpcHandler({
+      resolveSendFiles: async (raw) => raw,
+      sendIMessage: async (opts) => {
+        got = opts;
+        return { ok: true, to: opts.to, files: opts.files };
+      },
+    });
+    const res = mockRes();
+    await handler(
+      mockReq("POST", "/imessage/send", {
+        to: "Alex",
+        text: "look",
+        files: ["/tmp/a.jpg"],
+      }),
+      res
+    );
+    assert.equal(res.out.status, 200);
+    assert.deepEqual(got.files, ["/tmp/a.jpg"]);
+    assert.match(got.text, /^look\n\n\/\/ Sent by Yan's Personal Agent$/);
   });
 
   it("starts context synthesis in the background", async () => {

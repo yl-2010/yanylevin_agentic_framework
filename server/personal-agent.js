@@ -36,7 +36,7 @@ import {
   formatWidgetsAsFences,
   parseAgentReply,
 } from "./chat-widgets.js";
-import { sendIMessage } from "./imessage-send.js";
+import { sendIMessage, takeIMessageReplyFiles } from "./imessage-send.js";
 import {
   applyAgentSentFooter,
   formatIMessageOriginBlock,
@@ -840,15 +840,25 @@ function persistSessionHistory(sid, session) {
  */
 export async function deliverIMessageFinalReply(origin, content) {
   const body = applyAgentSentFooter(content, origin);
-  if (!body) return { ok: false, skipped: "empty" };
-  if (body.includes(PA_ERROR_REPLY)) return { ok: false, skipped: "error" };
+  if (!body) {
+    takeIMessageReplyFiles(origin);
+    return { ok: false, skipped: "empty" };
+  }
+  if (body.includes(PA_ERROR_REPLY)) {
+    takeIMessageReplyFiles(origin);
+    return { ok: false, skipped: "error" };
+  }
   const to = String(origin?.to || origin?.chatId || origin?.handle || "").trim();
   const chatGuid = String(origin?.chatGuid || "").trim();
-  if (!to && !chatGuid) return { ok: false, skipped: "no-target" };
+  if (!to && !chatGuid) {
+    takeIMessageReplyFiles(origin);
+    return { ok: false, skipped: "no-target" };
+  }
   return sendIMessage({
     to: to || chatGuid,
     text: body,
     chatGuid: chatGuid || undefined,
+    files: takeIMessageReplyFiles(origin),
   });
 }
 
@@ -1152,7 +1162,7 @@ export function systemPrompt(email, opts = {}) {
     "Live context below is authoritative for clock, class-now, and the open screen. Trust it. Named-people lookup still opens brain/people/. Other education/<email>/ files only when the question needs that data.",
     "",
     "Reply: short. School mutations 1-3 lines. Markdown OK in the text bubble; never HTML tags or markdown images. Never em dashes. No thinking aloud. Do not tell the user to refresh. Read the widgets skill before emitting any widget fence. Never put Sent by Yan's Personal Agent in app or website bubbles; that footer is only for iMessage, email, and Teams.",
-    "Send to a person with no channel named: iMessage, then Teams, then email. Named channel (on Teams / iMessage / email) wins.",
+    "Send to a person with no channel named: iMessage, then Teams, then email. Named channel (on Teams / iMessage / email) wins. iMessage files are native attachments (iMessage skill), never a URL stand-in. Each file is its own message, then the text.",
     "Long work: send_chat_message first with a short status. Send more mid-run when new info, a change, or a useful update appears. Then a final Done. Quick answers: one reply only (that is the end of turn).",
     "To show one education page on web/iOS, call open_education_page (education-dashboard skill). The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Skip if already on that page. Not on Cursor Desktop.",
     "No period when the reply is one word, one phrase, or one sentence.",

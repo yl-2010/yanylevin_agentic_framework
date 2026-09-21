@@ -1,13 +1,19 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   IMESSAGE_SEND_SCRIPT,
   findChatGuid,
   findNamedChat,
   normalizeHandle,
+  normalizeSendFiles,
+  queueIMessageReplyFiles,
+  resetIMessageReplyFiles,
   resolveHandle,
   sendIMessage,
+  takeIMessageReplyFiles,
 } from "./imessage-send.js";
 
 describe("imessage-send", () => {
@@ -33,7 +39,7 @@ describe("imessage-send", () => {
     await assert.rejects(() => sendIMessage({ to: "", text: "hi" }), /to is required/);
     await assert.rejects(
       () => sendIMessage({ to: "+14253260143", text: "   " }),
-      /text is required/
+      /text or files required/
     );
   });
 
@@ -146,5 +152,95 @@ describe("imessage-send", () => {
     );
     assert.equal(result.ok, true);
     assert.equal(result.chatGuid, "iMessage;+;chat123");
+  });
+
+  it("normalizes file lists and queues @agent reply files", () => {
+    assert.deepEqual(normalizeSendFiles([" /a.jpg ", "", "/b.pdf"]), [
+      "/a.jpg",
+      "/b.pdf",
+    ]);
+    resetIMessageReplyFiles();
+    queueIMessageReplyFiles({ to: "JYPE", chatGuid: "iMessage;+;chat123" }, [
+      "/tmp/a.jpg",
+    ]);
+    assert.deepEqual(takeIMessageReplyFiles({ to: "jype" }), ["/tmp/a.jpg"]);
+    assert.deepEqual(takeIMessageReplyFiles({ to: "jype" }), []);
+  });
+
+  it("sends files first then text in one osascript call", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "yanylevin-imessage-file-"));
+    const pic = join(dir, "pic.jpg");
+    await writeFile(pic, Buffer.from("jpeg"));
+    /** @type {string[]|null} */
+    let args = null;
+    try {
+      const result = await sendIMessage(
+        { to: "+14253260143", text: "caption", files: [pic] },
+        {
+          resolveHandle: async () => "+14253260143",
+          findChatGuid: async () => "iMessage;-;+14253260143",
+          execFile: async (cmd, argv) => {
+            assert.equal(cmd, "osascript");
+            args = argv;
+            const written = await readFile(argv[2], "utf8");
+            assert.equal(written, "caption");
+            return { stdout: "sent-chat\n", stderr: "" };
+          },
+        }
+      );
+      assert.equal(result.ok, true);
+      assert.equal(result.files.length, 1);
+      assert.ok(result.files[0].endsWith("/pic.jpg"));
+      assert.equal(args?.[0], IMESSAGE_SEND_SCRIPT);
+      assert.equal(args?.[1], "+14253260143");
+      assert.equal(args?.[3], "iMessage;-;+14253260143");
+      assert.equal(args?.[4], result.files[0]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("sends files only when there is no text", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "yanylevin-imessage-file-"));
+    const pic = join(dir, "pic.jpg");
+    await writeFile(pic, Buffer.from("jpeg"));
+    try {
+      const result = await sendIMessage(
+        { to: "+14253260143", files: [pic] },
+        {
+          resolveHandle: async () => "+14253260143",
+          findChatGuid: async () => "g",
+          execFile: async (_cmd, argv) => {
+            const written = await readFile(argv[2], "utf8");
+            assert.equal(written, "");
+            assert.ok(String(argv[4] || "").endsWith("/pic.jpg"));
+            return { stdout: "sent-chat\n", stderr: "" };
+          },
+        }
+      );
+      assert.equal(result.ok, true);
+      assert.equal(result.files.length, 1);
+      assert.ok(result.files[0].endsWith("/pic.jpg"));
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a missing file without calling osascript", async () => {
+    let called = false;
+    await assert.rejects(
+      () =>
+        sendIMessage(
+          { to: "+14253260143", files: ["/tmp/yanylevin-missing-imessage-file"] },
+          {
+            execFile: async () => {
+              called = true;
+              return { stdout: "sent-chat\n", stderr: "" };
+            },
+          }
+        ),
+      /file not found/
+    );
+    assert.equal(called, false);
   });
 });

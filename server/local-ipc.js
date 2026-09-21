@@ -13,7 +13,11 @@ import {
   recentThread,
   searchMessages,
 } from "./imessage-read.js";
-import { sendIMessage } from "./imessage-send.js";
+import {
+  queueIMessageReplyFiles,
+  resolveSendFiles,
+  sendIMessage,
+} from "./imessage-send.js";
 import { applyAgentSentFooter } from "./imessage-mention.js";
 import { recentSessions, screenTimeSummary } from "./screentime-read.js";
 
@@ -97,6 +101,8 @@ async function readJsonBody(req, limit = 512 * 1024) {
  *   exportPersonThread?: typeof exportPersonThread,
  *   listIMessagePeople?: typeof listIMessagePeople,
  *   sendIMessage?: typeof sendIMessage,
+ *   queueIMessageReplyFiles?: typeof queueIMessageReplyFiles,
+ *   resolveSendFiles?: typeof resolveSendFiles,
  *   screenTimeSummary?: typeof screenTimeSummary,
  *   recentSessions?: typeof recentSessions,
  *   listContacts?: () => Promise<unknown>,
@@ -112,6 +118,8 @@ export function createLocalIpcHandler(deps = {}) {
   const exportThread = deps.exportPersonThread || exportPersonThread;
   const people = deps.listIMessagePeople || listIMessagePeople;
   const sendMsg = deps.sendIMessage || sendIMessage;
+  const queueReplyFiles = deps.queueIMessageReplyFiles || queueIMessageReplyFiles;
+  const resolveFiles = deps.resolveSendFiles || resolveSendFiles;
   const screenSummary = deps.screenTimeSummary || screenTimeSummary;
   const screenRecent = deps.recentSessions || recentSessions;
   const contacts =
@@ -186,12 +194,33 @@ export function createLocalIpcHandler(deps = {}) {
       if (method === "POST" && path === "/imessage/send") {
         const payload = await readJsonBody(req);
         const to = payload?.to || payload?.person || "";
+        const chatGuid = String(payload?.chatGuid || "").trim();
+        const files = await resolveFiles(
+          payload?.files ?? payload?.attachments ?? payload?.file
+        );
+        const origin = { to, chatGuid, handle: to, chat: to };
+        if (payload?.attachToReply === true || payload?.queueForReply === true) {
+          if (!files.length) {
+            const err = new Error("attachToReply needs files");
+            err.status = 400;
+            throw err;
+          }
+          queueReplyFiles(origin, files);
+          return sendJson(res, 200, {
+            ok: true,
+            queued: true,
+            to,
+            files,
+          });
+        }
         const result = await sendMsg({
           to,
           text: applyAgentSentFooter(payload?.text || payload?.body || "", {
             chat: to,
             handle: to,
           }),
+          files,
+          chatGuid: chatGuid || undefined,
         });
         return sendJson(res, 200, result);
       }
