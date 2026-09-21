@@ -8,7 +8,7 @@ description: >-
 
 # Agent recap
 
-Yan-only (`education/you@example.com/`). Local Cursor agent, never cloud. Model: **grok-4.6 xhigh** (effort=xhigh, fast=false).
+Yan-only (`education/you@example.com/`). Local Cursor agent, never cloud. Model: **grok-4.7 xhigh** (reasoning_effort=xhigh, fast=false, context=256k).
 
 Phase 2 of the morning pipeline (`server/daily-briefing-agent.js`), after the news draft and before unslop.
 
@@ -97,7 +97,7 @@ All scheduled jobs **except** the daily briefing itself:
 | 01:00 | Location compose, location enrichment, health takeaways, canvas sync |
 | 01:30 | Chat title refresh, life-state cleanup |
 | 02:30 | Context synthesis pipeline (triage, entities, synthesis, actions, lint) |
-| 03:00 | Location brain projection, health brain projection, then fact-check (Grok 4.6 xhigh) as soon as both finish. URGENT if fact-check did not run. Mention `notes.factCheck` corrections in the recap; do not re-verify facts. |
+| 03:00 | Location brain projection, health brain projection, then fact-check (Grok 4.7 xhigh) as soon as both finish. URGENT if fact-check did not run. Mention `notes.factCheck` corrections in the recap; do not re-verify facts. |
 
 Health takeaways may skip when there are no new dumps; that is OK unless something else looks wrong.
 

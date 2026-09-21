@@ -2,11 +2,11 @@
  * Nightly 02:30 pipeline (5 phases). Runs at least 90 minutes after the
  * 01:00 nightly agents. Yan only.
  *
- *   1. triage     grok-4.6 high  reads all dumps, writes /tmp digest, no brain writes
- *   2. entities   grok-4.6 high  updates people/groups/orgs/places from the digest
- *   3. synthesis  grok-4.6 xhigh identity/patterns/threads/journal + location fixes
- *   4. actions    grok-4.6 xhigh executes Yan-directed actions (skipped when digest has none)
- *   5. lint       grok-4.6 high  schema police, dedup, cursors
+ *   1. triage     grok-4.7 high  reads all dumps, writes /tmp digest, no brain writes
+ *   2. entities   grok-4.7 high  updates people/groups/orgs/places from the digest
+ *   3. synthesis  grok-4.7 xhigh identity/patterns/threads/journal + location fixes
+ *   4. actions    grok-4.7 xhigh executes Yan-directed actions (skipped when digest has none)
+ *   5. lint       grok-4.7 high  schema police, dedup, cursors
  *
  * The runner regenerates people/index.md, people/graph.md, and the education
  * mirror between phases (brain-graph.js, brain-education-mirror.js).
@@ -91,25 +91,28 @@ export const PIPELINE_PHASES = [
 ];
 
 export const CONTEXT_SYNTHESIS_MODEL_SPEC = {
-  id: process.env.CURSOR_CONTEXT_SYNTHESIS_MODEL || "grok-4.6",
+  id: process.env.CURSOR_CONTEXT_SYNTHESIS_MODEL || "grok-4.7",
   params: [
-    { id: "effort", value: "xhigh" },
+    { id: "context", value: "256k" },
+    { id: "reasoning_effort", value: "xhigh" },
     { id: "fast", value: "false" },
   ],
 };
 
 export const PEOPLE_ENRICH_MODEL_SPEC = {
-  id: process.env.CURSOR_PEOPLE_ENRICH_MODEL || "grok-4.6",
+  id: process.env.CURSOR_PEOPLE_ENRICH_MODEL || "grok-4.7",
   params: [
-    { id: "effort", value: "high" },
+    { id: "context", value: "256k" },
+    { id: "reasoning_effort", value: "high" },
     { id: "fast", value: "false" },
   ],
 };
 
 export const NIGHTLY_ACTIONS_MODEL_SPEC = {
-  id: process.env.CURSOR_NIGHTLY_ACTIONS_MODEL || "grok-4.6",
+  id: process.env.CURSOR_NIGHTLY_ACTIONS_MODEL || "grok-4.7",
   params: [
-    { id: "effort", value: "xhigh" },
+    { id: "context", value: "256k" },
+    { id: "reasoning_effort", value: "xhigh" },
     { id: "fast", value: "false" },
   ],
 };
@@ -543,7 +546,7 @@ export function buildPeopleEnrichPrompt({
     "You are enriching thin people cards. Yan only (you@example.com). Local only. Never spawn a Cursor cloud agent. ",
     `Today's date key: ${dateKey} (timezone ${timezone}). Batch ${batch} of ${batchCount}.`,
     "Do not rewrite memories.md. Do not compile news. Do not send mail or iMessage. Do not create new people. Do not glob people/. Do not touch people who already have a folder (person.md + log.md).",
-    "Nightly context synthesis stays on grok-4.6 xhigh. This pass only deepens existing single-file cards.",
+    "Nightly context synthesis stays on grok-4.7 xhigh. This pass only deepens existing single-file cards.",
     `Dumps: contacts ${CONTACTS_PREFETCH_PATH}; iMessage chats/handles + mentions ${IMESSAGE_PEOPLE_PREFETCH_PATH}; mail ${MAIL_PEOPLE_PREFETCH_PATH}; school name index ${SCHOOL_NAMES_PREFETCH_PATH} (lookup only).`,
     `For each slug below, Read the current ${people}/<slug>.md, then dig. Cursor shells cannot open chat.db. Use curl --unix-socket /tmp/personal-agent-local.sock "http://localhost/imessage/thread?person=Name" and /imessage/search?q=Name. Check group chats they are in, mail correspondent rows, school index (class of / teacher), memories.md if the name appears, places.md for whose house. Try hard. A card that only says "contact" is unfinished if texts or mail say more.`,
     "Write real standing facts: relationship (more specific than contact when you can tell), how Yan knows them, school/work/family, groups, patterns. Label uncertainty (likely / looks like). Do not invent. Do not paste full texts or emails.",

@@ -1,7 +1,7 @@
 ---
 name: nightly-fact-check
 description: >-
-  After both 03:00 brain jobs finish: Grok 4.6 xhigh verifies overnight
+  After both 03:00 brain jobs finish: Grok 4.7 xhigh verifies overnight
   agent facts against source dumps before the 06:00 briefing. Yan only.
   Not news, not agent-recap.
 disable-model-invocation: true
@@ -13,7 +13,7 @@ disable-model-invocation: true
 
 You run as soon as both 03:00 location-brain and health-brain finish. The 06:00 briefing is not your job. Leave identity, people cards, journal, location, and health accurate so recap can trust them.
 
-Model: **grok-4.6 xhigh** (effort=xhigh, fast=false).
+Model: **grok-4.7 xhigh** (reasoning_effort=xhigh, fast=false, context=256k).
 
 ## Goal
 

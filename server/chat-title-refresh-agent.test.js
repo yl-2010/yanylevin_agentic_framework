@@ -31,12 +31,13 @@ const META = {
 };
 
 describe("chat title refresh model", () => {
-  it("uses grok-4.6 high with Fast off", () => {
-    assert.equal(CHAT_TITLE_REFRESH_MODEL_SPEC.id, "grok-4.6");
+  it("uses grok-4.7 high with Fast off", () => {
+    assert.equal(CHAT_TITLE_REFRESH_MODEL_SPEC.id, "grok-4.7");
     const spec = chatTitleRefreshModelSpec();
-    assert.equal(spec.id, "grok-4.6");
+    assert.equal(spec.id, "grok-4.7");
     assert.deepEqual(spec.params, [
-      { id: "effort", value: "high" },
+      { id: "context", value: "256k" },
+      { id: "reasoning_effort", value: "high" },
       { id: "fast", value: "false" },
     ]);
     assert.doesNotMatch(spec.id, /fast/);

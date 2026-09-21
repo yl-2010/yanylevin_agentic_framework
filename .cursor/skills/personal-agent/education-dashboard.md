@@ -229,7 +229,7 @@ Users can attach files in Personal Agent chat (web: drag onto /education compose
 - Copy only what should persist; skip the rest
 - Do not leave needed long-term context only in `.chat-uploads/` (cleared when the chat session ends)
 
-Text-only and attachment turns both run on **grok-4.6 high** with Fast off. The two ModelSelections stay separate so text-only can switch back to composer later.
+Text-only and attachment turns both run on **grok-4.7 high** with Fast off. The two ModelSelections stay separate so text-only can switch back to composer later.
 
 ## Actions
 

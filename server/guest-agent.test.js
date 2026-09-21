@@ -332,7 +332,7 @@ describe("guest-agent limits", () => {
     });
     assert.equal(nextHour.useGrok, true);
     assert.equal(GROK_HOURLY["example-neighbor"], FRIEND_HOURLY_LIMIT / 2);
-    assert.equal(GUEST_GROK_SPEC.id, "grok-4.6");
+    assert.equal(GUEST_GROK_SPEC.id, "grok-4.7");
     assert.equal(
       GUEST_GROK_SPEC.params.find((p) => p.id === "fast")?.value,
       "false"
@@ -371,20 +371,21 @@ describe("guest-agent limits", () => {
     assert.equal(isFriendGuest("", "Example Neighbor"), true);
     assert.equal(isFriendGuest("", "Sam"), false);
     const grok = withoutFast({
-      id: "grok-4.6",
+      id: "grok-4.7",
       params: [
-        { id: "effort", value: "high" },
+        { id: "context", value: "256k" },
+        { id: "reasoning_effort", value: "high" },
         { id: "fast", value: "true" },
       ],
     });
     assert.equal(grok.params.find((p) => p.id === "fast")?.value, "false");
-    assert.equal(grok.params.find((p) => p.id === "effort")?.value, "high");
+    assert.equal(grok.params.find((p) => p.id === "reasoning_effort")?.value, "high");
     const run = guestRunModels({
       slug: "alex-rivera",
       displayName: "Alex",
       model: GUEST_GROK_SPEC,
     });
-    assert.equal(run.preferred.id, "grok-4.6");
+    assert.equal(run.preferred.id, "grok-4.7");
     assert.equal(run.preferred.params.find((p) => p.id === "fast")?.value, "false");
     assert.equal(run.fallback.id, "composer-2.5");
     assert.equal(run.fallback.params.find((p) => p.id === "fast")?.value, "false");
@@ -452,7 +453,7 @@ describe("evaluateGuestMention", () => {
     });
     assert.equal(decision.action, "start");
     assert.equal(decision.caller.slug, "alex-rivera");
-    assert.equal(decision.caller.model.id, "grok-4.6");
+    assert.equal(decision.caller.model.id, "grok-4.7");
     assert.equal(
       decision.caller.model.params.find((p) => p.id === "fast")?.value,
       "false"
@@ -483,7 +484,7 @@ describe("evaluateGuestMention", () => {
       statePath,
     };
     for (let i = 0; i < GROK_HOURLY["example-friend"]; i += 1) {
-      assert.equal((await evaluateGuestMention(base)).caller.model.id, "grok-4.6");
+      assert.equal((await evaluateGuestMention(base)).caller.model.id, "grok-4.7");
     }
     const composer = await evaluateGuestMention(base);
     assert.equal(composer.caller.model.id, "composer-2.5");
@@ -607,7 +608,7 @@ describe("evaluateGuestMention", () => {
       statePath,
     });
     assert.equal(groupPrasham.action, "start");
-    assert.equal(groupPrasham.caller.model.id, "grok-4.6");
+    assert.equal(groupPrasham.caller.model.id, "grok-4.7");
     assert.equal(groupPrasham.caller.audience.kind, "group");
     assert.equal(groupPrasham.caller.audience.threadLabel, "Class of 2028");
     assert.equal(groupPrasham.caller.audience.gradeWide, true);
@@ -761,7 +762,7 @@ describe("evaluateGuestMention", () => {
     for (let i = 0; i < FRIEND_HOURLY_LIMIT + 3; i += 1) {
       const decision = await evaluateGuestMention(base);
       assert.equal(decision.action, "start");
-      assert.equal(decision.caller.model.id, "grok-4.6");
+      assert.equal(decision.caller.model.id, "grok-4.7");
       assert.equal(
         decision.caller.model.params.find((p) => p.id === "fast")?.value,
         "false"

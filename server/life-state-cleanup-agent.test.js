@@ -20,12 +20,13 @@ const META = {
 };
 
 describe("life-state cleanup model", () => {
-  it("uses grok-4.6 xhigh with Fast off", () => {
-    assert.equal(LIFE_STATE_CLEANUP_MODEL_SPEC.id, "grok-4.6");
+  it("uses grok-4.7 xhigh with Fast off", () => {
+    assert.equal(LIFE_STATE_CLEANUP_MODEL_SPEC.id, "grok-4.7");
     const spec = lifeStateCleanupModelSpec();
-    assert.equal(spec.id, "grok-4.6");
+    assert.equal(spec.id, "grok-4.7");
     assert.deepEqual(spec.params, [
-      { id: "effort", value: "xhigh" },
+      { id: "context", value: "256k" },
+      { id: "reasoning_effort", value: "xhigh" },
       { id: "fast", value: "false" },
     ]);
     assert.doesNotMatch(spec.id, /fast/);

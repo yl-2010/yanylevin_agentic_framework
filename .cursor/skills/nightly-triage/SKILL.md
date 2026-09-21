@@ -3,7 +3,7 @@ name: nightly-triage
 description: >-
   Phase 1 of Yan's nightly pipeline (02:30): read every source dump since the
   cursors and write one digest at /tmp/yanylevin-context-notable.md. No brain
-  writes. Yan only. Grok 4.6 high, fast off.
+  writes. Yan only. Grok 4.7 high, fast off.
 disable-model-invocation: true
 ---
 

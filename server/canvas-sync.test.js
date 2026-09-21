@@ -271,10 +271,11 @@ describe("nextCanvasSyncRetryAt", () => {
 });
 
 describe("canvas sync model", () => {
-  it("uses grok-4.6 xhigh with fast off", () => {
-    assert.equal(CANVAS_SYNC_MODEL_SPEC.id, "grok-4.6");
+  it("uses grok-4.7 xhigh with fast off", () => {
+    assert.equal(CANVAS_SYNC_MODEL_SPEC.id, "grok-4.7");
     assert.deepEqual(CANVAS_SYNC_MODEL_SPEC.params, [
-      { id: "effort", value: "xhigh" },
+      { id: "context", value: "256k" },
+      { id: "reasoning_effort", value: "xhigh" },
       { id: "fast", value: "false" },
     ]);
   });

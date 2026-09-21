@@ -329,7 +329,7 @@ describe("life-state rewrite-day", () => {
       assert.equal(day[1].kind, "on_computer");
       assert.equal(day[1].continued, true);
       assert.equal(day[1].since, day[0].since);
-      assert.equal(day[1].model, "grok-4.6");
+      assert.equal(day[1].model, "grok-4.7");
       assert.ok(day[1].evidence.includes("cleanup:corrected"));
       assert.equal(day[2].continued, true);
       const kept = await readLifeStateDay("2026-09-12", dir);

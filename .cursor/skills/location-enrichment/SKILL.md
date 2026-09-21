@@ -1,7 +1,7 @@
 ---
 name: location-enrichment
 description: >-
-  Nightly Grok 4.6 job: turn vague GPS stays/trips into named
+  Nightly Grok 4.7 job: turn vague GPS stays/trips into named
   businesses/buildings and trip mode. Not indoor activity (that is
   life-state). Yan only. Not for live "where am I" chat.
 disable-model-invocation: true
@@ -13,7 +13,7 @@ disable-model-invocation: true
 
 You run **after** the location-history compose job has written `places.md` and `trips.md`. Do not re-cluster GPS. Read those markdown files (and `state.json`, live `.location.json`, raw JSONL only if a stay is unnamed) and name the place and the trip mode. Do not write what Yan was doing inside the place.
 
-Model: **grok-4.6 xhigh** (effort=xhigh, fast=false).
+Model: **grok-4.7 xhigh** (reasoning_effort=xhigh, fast=false, context=256k).
 
 Places and trips are **two equal passes**. A good `places.md` does not finish the job. If `trips.md` still says generic `car`, you are not done.
 

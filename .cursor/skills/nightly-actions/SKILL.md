@@ -3,7 +3,7 @@ name: nightly-actions
 description: >-
   Phase 4 of Yan's nightly pipeline: execute directed actions, plus standing
   writes of Apple Calendar plans (add freely) and rare education dates
-  (skip unless big). Grok 4.6 xhigh. Yan only.
+  (skip unless big). Grok 4.7 xhigh. Yan only.
 disable-model-invocation: true
 ---
 

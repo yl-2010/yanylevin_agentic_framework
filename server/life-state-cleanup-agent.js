@@ -1,5 +1,5 @@
 /**
- * Nightly Grok 4.6 xhigh (Fast off): clean yesterday's 5-minute life-state
+ * Nightly Grok 4.7 xhigh (Fast off): clean yesterday's 5-minute life-state
  * log against Screen Time, iMessage, Teams, Calendar, location, and other
  * sources. 01:30 local, same slot as chat title refresh. Yan only.
  */
@@ -49,9 +49,10 @@ const TICK_WAIT_MS = 8 * 60 * 1000;
 const TICK_POLL_MS = 2000;
 
 export const LIFE_STATE_CLEANUP_MODEL_SPEC = {
-  id: process.env.CURSOR_LIFE_STATE_CLEANUP_MODEL || "grok-4.6",
+  id: process.env.CURSOR_LIFE_STATE_CLEANUP_MODEL || "grok-4.7",
   params: [
-    { id: "effort", value: "xhigh" },
+    { id: "context", value: "256k" },
+    { id: "reasoning_effort", value: "xhigh" },
     { id: "fast", value: "false" },
   ],
 };

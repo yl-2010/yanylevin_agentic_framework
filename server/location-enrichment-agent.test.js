@@ -14,10 +14,11 @@ const META = {
 };
 
 describe("location enrichment model", () => {
-  it("uses grok-4.6 xhigh with Fast off", () => {
-    assert.equal(LOCATION_ENRICHMENT_MODEL_SPEC.id, "grok-4.6");
+  it("uses grok-4.7 xhigh with Fast off", () => {
+    assert.equal(LOCATION_ENRICHMENT_MODEL_SPEC.id, "grok-4.7");
     assert.deepEqual(locationEnrichmentModelSpec().params, [
-      { id: "effort", value: "xhigh" },
+      { id: "context", value: "256k" },
+      { id: "reasoning_effort", value: "xhigh" },
       { id: "fast", value: "false" },
     ]);
   });

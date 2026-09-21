@@ -75,9 +75,10 @@ export const GUEST_FRIEND_COMPOSER_SPEC = {
 
 /** Grok for @agent (iMessage / Teams / JYPE group). Fast off. */
 export const GUEST_GROK_SPEC = {
-  id: "grok-4.6",
+  id: "grok-4.7",
   params: [
-    { id: "effort", value: "high" },
+    { id: "context", value: "256k" },
+    { id: "reasoning_effort", value: "high" },
     { id: "fast", value: "false" },
   ],
 };
@@ -93,7 +94,7 @@ export function copyModelSpec(spec) {
   };
 }
 
-/** Fast off, keep other params (effort, etc.). */
+/** Fast off, keep other params (reasoning_effort, context, etc.). */
 export function withoutFast(spec) {
   const next = copyModelSpec(spec);
   next.params = next.params.filter((p) => p.id !== "fast");

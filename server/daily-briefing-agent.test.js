@@ -57,26 +57,29 @@ describe("isoOnDateKey", () => {
 });
 
 describe("briefing model specs", () => {
-  it("news uses grok-4.6 xhigh", () => {
-    assert.equal(BRIEFING_NEWS_MODEL_SPEC.id, "grok-4.6");
+  it("news uses grok-4.7 xhigh", () => {
+    assert.equal(BRIEFING_NEWS_MODEL_SPEC.id, "grok-4.7");
     assert.deepEqual(BRIEFING_NEWS_MODEL_SPEC.params, [
-      { id: "effort", value: "xhigh" },
+      { id: "context", value: "256k" },
+      { id: "reasoning_effort", value: "xhigh" },
       { id: "fast", value: "false" },
     ]);
   });
 
-  it("agent recap uses grok-4.6 xhigh", () => {
-    assert.equal(AGENT_RECAP_MODEL_SPEC.id, "grok-4.6");
+  it("agent recap uses grok-4.7 xhigh", () => {
+    assert.equal(AGENT_RECAP_MODEL_SPEC.id, "grok-4.7");
     assert.deepEqual(AGENT_RECAP_MODEL_SPEC.params, [
-      { id: "effort", value: "xhigh" },
+      { id: "context", value: "256k" },
+      { id: "reasoning_effort", value: "xhigh" },
       { id: "fast", value: "false" },
     ]);
   });
 
-  it("unslop uses grok-4.6 high", () => {
-    assert.equal(BRIEFING_UNSLOP_MODEL_SPEC.id, "grok-4.6");
+  it("unslop uses grok-4.7 high", () => {
+    assert.equal(BRIEFING_UNSLOP_MODEL_SPEC.id, "grok-4.7");
     assert.deepEqual(BRIEFING_UNSLOP_MODEL_SPEC.params, [
-      { id: "effort", value: "high" },
+      { id: "context", value: "256k" },
+      { id: "reasoning_effort", value: "high" },
       { id: "fast", value: "false" },
     ]);
   });

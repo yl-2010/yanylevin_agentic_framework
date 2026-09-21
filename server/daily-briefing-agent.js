@@ -1,8 +1,8 @@
 /**
  * Morning Daily Briefing: 3-phase local Cursor SDK pipeline.
- *   1. news        Grok 4.6 xhigh  draft news capsules
- *   2. agent-recap Grok 4.6 xhigh  overnight agent recap card
- *   3. unslop      Grok 4.6 high   unslop + write todo.json + taste.md
+ *   1. news        Grok 4.7 xhigh  draft news capsules
+ *   2. agent-recap Grok 4.7 xhigh  overnight agent recap card
+ *   3. unslop      Grok 4.7 high   unslop + write todo.json + taste.md
  * Yan only.
  */
 
@@ -71,25 +71,28 @@ export const BRIEFING_NEWS_MODEL_SPEC = {
   id:
     process.env.CURSOR_PERSONAL_ATTACHMENT_MODEL ||
     process.env.CURSOR_EDUCATION_ATTACHMENT_MODEL ||
-    "grok-4.6",
+    "grok-4.7",
   params: [
-    { id: "effort", value: "xhigh" },
+    { id: "context", value: "256k" },
+    { id: "reasoning_effort", value: "xhigh" },
     { id: "fast", value: "false" },
   ],
 };
 
 export const AGENT_RECAP_MODEL_SPEC = {
-  id: process.env.CURSOR_AGENT_RECAP_MODEL || "grok-4.6",
+  id: process.env.CURSOR_AGENT_RECAP_MODEL || "grok-4.7",
   params: [
-    { id: "effort", value: "xhigh" },
+    { id: "context", value: "256k" },
+    { id: "reasoning_effort", value: "xhigh" },
     { id: "fast", value: "false" },
   ],
 };
 
 export const BRIEFING_UNSLOP_MODEL_SPEC = {
-  id: process.env.CURSOR_BRIEFING_UNSLOP_MODEL || "grok-4.6",
+  id: process.env.CURSOR_BRIEFING_UNSLOP_MODEL || "grok-4.7",
   params: [
-    { id: "effort", value: "high" },
+    { id: "context", value: "256k" },
+    { id: "reasoning_effort", value: "high" },
     { id: "fast", value: "false" },
   ],
 };

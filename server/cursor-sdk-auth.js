@@ -46,7 +46,7 @@ export const NIGHTLY_FALLBACK_DELAYS_MS = [0, 3000];
 
 /** Chat Working bubble copy while a user-facing turn is in flight. */
 export const WORKING_LABEL_DEFAULT = "Working…";
-export const WORKING_LABEL_GROK = "Reconnecting to Grok 4.6...";
+export const WORKING_LABEL_GROK = "Reconnecting to Grok 4.7...";
 export const WORKING_LABEL_AUTO = "Reconnecting to auto model...";
 
 /**
@@ -106,7 +106,7 @@ function collectText(value, out) {
 }
 
 /**
- * Grok 4.6 (and other) capacity / high-load failures. Not auth.
+ * Grok 4.7 (and other) capacity / high-load failures. Not auth.
  * @param {unknown} err
  * @param {unknown} [result]
  */

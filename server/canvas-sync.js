@@ -1,6 +1,6 @@
 /**
  * Canvas LMS fetch + dashboard sync agents.
- * Nightly: Grok 4.6 xhigh, full map (new classes, syllabus, dates).
+ * Nightly: Grok 4.7 xhigh, full map (new classes, syllabus, dates).
  * Hourly: Composer 2.5 (not fast), mapped classes only.
  * Live overlay: page-open GET of submissions + grades. Token from
  * server/.env (never commit). Agents never write done into todo.json.
@@ -47,9 +47,10 @@ export const CANVAS_LOCK_RETRY_MS = 3 * 60 * 1000;
 const SKILL_PATH = ".cursor/skills/personal-canvas/SKILL.md";
 
 export const CANVAS_SYNC_MODEL_SPEC = {
-  id: process.env.CURSOR_CANVAS_SYNC_MODEL || "grok-4.6",
+  id: process.env.CURSOR_CANVAS_SYNC_MODEL || "grok-4.7",
   params: [
-    { id: "effort", value: "xhigh" },
+    { id: "context", value: "256k" },
+    { id: "reasoning_effort", value: "xhigh" },
     { id: "fast", value: "false" },
   ],
 };
@@ -1505,7 +1506,7 @@ async function releaseLock(handle) {
 }
 
 /**
- * Fetch snapshot then (unless fetchOnly) run the Grok 4.6 high sync agent.
+ * Fetch snapshot then (unless fetchOnly) run the Grok 4.7 xhigh sync agent.
  * @param {{ force?: boolean, fetchOnly?: boolean }} [opts]
  */
 export async function runCanvasSync(opts = {}) {

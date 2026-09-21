@@ -3,7 +3,7 @@ name: context-synthesis
 description: >-
   Phase 3 of Yan's nightly pipeline (02:30): the thinking pass. Synthesize
   the day into identity.md and its siblings, patterns.md, threads/, and
-  journal/, and correct location history. Grok 4.6 xhigh. Yan only. Also
+  journal/, and correct location history. Grok 4.7 xhigh. Yan only. Also
   used when Yan asks to run synthesis manually.
 disable-model-invocation: true
 ---
@@ -18,7 +18,7 @@ chat title refresh and life-state cleanup at 01:30. They already had the 5-minut
 (`/tmp/yanylevin-context-life-state.json`), cleaned. Daily briefing is a separate 06:00
 job; do not compile news.
 
-Model: **grok-4.6 xhigh** (effort=xhigh, fast=false).
+Model: **grok-4.7 xhigh** (reasoning_effort=xhigh, fast=false, context=256k).
 
 ## Goal
 

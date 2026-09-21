@@ -11,7 +11,7 @@ alwaysApply: true
 
 A subagent must never run on a model tier **above** the parent.
 
-- **Auto** (`default`) and **Cursor first-party** parents (Composer, Grok 4.6, etc.): subagents stay first-party. Never pass Fable, Opus, Sonnet thinking, or any other third-party slug.
+- **Auto** (`default`) and **Cursor first-party** parents (Composer, Grok 4.7, etc.): subagents stay first-party. Never pass Fable, Opus, Sonnet thinking, or any other third-party slug.
 - **Third-party** parent (Fable, Opus): `inherit` or the same family only. Do not upgrade (e.g. Fable parent → Opus subagent).
 
 ## Auto mode
@@ -19,14 +19,14 @@ A subagent must never run on a model tier **above** the parent.
 When the parent chat is Auto (`default` / `catalogModelId=default`):
 
 - Prefer `inherit` on Task types that support it.
-- On **explore**, pass `cursor-grok-4.6-high` explicitly. Omitting `model` on explore still bills retired 4.5 even under Auto.
-- Allowed explicit slugs: `cursor-grok-4.6-high`, `composer-2.5-fast`, `composer-2.5`, and other Cursor first-party IDs. Not `claude-fable-5-thinking-high` or other Claude slugs.
+- On **explore**, pass `grok-4.7-high` explicitly. Omitting `model` on explore still bills retired 4.5 even under Auto.
+- Allowed explicit slugs: `grok-4.7-high`, `composer-2.5-fast`, `composer-2.5`, and other Cursor first-party IDs. Not `claude-fable-5-thinking-high` or other Claude slugs.
 
-## Named first-party parent (Grok 4.6, Composer, …)
+## Named first-party parent (Grok 4.7, Composer, …)
 
 - Prefer `inherit`.
-- On **explore**, pass the parent's family if you must be explicit (`cursor-grok-4.6-high`, `composer-2.5-fast`, etc.).
-- Do not steer Grok 4.6 toward Composer unless the user asked. Do not pass third-party Claude slugs.
+- On **explore**, pass the parent's family if you must be explicit (`grok-4.7-high`, `composer-2.5-fast`, etc.).
+- Do not steer Grok 4.7 toward Composer unless the user asked. Do not pass third-party Claude slugs.
 
 ## Named third-party parent (Fable, Opus, …)
 
@@ -36,10 +36,10 @@ When the parent chat is Auto (`default` / `catalogModelId=default`):
 
 ## Grok 4.5
 
-- Never pass `cursor-grok-4.5-high`. Use `cursor-grok-4.6-high` instead.
+- Never pass `cursor-grok-4.5-high`. Use `grok-4.7-high` instead.
 
 ## Other
 
-- Do **not** pin every Task to Grok 4.6 when the parent is already third-party or Composer.
+- Do **not** pin every Task to Grok 4.7 when the parent is already third-party or Composer.
 - This wins over Cursor's Task list that still includes 4.5.
 - Exception: a **direct user prompt** names a listed model (other than 4.5).

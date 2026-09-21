@@ -1,5 +1,5 @@
 /**
- * Nightly Grok 4.6 high (Fast off): project named GPS stays into
+ * Nightly Grok 4.7 high (Fast off): project named GPS stays into
  * brain/places cards. 03:00 local, after the 02:30 synthesis pipeline.
  * Yan only.
  */
@@ -47,9 +47,10 @@ const SYNTHESIS_WAIT_MS = 90 * 60 * 1000;
 const WAIT_POLL_MS = 5000;
 
 export const LOCATION_BRAIN_MODEL_SPEC = {
-  id: process.env.CURSOR_LOCATION_BRAIN_MODEL || "grok-4.6",
+  id: process.env.CURSOR_LOCATION_BRAIN_MODEL || "grok-4.7",
   params: [
-    { id: "effort", value: "high" },
+    { id: "context", value: "256k" },
+    { id: "reasoning_effort", value: "high" },
     { id: "fast", value: "false" },
   ],
 };

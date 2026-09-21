@@ -1,5 +1,5 @@
 /**
- * Nightly Grok 4.6 high (Fast off): turn Apple Health dumps into
+ * Nightly Grok 4.7 high (Fast off): turn Apple Health dumps into
  * takeaways.md. 01:00 local, same clock as location compose. Yan only.
  */
 
@@ -42,9 +42,10 @@ const META_PATH = join(
 const LOCK_STALE_MS = 45 * 60 * 1000;
 
 export const HEALTH_TAKEAWAYS_MODEL_SPEC = {
-  id: process.env.CURSOR_HEALTH_TAKEAWAYS_MODEL || "grok-4.6",
+  id: process.env.CURSOR_HEALTH_TAKEAWAYS_MODEL || "grok-4.7",
   params: [
-    { id: "effort", value: "high" },
+    { id: "context", value: "256k" },
+    { id: "reasoning_effort", value: "high" },
     { id: "fast", value: "false" },
   ],
 };

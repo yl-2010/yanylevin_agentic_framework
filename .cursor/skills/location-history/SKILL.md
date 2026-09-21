@@ -1,7 +1,7 @@
 ---
 name: location-history
 description: >-
-  Scheduled Grok 4.6 high job: turn Yan's GPS JSONL into stays and trips
+  Scheduled Grok 4.7 high job: turn Yan's GPS JSONL into stays and trips
   (walk / bike / car / plane / uber / robotaxi). Yan only. Not for live "where
   am I" chat — that is phone-location.
 disable-model-invocation: true
@@ -13,7 +13,7 @@ disable-model-invocation: true
 
 You are a one-shot local Cursor agent. Read new GPS points, compose coherent stays and trips, write markdown, update the cursor, stop.
 
-Model: **grok-4.6 high** (effort=high, fast=false). Also the every-4h compose when new GPS has landed.
+Model: **grok-4.7 high** (reasoning_effort=high, fast=false, context=256k). Also the every-4h compose when new GPS has landed.
 
 ## Files
 

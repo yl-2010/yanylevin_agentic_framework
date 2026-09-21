@@ -42,15 +42,17 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const YAN = "you@example.com";
 
 describe("Personal Agent models", () => {
-  it("uses grok-4.6 high with Fast off for text and attachments", () => {
-    assert.equal(DEFAULT_MODEL_SPEC.id, "grok-4.6");
+  it("uses grok-4.7 high with Fast off for text and attachments", () => {
+    assert.equal(DEFAULT_MODEL_SPEC.id, "grok-4.7");
     assert.deepEqual(DEFAULT_MODEL_SPEC.params, [
-      { id: "effort", value: "high" },
+      { id: "context", value: "256k" },
+      { id: "reasoning_effort", value: "high" },
       { id: "fast", value: "false" },
     ]);
-    assert.equal(ATTACHMENT_MODEL_SPEC.id, "grok-4.6");
+    assert.equal(ATTACHMENT_MODEL_SPEC.id, "grok-4.7");
     assert.deepEqual(ATTACHMENT_MODEL_SPEC.params, [
-      { id: "effort", value: "high" },
+      { id: "context", value: "256k" },
+      { id: "reasoning_effort", value: "high" },
       { id: "fast", value: "false" },
     ]);
   });
@@ -60,9 +62,10 @@ describe("Personal Agent models", () => {
       { imessageDeliverFinal: true, guestCaller: null },
       false
     );
-    assert.equal(yanMention.id, "grok-4.6");
+    assert.equal(yanMention.id, "grok-4.7");
     assert.deepEqual(yanMention.params, [
-      { id: "effort", value: "high" },
+      { id: "context", value: "256k" },
+      { id: "reasoning_effort", value: "high" },
       { id: "fast", value: "false" },
     ]);
     const later = guestTurnModelSpec(
@@ -77,9 +80,10 @@ describe("Personal Agent models", () => {
           slug: "alex-rivera",
           displayName: "Alex",
           model: {
-            id: "grok-4.6",
+            id: "grok-4.7",
             params: [
-              { id: "effort", value: "high" },
+              { id: "context", value: "256k" },
+              { id: "reasoning_effort", value: "high" },
               { id: "fast", value: "false" },
             ],
           },
@@ -558,7 +562,7 @@ describe("Personal Agent skill files", () => {
     assert.match(synthesis, /220 characters/);
     assert.match(synthesis, /SOUL\.md/);
     assert.match(synthesis, /journal\//);
-    assert.match(synthesis, /grok-4\.6 xhigh/);
+    assert.match(synthesis, /grok-4\.7 xhigh/);
     assert.match(synthesis, /who=yan/);
     assert.match(synthesis, /Example Friend spelling stays on/);
     assert.match(synthesis, /Did not write Apple Calendar/);
@@ -662,7 +666,7 @@ describe("Personal Agent skill files", () => {
       "utf8"
     );
     assert.match(locationBrain, /brain\/places/);
-    assert.match(locationBrain, /grok-4\.6 high/);
+    assert.match(locationBrain, /grok-4\.7 high/);
     assert.match(locationBrain, /\[GPS\]/);
     assert.match(locationBrain, /Never spawn a cloud agent/);
 
@@ -671,7 +675,7 @@ describe("Personal Agent skill files", () => {
       "utf8"
     );
     assert.match(healthBrain, /brain\/health\.md/);
-    assert.match(healthBrain, /grok-4\.6 high/);
+    assert.match(healthBrain, /grok-4\.7 high/);
     assert.match(healthBrain, /history-patterns\.md/);
     assert.match(healthBrain, /Never spawn a cloud agent/);
 

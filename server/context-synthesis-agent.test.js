@@ -48,20 +48,22 @@ const META = {
 };
 
 describe("context synthesis model", () => {
-  it("uses grok-4.6 xhigh with Fast off", () => {
-    assert.equal(CONTEXT_SYNTHESIS_MODEL_SPEC.id, "grok-4.6");
+  it("uses grok-4.7 xhigh with Fast off", () => {
+    assert.equal(CONTEXT_SYNTHESIS_MODEL_SPEC.id, "grok-4.7");
     assert.deepEqual(contextSynthesisModelSpec().params, [
-      { id: "effort", value: "xhigh" },
+      { id: "context", value: "256k" },
+      { id: "reasoning_effort", value: "xhigh" },
       { id: "fast", value: "false" },
     ]);
   });
 });
 
 describe("people enrich model", () => {
-  it("uses grok-4.6 high with Fast off", () => {
-    assert.equal(PEOPLE_ENRICH_MODEL_SPEC.id, "grok-4.6");
+  it("uses grok-4.7 high with Fast off", () => {
+    assert.equal(PEOPLE_ENRICH_MODEL_SPEC.id, "grok-4.7");
     assert.deepEqual(peopleEnrichModelSpec().params, [
-      { id: "effort", value: "high" },
+      { id: "context", value: "256k" },
+      { id: "reasoning_effort", value: "high" },
       { id: "fast", value: "false" },
     ]);
   });
@@ -259,10 +261,11 @@ describe("nightly phase prompts", () => {
     assert.ok(NIGHTLY_GIT_PATHS.includes("server"));
   });
 
-  it("uses grok-4.6 xhigh for the actions phase", () => {
-    assert.equal(NIGHTLY_ACTIONS_MODEL_SPEC.id, "grok-4.6");
+  it("uses grok-4.7 xhigh for the actions phase", () => {
+    assert.equal(NIGHTLY_ACTIONS_MODEL_SPEC.id, "grok-4.7");
     assert.deepEqual(NIGHTLY_ACTIONS_MODEL_SPEC.params, [
-      { id: "effort", value: "xhigh" },
+      { id: "context", value: "256k" },
+      { id: "reasoning_effort", value: "xhigh" },
       { id: "fast", value: "false" },
     ]);
   });
@@ -371,7 +374,7 @@ describe("people enrich prompt", () => {
     assert.match(prompt, /kate-huang\.md/);
     assert.match(prompt, /example-neighbor\.md/);
     assert.match(prompt, /Do not glob people/);
-    assert.match(prompt, /composer-2\.5|Nightly context synthesis stays on grok-4\.6/);
+    assert.match(prompt, /composer-2\.5|Nightly context synthesis stays on grok-4\.7/);
     assert.match(prompt, /promote to a folder/);
     assert.doesNotMatch(prompt, /rajasi-saha/);
     assert.equal(PEOPLE_ENRICH_BATCH_SIZE, 12);

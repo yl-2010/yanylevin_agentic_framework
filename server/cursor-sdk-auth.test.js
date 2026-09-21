@@ -69,7 +69,7 @@ describe("isCursorAuthFailure", () => {
 
   it("does not treat Grok high-load as auth", () => {
     const err = new Error(
-      "High Load. We're experiencing high demand for Cursor Grok 4.6 right now. Please switch to Auto, another model, or try again in a few moments."
+      "High Load. We're experiencing high demand for Cursor Grok 4.7 right now. Please switch to Auto, another model, or try again in a few moments."
     );
     err.status = 429;
     assert.equal(isCursorAuthFailure(err), false);
@@ -79,7 +79,7 @@ describe("isCursorAuthFailure", () => {
 describe("isCursorCapacityFailure", () => {
   it("matches Grok high-load copy", () => {
     const err = new Error(
-      "High Load. We're experiencing high demand for Cursor Grok 4.6 right now. Please switch to Auto, another model, or try again in a few moments. Request ID: c8996da1-9c20-4163-98da-ed60a22e067c"
+      "High Load. We're experiencing high demand for Cursor Grok 4.7 right now. Please switch to Auto, another model, or try again in a few moments. Request ID: c8996da1-9c20-4163-98da-ed60a22e067c"
     );
     assert.equal(isCursorCapacityFailure(err), true);
   });
@@ -101,7 +101,7 @@ describe("retry schedules", () => {
 
   it("gives nightly Grok jobs eight preferred-model attempts", () => {
     assert.equal(NIGHTLY_GROK_DELAYS_MS.length, 8);
-    assert.equal(scheduledPreferredDelaysMs({ id: "grok-4.6" }).length, 8);
+    assert.equal(scheduledPreferredDelaysMs({ id: "grok-4.7" }).length, 8);
     assert.ok(scheduledPreferredDelaysMs({ id: "composer-2.5" }).length < 8);
   });
 
@@ -116,7 +116,7 @@ describe("workingLabelForAttempt", () => {
   it("uses Working on the first Grok attempt", () => {
     assert.equal(
       workingLabelForAttempt({
-        model: { id: "grok-4.6" },
+        model: { id: "grok-4.7" },
         isFallback: false,
         recreate: false,
       }),
@@ -127,7 +127,7 @@ describe("workingLabelForAttempt", () => {
   it("uses Grok reconnect copy on a Grok retry", () => {
     assert.equal(
       workingLabelForAttempt({
-        model: { id: "grok-4.6" },
+        model: { id: "grok-4.7" },
         isFallback: false,
         recreate: true,
       }),
@@ -222,7 +222,7 @@ describe("promptWithAuthRetry", () => {
     try {
       const { result, usedFallback, capacityFailed } = await promptWithAuthRetry({
         prefix: "test",
-        model: { id: "grok-4.6", params: [] },
+        model: { id: "grok-4.7", params: [] },
         delaysMs: [0, 1],
         fallbackDelaysMs: [0],
         laterDelaysMs: [],
@@ -230,7 +230,7 @@ describe("promptWithAuthRetry", () => {
           ids.push(model.id);
           if (model.id !== "auto") {
             const err = new Error(
-              "High Load. We're experiencing high demand for Cursor Grok 4.6 right now. Please switch to Auto."
+              "High Load. We're experiencing high demand for Cursor Grok 4.7 right now. Please switch to Auto."
             );
             err.status = 429;
             throw err;
@@ -238,7 +238,7 @@ describe("promptWithAuthRetry", () => {
           return { status: "finished", result: "ok" };
         },
       });
-      assert.deepEqual(ids, ["grok-4.6", "grok-4.6", "auto"]);
+      assert.deepEqual(ids, ["grok-4.7", "grok-4.7", "auto"]);
       assert.equal(usedFallback, true);
       assert.equal(capacityFailed, false);
       assert.equal(result.status, "finished");
@@ -256,7 +256,7 @@ describe("promptWithAuthRetry", () => {
     try {
       const { result, usedFallback } = await promptWithAuthRetry({
         prefix: "test",
-        model: { id: "grok-4.6", params: [] },
+        model: { id: "grok-4.7", params: [] },
         delaysMs: [0, 0],
         fallbackDelaysMs: [0, 0],
         laterDelaysMs: [25],
@@ -318,7 +318,7 @@ describe("runWithModelFallback interactive ladder", () => {
     try {
       await runWithModelFallback({
         prefix: "test",
-        preferredModel: { id: "grok-4.6", params: [] },
+        preferredModel: { id: "grok-4.7", params: [] },
         delaysMs: [0, 0, 0],
         fallbackModel: AUTO_MODEL_SELECTION,
         fallbackDelaysMs: [0, 0],
@@ -333,9 +333,9 @@ describe("runWithModelFallback interactive ladder", () => {
         run: async () => ({ status: "error", result: "" }),
       });
       assert.deepEqual(calls, [
-        { id: "grok-4.6", recreate: false, isFallback: false },
-        { id: "grok-4.6", recreate: true, isFallback: false },
-        { id: "grok-4.6", recreate: true, isFallback: false },
+        { id: "grok-4.7", recreate: false, isFallback: false },
+        { id: "grok-4.7", recreate: true, isFallback: false },
+        { id: "grok-4.7", recreate: true, isFallback: false },
         { id: "auto", recreate: true, isFallback: true },
         { id: "auto", recreate: true, isFallback: true },
       ]);

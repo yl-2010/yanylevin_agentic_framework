@@ -1,7 +1,7 @@
 ---
 name: chat-title-refresh
 description: >-
-  Nightly Grok 4.6 high job: retitle Personal Agent chats (yanylevin, not
+  Nightly Grok 4.7 high job: retitle Personal Agent chats (yanylevin, not
   JYPE) from the full transcript in short keyword style. Never prefix Yan:.
   Guest @agent threads in this folder keep Name: via the Node wrapper.
   Also used for a one-shot historical backfill. Not live first-message titles.
@@ -12,7 +12,7 @@ disable-model-invocation: true
 
 **Gate:** local Cursor agent only. Never spawn a cloud agent. Only rewrite `title:` lines in listed `education/<email>/.chat-history/<sessionId>.md` files. Do not edit messages, widgets, or other users' folders that were not listed. JYPE chats are a different skill: `.cursor/skills/jype-chat-title-refresh/SKILL.md`. You will not be given those files.
 
-Model: **grok-4.6 high** (effort=high, fast=false).
+Model: **grok-4.7 high** (reasoning_effort=high, fast=false, context=256k).
 
 You run **after** the 01:00 nightly agents. Default slot is **01:30** (`chatTitleRefreshLocalTime` in `education/you@example.com/daily-briefing/meta.json`). Life-state cleanup is the other 01:30 job. Context synthesis is later (02:30). Daily briefing is 06:00.
 

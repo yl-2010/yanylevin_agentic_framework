@@ -19,7 +19,7 @@ export const LIFE_STATE_CLEANUP_DAY_PATH =
   "/tmp/yanylevin-life-state-cleanup-day.json";
 export const LIFE_STATE_CLEANUP_PATCH_PATH =
   "/tmp/yanylevin-life-state-cleanup.json";
-export const LIFE_STATE_CLEANUP_MODEL = "grok-4.6";
+export const LIFE_STATE_CLEANUP_MODEL = "grok-4.7";
 export const LIFE_STATE_CLEANUP_EVIDENCE = "cleanup:corrected";
 export const LIFE_STATE_CLEANUP_STATE = "cleanup-state.json";
 export const CURRENT_STALE_MS = 10 * 60 * 1000;
