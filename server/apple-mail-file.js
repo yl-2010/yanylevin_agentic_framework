@@ -8,7 +8,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { listRecentAppleMail } from "./apple-mail.js";
+import { FILE_LIST_MAX, listRecentAppleMail } from "./apple-mail.js";
 import { choice, systemOne, typesafeConfig } from "./typesafe.js";
 
 const execFileAsync = promisify(execFile);
@@ -237,16 +237,27 @@ export async function fileMailRows(rows, deps = {}) {
 }
 
 /**
+ * @param {unknown} raw
+ */
+export function parseBackfillLimit(raw) {
+  const s = String(raw ?? "").trim().toLowerCase();
+  if (s === "all" || s === "*") return FILE_LIST_MAX;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return 1000;
+  return Math.min(Math.max(Math.trunc(n), 1), FILE_LIST_MAX);
+}
+
+/**
  * Newest inbox/junk messages across Mail.app accounts, then Jev-file them.
  * Does not change the live poller watermark.
- * @param {number} [limit]
+ * @param {number|string} [limit]
  * @param {object} [deps]
  */
 export async function backfillAppleMailFile(limit = 1000, deps = {}) {
   if (!typesafeConfig().configured && !deps.systemOne && !deps.classifyMailRow) {
     return { ok: false, skipped: "no-key" };
   }
-  const n = Math.min(Math.max(Number(limit) || 1000, 1), 5000);
+  const n = parseBackfillLimit(limit);
   const list = deps.listRecentAppleMail || listRecentAppleMail;
   let rows = [];
   try {
@@ -263,7 +274,7 @@ export async function backfillAppleMailFile(limit = 1000, deps = {}) {
   const result = await fileMailRows(rows, {
     ...deps,
     skipSeen: false,
-    logEvery: deps.logEvery ?? 25,
+    logEvery: deps.logEvery ?? (rows.length > 2000 ? 100 : 25),
   });
   return {
     ...result,
@@ -361,12 +372,12 @@ const isCli =
   process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isCli) {
   const cmd = process.argv[2] || "once";
-  const n = Number(process.argv[3]) || 1000;
   if (cmd !== "once" && cmd !== "poll" && cmd !== "backfill") {
-    console.error("usage: node --env-file=.env apple-mail-file.js once|backfill [n]");
+    console.error("usage: node --env-file=.env apple-mail-file.js once|backfill [n|all]");
     process.exit(2);
   }
-  const run = cmd === "backfill" ? backfillAppleMailFile(n) : pollAppleMailFile();
+  const run =
+    cmd === "backfill" ? backfillAppleMailFile(process.argv[3] || 1000) : pollAppleMailFile();
   run
     .then((out) => {
       console.log(JSON.stringify(out));

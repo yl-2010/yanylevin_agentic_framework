@@ -20,6 +20,7 @@
     "apple-mail-fill": "npm run apple-mail-fill --prefix server",
     "apple-mail-file": "npm run apple-mail-file --prefix server",
     "apple-mail-file:backfill": "npm run apple-mail-file:backfill --prefix server",
+    "apple-mail-file:backfill:all": "npm run apple-mail-file:backfill:all --prefix server",
     "health-takeaways": "npm run health-takeaways --prefix server",
     "health-shortcut": "npm run health-shortcut --prefix server",
     "life-state-shortcut": "npm run life-state-shortcut --prefix server",

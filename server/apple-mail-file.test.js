@@ -13,8 +13,9 @@ import {
   parseFileState,
   pollAppleMailFile,
   backfillAppleMailFile,
+  parseBackfillLimit,
 } from "./apple-mail-file.js";
-import { FILE_BODY_MAX, extractPlaintext, isFiledMailbox, isWatchMailbox } from "./apple-mail.js";
+import { FILE_BODY_MAX, FILE_LIST_MAX, extractPlaintext, isFiledMailbox, isWatchMailbox } from "./apple-mail.js";
 
 describe("mail watch folders", () => {
   it("watches inbox and junk, not colleges or drafts", () => {
@@ -203,5 +204,27 @@ describe("backfillAppleMailFile", () => {
     assert.equal(listed[0].limit, 1);
     assert.equal(out.filed, 1);
     assert.deepEqual(moved, [{ id: 1, dest: "Security" }]);
+  });
+
+  it("treats all as the listing cap", () => {
+    assert.equal(parseBackfillLimit("all"), FILE_LIST_MAX);
+    assert.equal(parseBackfillLimit("*"), FILE_LIST_MAX);
+    assert.equal(parseBackfillLimit(1000), 1000);
+    assert.equal(parseBackfillLimit("nope"), 1000);
+  });
+
+  it("files every inbox row when limit is all", async () => {
+    const listed = [];
+    const out = await backfillAppleMailFile("all", {
+      listRecentAppleMail: async (opts) => {
+        listed.push(opts);
+        return [];
+      },
+      classifyMailRow: async () => ({ choice: "other", confidence: 0.9 }),
+    });
+    assert.equal(listed[0].newest, true);
+    assert.equal(listed[0].limit, FILE_LIST_MAX);
+    assert.equal(out.backfill, FILE_LIST_MAX);
+    assert.equal(out.scanned, 0);
   });
 });

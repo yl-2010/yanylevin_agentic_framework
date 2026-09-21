@@ -19,6 +19,8 @@ const execFileAsync = promisify(execFile);
 export const DUMP_BODY_MAX = 20_000;
 /** Jev input budget is 32k tokens. Leave room for questions; keep almost the whole body. */
 export const FILE_BODY_MAX = 100_000;
+/** Inbox/junk listing cap for a full backfill. Poller still passes a small limit. */
+export const FILE_LIST_MAX = 100_000;
 export const EMPTY_BODY_MAX_RATE = 0.05;
 export const IMAGE_OMITTED = "[image omitted]";
 
@@ -570,7 +572,7 @@ export async function listRecentAppleMail(opts = {}) {
   const sinceIso = String(opts.since || "").trim();
   const newest = opts.newest === true;
   const bodyMax = Number(opts.bodyMax) > 0 ? Number(opts.bodyMax) : FILE_BODY_MAX;
-  const limit = Math.min(Math.max(Number(opts.limit) || 40, 1), 5000);
+  const limit = Math.min(Math.max(Number(opts.limit) || 40, 1), FILE_LIST_MAX);
   if (!sinceIso && !newest) return [];
 
   const snapshot = await snapshotEnvelopeDb(envelopeDb);
@@ -583,14 +585,26 @@ export async function listRecentAppleMail(opts = {}) {
     await rm(`${snapshot}-shm`, { force: true }).catch(() => {});
   }
 
-  const emlxMap = await indexEmlxFiles(mailRoot);
-  const uuidMap = await accountMapFromMailRoot(mailRoot);
   /** @type {object[]} */
-  const out = [];
+  const metas = [];
   for (const row of rows) {
     if (!isWatchMailbox(row.mailboxUrl, row.mailboxName)) continue;
     if (isFiledMailbox(row.mailboxUrl, row.mailboxName)) continue;
     if (sinceIso && row.received && row.received < sinceIso) continue;
+    metas.push(row);
+  }
+  if (newest) {
+    metas.sort((a, b) => String(b.received || "").localeCompare(String(a.received || "")));
+  } else {
+    metas.sort((a, b) => String(a.received).localeCompare(String(b.received)));
+  }
+  const picked = newest ? metas.slice(0, limit).reverse() : metas.slice(0, limit);
+
+  const emlxMap = await indexEmlxFiles(mailRoot);
+  const uuidMap = await accountMapFromMailRoot(mailRoot);
+  /** @type {object[]} */
+  const out = [];
+  for (const row of picked) {
     const account = resolveAccount(row.mailboxUrl, uuidMap);
     const folder = folderFromMailbox(row.mailboxUrl, row.mailboxName);
     const emlxPath = emlxMap.get(row.id);
@@ -619,12 +633,7 @@ export async function listRecentAppleMail(opts = {}) {
       body,
     });
   }
-  if (newest) {
-    out.sort((a, b) => String(b.received || "").localeCompare(String(a.received || "")));
-    return out.slice(0, limit).reverse();
-  }
-  out.sort((a, b) => String(a.received).localeCompare(String(b.received)));
-  return out.slice(0, limit);
+  return out;
 }
 
 /**
