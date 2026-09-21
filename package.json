@@ -18,6 +18,7 @@
     "school-teams-fill": "npm run school-teams-fill --prefix server",
     "apple-mail": "npm run apple-mail --prefix server",
     "apple-mail-fill": "npm run apple-mail-fill --prefix server",
+    "apple-mail-file": "npm run apple-mail-file --prefix server",
     "health-takeaways": "npm run health-takeaways --prefix server",
     "health-shortcut": "npm run health-shortcut --prefix server",
     "life-state-shortcut": "npm run life-state-shortcut --prefix server",

@@ -17,6 +17,8 @@ import { stripHtml } from "./school-mail.js";
 const execFileAsync = promisify(execFile);
 
 export const DUMP_BODY_MAX = 20_000;
+/** Jev input budget is 32k tokens. Leave room for questions; keep almost the whole body. */
+export const FILE_BODY_MAX = 100_000;
 export const EMPTY_BODY_MAX_RATE = 0.05;
 export const IMAGE_OMITTED = "[image omitted]";
 
@@ -51,6 +53,12 @@ export function appleTimeToIso(raw) {
   return new Date((n + APPLE_EPOCH) * 1000).toISOString();
 }
 
+export function isoToAppleTime(iso) {
+  const ms = Date.parse(String(iso || "").trim());
+  if (!Number.isFinite(ms)) return 0;
+  return ms / 1000 - APPLE_EPOCH;
+}
+
 export function monthKeyFromIso(iso) {
   const key = String(iso || "").slice(0, 7);
   return /^\d{4}-\d{2}$/.test(key) ? key : "unknown";
@@ -58,6 +66,26 @@ export function monthKeyFromIso(iso) {
 
 export function shouldSkipMailbox(url, name) {
   return SKIP_FOLDER_RE.test(`${url || ""} ${name || ""}`);
+}
+
+export function folderKey(url, name) {
+  return folderFromMailbox(url, name).trim().toLowerCase();
+}
+
+/** Inbox plus junk/spam. The Jev filer watches these. Dump still skips junk. */
+export function isWatchMailbox(url, name) {
+  const folder = folderKey(url, name);
+  return (
+    folder === "inbox" ||
+    folder === "junk" ||
+    folder === "junk email" ||
+    folder === "spam"
+  );
+}
+
+export function isFiledMailbox(url, name) {
+  const folder = folderKey(url, name);
+  return folder === "colleges" || folder === "college" || folder === "security";
 }
 
 export function accountFromMailbox(url) {
@@ -229,11 +257,12 @@ function splitMultipart(body, boundary) {
  * @param {string} rfc822
  * @returns {{ text: string, imageOnly: boolean }}
  */
-export function extractPlaintext(rfc822) {
-  return extractPart(String(rfc822 || "").replace(/\r\n/g, "\n"));
+export function extractPlaintext(rfc822, max = DUMP_BODY_MAX) {
+  const cap = Number(max) > 0 ? Number(max) : DUMP_BODY_MAX;
+  return extractPart(String(rfc822 || "").replace(/\r\n/g, "\n"), cap);
 }
 
-function extractPart(raw) {
+function extractPart(raw, max) {
   const text = String(raw || "");
   const split = text.search(/\n\n/);
   const headerText = split < 0 ? text : text.slice(0, split);
@@ -250,25 +279,25 @@ function extractPart(raw) {
     const htmls = [];
     let sawImage = false;
     for (const part of parts) {
-      const got = extractPart(part);
+      const got = extractPart(part, max);
       if (got.imageOnly) sawImage = true;
       else if (got.text) {
         if (/content-type:\s*text\/html/i.test(part.slice(0, 500))) htmls.push(got.text);
         else plains.push(got.text);
       }
     }
-    if (plains.length) return { text: plains.join("\n"), imageOnly: false };
-    if (htmls.length) return { text: htmls.join("\n"), imageOnly: false };
+    if (plains.length) return { text: plains.join("\n").slice(0, max), imageOnly: false };
+    if (htmls.length) return { text: htmls.join("\n").slice(0, max), imageOnly: false };
     if (sawImage) return { text: IMAGE_OMITTED, imageOnly: true };
     return { text: "", imageOnly: false };
   }
 
   if (type.startsWith("image/")) return { text: IMAGE_OMITTED, imageOnly: true };
   if (type === "text/html" || type.endsWith("/html")) {
-    return { text: stripHtml(decoded, DUMP_BODY_MAX), imageOnly: false };
+    return { text: stripHtml(decoded, max), imageOnly: false };
   }
   if (type.startsWith("text/")) {
-    return { text: decoded.trim().slice(0, DUMP_BODY_MAX), imageOnly: false };
+    return { text: decoded.trim().slice(0, max), imageOnly: false };
   }
   return { text: "", imageOnly: false };
 }
@@ -358,7 +387,7 @@ async function columnNames(db, table) {
   return rows.map((r) => String(r.name || ""));
 }
 
-export async function listEnvelopeMessages(db) {
+export async function listEnvelopeMessages(db, opts = {}) {
   const tables = await tableNames(db);
   if (!tables.includes("messages")) {
     throw new Error("Envelope Index has no messages table");
@@ -367,6 +396,7 @@ export async function listEnvelopeMessages(db) {
   const mailboxCols = tables.includes("mailboxes") ? await columnNames(db, "mailboxes") : [];
   const hasSubjects = tables.includes("subjects");
   const hasAddresses = tables.includes("addresses");
+  const sinceIso = String(opts.sinceIso || "").trim();
 
   const senderJoin =
     hasAddresses && msgCols.includes("sender")
@@ -398,7 +428,13 @@ export async function listEnvelopeMessages(db) {
     : msgCols.includes("date_sent")
       ? "m.date_sent"
       : "0";
-  const deletedWhere = msgCols.includes("deleted") ? "WHERE COALESCE(m.deleted, 0) = 0" : "";
+  const where = [];
+  if (msgCols.includes("deleted")) where.push("COALESCE(m.deleted, 0) = 0");
+  if (sinceIso) {
+    const apple = isoToAppleTime(sinceIso);
+    if (apple) where.push(`${dateExpr} > ${apple}`);
+  }
+  const deletedWhere = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
   const sql = `
     SELECT
@@ -521,6 +557,69 @@ async function snapshotEnvelopeDb(src) {
   }
   await access(dest);
   return dest;
+}
+
+/**
+ * Recent inbox/junk messages with plaintext bodies for the Jev filer.
+ * @param {{ mailRoot?: string, envelopeDb?: string, since?: string, bodyMax?: number, limit?: number }} [opts]
+ */
+export async function listRecentAppleMail(opts = {}) {
+  const mailRoot = String(opts.mailRoot || "").trim() || defaultMailRoot();
+  const envelopeDb =
+    String(opts.envelopeDb || "").trim() || defaultMailEnvelopeDb();
+  const sinceIso = String(opts.since || "").trim();
+  const bodyMax = Number(opts.bodyMax) > 0 ? Number(opts.bodyMax) : FILE_BODY_MAX;
+  const limit = Math.min(Math.max(Number(opts.limit) || 40, 1), 200);
+  if (!sinceIso) return [];
+
+  const snapshot = await snapshotEnvelopeDb(envelopeDb);
+  let rows;
+  try {
+    rows = await listEnvelopeMessages(snapshot, { sinceIso });
+  } finally {
+    await rm(snapshot, { force: true }).catch(() => {});
+    await rm(`${snapshot}-wal`, { force: true }).catch(() => {});
+    await rm(`${snapshot}-shm`, { force: true }).catch(() => {});
+  }
+
+  const emlxMap = await indexEmlxFiles(mailRoot);
+  const uuidMap = await accountMapFromMailRoot(mailRoot);
+  /** @type {object[]} */
+  const out = [];
+  for (const row of rows) {
+    if (!isWatchMailbox(row.mailboxUrl, row.mailboxName)) continue;
+    if (isFiledMailbox(row.mailboxUrl, row.mailboxName)) continue;
+    if (sinceIso && row.received && row.received < sinceIso) continue;
+    const account = resolveAccount(row.mailboxUrl, uuidMap);
+    const folder = folderFromMailbox(row.mailboxUrl, row.mailboxName);
+    const emlxPath = emlxMap.get(row.id);
+    let body = "";
+    let messageId = "";
+    if (emlxPath) {
+      try {
+        const raw = await readFile(emlxPath);
+        const rfc822 = parseEmlx(raw);
+        const headers = parseHeaderBlock(rfc822.slice(0, 8000));
+        messageId = String(headers["message-id"] || "").trim();
+        body = extractPlaintext(rfc822, bodyMax).text;
+      } catch {
+        body = "";
+      }
+    }
+    out.push({
+      id: row.id,
+      received: row.received,
+      account,
+      folder,
+      from: row.from,
+      to: row.to,
+      subject: row.subject,
+      messageId,
+      body,
+    });
+  }
+  out.sort((a, b) => String(a.received).localeCompare(String(b.received)));
+  return out.slice(0, limit);
 }
 
 /**

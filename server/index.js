@@ -75,6 +75,7 @@ import { attachFitnessEvents } from "./fitness-events.js";
 import { startLocalIpc } from "./local-ipc.js";
 import { startIMessageAgentMentionScheduler } from "./imessage-agent-mentions.js";
 import { startTeamsAgentMentionScheduler } from "./teams-agent-mentions.js";
+import { startAppleMailFileScheduler } from "./apple-mail-file.js";
 import {
   startFitnessAgent,
   messageFitnessAgent,
@@ -1326,6 +1327,7 @@ app.use((_req, res) => {
   startLocalIpc();
   startIMessageAgentMentionScheduler();
   startTeamsAgentMentionScheduler();
+  startAppleMailFileScheduler();
   startHeadlinesWipeScheduler();
 });
 

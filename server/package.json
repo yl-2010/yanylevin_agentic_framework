@@ -21,6 +21,7 @@
     "school-teams-fill": "node --env-file=.env school-teams-fill.js",
     "apple-mail": "node apple-mail.js dump",
     "apple-mail-fill": "node --env-file=.env apple-mail-fill.js",
+    "apple-mail-file": "node --env-file=.env apple-mail-file.js once",
     "health-takeaways": "node --env-file=.env health-takeaways-agent.js",
     "location-brain": "node --env-file=.env location-brain-agent.js",
     "health-brain": "node --env-file=.env health-brain-agent.js",

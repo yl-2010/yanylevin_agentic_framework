@@ -14,6 +14,8 @@ import {
   extractPlaintext,
   folderFromMailbox,
   formatDumpMessage,
+  isFiledMailbox,
+  isWatchMailbox,
   parseEmlx,
   shouldSkipMailbox,
   wrapEmlx,
@@ -117,6 +119,9 @@ describe("apple-mail dump helpers", () => {
   it("skips junk/trash/drafts and labels the three accounts", () => {
     assert.equal(shouldSkipMailbox("imap://x/Junk", "Junk"), true);
     assert.equal(shouldSkipMailbox("imap://x/INBOX", "INBOX"), false);
+    assert.equal(isWatchMailbox("imap://x/Junk", "Junk"), true);
+    assert.equal(isWatchMailbox("imap://x/INBOX", "INBOX"), true);
+    assert.equal(isFiledMailbox("imap://x/Colleges", "Colleges"), true);
     assert.equal(accountFromMailbox("imap://yanylevin%40gmail.com@imap.gmail.com/INBOX"), "Google");
     assert.equal(
       accountFromMailbox("imap://yl-2010%40outlook.com@outlook.office365.com/Inbox"),

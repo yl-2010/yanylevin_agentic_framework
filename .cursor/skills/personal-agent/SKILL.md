@@ -96,6 +96,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | School Outlook fill (manual, one-shot) | `.cursor/skills/brain-school-mail/SKILL.md` |
 | School Teams fill (manual, one-shot) | `.cursor/skills/brain-school-teams/SKILL.md` |
 | Apple Mail fill (manual, one-shot) | `.cursor/skills/brain-apple-mail/SKILL.md` |
+| Mail.app Colleges/Security Jev filer | `.cursor/skills/typesafe-ai/SKILL.md` (`server/apple-mail-file.js`) |
 | TypeSafe Jev classify / route / score | `.cursor/skills/typesafe-ai/SKILL.md` |
 | Chat title refresh (manual / backfill) | `.cursor/skills/chat-title-refresh/SKILL.md` (Personal Agent) and `.cursor/skills/jype-chat-title-refresh/SKILL.md` (JYPE) |
 | Life-state cleanup (manual) | `.cursor/skills/life-state-cleanup/SKILL.md` |
