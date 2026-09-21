@@ -115,6 +115,8 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.education));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.schedule));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.widgets));
+    assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.browser));
+    assert.match(prompt, /skip static fetch/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.mail));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.schoolMail));
     assert.match(prompt, /school-mail\.js/);
@@ -161,6 +163,7 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /JYPE agent/);
     assert.match(prompt, /Do not copy Yan's personal \/education sites onto JYPE/);
     assert.ok(prompt.includes(FOUR11_SKILL_PATH));
+    assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.browser));
   });
 
 });
@@ -334,6 +337,20 @@ describe("Personal Agent skill files", () => {
     assert.match(widgets, /Never markdown images/);
     assert.match(widgets, /1–2 full sentences/);
     assert.match(widgets, /Never.*one-word/);
+    assert.match(widgets, /personal-browser/);
+
+    const browser = await readFile(
+      join(REPO_ROOT, PERSONAL_SKILL_PATHS.browser),
+      "utf8"
+    );
+    assert.match(browser, /Google Chrome/);
+    assert.match(browser, /skip static|When to skip/i);
+    assert.match(browser, /JYPE/);
+    assert.match(browser, /family portal/i);
+    assert.match(browser, /school-mail\.js search/);
+    assert.match(browser, /Fidelity|brokerage/);
+    assert.match(browser, /browser_navigate/);
+    assert.doesNotMatch(browser, /school-mail\/chrome-profile/);
 
     const mail = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.mail), "utf8");
     assert.match(mail, /osascript/);
@@ -508,6 +525,7 @@ describe("Personal Agent skill files", () => {
     assert.doesNotMatch(agent, /Sunny \/ Sunny Boy is Adi Levin/);
     assert.match(agent, /personal-screentime/);
     assert.match(agent, /personal-onenote/);
+    assert.match(agent, /personal-browser/);
     assert.match(agent, /context-synthesis/);
     assert.match(agent, /location-enrichment/);
     assert.match(agent, /location-brain/);

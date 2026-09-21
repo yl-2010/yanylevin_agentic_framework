@@ -49,3 +49,4 @@ Do **not** trust Apple Maps opening times. Before stating hours in the bubble, s
 1. Fetch the place’s official website hours page if one exists (library, cafe, gym, store).
 2. If there is no site, or the site does not list hours, use **Google Maps** hours.
 3. If you cannot verify, say so. Never quote Apple Maps hours as the answer.
+4. Open Chrome (personal-browser skill) only if that hours page is JS/login and fetch returned nothing useful.

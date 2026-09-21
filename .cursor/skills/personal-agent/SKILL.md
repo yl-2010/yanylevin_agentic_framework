@@ -71,6 +71,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Yan iPhone location (live + stays/trips) | `.cursor/skills/phone-location/SKILL.md` |
 | What Yan is doing now / was doing at a time (5-minute log) | `.cursor/skills/life-state/SKILL.md` |
 | Map / image / HTML widgets, location cards, place hours | `.cursor/skills/chat-widgets/SKILL.md` |
+| Click-through / login pages (not static fetch) | `.cursor/skills/personal-browser/SKILL.md` |
 | Yan inbox / Mail.app (search and send) | `.cursor/skills/personal-mail/SKILL.md` |
 | School Outlook `owner@school.example` | `.cursor/skills/personal-school-mail/SKILL.md` |
 | School OneNote / Class Notebooks (on demand; school questions about agendas, HW instructions, maps, day packets) | `.cursor/skills/personal-onenote/SKILL.md` |

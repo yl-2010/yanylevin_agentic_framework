@@ -11,6 +11,11 @@ import { isEducationUser, resolveNowScheduleContext } from "./education-data.js"
 import { notifyEducationClients } from "./education-events.js";
 import { canonicalizeEmail, isJypeAccessEmail, isFullAccessEmail, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
 import {
+  browserCustomTools,
+  closeAgentBrowser,
+  sessionMayUseBrowser,
+} from "./agent-browser.js";
+import {
   jypeEmailForSlug,
   jypeGivenName,
   normalizeJypeWorkspace,
@@ -728,6 +733,7 @@ function sessionCustomTools(sid, session) {
   return {
     ...sendChatMessageTool(sid, session),
     ...openEducationPageTool(sid, session),
+    ...(sessionMayUseBrowser(session) ? browserCustomTools(session) : {}),
   };
 }
 
@@ -1016,6 +1022,7 @@ async function disposeSession(id) {
     }).catch(() => {});
   }
   await disposeCursorAgent(s?.agent);
+  await closeAgentBrowser().catch(() => {});
 }
 
 function requireKey() {
@@ -1080,6 +1087,7 @@ export const PERSONAL_SKILL_PATHS = {
   chats: ".cursor/skills/past-chats/SKILL.md",
   news: ".cursor/skills/daily-news/SKILL.md",
   fitness: ".cursor/skills/fitness-os/SKILL.md",
+  browser: ".cursor/skills/personal-browser/SKILL.md",
   brain: "education/you@example.com/brain/schema.md",
   synthesis: ".cursor/skills/context-synthesis/SKILL.md",
   locationEnrichment: ".cursor/skills/location-enrichment/SKILL.md",
@@ -1121,6 +1129,7 @@ export function systemPrompt(email, opts = {}) {
       `- Static HTML on a JYPE object: ${PERSONAL_SKILL_PATHS.objectHtml || ".cursor/skills/object-html/SKILL.md"}`,
       `- Public yanylevin.com page: ${PERSONAL_SKILL_PATHS.webpage || ".cursor/skills/yanylevin-webpage-create/SKILL.md"}`,
       `- EPS student IDs / school photos: ${FOUR11_SKILL_PATH}`,
+      `- Click-through / login pages (skip static fetch): ${PERSONAL_SKILL_PATHS.browser}`,
       "File uploads can be stored in the matching JYPE class or project folder.",
     ].join("\n");
   }
@@ -1143,6 +1152,9 @@ export function systemPrompt(email, opts = {}) {
     `- EPS student IDs / school photos: ${FOUR11_SKILL_PATH}`,
     `- Past chats: ${PERSONAL_SKILL_PATHS.chats}`,
     `- Chat widgets (map / html / image fences): ${PERSONAL_SKILL_PATHS.widgets}`,
+    isJypeAccessEmail(email)
+      ? `- Click-through / login pages (skip static fetch): ${PERSONAL_SKILL_PATHS.browser}`
+      : "",
     `- Yan Mail.app search and send: ${PERSONAL_SKILL_PATHS.mail}`,
     `- School Outlook (owner@school.example) via school-mail.js: ${PERSONAL_SKILL_PATHS.schoolMail}`,
     `- School OneNote (on demand only): ${PERSONAL_SKILL_PATHS.schoolOnenote}`,
@@ -2305,6 +2317,17 @@ async function executeAgentTurn(sid, session, opts) {
     } else {
       session.status = "error";
       notifyTurnFinished(session, sid, { status: "error" });
+    }
+  } finally {
+    if (session.status !== "running") {
+      let otherRunning = false;
+      for (const [id, s] of sessions.entries()) {
+        if (id === sid) continue;
+        if (s.status === "running") otherRunning = true;
+      }
+      if (!otherRunning) {
+        await closeAgentBrowser().catch(() => {});
+      }
     }
   }
 }
