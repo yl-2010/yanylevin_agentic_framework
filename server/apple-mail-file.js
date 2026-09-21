@@ -160,6 +160,120 @@ export async function moveAndMarkRead(row, destMailbox, deps = {}) {
 }
 
 /**
+ * Classify and file a list of inbox/junk rows. Jev only.
+ * @param {object[]} rows
+ * @param {object} [deps]
+ */
+export async function fileMailRows(rows, deps = {}) {
+  const classify = deps.classifyMailRow || classifyMailRow;
+  const move = deps.moveAndMarkRead || moveAndMarkRead;
+  const seen = new Set(
+    Array.isArray(deps.seenIds) ? deps.seenIds.map((id) => String(id || "").trim()) : []
+  );
+  const skipSeen = deps.skipSeen !== false;
+  const logEvery = Number(deps.logEvery) || 0;
+  const list = Array.isArray(rows) ? rows : [];
+  let filed = 0;
+  let skipped = 0;
+  let errors = 0;
+  const nextSeen = [...seen];
+  let i = 0;
+  for (const row of list) {
+    i += 1;
+    const key = messageKey(row);
+    if (skipSeen && key && seen.has(key)) continue;
+    let answer;
+    try {
+      answer = await classify(row, deps);
+    } catch (err) {
+      errors += 1;
+      console.error("[apple-mail-file] jev", err);
+      continue;
+    }
+    const action = decideFileAction(answer);
+    if (action === "skip") {
+      if (key) {
+        nextSeen.push(key);
+        seen.add(key);
+      }
+      skipped += 1;
+      if (logEvery && i % logEvery === 0) {
+        console.log(
+          `[apple-mail-file] ${i}/${list.length} filed=${filed} skipped=${skipped} errors=${errors}`
+        );
+      }
+      continue;
+    }
+    const dest = destMailboxForAction(action);
+    try {
+      await move(row, dest, deps);
+    } catch (err) {
+      errors += 1;
+      console.error("[apple-mail-file] move", err);
+      continue;
+    }
+    if (key) {
+      nextSeen.push(key);
+      seen.add(key);
+    }
+    filed += 1;
+    console.log(
+      `[apple-mail-file] ${action} from=${row.from} subject=${String(row.subject || "").slice(0, 80)}`
+    );
+    if (logEvery && i % logEvery === 0) {
+      console.log(
+        `[apple-mail-file] ${i}/${list.length} filed=${filed} skipped=${skipped} errors=${errors}`
+      );
+    }
+  }
+  return {
+    ok: true,
+    filed,
+    skipped,
+    errors,
+    scanned: list.length,
+    nextSeen,
+  };
+}
+
+/**
+ * Newest inbox/junk messages across Mail.app accounts, then Jev-file them.
+ * Does not change the live poller watermark.
+ * @param {number} [limit]
+ * @param {object} [deps]
+ */
+export async function backfillAppleMailFile(limit = 1000, deps = {}) {
+  if (!typesafeConfig().configured && !deps.systemOne && !deps.classifyMailRow) {
+    return { ok: false, skipped: "no-key" };
+  }
+  const n = Math.min(Math.max(Number(limit) || 1000, 1), 5000);
+  const list = deps.listRecentAppleMail || listRecentAppleMail;
+  let rows = [];
+  try {
+    rows = await list({ newest: true, limit: n });
+  } catch (err) {
+    console.error("[apple-mail-file] list", err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+  console.log(
+    `[apple-mail-file] backfill ${rows.length} messages` +
+      (rows[0]?.received ? ` from ${rows[0].received}` : "") +
+      (rows[rows.length - 1]?.received ? ` to ${rows[rows.length - 1].received}` : "")
+  );
+  const result = await fileMailRows(rows, {
+    ...deps,
+    skipSeen: false,
+    logEvery: deps.logEvery ?? 25,
+  });
+  return {
+    ...result,
+    backfill: n,
+    oldest: rows[0]?.received || "",
+    newest: rows[rows.length - 1]?.received || "",
+  };
+}
+
+/**
  * One poll. First run with empty state only writes a watermark (no backlog).
  * @param {object} [deps]
  */
@@ -197,54 +311,26 @@ export async function pollAppleMailFile(deps = {}) {
     if (!key || seen.has(key)) continue;
     hits.push(row);
   }
-
-  const classify = deps.classifyMailRow || classifyMailRow;
-  const move = deps.moveAndMarkRead || moveAndMarkRead;
-  let filed = 0;
-  let skipped = 0;
-  const nextSeen = [...state.seenIds];
-  let newest = state.lastAt;
   const batch = hits.slice(0, POLL_LIMIT);
+  const result = await fileMailRows(batch, {
+    ...deps,
+    seenIds: state.seenIds,
+    skipSeen: true,
+  });
+  let newest = state.lastAt;
   for (const row of batch) {
-    const key = messageKey(row);
     const at = receivedIso(row);
-    let answer;
-    try {
-      answer = await classify(row, deps);
-    } catch (err) {
-      console.error("[apple-mail-file] jev", err);
-      continue;
-    }
-    const action = decideFileAction(answer);
-    if (action === "skip") {
-      nextSeen.push(key);
-      seen.add(key);
-      skipped += 1;
-      if (at && at > newest) newest = at;
-      continue;
-    }
-    const dest = destMailboxForAction(action);
-    try {
-      await move(row, dest, deps);
-    } catch (err) {
-      console.error("[apple-mail-file] move", err);
-      continue;
-    }
-    nextSeen.push(key);
-    seen.add(key);
-    filed += 1;
     if (at && at > newest) newest = at;
-    console.log(
-      `[apple-mail-file] ${action} from=${row.from} subject=${String(row.subject || "").slice(0, 80)}`
-    );
   }
-
   if (nowIso > newest && batch.length === hits.length) newest = nowIso;
-  await saveFileState({ lastAt: newest, seenIds: nextSeen.slice(-SEEN_MAX) }, path);
+  await saveFileState(
+    { lastAt: newest, seenIds: result.nextSeen.slice(-SEEN_MAX) },
+    path
+  );
   return {
     ok: true,
-    filed,
-    skipped,
+    filed: result.filed,
+    skipped: result.skipped,
     scanned: Array.isArray(rows) ? rows.length : 0,
     pending: Math.max(0, hits.length - batch.length),
   };
@@ -275,11 +361,13 @@ const isCli =
   process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isCli) {
   const cmd = process.argv[2] || "once";
-  if (cmd !== "once" && cmd !== "poll") {
-    console.error("usage: node --env-file=.env apple-mail-file.js once");
+  const n = Number(process.argv[3]) || 1000;
+  if (cmd !== "once" && cmd !== "poll" && cmd !== "backfill") {
+    console.error("usage: node --env-file=.env apple-mail-file.js once|backfill [n]");
     process.exit(2);
   }
-  pollAppleMailFile()
+  const run = cmd === "backfill" ? backfillAppleMailFile(n) : pollAppleMailFile();
+  run
     .then((out) => {
       console.log(JSON.stringify(out));
     })

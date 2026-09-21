@@ -12,6 +12,7 @@ import {
   moveArgs,
   parseFileState,
   pollAppleMailFile,
+  backfillAppleMailFile,
 } from "./apple-mail-file.js";
 import { FILE_BODY_MAX, extractPlaintext, isFiledMailbox, isWatchMailbox } from "./apple-mail.js";
 
@@ -168,5 +169,39 @@ describe("pollAppleMailFile", () => {
     const state = parseFileState(JSON.parse(await (await import("node:fs/promises")).readFile(path, "utf8")));
     assert.ok(state.seenIds.includes("mid:<1@u.edu>"));
     assert.ok(state.seenIds.includes("mid:<2@x.com>"));
+  });
+});
+
+describe("backfillAppleMailFile", () => {
+  it("files the newest N inbox rows", async () => {
+    const moved = [];
+    const listed = [];
+    const rows = [
+      {
+        id: 1,
+        account: "Google",
+        folder: "INBOX",
+        from: "alerts@accounts.google.com",
+        subject: "New sign-in",
+        received: "2026-09-20T17:10:00.000Z",
+        messageId: "<s@g>",
+        body: "New sign-in on Chrome in Kirkland.",
+      },
+    ];
+    const out = await backfillAppleMailFile(1, {
+      listRecentAppleMail: async (opts) => {
+        listed.push(opts);
+        return rows;
+      },
+      classifyMailRow: async () => ({ choice: "security", confidence: 0.91 }),
+      moveAndMarkRead: async (row, dest) => {
+        moved.push({ id: row.id, dest });
+        return "moved";
+      },
+    });
+    assert.equal(listed[0].newest, true);
+    assert.equal(listed[0].limit, 1);
+    assert.equal(out.filed, 1);
+    assert.deepEqual(moved, [{ id: 1, dest: "Security" }]);
   });
 });

@@ -561,16 +561,17 @@ async function snapshotEnvelopeDb(src) {
 
 /**
  * Recent inbox/junk messages with plaintext bodies for the Jev filer.
- * @param {{ mailRoot?: string, envelopeDb?: string, since?: string, bodyMax?: number, limit?: number }} [opts]
+ * @param {{ mailRoot?: string, envelopeDb?: string, since?: string, newest?: boolean, bodyMax?: number, limit?: number }} [opts]
  */
 export async function listRecentAppleMail(opts = {}) {
   const mailRoot = String(opts.mailRoot || "").trim() || defaultMailRoot();
   const envelopeDb =
     String(opts.envelopeDb || "").trim() || defaultMailEnvelopeDb();
   const sinceIso = String(opts.since || "").trim();
+  const newest = opts.newest === true;
   const bodyMax = Number(opts.bodyMax) > 0 ? Number(opts.bodyMax) : FILE_BODY_MAX;
-  const limit = Math.min(Math.max(Number(opts.limit) || 40, 1), 200);
-  if (!sinceIso) return [];
+  const limit = Math.min(Math.max(Number(opts.limit) || 40, 1), 5000);
+  if (!sinceIso && !newest) return [];
 
   const snapshot = await snapshotEnvelopeDb(envelopeDb);
   let rows;
@@ -617,6 +618,10 @@ export async function listRecentAppleMail(opts = {}) {
       messageId,
       body,
     });
+  }
+  if (newest) {
+    out.sort((a, b) => String(b.received || "").localeCompare(String(a.received || "")));
+    return out.slice(0, limit).reverse();
   }
   out.sort((a, b) => String(a.received).localeCompare(String(b.received)));
   return out.slice(0, limit);
