@@ -5,11 +5,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   MIN_CONFIDENCE,
+  BODY_RETRY_FLOOR,
   buildFileState,
+  classifyMailRow,
   decideFileAction,
   destMailboxForAction,
+  isMaxTokensExceeded,
   loadFileState,
   moveArgs,
+  nextClassifyBodyCap,
   parseFileState,
   pollAppleMailFile,
   backfillAppleMailFile,
@@ -70,6 +74,47 @@ describe("buildFileState", () => {
     assert.equal(state.body, body);
     assert.equal(state.from, "admit@stanford.edu");
     assert.match(state.subject, /Visit campus/);
+  });
+});
+
+describe("max tokens retry", () => {
+  it("detects TypeSafe max_tokens_exceeded", () => {
+    assert.equal(
+      isMaxTokensExceeded({
+        status: 400,
+        message: '400 {"detail":{"error_type":"max_tokens_exceeded"}}',
+        body: { detail: { error_type: "max_tokens_exceeded" } },
+      }),
+      true
+    );
+    assert.equal(isMaxTokensExceeded(new Error("nope")), false);
+    assert.equal(nextClassifyBodyCap(100_000), 50_000);
+    assert.equal(nextClassifyBodyCap(BODY_RETRY_FLOOR), 0);
+  });
+
+  it("halves the body and classifies after max_tokens_exceeded", async () => {
+    const bodies = [];
+    const row = {
+      account: "Google",
+      folder: "INBOX",
+      from: "admit@u.edu",
+      subject: "Apply now",
+      body: "x".repeat(8_000),
+    };
+    const answer = await classifyMailRow(row, {
+      systemOne: async (req) => {
+        const body = String(req.state.body || "");
+        bodies.push(body.length);
+        if (body.length > 4_000) {
+          const err = new Error("400 max_tokens_exceeded");
+          err.body = { detail: { error_type: "max_tokens_exceeded" } };
+          throw err;
+        }
+        return { answers: { bucket: { choice: "college", confidence: 0.9 } } };
+      },
+    });
+    assert.deepEqual(bodies, [8000, 4000]);
+    assert.equal(answer.choice, "college");
   });
 });
 

@@ -24,6 +24,8 @@ export const MIN_CONFIDENCE = 0.5;
 export const DEST_ACCOUNT = "iCloud";
 export const DEST_COLLEGES = "Colleges";
 export const DEST_SECURITY = "Security";
+/** Smallest body to retry after Jev max_tokens_exceeded. Then headers only. */
+export const BODY_RETRY_FLOOR = 500;
 
 const FILE_QUESTION = choice(
   [
@@ -139,13 +141,39 @@ export function moveArgs(row) {
   ];
 }
 
+export function isMaxTokensExceeded(err) {
+  if (!err || typeof err !== "object") {
+    return /max_tokens_exceeded/i.test(String(err || ""));
+  }
+  const type = String(err.body?.detail?.error_type || err.error_type || "").toLowerCase();
+  if (type === "max_tokens_exceeded") return true;
+  return /max_tokens_exceeded/i.test(String(err.message || ""));
+}
+
+export function nextClassifyBodyCap(currentLen) {
+  const n = Math.max(0, Number(currentLen) || 0);
+  if (n <= BODY_RETRY_FLOOR) return 0;
+  return Math.max(BODY_RETRY_FLOOR, Math.floor(n / 2));
+}
+
 export async function classifyMailRow(row, deps = {}) {
   const run = deps.systemOne || systemOne;
-  const result = await run({
-    state: buildFileState(row),
-    questions: { bucket: FILE_QUESTION },
-  });
-  return result?.answers?.bucket;
+  let body = String(row?.body || "");
+  for (;;) {
+    try {
+      const result = await run({
+        state: buildFileState({ ...row, body }),
+        questions: { bucket: FILE_QUESTION },
+      });
+      return result?.answers?.bucket;
+    } catch (err) {
+      if (!isMaxTokensExceeded(err)) throw err;
+      if (!body) throw err;
+      const next = nextClassifyBodyCap(body.length);
+      body = next > 0 ? body.slice(0, next) : "";
+      console.warn(`[apple-mail-file] max_tokens; retry with body=${body.length}`);
+    }
+  }
 }
 
 export async function moveAndMarkRead(row, destMailbox, deps = {}) {
