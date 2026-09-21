@@ -22,6 +22,7 @@ import {
   originIsJypeThread,
 } from "./jype.js";
 import { gitAddCommitPush } from "./git-publish.js";
+import { encodeEducationRouteId } from "./education-route-id.js";
 import { enqueueBrainExtraction } from "./brain-extraction.js";
 import { parseLocationPayload } from "./phone-location.js";
 import { formatCalendarLiveLines } from "./calendar-cli.js";
@@ -576,20 +577,20 @@ export function educationNavigateHref(raw) {
     case "home":
       return "/education/";
     case "class":
-      return `/education/class/${encodeURIComponent(n.classId || "")}`;
+      return `/education/class/${encodeEducationRouteId(n.classId || "")}`;
     case "project":
-      return `/education/project/${encodeURIComponent(n.projectId || "")}`;
+      return `/education/project/${encodeEducationRouteId(n.projectId || "")}`;
     case "todo":
-      return `/education/todo/${encodeURIComponent(n.todoId || "")}${q}`;
+      return `/education/todo/${encodeEducationRouteId(n.todoId || "")}${q}`;
     case "date":
-      return `/education/date/${encodeURIComponent(n.dateId || "")}${q}`;
+      return `/education/date/${encodeEducationRouteId(n.dateId || "")}${q}`;
     case "capsule":
-      return `/education/todo/${encodeURIComponent(n.todoId || "")}/capsule/${encodeURIComponent(
+      return `/education/todo/${encodeEducationRouteId(n.todoId || "")}/capsule/${encodeEducationRouteId(
         n.capsuleId || ""
       )}${q}`;
     case "case": {
       const side = n.caseSide === "neg" ? "neg" : "aff";
-      return `/debate/case/${encodeURIComponent(n.caseId || "")}/${side}`;
+      return `/debate/case/${encodeEducationRouteId(n.caseId || "")}/${side}`;
     }
     default:
       return null;

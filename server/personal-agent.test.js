@@ -907,6 +907,14 @@ describe("open_education_page navigate payload", () => {
       }),
       "/education/date/fall-orientation-day-1"
     );
+    const spanishHref = educationNavigateHref({
+      view: "todo",
+      todoId: "QA Sep 24 #1 ESCRITO AUDITIVO Otoño 2026",
+      classId: "spanish-4",
+    });
+    assert.equal(spanishHref.includes("#"), false);
+    assert.match(spanishHref, /^\/education\/todo\/QA\*20Sep\*2024\*20\*231/);
+    assert.match(spanishHref, /\?class=spanish-4$/);
     assert.equal(
       educationNavigateHref({
         view: "case",

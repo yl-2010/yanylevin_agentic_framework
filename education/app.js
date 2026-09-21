@@ -32,33 +32,86 @@
   const API = String(CFG.apiPrefix || "/api/education").replace(/\/+$/, "") || "/api/education";
   const BASE_RE = BASE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+  /**
+   * Keep in sync with server/education-route-id.js.
+   * encodeURIComponent leaves `#` as `%23`. Drag-to-tab decodes that into a
+   * real hash, so Spanish QA #1 (and anything else with `#`) opens Missing.
+   */
+  function encodeRouteId(id) {
+    return encodeURIComponent(String(id ?? "")).replace(/%/g, "*");
+  }
+  function decodeRouteId(raw) {
+    const s = String(raw ?? "");
+    if (!s) return s;
+    try {
+      const decoded = s.includes("*")
+        ? decodeURIComponent(s.replace(/\*/g, "%"))
+        : decodeURIComponent(s);
+      return decoded.normalize("NFC");
+    } catch {
+      try {
+        return s.normalize("NFC");
+      } catch {
+        return s;
+      }
+    }
+  }
+  function recoverHashSplitId(id, params) {
+    const src = String(window.location.hash || "");
+    if (src.length < 2 || !src.startsWith("#")) return { id, params };
+    const rest = src.slice(1);
+    const qAt = rest.indexOf("?");
+    const namePart = qAt >= 0 ? rest.slice(0, qAt) : rest;
+    const extraQuery = qAt >= 0 ? rest.slice(qAt + 1) : "";
+    const looksSplit =
+      /(?:^|&)(class|project|classId|projectId)=/.test(extraQuery) ||
+      /^\d+(\s|$)/.test(namePart);
+    if (!looksSplit || String(id).includes("#")) return { id, params };
+    let nameDecoded = namePart;
+    try {
+      nameDecoded = decodeURIComponent(namePart.replace(/\+/g, " "));
+    } catch {
+      /* keep */
+    }
+    const recovered = `${id}#${nameDecoded}`.normalize("NFC");
+    if (!extraQuery) return { id: recovered, params };
+    const merged = new URLSearchParams(params);
+    new URLSearchParams(extraQuery).forEach((value, key) => {
+      if (!merged.get(key)) merged.set(key, value);
+    });
+    return { id: recovered, params: merged };
+  }
+  function sameObjectId(a, b) {
+    return String(a || "").normalize("NFC") === String(b || "").normalize("NFC");
+  }
+
   function spaHome() {
     return `${BASE}/`;
   }
   function spaClass(id) {
-    return `${BASE}/class/${encodeURIComponent(id)}`;
+    return `${BASE}/class/${encodeRouteId(id)}`;
   }
   function spaProject(id) {
-    return `${BASE}/project/${encodeURIComponent(id)}`;
+    return `${BASE}/project/${encodeRouteId(id)}`;
   }
   function spaTodo(id, q = "") {
-    return `${BASE}/todo/${encodeURIComponent(id)}${q}`;
+    return `${BASE}/todo/${encodeRouteId(id)}${q}`;
   }
   function spaDate(id, q = "") {
-    return `${BASE}/date/${encodeURIComponent(id)}${q}`;
+    return `${BASE}/date/${encodeRouteId(id)}${q}`;
   }
   function spaCapsule(todoId, capsuleId, q = "") {
-    return `${BASE}/todo/${encodeURIComponent(todoId)}/capsule/${encodeURIComponent(
+    return `${BASE}/todo/${encodeRouteId(todoId)}/capsule/${encodeRouteId(
       capsuleId
     )}${q}`;
   }
   function spaCase(id, side) {
     const s = String(side || "aff").toLowerCase() === "neg" ? "neg" : "aff";
-    return `${BASE}/case/${encodeURIComponent(id)}/${s}`;
+    return `${BASE}/case/${encodeRouteId(id)}/${s}`;
   }
   function debateCaseHref(id, side) {
     const s = String(side || "aff").toLowerCase() === "neg" ? "neg" : "aff";
-    return `/debate/case/${encodeURIComponent(id)}/${s}`;
+    return `/debate/case/${encodeRouteId(id)}/${s}`;
   }
   function homeScopeProjectId() {
     return String(CFG.homeProjectId || "").trim() || "";
@@ -339,53 +392,62 @@
 
   function parseRoute() {
     const path = window.location.pathname.replace(/\/+$/, "") || "/";
-    const params = new URLSearchParams(window.location.search);
-    const classFromQuery = params.get("class") || params.get("classId") || null;
-    const projectFromQuery =
+    let params = new URLSearchParams(window.location.search);
+    const classFromQuery = () =>
+      params.get("class") || params.get("classId") || null;
+    const projectFromQuery = () =>
       params.get("project") || params.get("projectId") || null;
+    const queryClass = () => {
+      const raw = classFromQuery();
+      return raw ? decodeRouteId(raw) : null;
+    };
+    const queryProject = () => {
+      const raw = projectFromQuery();
+      return raw ? decodeRouteId(raw) : null;
+    };
     let m = path.match(new RegExp(`^${BASE_RE}/class/([^/]+)$`));
-    if (m) return { view: "class", classId: decodeURIComponent(m[1]), projectId: null, itemId: null, capsuleId: null };
+    if (m) return { view: "class", classId: decodeRouteId(m[1]), projectId: null, itemId: null, capsuleId: null };
     m = path.match(new RegExp(`^${BASE_RE}/project/([^/]+)$`));
     if (m) {
       return {
         view: "project",
         classId: null,
-        projectId: decodeURIComponent(m[1]),
+        projectId: decodeRouteId(m[1]),
         itemId: null,
       };
     }
     m = path.match(new RegExp(`^${BASE_RE}/todo/([^/]+)/capsule/([^/]+)$`));
     if (m) {
+      const recovered = recoverHashSplitId(decodeRouteId(m[1]), params);
+      params = recovered.params;
       return {
         view: "capsule",
-        classId: classFromQuery ? decodeURIComponent(classFromQuery) : null,
-        projectId: projectFromQuery
-          ? decodeURIComponent(projectFromQuery)
-          : null,
-        itemId: decodeURIComponent(m[1]),
-        capsuleId: decodeURIComponent(m[2]),
+        classId: queryClass(),
+        projectId: queryProject(),
+        itemId: recovered.id,
+        capsuleId: decodeRouteId(m[2]),
       };
     }
     m = path.match(new RegExp(`^${BASE_RE}/todo/([^/]+)$`));
     if (m) {
+      const recovered = recoverHashSplitId(decodeRouteId(m[1]), params);
+      params = recovered.params;
       return {
         view: "todo",
-        classId: classFromQuery ? decodeURIComponent(classFromQuery) : null,
-        projectId: projectFromQuery
-          ? decodeURIComponent(projectFromQuery)
-          : null,
-        itemId: decodeURIComponent(m[1]),
+        classId: queryClass(),
+        projectId: queryProject(),
+        itemId: recovered.id,
       };
     }
     m = path.match(new RegExp(`^${BASE_RE}/date/([^/]+)$`));
     if (m) {
+      const recovered = recoverHashSplitId(decodeRouteId(m[1]), params);
+      params = recovered.params;
       return {
         view: "date",
-        classId: classFromQuery ? decodeURIComponent(classFromQuery) : null,
-        projectId: projectFromQuery
-          ? decodeURIComponent(projectFromQuery)
-          : null,
-        itemId: decodeURIComponent(m[1]),
+        classId: queryClass(),
+        projectId: queryProject(),
+        itemId: recovered.id,
       };
     }
     m = path.match(new RegExp(`^${BASE_RE}/case/([^/]+)/(aff|neg)$`, "i"));
@@ -395,7 +457,7 @@
         classId: null,
         projectId: homeScopeProjectId() || "debate",
         itemId: null,
-        caseId: decodeURIComponent(m[1]),
+        caseId: decodeRouteId(m[1]),
         caseSide: String(m[2] || "aff").toLowerCase(),
       };
     }
@@ -1259,29 +1321,33 @@
   function findTodoById(id, { classId = null, projectId = null } = {}) {
     const wantClass = classId || null;
     const wantProject = projectId || null;
-    return (
-      flattenTodos(tree, { includeHiddenFromHome: true }).find((t) => {
-        if (t.id !== id) return false;
-        return (
-          (t.classId || null) === wantClass &&
-          (t.projectId || null) === wantProject
-        );
-      }) || null
+    const all = flattenTodos(tree, { includeHiddenFromHome: true }).filter((t) =>
+      sameObjectId(t.id, id)
     );
+    if (!all.length) return null;
+    const scoped = all.find(
+      (t) =>
+        sameObjectId(t.classId || "", wantClass || "") &&
+        sameObjectId(t.projectId || "", wantProject || "")
+    );
+    if (scoped) return scoped;
+    if (all.length === 1) return all[0];
+    return null;
   }
 
   function findDateById(id, { classId = null, projectId = null } = {}) {
     const wantClass = classId || null;
     const wantProject = projectId || null;
-    return (
-      flattenDates(tree).find((d) => {
-        if (d.id !== id) return false;
-        return (
-          (d.classId || null) === wantClass &&
-          (d.projectId || null) === wantProject
-        );
-      }) || null
+    const all = flattenDates(tree).filter((d) => sameObjectId(d.id, id));
+    if (!all.length) return null;
+    const scoped = all.find(
+      (d) =>
+        sameObjectId(d.classId || "", wantClass || "") &&
+        sameObjectId(d.projectId || "", wantProject || "")
     );
+    if (scoped) return scoped;
+    if (all.length === 1) return all[0];
+    return null;
   }
 
   function todoHref(t) {
@@ -1682,7 +1748,7 @@
       t.id
     )}" data-due-date="${escapeHtml(t.dueDate || "")}"${classAttr}${projectAttr}>
       ${todoCheckHtml({ done, filterId: checkFilterId })}
-      <a class="edu-row-link" href="${href}">
+      <a class="edu-row-link" href="${escapeHtml(href)}">
         <span class="edu-name">${taggedNameHtml(tag, t.name || t.id)}</span>
         ${klass}${due}
       </a>
@@ -1701,7 +1767,7 @@
       : "";
     const href = dateHref(d);
     return `<li class="edu-row">
-      <a class="edu-row-link" href="${href}">
+      <a class="edu-row-link" href="${escapeHtml(href)}">
         <span class="edu-name">${escapeHtml(d.name || d.id)}</span>
         ${klass}${when}
       </a>
@@ -1816,7 +1882,7 @@
       ? scoreHtml(classScoreLabel(m.class), classCanvasLink(m.class))
       : "";
     return `<li class="edu-row edu-class-row${highlight ? " is-current" : ""}">
-      <a class="edu-row-link" href="${href}">
+      <a class="edu-row-link" href="${escapeHtml(href)}">
         <span class="edu-tag edu-period">${escapeHtml(m.period)}</span>
         <span class="edu-name">${escapeHtml(classScheduleName(m.class))}</span>
       </a>
