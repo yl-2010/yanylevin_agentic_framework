@@ -66,6 +66,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Static HTML on a todo / date / project / class | `.cursor/skills/object-html/SKILL.md` |
 | Public yanylevin.com page (study guide, plan, blueprint, liquid-glass report) | `.cursor/skills/yanylevin-webpage-create/SKILL.md` |
 | Weekly PDF, `schedule.json`, bells, what class is now | `.cursor/skills/class-schedule/SKILL.md` |
+| EPS student IDs, four11 course lists, school / yearbook photos | `~/.cursor/skills/eps-four11/SKILL.md` |
 | Past Personal Agent transcripts | `.cursor/skills/past-chats/SKILL.md` |
 | Yan iPhone location (live + stays/trips) | `.cursor/skills/phone-location/SKILL.md` |
 | What Yan is doing now / was doing at a time (5-minute log) | `.cursor/skills/life-state/SKILL.md` |

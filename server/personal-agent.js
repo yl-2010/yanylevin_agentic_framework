@@ -1040,6 +1040,12 @@ onLocalCursorExecutorEvict(() => {
 /** Global unslop skill. Always Read; never inline the whole file into the prompt. */
 export const UNSLOP_SKILL_PATH = join(REPO_ROOT, ".cursor/skills/unslop/SKILL.md");
 
+/** Four11 IDs + Fix Photo Group school photos. User-level; not in the repo. */
+export const FOUR11_SKILL_PATH = join(
+  homedir(),
+  ".cursor/skills/eps-four11/SKILL.md"
+);
+
 /** On-demand files. Do not inline their contents into the turn prompt. */
 export const PERSONAL_SKILL_PATHS = {
   agent: ".cursor/skills/personal-agent/SKILL.md",
@@ -1104,6 +1110,7 @@ export function systemPrompt(email, opts = {}) {
       `- JYPE dashboard (classes, todos, dates, projects): ${PERSONAL_SKILL_PATHS.education}`,
       `- Static HTML on a JYPE object: ${PERSONAL_SKILL_PATHS.objectHtml || ".cursor/skills/object-html/SKILL.md"}`,
       `- Public yanylevin.com page: ${PERSONAL_SKILL_PATHS.webpage || ".cursor/skills/yanylevin-webpage-create/SKILL.md"}`,
+      `- EPS student IDs / school photos: ${FOUR11_SKILL_PATH}`,
       "File uploads can be stored in the matching JYPE class or project folder.",
     ].join("\n");
   }
@@ -1123,6 +1130,7 @@ export function systemPrompt(email, opts = {}) {
     `- Education dashboard (classes, todos, dates, projects, school attachments): ${PERSONAL_SKILL_PATHS.education}`,
     `- Debate / case building: ${PERSONAL_SKILL_PATHS.debate}`,
     `- Class schedule: ${PERSONAL_SKILL_PATHS.schedule}`,
+    `- EPS student IDs / school photos: ${FOUR11_SKILL_PATH}`,
     `- Past chats: ${PERSONAL_SKILL_PATHS.chats}`,
     `- Chat widgets (map / html / image fences): ${PERSONAL_SKILL_PATHS.widgets}`,
     `- Yan Mail.app search and send: ${PERSONAL_SKILL_PATHS.mail}`,

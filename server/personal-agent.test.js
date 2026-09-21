@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   PERSONAL_SKILL_PATHS,
   UNSLOP_SKILL_PATH,
+  FOUR11_SKILL_PATH,
   ATTACHMENT_MODEL_SPEC,
   DEFAULT_MODEL_SPEC,
   EMPTY_TURN_REPLY,
@@ -95,7 +96,9 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /Personal Agent/);
     assert.match(prompt, /Do not preload other skills/);
     assert.ok(prompt.includes(UNSLOP_SKILL_PATH));
+    assert.ok(prompt.includes(FOUR11_SKILL_PATH));
     assert.match(prompt, /Always Read and apply the unslop skill/);
+    assert.match(prompt, /EPS student IDs \/ school photos/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.soul));
     assert.match(prompt, /Always Read SOUL\.md/);
     assert.match(prompt, /send_chat_message/);
@@ -151,6 +154,7 @@ describe("Personal Agent system prompt", () => {
     const prompt = systemPrompt(YAN, { workspace: "jype" });
     assert.match(prompt, /JYPE agent/);
     assert.match(prompt, /Do not copy Yan's personal \/education sites onto JYPE/);
+    assert.ok(prompt.includes(FOUR11_SKILL_PATH));
   });
 
 });
@@ -250,6 +254,9 @@ describe("Personal Agent skill files", () => {
     const unslop = await readFile(UNSLOP_SKILL_PATH, "utf8");
     assert.match(unslop, /Cut AI tells/);
     assert.match(unslop, /Never use a period when the output is only one word/);
+    const four11 = await readFile(FOUR11_SKILL_PATH, "utf8");
+    assert.match(four11, /thefixphotogroup\.zenfolio\.com\/f409629586/);
+    assert.match(four11, /eq=\{STUDENT_ID\}/);
     const dashboard = await readFile(
       join(REPO_ROOT, PERSONAL_SKILL_PATHS.education),
       "utf8"
@@ -501,6 +508,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /fact-check-agent\.js/);
     assert.match(agent, /lifeStateCleanupLocalTime/);
     assert.match(agent, /life-state-cleanup-agent\.js/);
+    assert.match(agent, /eps-four11/);
 
     const brain = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.brain), "utf8");
     assert.match(brain, /Frontmatter contract/);
