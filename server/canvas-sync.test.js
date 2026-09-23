@@ -23,6 +23,7 @@ import {
   shouldSkipCanvasHourly,
   nextCanvasHourlyAt,
   canvasHourKey,
+  applyPlannerOverrides,
 } from "./canvas-sync.js";
 import {
   contextSynthesisHm,
@@ -518,5 +519,48 @@ describe("buildCanvasHourlyPrompt", () => {
     assert.match(prompt, /Do not edit course-map\.json/);
     assert.match(prompt, /NEVER write done/);
     assert.match(prompt, /Do not fold Canvas comments/);
+  });
+});
+
+describe("applyPlannerOverrides", () => {
+  it("keeps a checkoff that has aged out of the two-week planner feed", () => {
+    const assignments = [
+      { id: 40283613, title: "Indigenous America", plannerComplete: false, plannerOverrideId: "" },
+      { id: 99, title: "still open", plannerComplete: false, plannerOverrideId: "" },
+    ];
+    const saved = applyPlannerOverrides(assignments, [
+      {
+        id: 39889256,
+        plannable_type: "assignment",
+        plannable_id: 40283613,
+        marked_complete: true,
+      },
+      {
+        id: 1,
+        plannable_type: "announcement",
+        plannable_id: 99,
+        marked_complete: true,
+      },
+    ]);
+    assert.equal(assignments[0].plannerComplete, true);
+    assert.equal(assignments[0].plannerOverrideId, "39889256");
+    assert.equal(assignments[1].plannerComplete, false);
+    assert.deepEqual(saved, [["40283613", "39889256"]]);
+  });
+
+  it("clears plannerComplete when the override is unchecked", () => {
+    const assignments = [
+      { id: 5, plannerComplete: true, plannerOverrideId: "9" },
+    ];
+    applyPlannerOverrides(assignments, [
+      {
+        id: 9,
+        plannable_type: "assignment",
+        plannable_id: 5,
+        marked_complete: false,
+      },
+    ]);
+    assert.equal(assignments[0].plannerComplete, false);
+    assert.equal(assignments[0].plannerOverrideId, "9");
   });
 });

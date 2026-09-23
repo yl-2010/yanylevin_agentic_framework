@@ -2,9 +2,11 @@
  * Canvas LMS fetch + dashboard sync agents.
  * Nightly: Grok 4.7 xhigh, full map (new classes, syllabus, dates).
  * Hourly: Composer 2.5 (not fast), mapped classes only.
- * Live overlay: page-open GET of submissions + grades. Token from
- * server/.env (never commit). Agents never write done into todo.json.
+ * Live overlay: page-open GET of submissions, grades, and planner overrides.
+ * Token from server/.env (never commit). Agents never write done into todo.json.
  * Express may POST planner overrides when Yan checks off a Canvas todo.
+ * Planner items only go back about two weeks. Overrides are the completion
+ * record after that, so a checkoff still counts once the item leaves the feed.
  * Yan saying submit uses canvas-files.js (OneDrive file, text, or URL).
  * Hourly/nightly agents still do not POST submissions.
  * Full fetch also dumps comments, pages, modules, and course files into
@@ -443,6 +445,9 @@ function isoDaysFromNow(days) {
 
 async function fetchPlannerItems(base, token, fetchOpts) {
   try {
+    // Canvas drops planner items about two weeks after the due date.
+    // This feed is only a hint for recent rows. Older checkoffs live on
+    // planner overrides (fetchPlannerOverrides).
     const start = encodeURIComponent(isoDaysFromNow(-14));
     const end = encodeURIComponent(isoDaysFromNow(60));
     return await canvasGetAll(
@@ -455,6 +460,52 @@ async function fetchPlannerItems(base, token, fetchOpts) {
     console.error("[canvas-sync] planner items", err);
     return [];
   }
+}
+
+async function fetchPlannerOverrides(base, token, fetchOpts) {
+  try {
+    return await canvasGetAll(
+      base,
+      token,
+      `/api/v1/planner/overrides?per_page=100`,
+      { ...fetchOpts, maxPages: 10 }
+    );
+  } catch (err) {
+    console.error("[canvas-sync] planner overrides", err);
+    return [];
+  }
+}
+
+/**
+ * Planner overrides are not limited to the two-week planner feed.
+ * A marked-complete override keeps the assignment done after that window.
+ * @param {object[]} assignments
+ * @param {object[]} overrides
+ * @returns {Array<[string, string]>} canvas id, override id
+ */
+export function applyPlannerOverrides(assignments, overrides) {
+  /** @type {Array<[string, string]>} */
+  const saved = [];
+  if (!Array.isArray(assignments) || !assignments.length) return saved;
+  const byId = new Map();
+  for (const row of assignments) {
+    const id = Number(row?.id);
+    if (Number.isFinite(id)) byId.set(id, row);
+  }
+  for (const ov of overrides || []) {
+    const type = String(ov?.plannable_type || "").toLowerCase();
+    if (type && type !== "assignment") continue;
+    const pid = Number(ov?.plannable_id);
+    const row = byId.get(pid);
+    if (!row) continue;
+    row.plannerComplete = Boolean(ov?.marked_complete);
+    const oid = ov?.id;
+    if (oid != null && oid !== "") {
+      row.plannerOverrideId = String(oid);
+      saved.push([String(row.id), String(oid)]);
+    }
+  }
+  return saved;
 }
 
 function applyPlannerItems(assignments, items) {
@@ -518,12 +569,7 @@ async function readPlannerOverrides() {
   }
 }
 
-async function writePlannerOverrideId(canvasId, overrideId) {
-  const id = String(canvasId || "").trim();
-  const oid = String(overrideId || "").trim();
-  if (!id || !oid) return;
-  const map = await readPlannerOverrides();
-  map[id] = oid;
+async function writePlannerOverrideMap(map) {
   const dir = canvasDir();
   await mkdir(dir, { recursive: true });
   await writeFile(
@@ -531,6 +577,42 @@ async function writePlannerOverrideId(canvasId, overrideId) {
     `${JSON.stringify(map, null, 2)}\n`,
     "utf8"
   );
+}
+
+async function writePlannerOverrideId(canvasId, overrideId) {
+  const id = String(canvasId || "").trim();
+  const oid = String(overrideId || "").trim();
+  if (!id || !oid) return;
+  const map = await readPlannerOverrides();
+  if (map[id] === oid) return;
+  map[id] = oid;
+  await writePlannerOverrideMap(map);
+}
+
+async function rememberOverrideIds(pairs) {
+  if (!Array.isArray(pairs) || !pairs.length) return;
+  const map = await readPlannerOverrides();
+  let changed = false;
+  for (const pair of pairs) {
+    const id = String(pair?.[0] || "").trim();
+    const oid = String(pair?.[1] || "").trim();
+    if (!id || !oid || map[id] === oid) continue;
+    map[id] = oid;
+    changed = true;
+  }
+  if (changed) await writePlannerOverrideMap(map);
+}
+
+async function findPlannerOverrideId(base, token, canvasId, timeoutMs) {
+  const want = Number(canvasId);
+  if (!Number.isFinite(want)) return "";
+  const rows = await fetchPlannerOverrides(base, token, { timeoutMs });
+  const hit = rows.find(
+    (row) =>
+      String(row?.plannable_type || "").toLowerCase() === "assignment" &&
+      Number(row?.plannable_id) === want
+  );
+  return hit?.id != null && hit.id !== "" ? String(hit.id) : "";
 }
 
 export function patchLiveAssignmentSubmitted(canvasId, submittedAt = new Date().toISOString()) {
@@ -591,18 +673,33 @@ export async function setPlannerComplete({ canvasId, plannerOverrideId, done }) 
       { timeoutMs }
     );
   } else {
-    saved = await canvasWrite(
-      base,
-      token,
-      `/api/v1/planner/overrides`,
-      "POST",
-      {
-        plannable_type: "assignment",
-        plannable_id: Number(id) || id,
-        marked_complete: marked,
-      },
-      { timeoutMs }
-    );
+    try {
+      saved = await canvasWrite(
+        base,
+        token,
+        `/api/v1/planner/overrides`,
+        "POST",
+        {
+          plannable_type: "assignment",
+          plannable_id: Number(id) || id,
+          marked_complete: marked,
+        },
+        { timeoutMs }
+      );
+    } catch (err) {
+      const status = Number(err?.status);
+      if (status !== 400 && status !== 409 && status !== 422) throw err;
+      overrideId = await findPlannerOverrideId(base, token, id, timeoutMs);
+      if (!overrideId) throw err;
+      saved = await canvasWrite(
+        base,
+        token,
+        `/api/v1/planner/overrides/${encodeURIComponent(overrideId)}`,
+        "PUT",
+        { marked_complete: marked },
+        { timeoutMs }
+      );
+    }
   }
   const newId = String(saved?.id || overrideId || "").trim();
   if (newId) await writePlannerOverrideId(id, newId);
@@ -1181,6 +1278,7 @@ export async function fetchCanvasSnapshot(opts = {}) {
   }
 
   const plannerPromise = fetchPlannerItems(base, token, fetchOpts);
+  const overridePromise = fetchPlannerOverrides(base, token, fetchOpts);
   /** @type {ReturnType<typeof assignmentRow>[]} */
   const assignmentChunks = await Promise.all(
     courses.map(async (course) => {
@@ -1202,6 +1300,12 @@ export async function fetchCanvasSnapshot(opts = {}) {
   );
   const assignments = assignmentChunks.flat();
   applyPlannerItems(assignments, await plannerPromise);
+  const overrideIds = applyPlannerOverrides(assignments, await overridePromise);
+  try {
+    await rememberOverrideIds(overrideIds);
+  } catch (err) {
+    console.error("[canvas-sync] planner override ids", err);
+  }
 
   const year = Number(String(dateKey).slice(0, 4));
   const month = Number(String(dateKey).slice(5, 7));
