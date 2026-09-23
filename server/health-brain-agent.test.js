@@ -15,11 +15,9 @@ const META = {
 };
 
 describe("health brain model", () => {
-  it("uses grok-4.7 high with Fast off", () => {
-    assert.equal(HEALTH_BRAIN_MODEL_SPEC.id, "grok-4.7");
+  it("uses composer-2.5 with Fast off", () => {
+    assert.equal(HEALTH_BRAIN_MODEL_SPEC.id, "composer-2.5");
     assert.deepEqual(healthBrainModelSpec().params, [
-      { id: "context", value: "256k" },
-      { id: "reasoning_effort", value: "high" },
       { id: "fast", value: "false" },
     ]);
   });

@@ -57,8 +57,8 @@ import {
 import {
   copyModelSpec,
   formatGuestUserBubble,
-  GUEST_GROK_SPEC,
   guestRunModels,
+  jypeMentionModelSpec,
   platformLabel,
   withoutFast,
 } from "./guest-agent.js";
@@ -1605,12 +1605,12 @@ function guestAgentCreateOpts(guest) {
   };
 }
 
-/** @agent iMessage/Teams first turn: same models as live chat, Fast off. */
-function mentionAgentCreateOpts(guest, workspace) {
+/** @agent iMessage/Teams first turn. JYPE Teams group is Composer 2.5. JYPE iMessage stays Grok. */
+function mentionAgentCreateOpts(guest, workspace, platform) {
   if (workspace === "jype") {
     return guestAgentCreateOpts({
       ...(guest && typeof guest === "object" ? guest : {}),
-      model: copyModelSpec(GUEST_GROK_SPEC),
+      model: jypeMentionModelSpec(platform),
     });
   }
   if (guest) return guestAgentCreateOpts(guest);
@@ -1623,6 +1623,13 @@ function mentionAgentCreateOpts(guest, workspace) {
 export function guestTurnModelSpec(session, hasSessionFiles) {
   const mentionFirstTurn =
     Boolean(session.imessageDeliverFinal) || Boolean(session.teamsDeliverFinal);
+  if (
+    mentionFirstTurn &&
+    session.teamsDeliverFinal &&
+    sessionWorkspace(session) === "jype"
+  ) {
+    return jypeMentionModelSpec("teams");
+  }
   if (mentionFirstTurn) {
     const run = guestRunModels(session.guestCaller);
     if (run.preferred) return run.preferred;
@@ -1771,7 +1778,7 @@ export async function startAgentFromIMessageMention(message) {
     workspace === "jype"
       ? jypeEmailForSlug(guest?.slug) || YAN_EMAIL
       : YAN_EMAIL;
-  const createOpts = mentionAgentCreateOpts(guest, workspace);
+  const createOpts = mentionAgentCreateOpts(guest, workspace, "imessage");
   const started = await startAgent(startEmail, {
     ...createOpts,
     workspace,
@@ -1819,7 +1826,7 @@ export async function startAgentFromTeamsMention(message) {
     workspace === "jype"
       ? jypeEmailForSlug(guest?.slug) || YAN_EMAIL
       : YAN_EMAIL;
-  const createOpts = mentionAgentCreateOpts(guest, workspace);
+  const createOpts = mentionAgentCreateOpts(guest, workspace, "teams");
   const started = await startAgent(startEmail, {
     ...createOpts,
     workspace,

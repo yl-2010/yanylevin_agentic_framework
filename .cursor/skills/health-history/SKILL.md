@@ -15,7 +15,7 @@ You are a one-shot local Cursor agent. Read the monthly digest, write standing p
 
 Clock times are America/Los_Angeles (Seattle), except workouts after 2026-08-12 through 2026-08-26, which are America/Chicago (Austin).
 
-Model: **composer-2.5** (fast=false). One-shot only; nightly takeaways is a separate Grok 4.7 high job.
+Model: **composer-2.5** (fast=false). One-shot only; nightly takeaways is a separate Composer 2.5 job.
 
 ## Files
 

@@ -95,6 +95,25 @@ describe("Personal Agent models", () => {
       guestMention.params.find((p) => p.id === "fast")?.value,
       "false"
     );
+    const teamsJype = guestTurnModelSpec(
+      {
+        teamsDeliverFinal: true,
+        workspace: "jype",
+        guestCaller: null,
+      },
+      false
+    );
+    assert.equal(teamsJype.id, "composer-2.5");
+    assert.deepEqual(teamsJype.params, [{ id: "fast", value: "false" }]);
+    const imessageJype = guestTurnModelSpec(
+      {
+        imessageDeliverFinal: true,
+        workspace: "jype",
+        guestCaller: null,
+      },
+      false
+    );
+    assert.equal(imessageJype.id, "grok-4.7");
   });
 });
 
@@ -666,7 +685,7 @@ describe("Personal Agent skill files", () => {
       "utf8"
     );
     assert.match(locationBrain, /brain\/places/);
-    assert.match(locationBrain, /grok-4\.7 high/);
+    assert.match(locationBrain, /composer-2\.5/);
     assert.match(locationBrain, /\[GPS\]/);
     assert.match(locationBrain, /Never spawn a cloud agent/);
 
@@ -675,7 +694,7 @@ describe("Personal Agent skill files", () => {
       "utf8"
     );
     assert.match(healthBrain, /brain\/health\.md/);
-    assert.match(healthBrain, /grok-4\.7 high/);
+    assert.match(healthBrain, /composer-2\.5/);
     assert.match(healthBrain, /history-patterns\.md/);
     assert.match(healthBrain, /Never spawn a cloud agent/);
 

@@ -1,7 +1,7 @@
 ---
 name: jype-chat-title-refresh
 description: >-
-  Nightly Grok 4.7 high job: retitle JYPE agent chats from the full
+  Nightly Composer 2.5 job: retitle JYPE agent chats from the full
   transcript in short keyword style. Always keep who started the thread
   (Yan:, Alex:, Example Friend:, Example Neighbor:). The Node wrapper restores Name:
   after you rewrite the rest. Not Personal Agent / yanylevin history.
@@ -12,7 +12,7 @@ disable-model-invocation: true
 
 **Gate:** local Cursor agent only. Never spawn a cloud agent. Only rewrite `title:` lines in listed `education/projects/jype/.chat-history/<sessionId>.md` files. Do not edit messages, widgets, or personal `education/<email>/.chat-history/` files. Those use `.cursor/skills/chat-title-refresh/SKILL.md`. You will not be given those files.
 
-Model: **grok-4.7 high** (reasoning_effort=high, fast=false, context=256k).
+Model: **composer-2.5** (fast=false).
 
 Same 01:30 slot as Personal Agent title refresh (`chatTitleRefreshLocalTime`). The live first-message title agent is a different, faster pass. You see the **whole** thread and overwrite that first guess.
 

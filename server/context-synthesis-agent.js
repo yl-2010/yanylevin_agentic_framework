@@ -2,11 +2,11 @@
  * Nightly 02:30 pipeline (5 phases). Runs at least 90 minutes after the
  * 01:00 nightly agents. Yan only.
  *
- *   1. triage     grok-4.7 high  reads all dumps, writes /tmp digest, no brain writes
- *   2. entities   grok-4.7 high  updates people/groups/orgs/places from the digest
+ *   1. triage     composer-2.5  reads all dumps, writes /tmp digest, no brain writes
+ *   2. entities   composer-2.5  updates people/groups/orgs/places from the digest
  *   3. synthesis  grok-4.7 xhigh identity/patterns/threads/journal + location fixes
  *   4. actions    grok-4.7 xhigh executes Yan-directed actions (skipped when digest has none)
- *   5. lint       grok-4.7 high  schema police, dedup, cursors
+ *   5. lint       composer-2.5  schema police, dedup, cursors
  *
  * The runner regenerates people/index.md, people/graph.md, and the education
  * mirror between phases (brain-graph.js, brain-education-mirror.js).
@@ -100,12 +100,8 @@ export const CONTEXT_SYNTHESIS_MODEL_SPEC = {
 };
 
 export const PEOPLE_ENRICH_MODEL_SPEC = {
-  id: process.env.CURSOR_PEOPLE_ENRICH_MODEL || "grok-4.7",
-  params: [
-    { id: "context", value: "256k" },
-    { id: "reasoning_effort", value: "high" },
-    { id: "fast", value: "false" },
-  ],
+  id: process.env.CURSOR_PEOPLE_ENRICH_MODEL || "composer-2.5",
+  params: [{ id: "fast", value: "false" }],
 };
 
 export const NIGHTLY_ACTIONS_MODEL_SPEC = {

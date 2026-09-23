@@ -3,7 +3,7 @@ name: nightly-entities
 description: >-
   Phase 2 of Yan's nightly pipeline: update entity cards (people, groups,
   orgs, places) for entities that appeared in the triage digest. Yan only.
-  Grok 4.7 high, fast off.
+  Composer 2.5, fast off.
 disable-model-invocation: true
 ---
 

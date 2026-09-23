@@ -19,7 +19,7 @@
         {
           id: "compose-4h",
           name: "Location compose",
-          model: "Grok 4.7 high",
+          model: "Composer 2.5",
           kind: "clock",
         },
       ],
@@ -30,7 +30,7 @@
         {
           id: "compose-0100",
           name: "Location compose",
-          model: "Grok 4.7 high",
+          model: "Composer 2.5",
           kind: "clock",
         },
         { edge: true },
@@ -44,7 +44,7 @@
         {
           id: "takeaways",
           name: "Health takeaways",
-          model: "Grok 4.7 high",
+          model: "Composer 2.5",
           kind: "clock",
         },
         {
@@ -61,7 +61,7 @@
         {
           id: "titles",
           name: "Chat title refresh",
-          model: "Grok 4.7 high",
+          model: "Composer 2.5",
           kind: "clock",
         },
         {
@@ -78,14 +78,14 @@
         {
           id: "triage",
           name: "Nightly triage",
-          model: "Grok 4.7 high",
+          model: "Composer 2.5",
           kind: "clock",
         },
         { edge: true },
         {
           id: "entities",
           name: "Nightly entities",
-          model: "Grok 4.7 high",
+          model: "Composer 2.5",
           kind: "after",
         },
         { edge: true },
@@ -107,7 +107,7 @@
         {
           id: "lint",
           name: "Nightly lint",
-          model: "Grok 4.7 high",
+          model: "Composer 2.5",
           kind: "after",
         },
       ],
@@ -118,14 +118,14 @@
         {
           id: "location-brain",
           name: "Location brain",
-          model: "Grok 4.7 high",
+          model: "Composer 2.5",
           kind: "clock",
         },
         { edge: true, wait: true },
         {
           id: "health-brain",
           name: "Health brain",
-          model: "Grok 4.7 high",
+          model: "Composer 2.5",
           kind: "clock",
         },
         { edge: true, wait: true },

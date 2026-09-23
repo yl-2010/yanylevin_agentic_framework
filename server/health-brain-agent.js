@@ -1,5 +1,5 @@
 /**
- * Nightly Grok 4.7 high (Fast off): project standing Apple Health facts
+ * Nightly Composer 2.5 (Fast off): project standing Apple Health facts
  * into brain/health.md. 03:00 local, after synthesis and location-brain.
  * Yan only.
  */
@@ -45,12 +45,8 @@ const WAIT_MS = 90 * 60 * 1000;
 const WAIT_POLL_MS = 5000;
 
 export const HEALTH_BRAIN_MODEL_SPEC = {
-  id: process.env.CURSOR_HEALTH_BRAIN_MODEL || "grok-4.7",
-  params: [
-    { id: "context", value: "256k" },
-    { id: "reasoning_effort", value: "high" },
-    { id: "fast", value: "false" },
-  ],
+  id: process.env.CURSOR_HEALTH_BRAIN_MODEL || "composer-2.5",
+  params: [{ id: "fast", value: "false" }],
 };
 
 /** @type {Promise<unknown>|null} */

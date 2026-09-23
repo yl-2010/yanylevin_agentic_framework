@@ -73,7 +73,7 @@ export const GUEST_FRIEND_COMPOSER_SPEC = {
   params: [{ id: "fast", value: "false" }],
 };
 
-/** Grok for @agent (iMessage / Teams / JYPE group). Fast off. */
+/** Grok for @agent (iMessage, Teams 1:1, JYPE iMessage). Fast off. */
 export const GUEST_GROK_SPEC = {
   id: "grok-4.7",
   params: [
@@ -543,6 +543,17 @@ function getCachedPeople(deps = {}) {
   return rows;
 }
 
+/**
+ * JYPE group @agent. Teams group chat is Composer 2.5, Fast off.
+ * iMessage JYPE stays on Grok.
+ * @param {string} platform
+ */
+export function jypeMentionModelSpec(platform) {
+  return platform === "teams"
+    ? copyModelSpec(GUEST_COMPOSER_SPEC)
+    : copyModelSpec(GUEST_GROK_SPEC);
+}
+
 function guestModelSpec(useGrok, slug, name) {
   const friend = isFriendGuest(slug, name);
   if (useGrok && friend) return copyModelSpec(GUEST_GROK_SPEC);
@@ -661,7 +672,7 @@ export async function evaluateGuestMention(opts) {
         handle,
         inContacts,
         audience: describeGuestAudience(platform, message),
-        model: copyModelSpec(GUEST_GROK_SPEC),
+        model: jypeMentionModelSpec(platform),
         workspace: "jype",
       },
     };

@@ -75,11 +75,9 @@ describe("briefing model specs", () => {
     ]);
   });
 
-  it("unslop uses grok-4.7 high", () => {
-    assert.equal(BRIEFING_UNSLOP_MODEL_SPEC.id, "grok-4.7");
+  it("unslop uses composer-2.5 with Fast off", () => {
+    assert.equal(BRIEFING_UNSLOP_MODEL_SPEC.id, "composer-2.5");
     assert.deepEqual(BRIEFING_UNSLOP_MODEL_SPEC.params, [
-      { id: "context", value: "256k" },
-      { id: "reasoning_effort", value: "high" },
       { id: "fast", value: "false" },
     ]);
   });

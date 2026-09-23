@@ -9,6 +9,7 @@ import {
   GUEST_COMPOSER_SPEC,
   GUEST_FRIEND_COMPOSER_SPEC,
   GUEST_GROK_SPEC,
+  jypeMentionModelSpec,
   HOURLY_LIMIT,
   contactHasHandle,
   dayKey,
@@ -785,5 +786,54 @@ describe("evaluateGuestMention", () => {
       statePath,
     });
     assert.equal(stranger.action, "ignore");
+  });
+
+  it("uses Composer 2.5 for the JYPE Teams group and still skips the hourly cap", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "guest-jype-teams-"));
+    const statePath = join(dir, "limits.json");
+    assert.equal(jypeMentionModelSpec("teams").id, "composer-2.5");
+    assert.equal(jypeMentionModelSpec("imessage").id, "grok-4.7");
+    const base = {
+      platform: "teams",
+      message: {
+        fromMe: false,
+        from: "Alex Rivera",
+        fromEmail: "friend@school.example",
+        chat: "JYPE",
+        chatType: "group",
+        text: "@agent notes",
+      },
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    };
+    for (let i = 0; i < FRIEND_HOURLY_LIMIT + 3; i += 1) {
+      const decision = await evaluateGuestMention(base);
+      assert.equal(decision.action, "start");
+      assert.equal(decision.caller.model.id, "composer-2.5");
+      assert.equal(
+        decision.caller.model.params.find((p) => p.id === "fast")?.value,
+        "false"
+      );
+      assert.equal(decision.caller.workspace, "jype");
+    }
+
+    const dm = await evaluateGuestMention({
+      platform: "teams",
+      message: {
+        fromMe: false,
+        from: "Alex Rivera",
+        fromEmail: "friend@school.example",
+        chat: "Alex",
+        chatType: "oneOnOne",
+        text: "@agent hi",
+      },
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(dm.action, "start");
+    assert.equal(dm.caller.model.id, "grok-4.7");
+    assert.equal(dm.caller.workspace, undefined);
   });
 });

@@ -20,7 +20,7 @@ Yan-only (`education/you@example.com/`). Local Cursor agents, never cloud.
 |-------|-------|-------|--------|
 | 1 news | grok-4.7 xhigh | this file (news sections only) | `/tmp/yanylevin-daily-briefing-news-draft-<dateKey>.json` |
 | 2 agent-recap | grok-4.7 xhigh | agent-recap | `/tmp/yanylevin-daily-briefing-agent-recap-<dateKey>.json` |
-| 3 unslop | grok-4.7 high | unslop + assemble | `todo.json`, `taste.md` |
+| 3 unslop | composer-2.5 | unslop + assemble | `todo.json`, `taste.md` |
 
 Phase 1 stops after the news draft. Phase 3 reads unslop, merges agent recap (first capsule) with news, writes the todo, rewrites taste.
 
