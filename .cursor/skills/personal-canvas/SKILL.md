@@ -168,6 +168,8 @@ If Canvas only accepts a quiz or on-paper (`unsupported` / `not-online-upload` w
 
 Hourly/nightly/fetch-only download assignment attachments into the matching OneDrive todo folder and record them on `todo.json` `canvasFiles`. Leave that key alone. Those files show on the todo page because they sit in the OneDrive folder. Do not submit them as Yan's work.
 
+Junk Canvas names get renamed when they land. `image-` plus a uuid, `image-` plus a long random token, and scanner names like `Scanned Document 17.pdf` become the assignment title, with the original extension. A second junk file in that folder is `Title 2.png`. A real filename such as Ping Pong WS.pdf stays. Express does this on pull. Do not leave `image-<random>` in the todo folder.
+
 ## Never
 
 - **Never** set or clear `done` or `completedAt` in todo.json from Canvas. Yan checks work off in yanylevin. Express overlays Canvas submitted/graded/planner-complete as `done` on `/api/education/data` without writing those keys. Express may POST/PUT Canvas planner overrides when Yan checks a Canvas-linked todo. An agent update must leave `done` / `completedAt` exactly as they are.

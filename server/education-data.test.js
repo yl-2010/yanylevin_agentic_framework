@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 import { mkdtemp, writeFile, utimes, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createRequire } from "node:module";
 import {
   contextFileListOpts,
+  decodeEducationFileQuery,
   isSafeContextFileName,
   listContextFiles,
   parseHiddenFileNames,
@@ -20,7 +22,44 @@ import {
   siteFilesFromProps,
   stripTodoTagPrefix,
   uiPanelDateKeys,
+  publicDebateCase,
 } from "./education-data.js";
+
+const require = createRequire(import.meta.url);
+const {
+  encodeEducationFileQueryValue,
+  decodeEducationFileQueryValue,
+} = require("../education/file-query.js");
+
+describe("education file query", () => {
+  const id = "HW Sep 24 STUDY GUIDE QA #1 ESCRITO AUDITIVO GUÍA DE ESTUDIO Otoño 2026";
+
+  it("roundtrips folder names that contain #", () => {
+    const enc = encodeEducationFileQueryValue(id);
+    assert.equal(enc.includes("#"), false);
+    assert.equal(decodeEducationFileQueryValue(enc), id);
+    assert.equal(encodeEducationFileQueryValue("spanish-4"), "spanish-4");
+    assert.equal(encodeEducationFileQueryValue("image-57b18e43.png"), "image-57b18e43.png");
+  });
+
+  it("keeps a dragged link from splitting on #", () => {
+    const q = new URLSearchParams();
+    q.set("scope", "todo");
+    q.set("name", "image-57b18e43-adb7-4bd1-b40c-8cc412a38c18.png");
+    q.set("id", encodeEducationFileQueryValue(id));
+    q.set("classId", "spanish-4");
+    const url = new URL(`https://yanylevin.com/api/education/file?${q}`);
+    assert.equal(url.hash, "");
+    const decoded = decodeEducationFileQuery({
+      scope: url.searchParams.get("scope"),
+      name: url.searchParams.get("name"),
+      id: url.searchParams.get("id"),
+      classId: url.searchParams.get("classId"),
+    });
+    assert.equal(decoded.id, id);
+    assert.equal(decoded.classId, "spanish-4");
+  });
+});
 
 describe("parseHiddenFileNames", () => {
   it("returns empty set when hiddenFiles is absent", () => {
@@ -606,5 +645,90 @@ describe("uiPanelDateKeys", () => {
       "2026-09-22",
       "2026-09-23",
     ]);
+  });
+});
+
+describe("publicDebateCase", () => {
+  it("keeps a speech and drops a bad link", () => {
+    const out = publicDebateCase({
+      name: "Example",
+      resolution: "Resolved: Justice requires open borders for human migration.",
+      aff: {
+        framework: { value: "Justice", criterion: "Util", text: ["Why."] },
+        definitions: [{ term: "Open borders", text: "No quota." }],
+        contentions: [
+          {
+            label: "C1",
+            title: "The number",
+            chain: ["Chain."],
+            cards: [
+              {
+                tag: "Clemens 11: warrant",
+                quote: "The line that says it.",
+                source: "Clemens 2011",
+                url: "https://example.com/paper.pdf",
+                means: ["this means 3 billion times 7500."],
+              },
+              {
+                tag: "Nope",
+                quote: "No link",
+                url: "javascript:alert(1)",
+              },
+            ],
+          },
+        ],
+      },
+    });
+    assert.equal(out.aff.contentions[0].cards.length, 1);
+    assert.equal(out.aff.contentions[0].cards[0].url, "https://example.com/paper.pdf");
+    assert.equal(out.neg, undefined);
+  });
+
+  it("loads the open borders case with a direct link on every card", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const raw = JSON.parse(
+      await readFile(
+        new URL(
+          "../education/you@example.com/projects/debate/cases/justice-requires-open-borders/case.json",
+          import.meta.url
+        ),
+        "utf8"
+      )
+    );
+    const out = publicDebateCase(raw);
+    for (const side of ["aff", "neg"]) {
+      const cards = out[side].contentions.flatMap((c) => c.cards);
+      assert.ok(cards.length >= 4);
+      for (const card of cards) {
+        assert.match(card.url, /^https:\/\//);
+        assert.ok(card.quote.length > 40);
+        assert.ok(card.tag.includes(":"));
+      }
+    }
+    assert.equal(out.aff.framework.value, "Justice");
+    assert.equal(out.neg.framework.value, "Justice");
+    assert.ok(out.aff.contentions[0].chain.length > 8);
+    assert.ok(out.aff.definitions[0].points.length >= 2);
+    assert.equal(out.aff.definitions[0].text, undefined);
+    assert.equal(out.aff.blockfile, undefined);
+    assert.ok(out.neg.blockfile.length >= 5);
+    for (const block of out.neg.blockfile) {
+      assert.equal(block.label, "A2");
+      assert.ok(block.title.length > 4);
+      assert.ok((block.cards || []).length >= 1);
+      for (const card of block.cards) {
+        assert.match(card.url, /^https:\/\//);
+        assert.ok(card.quote.length > 40);
+      }
+    }
+    for (const side of ["aff", "neg"]) {
+      assert.ok(out[side].framework.cards.length >= 1);
+      const defCards = out[side].definitions.flatMap((def) => def.cards || []);
+      assert.ok(defCards.length >= 4);
+      for (const card of defCards) {
+        assert.match(card.url, /^https:\/\//);
+        assert.ok(card.quote.length > 40);
+      }
+    }
   });
 });

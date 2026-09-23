@@ -4,6 +4,8 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  allocateFileName,
+  canvasDownloadName,
   displayUploadName,
   pickSubmitFiles,
   pickCanvasSubmitKind,
@@ -47,6 +49,47 @@ describe("displayUploadName", () => {
     assert.equal(
       displayUploadName("When the Emperor Was Divine.pdf"),
       "When the Emperor Was Divine.pdf"
+    );
+    assert.equal(
+      displayUploadName(
+        "image-57b18e43-adb7-4bd1-b40c-8cc412a38c18.png",
+        "STUDY GUIDE QA #1"
+      ),
+      "STUDY GUIDE QA 1.png"
+    );
+    assert.equal(
+      displayUploadName("image-asldjfhasldjfbalsdj.jpg", "El dinosaurio"),
+      "El dinosaurio.jpg"
+    );
+  });
+});
+
+describe("canvasDownloadName", () => {
+  it("keeps a real teacher filename and renames image-random", () => {
+    assert.equal(
+      canvasDownloadName("Ping Pong WS.pdf", "Comparing Motion Diagrams", 1),
+      "Ping Pong WS.pdf"
+    );
+    assert.equal(
+      canvasDownloadName(
+        "image-57b18e43-adb7-4bd1-b40c-8cc412a38c18.png",
+        "STUDY GUIDE: QA #1 ESCRITO - AUDITIVO",
+        9
+      ),
+      "STUDY GUIDE QA 1 ESCRITO - AUDITIVO.png"
+    );
+    assert.equal(
+      canvasDownloadName("image-asldjfhasldjfbalsdj.png", "Practica", 3),
+      "Practica.png"
+    );
+  });
+
+  it("does not reuse a name another file already has", () => {
+    const taken = new Set(["practica.png"]);
+    assert.equal(allocateFileName("Practica.png", taken, ""), "Practica 2.png");
+    assert.equal(
+      allocateFileName("Practica.png", taken, "practica.png"),
+      "Practica.png"
     );
   });
 });

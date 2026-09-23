@@ -305,10 +305,79 @@ struct EducationClass: Decodable, Identifiable, Hashable {
     }
 }
 
+struct DebateCard: Decodable, Hashable {
+    let tag: String
+    let quote: String
+    let source: String?
+    let url: String
+    let means: [String]?
+
+    var link: URL? {
+        guard let parsed = URL(string: url), parsed.scheme?.lowercased() == "https" else { return nil }
+        return parsed
+    }
+}
+
+struct DebateContention: Decodable, Hashable, Identifiable {
+    let label: String?
+    let title: String
+    let chain: [String]?
+    let cards: [DebateCard]?
+
+    var id: String { "\(label ?? "")-\(title)" }
+    var heading: String {
+        let label = (label ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if label.isEmpty { return title }
+        return "\(label). \(title)"
+    }
+}
+
+struct DebateDefinition: Decodable, Hashable, Identifiable {
+    let term: String
+    let points: [String]?
+    let cards: [DebateCard]?
+
+    var id: String { term }
+}
+
+struct DebateFramework: Decodable, Hashable {
+    let value: String?
+    let criterion: String?
+    let text: [String]?
+    let cards: [DebateCard]?
+}
+
+struct DebateSide: Decodable, Hashable {
+    let framework: DebateFramework?
+    let definitions: [DebateDefinition]?
+    let contentions: [DebateContention]?
+    let blockfile: [DebateContention]?
+
+    var hasBody: Bool {
+        if framework?.value != nil || framework?.criterion != nil || !(framework?.text ?? []).isEmpty {
+            return true
+        }
+        if !(framework?.cards ?? []).isEmpty { return true }
+        if !(definitions ?? []).isEmpty { return true }
+        if !(contentions ?? []).isEmpty { return true }
+        return !(blockfile ?? []).isEmpty
+    }
+}
+
 struct EducationCase: Decodable, Identifiable, Hashable {
     let id: String
     let name: String?
+    let resolution: String?
+    let aff: DebateSide?
+    let neg: DebateSide?
+
     var displayName: String { name ?? id }
+
+    func side(_ key: String) -> DebateSide? {
+        key.lowercased() == "neg" ? neg : aff
+    }
+
+    var hasSpeech: Bool { aff?.hasBody == true || neg?.hasBody == true }
 }
 
 struct EducationProject: Decodable, Identifiable, Hashable {

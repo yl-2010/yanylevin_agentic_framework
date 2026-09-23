@@ -35,6 +35,9 @@ const SKIP_SUBMIT_NAMES = new Set([
 ]);
 const JUNK_BASE =
   /^(scanned document(?: \d+)?|scan(?:ned)?(?: \d+)?|img[_-]?\d+|dsc[_-]?\d+|screenshot(?: \d+)?|untitled(?: \d+)?|photo[_-]?\d+|image[_-]?\d+)$/i;
+/** Canvas paste names: image-<uuid> or image- plus a long random token. */
+const JUNK_IMAGE_TOKEN =
+  /^image[-_](?:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}|[a-z0-9]{12,})$/i;
 
 const MIME_BY_EXT = {
   ".pdf": "application/pdf",
@@ -79,7 +82,7 @@ async function readJsonFile(path) {
 
 function sanitizeFileBase(raw) {
   let s = String(raw || "")
-    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, " ")
+    .replace(/[<>:"/\\|?*#\u0000-\u001f]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
   s = s.replace(/^\.+/, "").replace(/\.+$/, "").trim();
@@ -88,6 +91,13 @@ function sanitizeFileBase(raw) {
     s = cut.length >= 16 ? cut : s.slice(0, 120).trim();
   }
   return s;
+}
+
+/** Scanner names and Canvas `image-<random>` tokens. Real titles stay. */
+export function isJunkFileBase(base) {
+  const s = String(base || "").trim();
+  if (!s) return false;
+  return JUNK_BASE.test(s) || JUNK_IMAGE_TOKEN.test(s);
 }
 
 /**
@@ -100,16 +110,54 @@ export function displayUploadName(originalName, fallbackTitle = "") {
   const raw = String(originalName || "").trim();
   const ext = extname(raw) || extname(String(fallbackTitle || "")) || "";
   const base = basename(raw, extname(raw));
-  if (base && !JUNK_BASE.test(base) && !/[_-]/.test(base)) {
+  if (base && !isJunkFileBase(base) && !/[_-]/.test(base)) {
     const keep = sanitizeFileBase(base);
     return keep ? `${keep}${ext}` : `${sanitizeFileBase(fallbackTitle) || "Upload"}${ext}`;
   }
-  if (base && !JUNK_BASE.test(base) && /[_-]/.test(base)) {
+  if (base && !isJunkFileBase(base) && /[_-]/.test(base)) {
     const spaced = sanitizeFileBase(base.replace(/[_-]+/g, " "));
     if (spaced) return `${spaced}${ext}`;
   }
   const fb = sanitizeFileBase(fallbackTitle) || "Upload";
   return `${fb}${ext || ".pdf"}`;
+}
+
+/**
+ * Name to store for a teacher file pulled from Canvas.
+ * A real title is kept. `image-<uuid>` and other junk use the assignment title.
+ * @param {unknown} raw
+ * @param {unknown} [fallbackTitle]
+ * @param {unknown} [fileId]
+ */
+export function canvasDownloadName(raw, fallbackTitle = "", fileId = "") {
+  const baseRaw = basename(String(raw || "").trim());
+  const ext = extname(baseRaw);
+  const rawStem = basename(baseRaw, ext);
+  if (rawStem && !isJunkFileBase(rawStem)) {
+    const stem = sanitizeFileBase(rawStem) || (fileId ? `canvas-${fileId}` : "file");
+    return `${stem}${ext}`;
+  }
+  const fb =
+    sanitizeFileBase(fallbackTitle) || (fileId ? `canvas-${fileId}` : "Upload");
+  return `${fb}${ext || ""}`;
+}
+
+/**
+ * @param {string} desired
+ * @param {Set<string>} taken lowercase names already used
+ * @param {string} [keepLower] this file's current name, which may stay
+ */
+export function allocateFileName(desired, taken, keepLower = "") {
+  const ext = extname(desired);
+  const stem = basename(desired, ext) || "file";
+  let name = desired;
+  let n = 2;
+  const used = taken instanceof Set ? taken : new Set();
+  while (used.has(name.toLowerCase()) && name.toLowerCase() !== keepLower) {
+    name = `${stem} ${n}${ext}`;
+    n += 1;
+  }
+  return name;
 }
 
 /**
@@ -214,11 +262,67 @@ export async function writeFileIntoFolder(dir, name, srcPath) {
   return dest;
 }
 
-function safeDownloadName(raw, fileId) {
-  const baseRaw = basename(String(raw || "").trim()) || `canvas-${fileId}`;
-  const ext = extname(baseRaw);
-  const stem = sanitizeFileBase(basename(baseRaw, ext)) || `canvas-${fileId}`;
-  return `${stem}${ext}`;
+function assignmentFileTitle(props) {
+  return String(props?.name || "").trim();
+}
+
+/**
+ * Rename junk teacher files already sitting in OneDrive todo folders.
+ * The next pull then sees the readable name and does not download a second copy.
+ */
+export async function retitleJunkCanvasFiles() {
+  const entries = await listClassEntriesForRoot(yanRoot());
+  let renamed = 0;
+  for (const entry of entries) {
+    if (entry.source !== "onedrive") continue;
+    let dirs;
+    try {
+      dirs = await readdir(entry.classFolder, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const d of dirs) {
+      if (!d.isDirectory()) continue;
+      if (d.name === ".education" || d.name === ".Trash") continue;
+      const jsonPath = join(entry.classFolder, d.name, "todo.json");
+      const props = await readJsonFile(jsonPath);
+      const rows = Array.isArray(props?.canvasFiles) ? props.canvasFiles : [];
+      if (!rows.length) continue;
+      const dir = join(entry.classFolder, d.name);
+      const existing = await listTodoFiles(dir);
+      const byLower = new Map(existing.map((f) => [f.name.toLowerCase(), f]));
+      const taken = new Set(byLower.keys());
+      /** @type {{ id: number, name: string }[]} */
+      const next = [];
+      let changed = false;
+      for (const row of rows) {
+        const id = Number(row?.id);
+        const oldName = basename(String(row?.name || "").trim());
+        if (!Number.isFinite(id) || id <= 0 || !oldName) {
+          if (oldName) next.push({ id, name: oldName });
+          continue;
+        }
+        const desired = canvasDownloadName(oldName, assignmentFileTitle(props), id);
+        const finalName = allocateFileName(desired, taken, oldName.toLowerCase());
+        if (finalName.toLowerCase() !== oldName.toLowerCase()) {
+          const old = byLower.get(oldName.toLowerCase());
+          if (old) {
+            await writeFileIntoFolder(dir, finalName, old.path);
+            await rm(old.path, { force: true });
+            byLower.delete(oldName.toLowerCase());
+            byLower.set(finalName.toLowerCase(), { ...old, name: finalName, path: join(dir, finalName) });
+            renamed += 1;
+          }
+          taken.delete(oldName.toLowerCase());
+          changed = true;
+        }
+        taken.add(finalName.toLowerCase());
+        next.push({ id, name: finalName });
+      }
+      if (changed) await mergeCanvasFiles(jsonPath, next);
+    }
+  }
+  return { ok: true, renamed };
 }
 
 export async function findYanTodoByCanvasId(canvasId) {
@@ -729,6 +833,8 @@ export async function pullCanvasAssignmentFiles(opts = {}) {
   const snapshot = opts.snapshot || (await readCanvasSnapshot());
   if (!snapshot) return { ok: false, reason: "no-snapshot" };
 
+  const retitled = await retitleJunkCanvasFiles();
+
   let downloaded = 0;
   let skipped = 0;
   let missingTodo = 0;
@@ -755,10 +861,28 @@ export async function pullCanvasAssignmentFiles(opts = {}) {
         console.error(`[canvas-files] file ${id}`, err);
         continue;
       }
-      const finalName = safeDownloadName(
-        ref.name || meta?.display_name || meta?.filename,
+      const rawName = ref.name || meta?.display_name || meta?.filename;
+      const stored = (todo.props?.canvasFiles || []).find(
+        (row) => Number(row?.id) === id
+      );
+      const storedName = basename(String(stored?.name || "").trim());
+      const storedStem = basename(storedName, extname(storedName));
+      const computed = canvasDownloadName(
+        rawName,
+        assignmentFileTitle(todo.props),
         id
       );
+      const preferred =
+        storedName &&
+        byName.has(storedName.toLowerCase()) &&
+        !isJunkFileBase(storedStem)
+          ? storedName
+          : computed;
+      const keepLower =
+        preferred.toLowerCase() === storedName.toLowerCase()
+          ? storedName.toLowerCase()
+          : "";
+      const finalName = allocateFileName(preferred, new Set(byName.keys()), keepLower);
       const prior = byName.get(finalName.toLowerCase());
       const size = Number(meta?.size);
       if (prior && Number.isFinite(size) && prior.size === size) {
@@ -799,6 +923,7 @@ export async function pullCanvasAssignmentFiles(opts = {}) {
     downloaded,
     skipped,
     missingTodo,
+    renamed: retitled.renamed,
   };
 }
 
@@ -824,6 +949,9 @@ async function runCli(argv = process.argv.slice(2)) {
   const cmd = String(argv[0] || "").trim();
   if (cmd === "pull" || argv.includes("--pull-files")) {
     return pullCanvasAssignmentFiles();
+  }
+  if (cmd === "retitle") {
+    return retitleJunkCanvasFiles();
   }
   if (cmd === "comments") {
     return readAssignmentCommentsCli({

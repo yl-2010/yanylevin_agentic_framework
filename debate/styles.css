@@ -42,3 +42,143 @@ html[data-resolved-theme="light"] {
   --bloom-c: rgba(70, 78, 118, 0.14);
   --glow: rgba(236, 238, 248, 0.18);
 }
+
+/* Case speech: framework, defs, one contention, cards under the chain.
+   Wide screens put the blockfile in the second column. */
+.debate-case {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.debate-case--split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.debate-case--split > .debate-res {
+  grid-column: 1 / -1;
+}
+
+.debate-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.debate-col-label {
+  margin: 0;
+  font-family: var(--display);
+  font-size: var(--text-title3);
+  font-weight: 700;
+  color: var(--fg);
+}
+
+@media (max-width: 720px) {
+  .debate-case--split {
+    grid-template-columns: 1fr;
+  }
+}
+
+.debate-res {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-subhead, 1rem);
+  line-height: 1.4;
+}
+
+.debate-switch {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+
+.debate-switch-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.2rem 0.75rem;
+  border-radius: 999px;
+  font-size: var(--text-caption, 0.85rem);
+  font-weight: 700;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+}
+
+.debate-switch-link.is-current {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.debate-k {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.debate-cues {
+  margin: 0.35rem 0 0;
+  padding-left: 1.15rem;
+}
+
+.debate-cues li {
+  margin: 0 0 0.35rem;
+  line-height: 1.4;
+}
+
+.debate-cues li:last-child {
+  margin-bottom: 0;
+}
+
+.debate-chain .debate-cues,
+.debate-def .debate-cues {
+  margin-top: 0.15rem;
+}
+
+.debate-def + .debate-def {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+}
+
+.debate-def h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.debate-contention .debate-chain {
+  margin-bottom: 0.35rem;
+}
+
+.debate-card {
+  margin-top: 1rem;
+  padding-top: 0.95rem;
+  border-top: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+}
+
+.debate-tag {
+  margin: 0 0 0.45rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.debate-card blockquote {
+  margin: 0 0 0.55rem;
+  padding-left: 0.8rem;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  line-height: 1.45;
+}
+
+.debate-source {
+  margin: 0 0 0.55rem;
+  font-size: var(--text-caption, 0.85rem);
+}
+
+.debate-source a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}

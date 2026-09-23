@@ -2100,15 +2100,35 @@
    * Context-file query for /api/education/file.
    * @param {{ scope: string, id?: string, classId?: string, projectId?: string, name: string, source?: string, path?: string }} opts
    */
+  function fileQueryValue(value) {
+    const enc = window.YLFileQuery?.encodeEducationFileQueryValue;
+    const s = String(value ?? "");
+    return enc ? enc(s) : s;
+  }
+
+  function fileQueryName(queryString) {
+    const raw = new URLSearchParams(String(queryString || "")).get("name") || "";
+    const dec = window.YLFileQuery?.decodeEducationFileQueryValue;
+    return dec ? dec(raw) : raw;
+  }
+
+  function isRasterImageName(name) {
+    return /\.(png|jpe?g|gif|webp|heic|avif)$/i.test(String(name || ""));
+  }
+
   function contextFileQuery(opts) {
     const q = new URLSearchParams();
-    q.set("scope", String(opts.scope || ""));
-    q.set("name", String(opts.name || ""));
-    if (opts.id) q.set("id", String(opts.id));
-    if (opts.classId) q.set("classId", String(opts.classId));
-    if (opts.projectId) q.set("projectId", String(opts.projectId));
-    if (opts.source) q.set("source", String(opts.source));
-    if (opts.path) q.set("path", String(opts.path));
+    const set = (key, value) => {
+      if (value == null || String(value) === "") return;
+      q.set(key, fileQueryValue(value));
+    };
+    set("scope", opts.scope || "");
+    set("name", opts.name || "");
+    set("id", opts.id);
+    set("classId", opts.classId);
+    set("projectId", opts.projectId);
+    set("source", opts.source);
+    set("path", opts.path);
     return q.toString();
   }
 
@@ -2501,9 +2521,125 @@
     `;
   }
 
+  function debateCues(lines) {
+    const items = (Array.isArray(lines) ? lines : [])
+      .map((line) => `<li>${escapeHtml(line)}</li>`)
+      .join("");
+    if (!items) return "";
+    return `<ul class="debate-cues">${items}</ul>`;
+  }
+
+  function debateHttps(url) {
+    const s = String(url || "").trim();
+    return /^https:\/\/[^\s]+$/i.test(s) ? s : "";
+  }
+
+  function debateCardHtml(card) {
+    const url = debateHttps(card?.url);
+    if (!url) return "";
+    const source = String(card.source || "").trim();
+    const sourceHtml = source
+      ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source)}</a>`
+      : `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`;
+    const means = debateCues(card.means);
+    return `<article class="debate-card">
+      <p class="debate-tag">${escapeHtml(card.tag || "")}</p>
+      <blockquote>${escapeHtml(card.quote || "")}</blockquote>
+      <p class="debate-source">${sourceHtml}</p>
+      ${means}
+    </article>`;
+  }
+
+  function debateBlockfileHtml(c, sideKey) {
+    const body = c?.[sideKey];
+    const blocks = Array.isArray(body?.blockfile) ? body.blockfile : [];
+    return blocks
+      .map((block, i) => {
+        const label = String(block.label || "A2").trim();
+        const title = String(block.title || "").trim();
+        const heading = label && title ? `${label}. ${title}` : title || label || "A2";
+        const chain = debateCues(block.chain);
+        const cards = (block.cards || []).map((card) => debateCardHtml(card)).join("");
+        const inner = `${chain ? `<div class="debate-chain">${chain}</div>` : ""}${
+          cards ? `<div class="debate-cards">${cards}</div>` : ""
+        }`;
+        return panelHtml(heading, inner, {
+          filterId: `lg-debate-a2-${sideKey}-${i + 1}`,
+          extraClass: "debate-contention",
+        });
+      })
+      .join("");
+  }
+
+  function debateSideHtml(c, sideKey) {
+    const body = c?.[sideKey];
+    if (!body || typeof body !== "object") return "";
+    const blocks = [];
+    const framework = body.framework;
+    if (
+      framework &&
+      (framework.value ||
+        framework.criterion ||
+        (framework.text || []).length ||
+        (framework.cards || []).length)
+    ) {
+      const bits = [];
+      if (framework.value) {
+        bits.push(`<p><span class="debate-k">Value.</span> ${escapeHtml(framework.value)}</p>`);
+      }
+      if (framework.criterion) {
+        bits.push(
+          `<p><span class="debate-k">Criterion.</span> ${escapeHtml(framework.criterion)}</p>`
+        );
+      }
+      bits.push(debateCues(framework.text));
+      const frameworkCards = (framework.cards || [])
+        .map((card) => debateCardHtml(card))
+        .join("");
+      if (frameworkCards) bits.push(`<div class="debate-cards">${frameworkCards}</div>`);
+      blocks.push(panelHtml("Framework", bits.join(""), { filterId: "lg-debate-framework" }));
+    }
+    const defs = Array.isArray(body.definitions) ? body.definitions : [];
+    if (defs.length) {
+      const rows = defs
+        .map((def) => {
+          const cues = debateCues(def.points || (def.text ? [def.text] : []));
+          const cards = (def.cards || []).map((card) => debateCardHtml(card)).join("");
+          return `<article class="debate-def">
+            <h3>${escapeHtml(def.term || "")}</h3>
+            ${cues}
+            ${cards ? `<div class="debate-cards">${cards}</div>` : ""}
+          </article>`;
+        })
+        .join("");
+      blocks.push(panelHtml("Definitions", rows, { filterId: "lg-debate-defs" }));
+    }
+    const contentions = Array.isArray(body.contentions) ? body.contentions : [];
+    contentions.forEach((contention, i) => {
+      const label = String(contention.label || "").trim();
+      const title = String(contention.title || "").trim();
+      const heading = label && title ? `${label}. ${title}` : title || label || "Contention";
+      const chain = debateCues(contention.chain);
+      const cards = (contention.cards || [])
+        .map((card) => debateCardHtml(card))
+        .join("");
+      const inner = `${chain ? `<div class="debate-chain">${chain}</div>` : ""}${
+        cards ? `<div class="debate-cards">${cards}</div>` : ""
+      }`;
+      blocks.push(
+        panelHtml(heading, inner, {
+          filterId: `lg-debate-c${i + 1}`,
+          extraClass: "debate-contention",
+        })
+      );
+    });
+    return blocks.join("");
+  }
+
   function renderCase() {
     const c = findCaseById(route.caseId);
-    const side = route.caseSide === "neg" ? "Neg" : "Aff";
+    const sideKey = route.caseSide === "neg" ? "neg" : "aff";
+    const side = sideKey === "neg" ? "Neg" : "Aff";
     if (!c) {
       appEl.innerHTML = `
         <header class="edu-hero edu-hero--detail">
@@ -2514,11 +2650,53 @@
       return;
     }
     const title = `${c.name || c.id} · ${side}`;
+    const speech = debateSideHtml(c, sideKey);
+    const blockfile = debateBlockfileHtml(c, sideKey);
+    const resolution = String(c.resolution || "").trim();
+    const hasSpeech = Boolean(
+      debateSideHtml(c, "aff") ||
+        debateSideHtml(c, "neg") ||
+        debateBlockfileHtml(c, "aff") ||
+        debateBlockfileHtml(c, "neg")
+    );
+    const switchHtml = hasSpeech
+      ? `<nav class="debate-switch" aria-label="Side">
+          <a class="debate-switch-link${
+            sideKey === "aff" ? " is-current" : ""
+          }" href="${escapeHtml(spaCase(c.id, "aff"))}"${
+            sideKey === "aff" ? ' aria-current="page"' : ""
+          }>Aff</a>
+          <a class="debate-switch-link${
+            sideKey === "neg" ? " is-current" : ""
+          }" href="${escapeHtml(spaCase(c.id, "neg"))}"${
+            sideKey === "neg" ? ' aria-current="page"' : ""
+          }>Neg</a>
+        </nav>`
+      : "";
     appEl.innerHTML = `
       <header class="edu-hero edu-hero--detail">
-        ${backLinkHtml(spaHome(), "lg-edu-back-case")}
-        <h1 class="edu-hero-title">${escapeHtml(title)}</h1>
+        <div class="edu-hero-lead">
+          ${backLinkHtml(spaHome(), "lg-edu-back-case")}
+          <h1 class="edu-hero-title">${escapeHtml(title)}</h1>
+        </div>
+        ${switchHtml}
       </header>
+      ${
+        speech || blockfile
+          ? `<div class="debate-case${blockfile ? " debate-case--split" : ""}">
+              ${resolution ? `<p class="debate-res">${escapeHtml(resolution)}</p>` : ""}
+              ${
+                blockfile
+                  ? `<div class="debate-col">${speech}</div>
+              <div class="debate-col">
+                <p class="debate-col-label">Blockfile</p>
+                ${blockfile}
+              </div>`
+                  : speech
+              }
+            </div>`
+          : ""
+      }
     `;
   }
 
@@ -3399,8 +3577,11 @@
       const fileBtn = t.closest?.("[data-edu-file]");
       if (fileBtn) {
         if (!isUnmodifiedLeftClick(event)) return;
-        event.preventDefault();
         const qs = fileBtn.getAttribute("data-edu-file");
+        // Pictures follow the link. The new tab's address is the file itself,
+        // so dragging that picture into another tab still shows it.
+        if (qs && isRasterImageName(fileQueryName(qs))) return;
+        event.preventDefault();
         if (qs) openContextFile(qs);
         return;
       }

@@ -28,9 +28,9 @@ file when Yan asks how he writes cases, or before updating it.
 4. Then research deeply for real sources that say exactly what the claim
    needs. Prefer primary/academic over random blogs. Quote the line that
    actually warrants the tag.
-5. Case expanded views are currently title-only/blank. Do not invent a
-   layout. Put research notes in CONTEXT.md or a dropped file next to
-   `case.json` only if Yan asks to save them. Todos under a case live at
+5. Write the speech into `case.json` `aff` / `neg` using the layout in
+   the file section below. Do not invent a second layout. A case with no
+   body stays title-only. Todos under a case live at
    `education/you@example.com/projects/debate/cases/<id>/todos/<todoId>/todo.json`
    and still show on /debate home and /education home. Do not put a todo
    list on the case page.
@@ -44,13 +44,32 @@ education/you@example.com/projects/debate/
   project.json
   CONTEXT.md                    # agent notes, hidden from UI by default
   cases/<caseId>/
-    case.json                   # name; Aff/Neg are sides, not folders
+    case.json                   # name, resolution, aff, neg
     todos/<todoId>/todo.json    # optional; still show on both homes
 ```
 
 `/debate` is Yan-only (`allowedEmails: you@example.com`). Routes are
-`/debate/case/<caseId>/aff` and `/neg`. `renderCase()` is title only
-(`Name · Aff`). Do not fill that page with cards, blocks, or a todo list.
+`/debate/case/<caseId>/aff` and `/neg`. A case with no `aff` / `neg` body
+stays title-only (`Name · Aff`). A case that has a side renders that side
+as a speech, in this order, and no other order:
+
+1. Resolution line
+2. Framework. Value, criterion, one short why.
+3. Definitions. Term, then the cut. The cut is the same card shape as a contention card: tag, quote, link, then cue bullets.
+4. Contentions. Cue bullets first. Cards under them.
+
+The blockfile is not a fifth section of the speech. It is the other column. Each block is `A2`, the claim, cue bullets, then cards in the same shape. A side without a blockfile is unfinished. Write it with the speech. On a wide screen the speech is the left column and the blockfile is the right. That is the website above 720px and the iPad. A phone stacks the blockfile under the speech.
+
+Quotes stay full sentences from the source. Everything else is bullets of
+things to say, not a written speech. He turns the bullets into sentences.
+That includes framework notes, definitions, the chain, and the line after
+a card. Do not write those out as paragraphs.
+
+Each card is tag (`Author YY: warrant`), the quote that says the tag, a
+link to the direct text, then cue bullets for the math or the implication.
+Aff and Neg on the same topic use the same framework, the same defs, and
+the same card shape. The side switch is always Aff, then Neg. Do not put a
+todo list on the case page. Do not invent a second layout.
 
 Do **not** import old Word cases as `case.json` rows unless Yan asks.
 
@@ -61,8 +80,8 @@ a source that says that warrant, not a nearby vibe.
 
 - Prefer EPA, USDA, WHO, Congress/CRS, academic journals, official stats.
 - Tag format Yan uses: `Author YY: short warrant` plus a link (he often
-  used Arc quote URLs). Then a `this means` / `doing the math` line in his
-  voice.
+  used Arc quote URLs). After the quote, cue bullets for the math or the
+  implication. Not a written `this means` paragraph.
 - The card body has to say the tag. If it does not, keep looking.
 - Do not paste camp briefs, Victory/Champion dumps, or Kankee packets as
   if they were his case.
@@ -110,7 +129,7 @@ node --env-file=server/.env server/school-onenote.js sections --notebook "'25-'2
 
 - Create extra cases in the UI
 - Put objects under JYPE
-- Invent a case-page layout
+- Invent a second case-page layout. Speech order stays resolution, framework, definitions, contentions. The blockfile is the other column, not a new speech order.
 - Dump generic util / Kant / "I value morality because ought"
 - Treat leftover paste (Nukes Word mixed with Rewilding, AGI Neg pasted
   from Treaties, later blockfiles copied from Wealth Tax Aff) as his

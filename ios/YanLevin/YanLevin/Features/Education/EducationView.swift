@@ -101,7 +101,7 @@ struct EducationView: View {
                         .environmentObject(nav)
                         .ylSwipeBackHaptics()
                 case .caseDetail(let debateCase, let side):
-                    CaseDetailView(debateCase: debateCase, side: side)
+                    CaseDetailView(debateCase: debateCase, side: side, store: store)
                         .ylSwipeBackHaptics()
                 }
             }
@@ -705,23 +705,263 @@ struct EducationView: View {
 struct CaseDetailView: View {
     let debateCase: EducationCase
     let side: String
+    @ObservedObject var store: EducationStore
     @EnvironmentObject private var educationFocus: EducationFocusStore
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ylPalette) private var palette
 
-    private var sideLabel: String {
-        side.lowercased() == "neg" ? "Neg" : "Aff"
+    private var sideKey: String { side.lowercased() == "neg" ? "neg" : "aff" }
+
+    private var sideLabel: String { sideKey == "neg" ? "Neg" : "Aff" }
+
+    private var isWide: Bool {
+        AdaptiveLayout.isWideLayout(
+            horizontalSizeClass: horizontalSizeClass,
+            verticalSizeClass: verticalSizeClass
+        )
+    }
+
+    private var liveCase: EducationCase {
+        for project in store.tree?.projects ?? [] {
+            if let match = project.cases?.first(where: { $0.id == debateCase.id }) {
+                return match
+            }
+        }
+        return debateCase
+    }
+
+    private var bodySide: DebateSide? { liveCase.side(sideKey) }
+
+    private var hasBlockfile: Bool {
+        !(bodySide?.blockfile ?? []).isEmpty
     }
 
     var body: some View {
         ScrollView {
-            Color.clear
-                .frame(maxWidth: .infinity, minHeight: 1)
+            VStack(alignment: .leading, spacing: 14) {
+                if liveCase.hasSpeech {
+                    sideSwitch
+                }
+                if let resolution = liveCase.resolution?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !resolution.isEmpty {
+                    Text(resolution)
+                        .font(.subheadline)
+                        .foregroundStyle(YLTheme.muted(colorScheme))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if let speech = bodySide, speech.hasBody {
+                    if isWide, hasBlockfile {
+                        HStack(alignment: .top, spacing: 16) {
+                            speechColumn(speech)
+                            blockColumn(speech.blockfile ?? [])
+                        }
+                    } else {
+                        speechColumn(speech)
+                        if hasBlockfile {
+                            blockColumn(speech.blockfile ?? [])
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, isWide && hasBlockfile ? 28 : 16)
+            .padding(.bottom, 28)
+            .frame(maxWidth: isWide ? (hasBlockfile ? AdaptiveLayout.pageMaxWidth : 680) : .infinity)
+            .frame(maxWidth: .infinity)
         }
+        .id(sideKey)
         .educationTabReselectScroll(
             isActive: educationFocus.isShowingCase(debateCase.id, side: side)
         )
         .ylPageBackground()
-        .navigationTitle("\(debateCase.displayName) · \(sideLabel)")
+        .navigationTitle("\(liveCase.displayName) · \(sideLabel)")
         .navigationBarTitleDisplayMode(.large)
+    }
+
+    private var sideSwitch: some View {
+        HStack(spacing: 8) {
+            sidePill("aff", label: "Aff")
+            sidePill("neg", label: "Neg")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func sidePill(_ key: String, label: String) -> some View {
+        let on = sideKey == key
+        return Button {
+            selectSide(key)
+        } label: {
+            Text(label)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(
+                    on
+                        ? YLTheme.accent(colorScheme, palette: palette)
+                        : YLTheme.muted(colorScheme)
+                )
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    on
+                        ? YLTheme.accent(colorScheme, palette: palette).opacity(0.16)
+                        : YLTheme.fg(colorScheme).opacity(0.06),
+                    in: Capsule()
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    private func selectSide(_ key: String) {
+        guard key != sideKey else { return }
+        var path = educationFocus.path
+        guard let last = path.indices.last else { return }
+        path[last] = .caseDetail(liveCase, side: key)
+        educationFocus.path = path
+    }
+
+    private func speechColumn(_ speech: DebateSide) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if let framework = speech.framework {
+                frameworkBlock(framework)
+            }
+            if let defs = speech.definitions, !defs.isEmpty {
+                definitionsBlock(defs)
+            }
+            ForEach(speech.contentions ?? []) { contention in
+                contentionBlock(contention)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private func blockColumn(_ blocks: [DebateContention]) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Blockfile")
+                .font(.title3.weight(.bold))
+                .foregroundStyle(YLTheme.fg(colorScheme))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            ForEach(blocks) { block in
+                contentionBlock(block)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private func frameworkBlock(_ framework: DebateFramework) -> some View {
+        panel("Framework") {
+            VStack(alignment: .leading, spacing: 8) {
+                if let value = framework.value, !value.isEmpty {
+                    labeled("Value.", value)
+                }
+                if let criterion = framework.criterion, !criterion.isEmpty {
+                    labeled("Criterion.", criterion)
+                }
+                cueList(framework.text ?? [])
+                ForEach(Array((framework.cards ?? []).enumerated()), id: \.offset) { _, card in
+                    cardBlock(card)
+                }
+            }
+        }
+    }
+
+    private func definitionsBlock(_ defs: [DebateDefinition]) -> some View {
+        panel("Definitions") {
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(defs) { def in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(def.term)
+                            .font(.body.weight(.bold))
+                            .foregroundStyle(YLTheme.fg(colorScheme))
+                        cueList(def.points ?? [])
+                        ForEach(Array((def.cards ?? []).enumerated()), id: \.offset) { _, card in
+                            cardBlock(card)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func contentionBlock(_ contention: DebateContention) -> some View {
+        panel(contention.heading) {
+            VStack(alignment: .leading, spacing: 16) {
+                cueList(contention.chain ?? [])
+                ForEach(Array((contention.cards ?? []).enumerated()), id: \.offset) { _, card in
+                    cardBlock(card)
+                }
+            }
+        }
+    }
+
+    private func cardBlock(_ card: DebateCard) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(card.tag)
+                .font(.body.weight(.bold))
+                .foregroundStyle(YLTheme.fg(colorScheme))
+            HStack(alignment: .top, spacing: 10) {
+                RoundedRectangle(cornerRadius: 1, style: .continuous)
+                    .fill(YLTheme.accent(colorScheme, palette: palette).opacity(0.7))
+                    .frame(width: 2)
+                Text(card.quote)
+                    .font(.body)
+                    .foregroundStyle(YLTheme.fg(colorScheme))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if let url = card.link {
+                Link(destination: url) {
+                    Text((card.source ?? "").isEmpty ? card.url : (card.source ?? card.url))
+                        .font(.caption)
+                        .foregroundStyle(YLTheme.accent(colorScheme, palette: palette))
+                        .underline()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            cueList(card.means ?? [])
+        }
+        .padding(.top, 12)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(YLTheme.fg(colorScheme).opacity(0.12))
+                .frame(height: 1)
+        }
+    }
+
+    private func labeled(_ label: String, _ value: String) -> some View {
+        (Text(label).fontWeight(.bold).foregroundStyle(YLTheme.accent(colorScheme, palette: palette))
+            + Text(" \(value)").foregroundStyle(YLTheme.fg(colorScheme)))
+            .font(.body)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func cueList(_ lines: [String]) -> some View {
+        let cues = lines
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return VStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(cues.enumerated()), id: \.offset) { _, line in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("•")
+                        .foregroundStyle(YLTheme.muted(colorScheme))
+                    Text(line)
+                        .foregroundStyle(YLTheme.fg(colorScheme))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .font(.body)
+            }
+        }
+    }
+
+    private func panel<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(YLTheme.fg(colorScheme))
+            content()
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .ylGlassRounded(cornerRadius: 22, interactive: true)
     }
 }
 

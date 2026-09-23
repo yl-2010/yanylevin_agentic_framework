@@ -4,6 +4,7 @@
  */
 
 import { createReadStream } from "node:fs";
+import { createRequire } from "node:module";
 import { readdir, readFile, writeFile, stat } from "node:fs/promises";
 import { dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +34,21 @@ import {
   FULL_ACCESS_EMAILS,
 } from "./identity.js";
 import { JYPE_ROOT_REL, normalizeJypeWorkspace } from "./jype.js";
+
+const require = createRequire(import.meta.url);
+const { decodeEducationFileQueryValue } = require("../education/file-query.js");
+
+const FILE_QUERY_KEYS = ["scope", "id", "classId", "projectId", "name", "source", "path"];
+
+/** Undo ylb64 query values from a dragged file link. Plain ids pass through. */
+export function decodeEducationFileQuery(opts) {
+  const out = opts && typeof opts === "object" ? { ...opts } : {};
+  for (const key of FILE_QUERY_KEYS) {
+    if (out[key] == null || out[key] === "") continue;
+    out[key] = decodeEducationFileQueryValue(out[key]);
+  }
+  return out;
+}
 
 /** Property JSON filenames that are never treated as context files. */
 const PROPERTY_JSON = new Set([
@@ -531,6 +547,7 @@ async function resolveOnedriveContextFile(root, opts) {
  * @returns {Promise<{ path: string, name: string, size: number, mtime: string }>}
  */
 export async function resolveContextFile(email, opts) {
+  opts = decodeEducationFileQuery(opts);
   const root = userEducationRoot(email, opts);
   const source = String(opts?.source || "").trim().toLowerCase();
   if (source === "onedrive") {
@@ -1222,6 +1239,134 @@ async function loadObjectFolder(
   return out;
 }
 
+function debateCleanLine(value, max) {
+  return String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
+}
+
+function debateCleanLines(value, maxLines, maxLen) {
+  const parts = Array.isArray(value) ? value : String(value ?? "").split(/\n\s*\n/);
+  return parts
+    .map((part) => debateCleanLine(part, maxLen))
+    .filter(Boolean)
+    .slice(0, maxLines);
+}
+
+function debateCleanUrl(value) {
+  const url = String(value ?? "").trim();
+  if (!/^https:\/\/[^\s]+$/i.test(url)) return "";
+  return url.slice(0, 500);
+}
+
+function debateFramework(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const value = debateCleanLine(raw.value, 160);
+  const criterion = debateCleanLine(raw.criterion, 240);
+  const text = debateCleanLines(raw.text, 8, 2000);
+  const cards = debateCards(raw.cards);
+  if (!value && !criterion && !text.length && !cards.length) return null;
+  const framework = {};
+  if (value) framework.value = value;
+  if (criterion) framework.criterion = criterion;
+  if (text.length) framework.text = text;
+  if (cards.length) framework.cards = cards;
+  return framework;
+}
+
+function debateDefinitions(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const term = debateCleanLine(item.term, 80);
+      const points = debateCleanLines(item.points ?? item.text, 16, 2000);
+      const cards = debateCards(item.cards);
+      if (!term || (!points.length && !cards.length)) return null;
+      const def = { term };
+      if (points.length) def.points = points;
+      if (cards.length) def.cards = cards;
+      return def;
+    })
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function debateCards(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const tag = debateCleanLine(item.tag, 300);
+      const quote = debateCleanLine(item.quote, 2500);
+      const source = debateCleanLine(item.source, 240);
+      const url = debateCleanUrl(item.url);
+      const means = debateCleanLines(item.means, 12, 400);
+      if (!tag || !quote || !url) return null;
+      const card = { tag, quote, url };
+      if (source) card.source = source;
+      if (means.length) card.means = means;
+      return card;
+    })
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function debateContentions(raw, max = 4) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const label = debateCleanLine(item.label, 12);
+      const title = debateCleanLine(item.title, 160);
+      const chain = debateCleanLines(item.chain, 64, 400);
+      const cards = debateCards(item.cards);
+      if (!title || (!chain.length && !cards.length)) return null;
+      const contention = { title };
+      if (label) contention.label = label;
+      if (chain.length) contention.chain = chain;
+      if (cards.length) contention.cards = cards;
+      return contention;
+    })
+    .filter(Boolean)
+    .slice(0, max);
+}
+
+function debateSide(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const framework = debateFramework(raw.framework);
+  const definitions = debateDefinitions(raw.definitions);
+  const contentions = debateContentions(raw.contentions);
+  const blockfile = debateContentions(raw.blockfile, 8);
+  if (!framework && !definitions.length && !contentions.length && !blockfile.length) {
+    return null;
+  }
+  const side = {};
+  if (framework) side.framework = framework;
+  if (definitions.length) side.definitions = definitions;
+  if (contentions.length) side.contentions = contentions;
+  if (blockfile.length) side.blockfile = blockfile;
+  return side;
+}
+
+/**
+ * Aff/Neg speech stored on case.json. Drops anything that is not the
+ * framework, definitions, contention cards, or the blockfile.
+ * @param {object|null|undefined} props
+ */
+export function publicDebateCase(props) {
+  if (!props || typeof props !== "object") return {};
+  const resolution = debateCleanLine(props.resolution, 400);
+  const aff = debateSide(props.aff);
+  const neg = debateSide(props.neg);
+  const out = {};
+  if (resolution) out.resolution = resolution;
+  if (aff) out.aff = aff;
+  if (neg) out.neg = neg;
+  return out;
+}
+
 /**
  * Debate (and later) cases live under projects/<id>/cases/<caseId>/case.json.
  * Todos nested under a case still belong to the project for home flatten.
@@ -1257,6 +1402,7 @@ async function loadProjectCases(
     cases.push({
       id,
       name: row.name || id,
+      ...publicDebateCase(row),
     });
     todos.push(...caseTodos);
   }
