@@ -78,6 +78,14 @@ Reply `Sent to … (Teams)`.  Never from location-history or
 daily-briefing. Context-synthesis may send only when Yan's own message in that
 run directed it.
 
+Teams cannot attach a file. `--text` is the whole send. A PDF, photo, or
+other file for a person does not go in this chat. Look up their email (people
+card, then Contacts) and send the file from Apple Mail with it attached
+(personal-mail skill). Reply `Sent to Name (email)`. If this Teams thread
+should hear about it, say you emailed the file. School Outlook cannot send
+that file either. A class channel or a big group is not a file drop. Do not
+email the whole channel. This fallback is Yan only.
+
 `--text` is markdown (or plain text). The CLI converts it to Teams HTML
 (`RichText/Html`) so desktop keeps newlines and bold/lists/links. Do not
 pass HTML. The CLI appends `// Sent by Yan's Personal Agent`. Do not write

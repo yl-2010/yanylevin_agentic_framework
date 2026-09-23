@@ -46,6 +46,13 @@ folder into the repo.
 Prefer `search` with a name or subject needle over paging the whole inbox.
 Do not fall back to Mail.app or Rajasi forwards for school mail.
 
+## Send
+
+This account cannot send. No compose, and no attachments. A file for someone
+goes through Apple Mail (personal-mail skill), from Exchange
+`you@example.com` unless Yan names Gmail or iCloud. Do not add
+`owner@school.example` to Mail.app to get around this.
+
 ## History fill
 
 Do not run the two-year Composer fill unless Yan asks. That job is

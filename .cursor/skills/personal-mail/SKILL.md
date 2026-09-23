@@ -109,6 +109,50 @@ APPLESCRIPT
 
 Look up an address in Contacts (`.cursor/skills/personal-contacts/SKILL.md`) when Yan names a person without an email. Do not add the school Microsoft 365 account to Mail.app.
 
+## Attachments
+
+Mail.app can attach files. School Outlook cannot, and Teams cannot. This is the path when Yan asked Teams or school mail to carry a PDF, photo, or other file.
+
+Use an absolute path. End the body with a blank line so the attachment has a paragraph to follow. One `make new attachment` per file, inside `content`. Then the same Drafts cleanup as a normal send. Reply `Sent to Name (email)`.
+
+```bash
+osascript <<'APPLESCRIPT'
+set theFile to POSIX file "/abs/path/file.pdf"
+tell application "Mail"
+  set newMessage to make new outgoing message with properties {subject:"Subject here", content:"Body here" & return & return, visible:false}
+  tell newMessage
+    make new to recipient at end of to recipients with properties {address:"someone@example.com"}
+    set sender to "you@example.com"
+  end tell
+  tell content of newMessage
+    make new attachment with properties {file name:theFile} at after the last paragraph
+  end tell
+  send newMessage
+end tell
+delay 2
+tell application "Mail"
+  set draftBox to mailbox "Drafts" of account "Exchange"
+  set leftoverIds to {}
+  repeat with m in messages of draftBox
+    if (subject of m) is "Subject here" then
+      set hit to false
+      try
+        repeat with r in to recipients of m
+          if (address of r) is "someone@example.com" then set hit to true
+        end repeat
+      end try
+      if hit then set end of leftoverIds to id of m
+    end if
+  end repeat
+  repeat with mid in leftoverIds
+    try
+      delete (first message of draftBox whose id is mid)
+    end try
+  end repeat
+end tell
+APPLESCRIPT
+```
+
 ## URLs in a message
 
 `content` is plaintext. It keeps the words "Registration Link" and drops the href. When you need a Zoom / Meet / Teams / booking URL (calendar events, PathIvy webinars), read `source` of that message and parse `https://` links from the HTML. Quoted-printable mail splits URLs across lines (`href=3D"https://...` then `= ` continuation). Join those before you copy the URL onto a calendar event.

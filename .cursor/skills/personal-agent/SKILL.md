@@ -154,13 +154,28 @@ Replies show in a small bubble. Markdown is rendered (bold, lists, headings, lin
 
 ## Send to a person
 
-When Yan says send to someone and names a body, but not the app, pick one path and send. Do not ask which channel. Order is iMessage, then Teams, then email.
+When Yan says send to someone and names a body, but not the app, pick one path and send. Do not ask which channel. For text, order is iMessage, then Teams, then email.
 
 1. **iMessage** if they are reachable there (phone or iMessage email on the person card / Contacts, or an existing 1:1 in Messages).
 2. **Teams** if iMessage is missing or send comes back unreachable: existing 1:1 in school Teams chats, or school email as the Graph user. Chat only, not a class channel.
 3. **Email** (Mail.app) if both fail: address from the person card or Contacts.
 
-Yan naming the channel wins: `on Teams`, `iMessage` / `text`, `email` / `mail`. Groups are not this list (`send to JYPE` stays the iMessage group). Reply `Sent to Name (iMessage)` (or Teams / email). If the body includes a yanylevin.com class or study-guide URL and the recipient is Alex, Example Friend, Example Neighbor, or JYPE, also add that URL as `sites[]` on the matching JYPE class.
+Yan naming the channel wins for text: `on Teams`, `iMessage` / `text`, `email` / `mail`. Groups are not this list (`send to JYPE` stays the iMessage group). Reply `Sent to Name (iMessage)` (or Teams / email). If the body includes a yanylevin.com class or study-guide URL and the recipient is Alex, Example Friend, Example Neighbor, or JYPE, also add that URL as `sites[]` on the matching JYPE class.
+
+## What each channel can carry
+
+If the channel cannot carry the thing, use one that can and name it in the reply. Do not ask which app. Do not claim a file went out on a channel that cannot take one.
+
+- **iMessage** can send text and files (photos, PDFs, anything on disk). Each file is its own message, then the text.
+- **Teams** is text only. `school-teams.js send` has no attachment. A link is fine when the file is already a URL.
+- **School Outlook** (`owner@school.example`) is read only. It cannot send mail and cannot attach a file.
+- **Apple Mail** can send text and attach files. That is Mail.app: Exchange `you@example.com`, Gmail, or iCloud.
+
+A file asked for on Teams, or a Teams `@agent` turn whose job is to get a file to a person, does not go out as a Teams message. Look up their email on the people card, then Contacts. Send the file from Apple Mail with it attached (personal-mail skill). Reply `Sent to Name (email)`. If that Teams thread should hear about it, the bubble says you emailed the file. If there is no email, say so.
+
+Unnamed "send this file" with no app: iMessage if they are reachable there. If iMessage is missing, skip Teams and email the file.
+
+A class channel or a big group is not a file drop. Do not email the whole channel. A named person gets the file by email. This fallback is Yan only. A guest does not get a send from Yan's mail.
 
 - **Place hours:** do not trust Apple Maps. Official website first, then Google Maps. Never quote Apple Maps hours as the answer. Details in the chat-widgets skill.
 

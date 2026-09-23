@@ -149,6 +149,8 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /school-teams\.js/);
     assert.match(prompt, /iMessage, then Teams, then email/);
     assert.match(prompt, /native attachments/);
+    assert.match(prompt, /Teams and school Outlook cannot attach a file/);
+    assert.match(prompt, /Apple Mail/);
     assert.ok(prompt.length < 5600, `prompt length ${prompt.length}`);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.chats));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.location));
