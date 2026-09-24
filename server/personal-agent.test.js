@@ -187,6 +187,8 @@ describe("Personal Agent system prompt", () => {
     const prompt = systemPrompt(YAN, { workspace: "jype" });
     assert.match(prompt, /JYPE agent/);
     assert.match(prompt, /Do not copy Yan's personal \/education sites onto JYPE/);
+    assert.match(prompt, /npm run deploy:web yourself/);
+    assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.jypeAgent));
     assert.ok(prompt.includes(FOUR11_SKILL_PATH));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.browser));
   });
@@ -432,6 +434,7 @@ describe("Personal Agent skill files", () => {
     assert.doesNotMatch(schoolTeams, /Other people typing `@agent` do nothing/);
     assert.match(schoolTeams, /school-teams-fill/);
     assert.match(schoolTeams, /brain-school-teams/);
+    assert.match(schoolTeams, /Each row's `speaker` is the/);
 
     const calendar = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.calendar), "utf8");
     assert.match(calendar, /yl-calendar/);
@@ -513,6 +516,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /open_education_page/);
     assert.match(agent, /iMessage @agent/);
     assert.match(agent, /Teams @agent/);
+    assert.match(agent, /Each row from `school-teams\.js thread` has its own `speaker`/);
     assert.match(agent, /messages to himself/);
     assert.match(agent, /except the Class of 2028 Teams grade chat/);
     assert.match(agent, /only Yan, Alex, Example Friend, and Example Neighbor/);

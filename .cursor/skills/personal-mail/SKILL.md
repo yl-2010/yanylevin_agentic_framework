@@ -113,6 +113,8 @@ Look up an address in Contacts (`.cursor/skills/personal-contacts/SKILL.md`) whe
 
 Mail.app can attach files. School Outlook cannot, and Teams cannot. This is the path when Yan asked Teams or school mail to carry a PDF, photo, or other file.
 
+Do not re-read a sent message through Mail's scripting interface to decide whether the attachments were wrong. That read can report duplicate names and drop files that the sent message actually has. If Yan says the original mail was fine, send nothing else. One send, then stop.
+
 Use an absolute path. End the body with a blank line so the attachment has a paragraph to follow. One `make new attachment` per file, inside `content`. Then the same Drafts cleanup as a normal send. Reply `Sent to Name (email)`.
 
 ```bash

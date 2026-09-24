@@ -1096,6 +1096,7 @@ export const PERSONAL_SKILL_PATHS = {
   locationBrain: ".cursor/skills/location-brain/SKILL.md",
   healthBrain: ".cursor/skills/health-brain/SKILL.md",
   factCheck: ".cursor/skills/nightly-fact-check/SKILL.md",
+  jypeAgent: ".cursor/skills/jype-agent/SKILL.md",
 };
 
 const EDUCATION_VIEWS = new Set([
@@ -1123,10 +1124,12 @@ export function systemPrompt(email, opts = {}) {
       "Yan: full write in this repo and on this Mac.",
       "JYPE chats live in education/projects/jype/.chat-history/. They stay in the history list. No 10-minute hide.",
       "Public pages this JYPE agent creates get a sites[] tile on the related JYPE class. Do not copy Yan's personal /education sites onto JYPE unless Yan is sending that URL to a JYPE member.",
+      "On Yan's Mac Studio: after push, run npm run deploy:web yourself when the live site must change. Do not ask Yan or JYPE members to deploy. Read the jype-agent skill.",
       "Never spawn a Cursor cloud agent.",
       "",
       `Always Read and apply the unslop skill (${UNSLOP_SKILL_PATH}) on every turn.`,
       `Always Read ${PERSONAL_SKILL_PATHS.soul} for persona and judgment.`,
+      `- JYPE agent (deploy, ship URLs): ${PERSONAL_SKILL_PATHS.jypeAgent}`,
       `- JYPE dashboard (classes, todos, dates, projects): ${PERSONAL_SKILL_PATHS.education}`,
       `- Static HTML on a JYPE object: ${PERSONAL_SKILL_PATHS.objectHtml || ".cursor/skills/object-html/SKILL.md"}`,
       `- Public yanylevin.com page: ${PERSONAL_SKILL_PATHS.webpage || ".cursor/skills/yanylevin-webpage-create/SKILL.md"}`,

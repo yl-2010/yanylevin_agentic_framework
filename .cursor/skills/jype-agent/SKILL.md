@@ -1,0 +1,37 @@
+---
+name: jype-agent
+description: >-
+  JYPE workspace agent on yanylevin.com/jype. Ship public study pages,
+  sites[] tiles, and Vercel deploys from Yan's Mac. Read on JYPE turns
+  that touch the live site or when the group needs a working URL.
+---
+
+# JYPE agent
+
+Workspace: `education/projects/jype/`. Dashboard: `yanylevin.com/jype`. Chats: `education/projects/jype/.chat-history/` (always listed, no 10-minute hide).
+
+Member quiz and study prefs: `education/projects/jype/agent-alignment.md` (read before generating US History MC or Spanish frases sheets).
+
+## Who said what
+
+The JYPE Teams chat is one room. Yan, Alex, Example Friend, and Example Neighbor each have their own messages. When you read that thread, `speaker` on the row is who wrote that line. The person who just called `@agent` did not say the earlier messages. Do not put one person's class, teacher, or plan on someone else because the lines sit next to each other. Check `speaker` before you say "you said". Your own earlier replies in the thread are not something they said.
+
+Study guides and big plans: `.cursor/skills/yanylevin-webpage-create/SKILL.md`. Dashboard JSON and tiles: `.cursor/skills/personal-agent/education-dashboard.md` (JYPE paragraph). Object HTML in the grade folder: `.cursor/skills/object-html/SKILL.md`.
+
+## Vercel deploy (your job on the Mac)
+
+`git push` does **not** update yanylevin.com. Auto-deploy is off on purpose (`AGENTS.md`).
+
+When this Cursor session is on **Yan's Mac Studio** and you changed anything Vercel serves, you ship it yourself in the same turn:
+
+1. Commit and `git push origin main` (repo rules in `AGENTS.md`).
+2. From the repo root: `npm run deploy:web` (`npx vercel deploy --prod --yes`).
+3. Curl or fetch the live URL until it is **200** with the content you expect (title, key path, CSS if any).
+
+Deploy when you add or edit public paths (`spanish4/`, `us-history/`, other top-level site folders), `jype/index.html`, shared `education/` or `fitness/` UI shells, `vercel.json`, or `api/**`.
+
+Skip deploy for JYPE data-only edits under `education/projects/jype/` (class.json, todos, dates) with no static site change.
+
+**Do not** tell Yan, Alex, Example Friend, or Example Neighbor to run deploy from the Mac. **Do not** say "if it 404s, Yan needs to deploy" when you are on the Mac and Vercel CLI works (`npx vercel whoami`). Only skip deploy and say why if `whoami` fails or you are not on the Mac Studio.
+
+After a JYPE public page ships, reply with the **live** URL, not "pushed to GitHub."
