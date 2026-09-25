@@ -13,8 +13,10 @@ const TRAILING_FOOTER_RE = new RegExp(
   `(?:\\r?\\n[ \\t]*)+(?://[ \\t]*)?${FOOTER_ESC}[ \\t]*$`,
   "i"
 );
-/** Word token, any casing. Avoids emails like foo@agent.com. */
+/** Word token, any casing. Avoids emails like foo@agent.com. The trailing g is a word char, so @agentg does not match. */
 export const AGENT_MENTION_RE = /(^|[^\w@])@agent\b/i;
+/** Shorter Grok mention. Not a second @agent hit. */
+export const AGENT_GROK_MENTION_RE = /(^|[^\w@])@agentg\b/i;
 
 /** EPS grade-wide chats such as "Class of 2028". */
 export function isGradeWideThread(threadLabel) {
@@ -43,8 +45,13 @@ export function agentSentFooterFor(origin) {
 /**
  * @param {unknown} raw
  */
+export function messageForcesGrok(raw) {
+  return AGENT_GROK_MENTION_RE.test(String(raw || ""));
+}
+
 export function messageMentionsAgent(raw) {
-  return AGENT_MENTION_RE.test(String(raw || ""));
+  const text = String(raw || "");
+  return messageForcesGrok(text) || AGENT_MENTION_RE.test(text);
 }
 
 /**
@@ -56,6 +63,7 @@ export function isBareAgentMention(raw) {
   const text = String(raw || "").trim();
   if (!text || !messageMentionsAgent(text)) return false;
   const rest = text
+    .replace(AGENT_GROK_MENTION_RE, " ")
     .replace(AGENT_MENTION_RE, " ")
     .replace(/[\s.,!?;:'"“”]+/g, " ")
     .trim();

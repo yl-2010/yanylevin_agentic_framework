@@ -12,6 +12,7 @@ import {
   isClassOf2028Thread,
   isGradeWideThread,
   isJypeThread,
+  messageForcesGrok,
   normalizeIMessageOrigin,
   replyTargetForMessage,
 } from "./imessage-mention.js";
@@ -27,7 +28,7 @@ import {
 
 export const GUEST_LIMITS_PATH = "/tmp/yanylevin-guest-agent-limits.json";
 export const GUEST_TZ = "America/Los_Angeles";
-export const HOURLY_LIMIT = 5;
+export const HOURLY_LIMIT = 10;
 export const FRIEND_HOURLY_LIMIT = 20;
 export const CONTACTS_TTL_MS = 60_000;
 export const PEOPLE_TTL_MS = 60_000;
@@ -658,10 +659,12 @@ export async function evaluateGuestMention(opts) {
   const personKey = quotaKeyFor(handle, slug);
   if (!personKey) return { action: "ignore" };
 
+  const forceGrok = messageForcesGrok(message.text);
+  const jypeCaller = isJypeGuestCaller(slug, email, fromName);
+  if (forceGrok && !jypeCaller) return { action: "ignore" };
+
   if (messageIsJypeThread(message)) {
-    if (!isJypeGuestCaller(slug, email, fromName)) {
-      return { action: "ignore" };
-    }
+    if (!jypeCaller) return { action: "ignore" };
     return {
       action: "start",
       platform,
@@ -672,8 +675,28 @@ export async function evaluateGuestMention(opts) {
         handle,
         inContacts,
         audience: describeGuestAudience(platform, message),
-        model: jypeMentionModelSpec(platform),
+        model: forceGrok
+          ? copyModelSpec(GUEST_GROK_SPEC)
+          : jypeMentionModelSpec(platform),
         workspace: "jype",
+        ...(forceGrok ? { forceGrok: true } : {}),
+      },
+    };
+  }
+
+  if (forceGrok) {
+    return {
+      action: "start",
+      platform,
+      caller: {
+        displayName,
+        slug,
+        platform,
+        handle,
+        inContacts,
+        audience: describeGuestAudience(platform, message),
+        model: copyModelSpec(GUEST_GROK_SPEC),
+        forceGrok: true,
       },
     };
   }

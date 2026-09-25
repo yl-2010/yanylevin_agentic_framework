@@ -216,7 +216,8 @@ describe("guest-agent limits", () => {
     resetGuestAgentCaches();
   });
 
-  it("caps at 5 per clock hour and resets at the next hour", async () => {
+  it("caps at 10 per clock hour and resets at the next hour", async () => {
+    assert.equal(HOURLY_LIMIT, 10);
     const dir = await mkdtemp(join(tmpdir(), "guest-limit-"));
     const statePath = join(dir, "limits.json");
     for (let i = 0; i < HOURLY_LIMIT; i += 1) {
@@ -514,7 +515,7 @@ describe("evaluateGuestMention", () => {
     );
   });
 
-  it("sends a programmatic rate-limit action after 5 in the hour", async () => {
+  it("sends a programmatic rate-limit action after the base hourly cap", async () => {
     const dir = await mkdtemp(join(tmpdir(), "guest-eval-"));
     const statePath = join(dir, "limits.json");
     const base = {
@@ -529,7 +530,7 @@ describe("evaluateGuestMention", () => {
       now: FIVE_PM,
       statePath,
     };
-    for (let i = 0; i < 5; i += 1) {
+    for (let i = 0; i < HOURLY_LIMIT; i += 1) {
       assert.equal((await evaluateGuestMention(base)).action, "start");
     }
     const blocked = await evaluateGuestMention(base);
@@ -835,5 +836,79 @@ describe("evaluateGuestMention", () => {
     assert.equal(dm.action, "start");
     assert.equal(dm.caller.model.id, "grok-4.7");
     assert.equal(dm.caller.workspace, undefined);
+  });
+
+  it("starts one Grok run for @agentg and skips the cap", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "guest-agent-grok-"));
+    const statePath = join(dir, "limits.json");
+    for (let i = 0; i < HOURLY_LIMIT; i += 1) {
+      await takeGuestSlot({
+        platform: "teams",
+        personKey: "alex-rivera",
+        slug: "alex-rivera",
+        now: FIVE_PM,
+        statePath,
+      });
+    }
+    const teamsGroup = await evaluateGuestMention({
+      platform: "teams",
+      message: {
+        fromMe: false,
+        from: "Alex Rivera",
+        fromEmail: "friend@school.example",
+        chat: "JYPE",
+        chatType: "group",
+        text: "@agentg write the study guide",
+      },
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(teamsGroup.action, "start");
+    assert.equal(teamsGroup.caller.model.id, "grok-4.7");
+    assert.equal(teamsGroup.caller.forceGrok, true);
+    assert.equal(teamsGroup.caller.workspace, "jype");
+    assert.equal(
+      teamsGroup.caller.model.params.find((p) => p.id === "reasoning_effort")?.value,
+      "high"
+    );
+    assert.equal(
+      teamsGroup.caller.model.params.find((p) => p.id === "fast")?.value,
+      "false"
+    );
+
+    const dm = await evaluateGuestMention({
+      platform: "imessage",
+      message: {
+        fromMe: false,
+        handle: "+15555550111",
+        chatId: "+15555550111",
+        chat: "Alex",
+        text: "hey @agentg",
+      },
+      contacts: [contact("Alex", "+15555550111")],
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(dm.action, "start");
+    assert.equal(dm.caller.model.id, "grok-4.7");
+    assert.equal(dm.caller.workspace, undefined);
+
+    const stranger = await evaluateGuestMention({
+      platform: "imessage",
+      message: {
+        fromMe: false,
+        handle: "+15555550999",
+        chatId: "+15555550999",
+        chat: "Sam",
+        text: "@agentg hi",
+      },
+      contacts: [contact("Sam", "+15555550999")],
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(stranger.action, "ignore");
   });
 });

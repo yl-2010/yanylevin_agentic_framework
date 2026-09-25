@@ -11,7 +11,9 @@ import {
   isGradeWideThread,
   isJypeThread,
   messageKey,
+  messageForcesGrok,
   messageMentionsAgent,
+  AGENT_MENTION_RE,
   normalizeIMessageOrigin,
   replyTargetForMessage,
   shouldOmitAgentFooter,
@@ -27,6 +29,16 @@ describe("imessage-mention", () => {
     assert.equal(messageMentionsAgent("agent please"), false);
     assert.equal(messageMentionsAgent("foo@agent.com"), false);
     assert.equal(messageMentionsAgent("write @agency"), false);
+    assert.equal(messageMentionsAgent("@agentg do this"), true);
+    assert.equal(messageForcesGrok("@agentg do this"), true);
+    assert.equal(messageForcesGrok("@AgentG"), true);
+    assert.equal(messageForcesGrok("@agent what's next"), false);
+    assert.equal(messageForcesGrok("@agent_grok do this"), false);
+    assert.equal(messageMentionsAgent("@agent_grok do this"), false);
+    assert.equal(messageForcesGrok("@agentgood"), false);
+    assert.equal(AGENT_MENTION_RE.test("@agentg do this"), false);
+    assert.equal(isBareAgentMention("@agentg"), true);
+    assert.equal(isBareAgentMention("@agentg ping"), false);
     assert.equal(isBareAgentMention("@agent"), true);
     assert.equal(isBareAgentMention(" @Agent. "), true);
     assert.equal(isBareAgentMention("@agent ping"), false);

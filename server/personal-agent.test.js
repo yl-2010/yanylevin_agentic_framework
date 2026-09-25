@@ -114,6 +114,24 @@ describe("Personal Agent models", () => {
       false
     );
     assert.equal(imessageJype.id, "grok-4.7");
+    const grokOverride = guestTurnModelSpec(
+      {
+        teamsDeliverFinal: true,
+        workspace: "jype",
+        forceGrok: true,
+        guestCaller: null,
+      },
+      false
+    );
+    assert.equal(grokOverride.id, "grok-4.7");
+    assert.equal(
+      grokOverride.params.find((p) => p.id === "reasoning_effort")?.value,
+      "high"
+    );
+    assert.equal(
+      grokOverride.params.find((p) => p.id === "fast")?.value,
+      "false"
+    );
   });
 });
 

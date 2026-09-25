@@ -46,6 +46,7 @@ import { sendIMessage, takeIMessageReplyFiles } from "./imessage-send.js";
 import {
   applyAgentSentFooter,
   formatIMessageOriginBlock,
+  messageForcesGrok,
   normalizeIMessageOrigin,
   stripAgentSentFooter,
 } from "./imessage-mention.js";
@@ -57,6 +58,7 @@ import {
 import {
   copyModelSpec,
   formatGuestUserBubble,
+  GUEST_GROK_SPEC,
   guestRunModels,
   jypeMentionModelSpec,
   platformLabel,
@@ -1608,8 +1610,14 @@ function guestAgentCreateOpts(guest) {
   };
 }
 
-/** @agent iMessage/Teams first turn. JYPE Teams group is Composer 2.5. JYPE iMessage stays Grok. */
-function mentionAgentCreateOpts(guest, workspace, platform) {
+/** @agent iMessage/Teams first turn. JYPE Teams group is Composer 2.5. @agentg is Grok. */
+function mentionAgentCreateOpts(guest, workspace, platform, forceGrok) {
+  if (forceGrok) {
+    return guestAgentCreateOpts({
+      ...(guest && typeof guest === "object" ? guest : {}),
+      model: copyModelSpec(GUEST_GROK_SPEC),
+    });
+  }
   if (workspace === "jype") {
     return guestAgentCreateOpts({
       ...(guest && typeof guest === "object" ? guest : {}),
@@ -1624,6 +1632,7 @@ function mentionAgentCreateOpts(guest, workspace, platform) {
 }
 
 export function guestTurnModelSpec(session, hasSessionFiles) {
+  if (session.forceGrok) return copyModelSpec(GUEST_GROK_SPEC);
   const mentionFirstTurn =
     Boolean(session.imessageDeliverFinal) || Boolean(session.teamsDeliverFinal);
   if (
@@ -1777,11 +1786,12 @@ export async function startAgentFromIMessageMention(message) {
     throw err;
   }
   const workspace = originIsJypeThread(origin) ? "jype" : "";
+  const forceGrok = messageForcesGrok(raw);
   const startEmail =
     workspace === "jype"
       ? jypeEmailForSlug(guest?.slug) || YAN_EMAIL
       : YAN_EMAIL;
-  const createOpts = mentionAgentCreateOpts(guest, workspace, "imessage");
+  const createOpts = mentionAgentCreateOpts(guest, workspace, "imessage", forceGrok);
   const started = await startAgent(startEmail, {
     ...createOpts,
     workspace,
@@ -1796,6 +1806,7 @@ export async function startAgentFromIMessageMention(message) {
   session.imessageOrigin = origin;
   session.imessageDeliverFinal = true;
   session.guestCaller = guest;
+  session.forceGrok = forceGrok;
   return messageAgent(started.sessionId, startEmail, text, [], {
     client: "imessage",
     workspace,
@@ -1825,11 +1836,12 @@ export async function startAgentFromTeamsMention(message) {
     throw err;
   }
   const workspace = originIsJypeThread(origin) ? "jype" : "";
+  const forceGrok = messageForcesGrok(raw);
   const startEmail =
     workspace === "jype"
       ? jypeEmailForSlug(guest?.slug) || YAN_EMAIL
       : YAN_EMAIL;
-  const createOpts = mentionAgentCreateOpts(guest, workspace, "teams");
+  const createOpts = mentionAgentCreateOpts(guest, workspace, "teams", forceGrok);
   const started = await startAgent(startEmail, {
     ...createOpts,
     workspace,
@@ -1844,6 +1856,7 @@ export async function startAgentFromTeamsMention(message) {
   session.teamsOrigin = origin;
   session.teamsDeliverFinal = true;
   session.guestCaller = guest;
+  session.forceGrok = forceGrok;
   return messageAgent(started.sessionId, startEmail, text, [], {
     client: "teams",
     workspace,
