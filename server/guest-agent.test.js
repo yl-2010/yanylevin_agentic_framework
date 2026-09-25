@@ -9,6 +9,8 @@ import {
   GUEST_COMPOSER_SPEC,
   GUEST_FRIEND_COMPOSER_SPEC,
   GUEST_GROK_SPEC,
+  AGENTG_DAILY_LIMIT,
+  formatAgentgDailyLimitMessage,
   jypeMentionModelSpec,
   HOURLY_LIMIT,
   contactHasHandle,
@@ -909,6 +911,125 @@ describe("evaluateGuestMention", () => {
       now: FIVE_PM,
       statePath,
     });
-    assert.equal(stranger.action, "ignore");
+    assert.equal(stranger.action, "start");
+    assert.equal(stranger.caller.model.id, "grok-4.7");
+    assert.equal(stranger.caller.forceGrok, true);
+  });
+
+  it("gives everyone else 5 @agentg turns a day and still applies the hourly cap", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "guest-agentg-day-"));
+    const statePath = join(dir, "limits.json");
+    assert.equal(AGENTG_DAILY_LIMIT, 5);
+    const sam = {
+      id: "people/sam-classmate",
+      kind: "person",
+      name: "Sam Classmate",
+      fields: {
+        aliases: ["Sam"],
+        emails: ["sam@school.example"],
+        phones: ["+15555550999"],
+      },
+    };
+    const people = [...PEOPLE, sam];
+    const base = {
+      platform: "imessage",
+      message: {
+        fromMe: false,
+        handle: "+15555550999",
+        chatId: "+15555550999",
+        chat: "Sam",
+        text: "@agentg hi",
+      },
+      contacts: [contact("Sam", "+15555550999")],
+      people,
+      now: FIVE_PM,
+      statePath,
+    };
+    for (let i = 0; i < AGENTG_DAILY_LIMIT; i += 1) {
+      const decision = await evaluateGuestMention(base);
+      assert.equal(decision.action, "start");
+      assert.equal(decision.caller.model.id, "grok-4.7");
+      assert.equal(decision.caller.forceGrok, true);
+    }
+    const blocked = await evaluateGuestMention(base);
+    assert.equal(blocked.action, "rate-limit");
+    assert.equal(blocked.text, formatAgentgDailyLimitMessage());
+
+    const plain = await evaluateGuestMention({
+      ...base,
+      message: { ...base.message, text: "@agent hi" },
+    });
+    assert.equal(plain.action, "start");
+    assert.equal(plain.caller.model.id, "composer-2.5");
+
+    const teams = await evaluateGuestMention({
+      platform: "teams",
+      message: {
+        fromMe: false,
+        from: "Sam Classmate",
+        fromEmail: "sam@school.example",
+        chatType: "oneOnOne",
+        text: "@agentg hi",
+      },
+      people,
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(teams.action, "rate-limit");
+    assert.equal(teams.text, formatAgentgDailyLimitMessage());
+
+    const run = guestRunModels({
+      slug: "",
+      displayName: "Sam",
+      model: GUEST_GROK_SPEC,
+      forceGrok: true,
+    });
+    assert.equal(run.fallback.id, "composer-2.5");
+  });
+
+  it("blocks a non-JYPE @agentg on the hourly cap without using a daily credit", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "guest-agentg-hour-"));
+    const statePath = join(dir, "limits.json");
+    for (let i = 0; i < HOURLY_LIMIT; i += 1) {
+      await takeGuestSlot({
+        platform: "imessage",
+        personKey: "phone:5555550999",
+        slug: "",
+        now: FIVE_PM,
+        statePath,
+      });
+    }
+    const blocked = await evaluateGuestMention({
+      platform: "imessage",
+      message: {
+        fromMe: false,
+        handle: "+15555550999",
+        chatId: "+15555550999",
+        chat: "Sam",
+        text: "@agentg hi",
+      },
+      contacts: [contact("Sam", "+15555550999")],
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(blocked.action, "rate-limit");
+    assert.match(blocked.text, /hourly rate limit/);
+    const nextHour = await evaluateGuestMention({
+      platform: "imessage",
+      message: {
+        fromMe: false,
+        handle: "+15555550999",
+        chatId: "+15555550999",
+        chat: "Sam",
+        text: "@agentg hi",
+      },
+      contacts: [contact("Sam", "+15555550999")],
+      people: PEOPLE,
+      now: SIX_PM,
+      statePath,
+    });
+    assert.equal(nextHour.action, "start");
+    assert.equal(nextHour.caller.model.id, "grok-4.7");
   });
 });

@@ -30,6 +30,8 @@ export const GUEST_LIMITS_PATH = "/tmp/yanylevin-guest-agent-limits.json";
 export const GUEST_TZ = "America/Los_Angeles";
 export const HOURLY_LIMIT = 10;
 export const FRIEND_HOURLY_LIMIT = 20;
+/** @agentg turns per Pacific day for anyone who is not a JYPE member. */
+export const AGENTG_DAILY_LIMIT = 5;
 export const CONTACTS_TTL_MS = 60_000;
 export const PEOPLE_TTL_MS = 60_000;
 
@@ -193,6 +195,10 @@ export function formatRateLimitMessage(retryAt) {
   return `Your hourly rate limit has been reached. Try again at ${retryAt}.`;
 }
 
+export function formatAgentgDailyLimitMessage() {
+  return "Your daily @agentg limit has been reached. Try again tomorrow.";
+}
+
 /**
  * @param {{ name: string, platform: string, text: string }} opts
  */
@@ -329,8 +335,8 @@ export function displayGivenName({ person, contact, fromName }) {
  */
 export function parseLimitState(raw) {
   const src = raw && typeof raw === "object" ? raw : {};
-  /** @type {Record<string, Record<string, { hourKey: string, hourCount: number, dayKey: string, grokCount: number }>>} */
-  const out = { imessage: {}, teams: {} };
+  /** @type {Record<string, Record<string, { hourKey: string, hourCount: number, dayKey: string, grokCount: number }>> & { agentg?: Record<string, { dayKey: string, count: number }> }} */
+  const out = { imessage: {}, teams: {}, agentg: {} };
   for (const platform of PLATFORMS) {
     const bag = src[platform] && typeof src[platform] === "object" ? src[platform] : {};
     /** @type {Record<string, { hourKey: string, hourCount: number, dayKey: string, grokCount: number }>} */
@@ -348,6 +354,19 @@ export function parseLimitState(raw) {
     }
     out[platform] = next;
   }
+  const agentgBag = src.agentg && typeof src.agentg === "object" ? src.agentg : {};
+  /** @type {Record<string, { dayKey: string, count: number }>} */
+  const agentg = {};
+  for (const [key, row] of Object.entries(agentgBag)) {
+    const id = String(key || "").trim();
+    if (!id) continue;
+    const rec = row && typeof row === "object" ? row : {};
+    agentg[id] = {
+      dayKey: String(rec.dayKey || ""),
+      count: Math.max(0, Number(rec.count) || 0),
+    };
+  }
+  out.agentg = agentg;
   return out;
 }
 
@@ -374,6 +393,7 @@ export async function saveLimitState(state, path = GUEST_LIMITS_PATH) {
  *   slug?: string,
  *   now?: Date,
  *   statePath?: string,
+ *   agentg?: boolean,
  * }} opts
  */
 export async function takeGuestSlot(opts) {
@@ -382,8 +402,9 @@ export async function takeGuestSlot(opts) {
   const slug = String(opts.slug || "").trim();
   const now = opts.now || new Date();
   const path = opts.statePath || GUEST_LIMITS_PATH;
+  const countAgentg = opts.agentg === true;
   if (!personKey) {
-    return { overHourly: true, useGrok: false };
+    return { overHourly: true, overDaily: false, useGrok: false };
   }
   const state = await loadLimitState(path);
   const hour = hourKey(now);
@@ -408,8 +429,33 @@ export async function takeGuestSlot(opts) {
   if (row.hourCount >= hourCap) {
     bag[personKey] = row;
     await saveLimitState(state, path);
-    return { overHourly: true, useGrok: false, hourCount: row.hourCount };
+    return {
+      overHourly: true,
+      overDaily: false,
+      useGrok: false,
+      hourCount: row.hourCount,
+    };
   }
+
+  const agentgBag = state.agentg;
+  const agentgRow = agentgBag[personKey] || { dayKey: "", count: 0 };
+  if (agentgRow.dayKey !== day) {
+    agentgRow.dayKey = day;
+    agentgRow.count = 0;
+  }
+  if (countAgentg && agentgRow.count >= AGENTG_DAILY_LIMIT) {
+    agentgBag[personKey] = agentgRow;
+    bag[personKey] = row;
+    await saveLimitState(state, path);
+    return {
+      overHourly: false,
+      overDaily: true,
+      useGrok: false,
+      hourCount: row.hourCount,
+      agentgCount: agentgRow.count,
+    };
+  }
+
   row.hourCount += 1;
   const grokCap = Number(GROK_HOURLY[slug]) || 0;
   let useGrok = false;
@@ -417,13 +463,19 @@ export async function takeGuestSlot(opts) {
     row.grokCount += 1;
     useGrok = true;
   }
+  if (countAgentg) {
+    agentgRow.count += 1;
+    agentgBag[personKey] = agentgRow;
+  }
   bag[personKey] = row;
   await saveLimitState(state, path);
   return {
     overHourly: false,
-    useGrok,
+    overDaily: false,
+    useGrok: countAgentg ? true : useGrok,
     hourCount: row.hourCount,
     grokCount: row.grokCount,
+    agentgCount: countAgentg ? agentgRow.count : undefined,
   };
 }
 
@@ -576,9 +628,10 @@ function isJypeGuestCaller(slug, email, name) {
 export function guestRunModels(caller) {
   const friend = isFriendGuest(caller?.slug, caller?.displayName);
   const preferred = caller?.model ? copyModelSpec(caller.model) : null;
+  const composerFallback = friend || caller?.forceGrok;
   return {
     preferred,
-    fallback: friend ? copyModelSpec(GUEST_FRIEND_COMPOSER_SPEC) : null,
+    fallback: composerFallback ? copyModelSpec(GUEST_COMPOSER_SPEC) : null,
   };
 }
 
@@ -661,7 +714,6 @@ export async function evaluateGuestMention(opts) {
 
   const forceGrok = messageForcesGrok(message.text);
   const jypeCaller = isJypeGuestCaller(slug, email, fromName);
-  if (forceGrok && !jypeCaller) return { action: "ignore" };
 
   if (messageIsJypeThread(message)) {
     if (!jypeCaller) return { action: "ignore" };
@@ -684,7 +736,46 @@ export async function evaluateGuestMention(opts) {
     };
   }
 
+  if (forceGrok && jypeCaller) {
+    return {
+      action: "start",
+      platform,
+      caller: {
+        displayName,
+        slug,
+        platform,
+        handle,
+        inContacts,
+        audience: describeGuestAudience(platform, message),
+        model: copyModelSpec(GUEST_GROK_SPEC),
+        forceGrok: true,
+      },
+    };
+  }
+
   if (forceGrok) {
+    const slot = await takeGuestSlot({
+      platform,
+      personKey,
+      slug,
+      now,
+      statePath: opts.statePath,
+      agentg: true,
+    });
+    if (slot.overHourly) {
+      return {
+        action: "rate-limit",
+        platform,
+        text: formatRateLimitMessage(formatRetryAt(now)),
+      };
+    }
+    if (slot.overDaily) {
+      return {
+        action: "rate-limit",
+        platform,
+        text: formatAgentgDailyLimitMessage(),
+      };
+    }
     return {
       action: "start",
       platform,
