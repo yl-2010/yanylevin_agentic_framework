@@ -1376,6 +1376,100 @@ export async function fetchSchoolTeams(opts = {}) {
 }
 
 /**
+ * Recent messages in one chat or channel, for the realtime calendar agent.
+ * @param {string} chatId
+ * @param {{ limit?: number, session?: object, resolveSession?: typeof resolveSession, listChatMessages?: typeof listChatMessages, allowStale?: boolean }} [opts]
+ */
+export async function fetchChatWindow(chatId, opts = {}) {
+  const id = String(chatId || "").trim();
+  if (!id) return [];
+  const resolve = opts.resolveSession || resolveSession;
+  const session =
+    opts.session ||
+    (await resolve({
+      ...opts,
+      allowStale: opts.allowStale !== false,
+    }));
+  const list = opts.listChatMessages || listChatMessages;
+  return list(session, id, { limit: opts.limit || 40 });
+}
+
+/**
+ * Channel posts updated since `since`. Chats stay on the mention poller.
+ * @param {{ since?: string, max?: number, session?: object, resolveSession?: typeof resolveSession, listJoinedTeams?: typeof listJoinedTeams, listChatMessages?: typeof listChatMessages, allowStale?: boolean }} [opts]
+ */
+export async function fetchRecentChannelMessages(opts = {}) {
+  const resolve = opts.resolveSession || resolveSession;
+  const session =
+    opts.session ||
+    (await resolve({
+      ...opts,
+      allowStale: opts.allowStale !== false,
+    }));
+  const since = isoOrEmpty(opts.since);
+  const max = Number(opts.max) || 40;
+  const listTeams = opts.listJoinedTeams || listJoinedTeams;
+  let teams = [];
+  try {
+    teams = await listTeams(session, { limit: 30 });
+  } catch (err) {
+    if (isTeamsAuthError(err)) throw err;
+    teams = [];
+  }
+  const snapTeams = (session._csa && session._csa.teams) || teams;
+  /** @type {object[]} */
+  const messages = [];
+  const listMessages = opts.listChatMessages || listChatMessages;
+  const self = { objectId: session.objectId, email: session.email || SCHOOL_EMAIL };
+  for (const team of snapTeams.slice(0, 8)) {
+    if (messages.length >= max) break;
+    const teamName = team.displayName || team.name;
+    const channels = Array.isArray(team.channels)
+      ? team.channels.map((c) => (c.id && c.name ? c : normalizeChannel(c)))
+      : [];
+    for (const channel of channels.slice(0, 4)) {
+      if (messages.length >= max) break;
+      const last = channel.lastMessage || {};
+      const lastAt = isoOrEmpty(
+        last.originalArrivalTime ||
+          last.originalarrivaltime ||
+          last.composeTime ||
+          last.composetime
+      );
+      if (since && lastAt && lastAt < since) continue;
+      let rows = [];
+      try {
+        rows = await listMessages(session, channel.id, { limit: 12 });
+      } catch {
+        if (last && (last.content || last.id)) {
+          rows = [
+            normalizeMessage(last, {
+              kind: "channel",
+              textMax: DUMP_BODY_MAX,
+              self,
+            }),
+          ];
+        }
+      }
+      for (const row of rows) {
+        if (since && row.at && row.at < since) continue;
+        messages.push({
+          ...row,
+          team: teamName,
+          channel: channel.displayName || channel.name,
+          chatId: row.chatId || channel.id,
+          kind: "channel",
+        });
+        if (messages.length >= max) break;
+      }
+      await sleep(40);
+    }
+  }
+  messages.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  return messages;
+}
+
+/**
  * Full-history dump for the Composer fill. Monthly files under /tmp.
  * @param {{ since?: string, outDir?: string, root?: string, headed?: boolean, force?: boolean, session?: object }} [opts]
  */

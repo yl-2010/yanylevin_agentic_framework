@@ -77,6 +77,11 @@ import { startLocalIpc } from "./local-ipc.js";
 import { startIMessageAgentMentionScheduler } from "./imessage-agent-mentions.js";
 import { startTeamsAgentMentionScheduler } from "./teams-agent-mentions.js";
 import { startAppleMailFileScheduler } from "./apple-mail-file.js";
+import { startCalendarReconcileScheduler } from "./calendar-memory.js";
+import {
+  startSchoolMailCalendarScheduler,
+  startTeamsChannelCalendarScheduler,
+} from "./calendar-on-demand.js";
 import {
   startFitnessAgent,
   messageFitnessAgent,
@@ -1330,6 +1335,9 @@ app.use((_req, res) => {
   startIMessageAgentMentionScheduler();
   startTeamsAgentMentionScheduler();
   startAppleMailFileScheduler();
+  startCalendarReconcileScheduler();
+  startSchoolMailCalendarScheduler();
+  startTeamsChannelCalendarScheduler();
   startHeadlinesWipeScheduler();
 });
 

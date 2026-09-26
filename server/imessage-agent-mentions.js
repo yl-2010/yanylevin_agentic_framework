@@ -110,6 +110,13 @@ export async function pollIMessageAgentMentions(deps = {}) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 
+  /** @type {Promise<unknown>} */
+  const calendarTask = deps.liveCalendar
+    ? import("./calendar-on-demand.js")
+        .then((mod) => mod.observeCalendarMessages("imessage", rows))
+        .catch((err) => console.error("[imessage-agent] calendar", err))
+    : Promise.resolve();
+
   const seen = new Set(state.seenIds);
   /** @type {object[]} */
   const hits = [];
@@ -210,6 +217,7 @@ export async function pollIMessageAgentMentions(deps = {}) {
     { lastAt: newest, seenIds: nextSeen.slice(-SEEN_MAX) },
     path
   );
+  await calendarTask;
   return { ok: true, started, scanned: Array.isArray(rows) ? rows.length : 0 };
 }
 
@@ -218,14 +226,14 @@ export function startIMessageAgentMentionScheduler() {
   timer = setInterval(() => {
     if (ticking) return;
     ticking = true;
-    pollIMessageAgentMentions()
+    pollIMessageAgentMentions({ liveCalendar: true })
       .catch((err) => console.error("[imessage-agent] poll", err))
       .finally(() => {
         ticking = false;
       });
   }, POLL_MS);
   timer.unref?.();
-  pollIMessageAgentMentions().catch((err) =>
+  pollIMessageAgentMentions({ liveCalendar: true }).catch((err) =>
     console.error("[imessage-agent] first poll", err)
   );
 }

@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { FILE_LIST_MAX, listRecentAppleMail } from "./apple-mail.js";
+import { CALENDAR_SIGNAL_QUESTION, considerCalendarMessage } from "./calendar-on-demand.js";
 import { choice, systemOne, typesafeConfig } from "./typesafe.js";
 
 const execFileAsync = promisify(execFile);
@@ -163,9 +164,13 @@ export async function classifyMailRow(row, deps = {}) {
     try {
       const result = await run({
         state: buildFileState({ ...row, body }),
-        questions: { bucket: FILE_QUESTION },
+        questions: { bucket: FILE_QUESTION, calendar: CALENDAR_SIGNAL_QUESTION },
       });
-      return result?.answers?.bucket;
+      const bucket = result?.answers?.bucket;
+      if (bucket && typeof bucket === "object") {
+        return { ...bucket, calendar: result?.answers?.calendar };
+      }
+      return bucket;
     } catch (err) {
       if (!isMaxTokensExceeded(err)) throw err;
       if (!body) throw err;
@@ -217,6 +222,13 @@ export async function fileMailRows(rows, deps = {}) {
       errors += 1;
       console.error("[apple-mail-file] jev", err);
       continue;
+    }
+    if (deps.onClassified) {
+      try {
+        await deps.onClassified(row, answer);
+      } catch (err) {
+        console.error("[apple-mail-file] calendar", err);
+      }
     }
     const action = decideFileAction(answer);
     if (action === "skip") {
@@ -355,6 +367,14 @@ export async function pollAppleMailFile(deps = {}) {
     ...deps,
     seenIds: state.seenIds,
     skipSeen: true,
+    onClassified:
+      deps.onClassified ||
+      (async (row, answer) => {
+        if (!answer || answer.calendar == null) return;
+        await considerCalendarMessage("apple-mail", row, {
+          calendarAnswer: answer.calendar,
+        });
+      }),
   });
   let newest = state.lastAt;
   for (const row of batch) {

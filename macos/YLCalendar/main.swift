@@ -185,6 +185,17 @@ func cmdUpdate(_ args: [String]) {
     }
 }
 
+func cmdGet(_ args: [String]) {
+    guard let id = argValue(args, "--id"), !id.isEmpty else {
+        fail("get requires --id")
+    }
+    if let ev = store.event(withIdentifier: id) {
+        print(jsonString(["ok": true, "found": true, "event": eventJSON(ev)]))
+    } else {
+        print(jsonString(["ok": true, "found": false]))
+    }
+}
+
 func cmdDelete(_ args: [String]) {
     guard let id = argValue(args, "--id"), let ev = store.event(withIdentifier: id) else {
         fail("delete requires a valid --id")
@@ -202,7 +213,7 @@ let cmd = args.first ?? "help"
 if cmd == "help" || cmd == "--help" {
     print(jsonString([
         "ok": true,
-        "usage": "yl-calendar list | events --from ISO --to ISO | create --title T --start ISO [--end ISO] [--calendar NAME] [--location S] [--url URL] [--notes S] | update --id ID | delete --id ID",
+        "usage": "yl-calendar list | events --from ISO --to ISO | get --id ID | create --title T --start ISO [--end ISO] [--calendar NAME] [--location S] [--url URL] [--notes S] | update --id ID | delete --id ID",
     ]))
     exit(0)
 }
@@ -211,6 +222,7 @@ requestAccess()
 switch cmd {
 case "list": cmdList()
 case "events": cmdEvents(args)
+case "get": cmdGet(args)
 case "create": cmdCreate(args)
 case "update": cmdUpdate(args)
 case "delete": cmdDelete(args)

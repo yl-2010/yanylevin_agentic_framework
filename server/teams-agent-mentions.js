@@ -108,6 +108,13 @@ export async function pollTeamsAgentMentions(deps = {}) {
     return { ok: false, error: msg };
   }
 
+  /** @type {Promise<unknown>} */
+  const calendarTask = deps.liveCalendar
+    ? import("./calendar-on-demand.js")
+        .then((mod) => mod.observeCalendarMessages("teams", rows))
+        .catch((err) => console.error("[teams-agent] calendar", err))
+    : Promise.resolve();
+
   const seen = new Set(state.seenIds);
   /** @type {object[]} */
   const hits = [];
@@ -193,6 +200,7 @@ export async function pollTeamsAgentMentions(deps = {}) {
     { lastAt: newest, seenIds: nextSeen.slice(-SEEN_MAX) },
     path
   );
+  await calendarTask;
   return { ok: true, started, scanned: Array.isArray(rows) ? rows.length : 0 };
 }
 
@@ -201,14 +209,14 @@ export function startTeamsAgentMentionScheduler() {
   timer = setInterval(() => {
     if (ticking) return;
     ticking = true;
-    pollTeamsAgentMentions()
+    pollTeamsAgentMentions({ liveCalendar: true })
       .catch((err) => console.error("[teams-agent] poll", err))
       .finally(() => {
         ticking = false;
       });
   }, POLL_MS);
   timer.unref?.();
-  pollTeamsAgentMentions().catch((err) =>
+  pollTeamsAgentMentions({ liveCalendar: true }).catch((err) =>
     console.error("[teams-agent] first poll", err)
   );
 }

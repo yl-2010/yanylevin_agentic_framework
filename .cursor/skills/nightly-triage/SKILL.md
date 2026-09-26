@@ -127,8 +127,10 @@ event: title, local date, start to end (or all-day), calendar hint, evidence,
 and the meeting URL when mail or chat has one. PathIvy webinars: the Zoom
 registration href from Mail.app `source` for that date's row, not the words
 "Registration Link". "None" if none. Homework, Canvas, and bells do not belong.
-If it looks like a `deleted.md` calendar row, omit it (judgement, not exact
-clocks). Do not list it as new.
+If it matches a deleted calendar fingerprint (similar title and the same start,
+end, location, and link), omit it. A new time, place, or link is a new plan.
+A realtime calendar agent may already have filed today's messages. If that
+event is already on the day, do not list it as new.
 A named day is enough even when the venue is TBD. Yan `fromMe` "Saturday 4:30
 location tbd" belongs here. Put the missing venue on the line. Do not move it
 to Gaps.

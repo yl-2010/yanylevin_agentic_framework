@@ -368,7 +368,7 @@ export function buildTriagePrompt({ dateKey, timezone, existingIndex }) {
     "Calendar plans are biased to include. List any plan with a named day, including tentative, maybe, and TBD venue. Homework, Canvas, and bells stay out.",
     "Big dates are biased to omit. Only first/last day, orientation, advisor/parent conferences, out-of-school travel, college visits, and graduation-scale milestones. Picture day, picnic, hangouts, dentist, spirit week, and club meetings are Calendar plans, not Big dates.",
     "If a Big date already exists (same parent + date + similar name, including advisor/advisory and stripped year suffixes), write `update <path>` in Big dates. Do not invent a new name.",
-    "If a proposed big date, calendar event, or todo looks like a manually deleted.md row (in the existing-dates index when present), skip it. Judgement, not exact date/time. Do not write update <gone-path>. Next year's occurrence is allowed.",
+    "If a proposed big date or todo looks like a manually deleted.md row (in the existing-dates index when present), skip it. Judgement, not exact date/time. Do not write update <gone-path>. Next year's occurrence is allowed. For Apple Calendar, skip only an identical tombstone (similar title and the same start, end, location, and link, in deleted-events.jsonl). A new time, place, or link is a new event. A realtime calendar agent may already have filed today's messages. If that event is already on the day, leave it.",
     index,
   ]
     .filter(Boolean)
@@ -444,7 +444,7 @@ export function buildActionsPrompt({ dateKey, timezone, existingIndex }) {
     "Do not edit the brain. Do not write life-state samples; that 5-minute log is a source, not a write target. Report every action taken and every skip with its reason.",
     "OneNote is not a default source. Open school-onenote.js only when a directive or action already names a specific notebook, section, or page you must read.",
     "Same parent + date + similar name (advisor/advisory, stripped years) means UPDATE the existing folder. Never a new slug. Descriptions are markdown.",
-    "If a proposed big date, calendar event, or todo looks like a manually deleted.md row (in the existing-dates index when present), skip it. Judgement, not exact date/time. Do not write update <gone-path>. Next year's occurrence is allowed.",
+    "If a proposed big date or todo looks like a manually deleted.md row (in the existing-dates index when present), skip it. Judgement, not exact date/time. Do not write update <gone-path>. Next year's occurrence is allowed. For Apple Calendar, skip only an identical tombstone (similar title and the same start, end, location, and link, in deleted-events.jsonl). A new time, place, or link is a new event. A realtime calendar agent may already have filed today's messages. If that event is already on the day, leave it.",
     index,
   ]
     .filter(Boolean)

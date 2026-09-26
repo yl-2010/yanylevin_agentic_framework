@@ -74,8 +74,8 @@ Skip only:
 
 - Homework due dates, Canvas assignments, the EPS bell schedule
 - "we should hang out" with no day named
-- A similar title already on that local day (duplicate check below)
-- A `deleted.md` calendar row (judgement, not exact clocks)
+- A similar title already on that local day (duplicate check below). A realtime calendar agent may already have filed it. Leave it.
+- An identical deleted calendar event (similar title and the same start, end, location, and link). A new time, place, or link is a new event.
 - EPS Ventures outings unless Yan has a signup confirmation (form receipt or he said he signed up). Student News / Weekly News announcements are not enough
 
 Do not invent a clock. Use the time they named, or all-day.
@@ -84,9 +84,11 @@ Before `create`, list overlapping events with `node server/calendar-cli.js`
 (personal-calendar skill) and skip if a **similar title** already sits on
 that local day. Similar means the same event, not byte-identical strings:
 lowercase, strip year tokens (`2026`, `2026-27`), treat advisor/advisory as
-one word, singular/plural on the last word. Also skip if the event looks
-like a `deleted.md` calendar row (judgement, not exact clocks). Convert
-local times in the digest timezone to UTC for `--start` and `--end`. Pick
+one word, singular/plural on the last word. Also skip an identical tombstone
+in `calendar/deleted-events.jsonl` or a `deleted.md` calendar row with the
+same start, end, location, and link. A new time, place, or link is a new
+event. The CLI refuses an identical create. If it is already on that day
+from the realtime agent, leave it. Convert local times in the digest timezone to UTC for `--start` and `--end`. Pick
 the calendar from the personal-calendar skill. Do not ask; if the calendar
 is not obvious, use the personal / default iCloud calendar.
 

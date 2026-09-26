@@ -8,6 +8,12 @@ import { access, copyFile, mkdir, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import {
+  findCreateBlock,
+  loadCalendarTombstones,
+  recordAgentEvent,
+  tombstoneAgentEvent,
+} from "./calendar-memory.js";
 
 const execFileAsync = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -230,16 +236,86 @@ export async function formatCalendarLiveLines(opts = {}) {
   }
 }
 
+function flagValue(args, name) {
+  const i = args.indexOf(name);
+  if (i < 0 || i + 1 >= args.length) return "";
+  const value = args[i + 1];
+  if (value.startsWith("--")) return "";
+  return value;
+}
+
+function candidateFromArgs(args) {
+  const start = flagValue(args, "--start");
+  let end = flagValue(args, "--end");
+  const allDay = args.includes("--all-day");
+  if (!end && start && !allDay) {
+    const parsed = new Date(start);
+    if (!Number.isNaN(parsed.getTime())) {
+      end = new Date(parsed.getTime() + 3600_000).toISOString();
+    }
+  }
+  return {
+    title: flagValue(args, "--title"),
+    start,
+    end,
+    allDay,
+    location: flagValue(args, "--location"),
+    url: flagValue(args, "--url"),
+    calendar: flagValue(args, "--calendar"),
+  };
+}
+
+async function listNearbyEvents(candidate) {
+  const start = new Date(candidate.start);
+  if (Number.isNaN(start.getTime())) return [];
+  const from = new Date(start.getTime() - 36 * 3600_000).toISOString();
+  const to = new Date(start.getTime() + 36 * 3600_000).toISOString();
+  const result = await runCalendar(["events", "--from", from, "--to", to]);
+  return Array.isArray(result?.events) ? result.events : [];
+}
+
 const isCli =
   process.argv[1] &&
   fileURLToPath(import.meta.url) === process.argv[1];
 if (isCli) {
-  runCalendar(process.argv.slice(2))
-    .then((r) => {
-      console.log(JSON.stringify(r, null, 2));
-    })
-    .catch((err) => {
-      console.error(err);
-      process.exit(1);
-    });
+  const args = process.argv.slice(2);
+  const cmd = args[0] || "";
+  const force = args.includes("--force");
+  const swiftArgs = args.filter((arg) => arg !== "--force");
+  const finish = async () => {
+    if (cmd === "create" && !force) {
+      const candidate = candidateFromArgs(args);
+      const tombstones = await loadCalendarTombstones();
+      const liveEvents = await listNearbyEvents(candidate);
+      const block = findCreateBlock({ candidate, tombstones, liveEvents, force: false });
+      if (block) {
+        console.log(JSON.stringify({ ok: false, ...block }, null, 2));
+        return;
+      }
+    }
+    let prior = null;
+    if (cmd === "delete") {
+      const id = flagValue(swiftArgs, "--id");
+      if (id) {
+        try {
+          const got = await runCalendar(["get", "--id", id]);
+          if (got?.found && got.event) prior = got.event;
+        } catch (err) {
+          console.error("[calendar-cli] get before delete", err);
+        }
+      }
+    }
+    const result = await runCalendar(swiftArgs);
+    console.log(JSON.stringify(result, null, 2));
+    if ((cmd === "create" || cmd === "update") && result?.ok && result.event) {
+      await recordAgentEvent(result.event);
+    }
+    if (cmd === "delete" && result?.ok && prior) {
+      await tombstoneAgentEvent(prior, "cli-delete");
+    }
+  };
+  finish().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
 }

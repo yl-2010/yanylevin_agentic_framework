@@ -236,6 +236,8 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /Descriptions are markdown/);
     assert.match(prompt, /manually deleted\.md row/);
     assert.match(prompt, /Judgement, not exact date\/time/);
+    assert.match(prompt, /identical tombstone/);
+    assert.match(prompt, /realtime calendar agent/);
   });
 
   it("lint verifies cursors and the graph check", () => {

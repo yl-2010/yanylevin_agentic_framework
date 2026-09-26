@@ -26,11 +26,11 @@ node server/calendar-cli.js update --id "<eventIdentifier>" --title "Dentist (mo
 node server/calendar-cli.js delete --id "<eventIdentifier>"
 ```
 
-Before `delete`, append a row to `education/you@example.com/deleted.md` (create the file from the education-dashboard header if it is missing):
+`delete` records the event itself. It appends `education/you@example.com/calendar/deleted-events.jsonl` and a row in `education/you@example.com/deleted.md`:
 
 `- deleted YYYY-MM-DD HH:MM | calendar | Title | on YYYY-MM-DD HH:MM | Calendar Name | was <eventIdentifier>`
 
-Use the event's local start as `on`. Nightly actions must skip recreating an event that looks like a deleted row (judgement, not exact clocks). If Yan asks to add it back, create it and remove the matching row.
+Use the event's local start as `on`. Do not append that row again yourself. A later create of the same title, start, end, location, and link is refused. A new time, place, or link is allowed. If Yan explicitly asks for that exact event back, create it with `--force` and remove the matching `deleted.md` row plus the jsonl line.
 
 First Studio run should prompt for Calendar access (`yl-calendar.app`). If JSON `ok` is false and the error mentions denied access, use Calendar.app osascript for that write (location, url, description), then tell Yan to grant Calendar to **yl-calendar** (System Settings > Privacy & Security > Calendars) so the CLI works next time. Cursor Full Disk Access does not cover Calendar.
 
@@ -71,6 +71,6 @@ If `yl-calendar` returns Calendar access denied, Calendar.app osascript still wo
 
 Do not duplicate the EPS bell schedule (`schedule.json`) as Calendar events unless asked.
 
-Before creating, list overlapping events that day. Skip if a **similar title** already sits on that local day, not only a byte-identical string. Similar means the same event: lowercase, strip year tokens (`2026`, `2026-27`), treat advisor/advisory as one word, singular/plural on the last word. Also skip if it looks like a `deleted.md` calendar row. Nightly actions uses this same rule. Skip EPS Ventures unless there is a signup confirmation (form receipt or Yan said he signed up). A Student News or Weekly News announcement is not enough.
+Before creating, list overlapping events that day. The CLI also refuses the create when a similar title is already at that start, or when `calendar/deleted-events.jsonl` (and older `deleted.md` calendar rows) describe the same title, start, end, location, and link. Similar means the same event: lowercase, strip year tokens (`2026`, `2026-27`), treat advisor/advisory as one word, singular/plural on the last word. If the JSON says `skipped: deleted-identical` or `skipped: already-on-calendar`, stop. Do not retry with `--force` unless Yan explicitly asked for that exact event back. A different time, place, or link is a new event: update the live one if it is still there, or create it if the old one was only a tombstone. Nightly actions uses this same rule, and leaves an event the realtime agent already filed. Skip EPS Ventures unless there is a signup confirmation (form receipt or Yan said he signed up). A Student News or Weekly News announcement is not enough.
 
 Express live context already lists today + tomorrow. Open this skill when you need other days, or to create/change events.
