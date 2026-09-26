@@ -232,6 +232,45 @@
   let tree = null;
   /** @type {string} */
   let userEmail = "";
+
+  const PRASHAM_EMAILS = new Set([
+    "you@example.com",
+    "you@icloud.com",
+    "you@example.com",
+    "friend@school.example",
+  ]);
+
+  function isPrashamEmail(email) {
+    return PRASHAM_EMAILS.has(String(email || "").trim().toLowerCase());
+  }
+
+  /**
+   * Flat frost for Alex on /education, and for every account on /jype.
+   * Yan's /education and /debate stay on the normal liquid-glass path.
+   */
+  function applyGlassMode() {
+    const root = document.documentElement;
+    const onJype = CFG.workspace === "jype" || BASE === "/jype";
+    const onEducation = BASE === "/education";
+    if (onJype) {
+      if (root.dataset.lgCheap !== "1") {
+        root.dataset.lgCheap = "1";
+        window.reinitLiquidGlass?.();
+      }
+      return;
+    }
+    if (!onEducation || !userEmail) return;
+    const cheap = isPrashamEmail(userEmail);
+    const was = root.dataset.lgCheap === "1";
+    if (cheap) root.dataset.lgCheap = "1";
+    else delete root.dataset.lgCheap;
+    try {
+      sessionStorage.setItem("yl-edu-lg", cheap ? "cheap" : "full");
+    } catch (e) {
+      /* private mode */
+    }
+    if (was !== cheap) window.reinitLiquidGlass?.();
+  }
   /** Snapshot to skip no-op SSE/poll refreshes. */
   let treeFingerprint = "";
   /** Recent local checkoffs win over a slower Canvas overlay. */
@@ -3312,6 +3351,7 @@
     tree = data;
     treeFingerprint = nextFp;
     if (data.email) userEmail = String(data.email).trim().toLowerCase();
+    applyGlassMode();
     render();
   }
 
@@ -3671,6 +3711,7 @@
       userEmail = String(data.email || "")
         .trim()
         .toLowerCase();
+      applyGlassMode();
       const allowedEmails = (Array.isArray(CFG.allowedEmails) ? CFG.allowedEmails : [])
         .map((e) => String(e || "").trim().toLowerCase())
         .filter(Boolean);

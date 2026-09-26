@@ -7,8 +7,14 @@
  *   Other    → lucasromerodb turbulence displacement fallback (filter:url)
  *
  * Mobile (only):
- *   Plain frosted glass (CSS backdrop blur + tint) — same look as the main
- *   chatbot UI on mobile. No WebGL / SVG refraction. Desktop path untouched.
+ *   Plain frosted glass (CSS backdrop blur + tint). No WebGL / SVG refraction.
+ *   Desktop path untouched.
+ *
+ * Cheap frost (opt-in, html[data-lg-cheap="1"]):
+ *   No refraction, no specular maps, no pointer-follow glow. Flat frost on
+ *   cards. A short blur only on the corner orbs. Used for Alex on
+ *   /education and for every account on /jype. Absent flag keeps this file's
+ *   normal desktop path.
  */
 (() => {
   // Defaults from archisvaze/liquid-glass control panel (index.html sliders).
@@ -1457,12 +1463,109 @@ void main() {
     scheduleCapture(already ? 220 : 450);
   }
 
+  function cheapGlassOn() {
+    return document.documentElement.dataset.lgCheap === "1";
+  }
+
+  function ensureCheapFrostStyles() {
+    if (document.getElementById("lg-cheap-frost-styles")) return;
+    const style = document.createElement("style");
+    style.id = "lg-cheap-frost-styles";
+    style.textContent = `
+      html.lg-cheap body::after {
+        display: none !important;
+      }
+      html.lg-cheap body {
+        background-attachment: scroll !important;
+      }
+      html.lg-cheap .corner,
+      html.lg-cheap [data-liquid-glass] {
+        will-change: auto !important;
+      }
+      html.lg-cheap [data-liquid-glass] {
+        background-color: rgba(255, 255, 255, 0.78) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+      html.lg-cheap[data-resolved-theme="dark"] [data-liquid-glass] {
+        background-color: rgba(28, 34, 40, 0.92) !important;
+      }
+      html.lg-cheap .corner[data-liquid-glass],
+      html.lg-cheap .yan-chat-pill[data-liquid-glass] {
+        background-color: rgba(255, 255, 255, 0.42) !important;
+        backdrop-filter: blur(8px) saturate(1.2) !important;
+        -webkit-backdrop-filter: blur(8px) saturate(1.2) !important;
+      }
+      html.lg-cheap[data-resolved-theme="dark"] .corner[data-liquid-glass],
+      html.lg-cheap[data-resolved-theme="dark"] .yan-chat-pill[data-liquid-glass] {
+        background-color: rgba(20, 26, 32, 0.55) !important;
+      }
+      html.lg-cheap [data-liquid-glass]::before {
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28) !important;
+        background: none !important;
+      }
+      html.lg-cheap [data-liquid-glass]::after {
+        display: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+      html.lg-cheap .edu-panel,
+      html.lg-cheap .sheet,
+      html.lg-cheap .edu-file-tile,
+      html.lg-cheap .yan-chat-panel,
+      html.lg-cheap .yan-chat-bubble {
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12) !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  /** Opt-in. Skips SVG displacement, specular canvases, and the pointer glow. */
+  function initCheapFrosted(orbs) {
+    ensureCheapFrostStyles();
+    if (webgl.active) teardownWebGL();
+    if (chromeGlassObserver) {
+      chromeObserved.forEach((el) => chromeGlassObserver.unobserve(el));
+      chromeObserved.clear();
+    }
+    document.getElementById("lg-chrome-wash")?.remove();
+    const defs = document.getElementById("liquid-glass-defs");
+    if (defs) defs.replaceChildren();
+    chromeFilterCache.clear();
+    chromeSpecCache.clear();
+    document.documentElement.classList.add("lg-cheap");
+    document.documentElement.classList.remove(
+      "lg-chrome",
+      "lg-mobile-frost",
+      "lg-mobile-webgl",
+      "lg-webgl-ready",
+      "lg-capturing",
+      "lg-scrolling"
+    );
+
+    orbs.forEach((el) => {
+      el.style.removeProperty("--lg-filter");
+      el.style.removeProperty("--lg-spec");
+      el.style.removeProperty("--lg-spec-opacity");
+      el.classList.remove("lg-webgl", "lg-refraction", "lg-static", "lg-paused");
+      el.classList.add("lg-fallback");
+      const canvas = el.querySelector(":scope > canvas.lg-webgl-surface");
+      if (canvas) canvas.remove();
+    });
+  }
+
   function initAll() {
     const orbs = document.querySelectorAll("[data-liquid-glass]");
     if (!orbs.length) return;
 
     const dark = isDarkMode();
     document.documentElement.classList.toggle("lg-dark", dark);
+
+    if (cheapGlassOn()) {
+      initCheapFrosted(orbs);
+      return;
+    }
+    document.documentElement.classList.remove("lg-cheap");
 
     // Mobile → plain frosted glass (chatbot look). Desktop unchanged below.
     if (isMobileLiquidGlass()) {
@@ -1617,6 +1720,7 @@ void main() {
   }
 
   function trackPointer(e) {
+    if (cheapGlassOn()) return;
     lastPtr.x = e.clientX;
     lastPtr.y = e.clientY;
     lastPtr.has = true;
@@ -1641,6 +1745,7 @@ void main() {
   });
 
   function updateMagnetic(el, clientX, clientY) {
+    if (cheapGlassOn()) return;
     if (!el || !el._lgMagneticBound) return;
     if (el._drag) return;
     const chrome = document.documentElement.classList.contains("lg-chrome");
@@ -1782,6 +1887,7 @@ void main() {
   }
 
   function initMagneticCorners() {
+    if (cheapGlassOn()) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     document
       .querySelectorAll(".corner:not(.yan-chat-pill)")

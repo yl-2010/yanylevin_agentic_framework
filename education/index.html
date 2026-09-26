@@ -7,13 +7,42 @@
     <meta name="robots" content="noindex, nofollow" />
     <script>
       (function () {
+        var r = document.documentElement;
         try {
           var dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-          var r = document.documentElement;
           r.dataset.theme = "system";
           r.dataset.resolvedTheme = dark ? "dark" : "light";
           r.style.colorScheme = dark ? "dark" : "light";
+          if (sessionStorage.getItem("yl-edu-lg") === "cheap") r.dataset.lgCheap = "1";
         } catch (e) {}
+        var prasham = {
+          "you@example.com": 1,
+          "you@icloud.com": 1,
+          "you@example.com": 1,
+          "friend@school.example": 1,
+        };
+        fetch("/api/auth/session", {
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        })
+          .then(function (res) {
+            return res.json();
+          })
+          .then(function (data) {
+            if (!data || !data.authenticated) return;
+            var email = String(data.email || "").trim().toLowerCase();
+            var cheap = !!prasham[email];
+            try {
+              sessionStorage.setItem("yl-edu-lg", cheap ? "cheap" : "full");
+            } catch (err) {}
+            var was = r.dataset.lgCheap === "1";
+            if (cheap) r.dataset.lgCheap = "1";
+            else delete r.dataset.lgCheap;
+            if (was !== (r.dataset.lgCheap === "1") && window.reinitLiquidGlass) {
+              window.reinitLiquidGlass();
+            }
+          })
+          .catch(function () {});
       })();
     </script>
     <title>Education</title>
@@ -183,14 +212,14 @@
       <defs id="liquid-glass-defs"></defs>
     </svg>
 
-    <script src="/liquid-glass.js?v=chrome-perf13"></script>
+    <script src="/liquid-glass.js?v=frost-1"></script>
     <script src="/theme-orb.js?v=chrome-perf6"></script>
     <script src="/yl-home-link.js?v=3"></script>
     <script src="/js/mac-api.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" crossorigin="anonymous"></script>
     <script src="/education/markdown.js?v=katex-1"></script>
     <script src="/education/file-query.js?v=1"></script>
-    <script src="/education/app.js?v=file-drag-1"></script>
+    <script src="/education/app.js?v=frost-1"></script>
     <script src="/js/chat-send-flight.js?v=1"></script>
     <script src="/education/chatbot.js?v=attach-64mb-1"></script>
   </body>
