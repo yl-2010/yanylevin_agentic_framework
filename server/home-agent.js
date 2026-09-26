@@ -14,6 +14,7 @@ import {
   reloadCursorApiKeyFromEnv,
   requireCursorApiKey,
 } from "./cursor-sdk-auth.js";
+import { runHome } from "./home-cli.js";
 import { haversineMeters, KNOWN_PLACES } from "./life-state-snapshot.js";
 import { readPhoneLocation, YAN_EMAIL } from "./phone-location.js";
 
@@ -143,6 +144,8 @@ export function classifyVacuumLocation(location) {
 }
 
 /**
+ * HomeClaw often lists action_count 0 for Vacuum Yan. That scene still
+ * starts the Roomba. A trigger that returns without an error is a real start.
  * @param {{
  *   nowMs?: number,
  *   force?: boolean,
@@ -191,8 +194,9 @@ export function buildHomeAgentPrompt(opts) {
     "Start the vacuum only if he is unlikely to be home within 2 hours and the house will not be asleep during those 2 hours.",
     "Early morning, and an evening where people will be in bed within 2 hours, are no. A long absence does not override that.",
     "Read the vacuum file, Apple Calendar for the next several hours (node server/calendar-cli.js events), life-state now and recent samples (node server/life-state.js now, node server/life-state.js recent 6), and today's class schedule when it is a school day (education/you@example.com/schedule.json).",
-    `If yes: node server/home-cli.js trigger ${JSON.stringify(VACUUM_SCENE)}`,
-    "Only after that trigger succeeds: node server/home-agent.js record-start --reason \"<one line>\"",
+    `If yes: node server/home-agent.js trigger --reason "<one line>"`,
+    `That runs home-cli trigger ${JSON.stringify(VACUUM_SCENE)} and then record-start.`,
+    "HomeClaw listing action_count 0 is normal for this scene. The Roomba still starts. Record the start unless the trigger command itself fails.",
     "If the trigger fails, do not record a start.",
     "If no: node server/home-agent.js record-skip --reason \"<one line>\" --next-check <ISO time>",
     "A skip must not change lastStartedAt.",
@@ -475,6 +479,12 @@ if (isMain) {
   const cmd = process.argv[2];
   const force = process.argv.includes("--force");
   const run = async () => {
+    if (cmd === "trigger") {
+      await runHome(["trigger", VACUUM_SCENE]);
+      const state = await recordVacuumStart({ reason: argValue("--reason") });
+      console.log("[home-agent] recorded start", state.lastStartedAt);
+      return;
+    }
     if (cmd === "record-start") {
       const state = await recordVacuumStart({ reason: argValue("--reason") });
       console.log("[home-agent] recorded start", state.lastStartedAt);

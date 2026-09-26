@@ -106,6 +106,7 @@ describe("home agent prompt", () => {
     assert.equal(prompt.includes(VACUUM_SCENE), true);
     assert.equal(prompt.includes(VACUUM_SCENE_FORBIDDEN), true);
     assert.match(prompt, /within 2 hours/);
+    assert.match(prompt, /action_count 0 is normal/);
     assert.match(prompt, /record-start/);
     assert.match(prompt, /record-skip/);
   });

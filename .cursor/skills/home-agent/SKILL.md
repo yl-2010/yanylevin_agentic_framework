@@ -46,19 +46,13 @@ Parents live in the Kirkland house. Yan being out does not mean the house is emp
 
 ## If yes
 
-Trigger this scene and no other:
-
 ```bash
-node server/home-cli.js trigger "Vacuum Yan"
+node server/home-agent.js trigger --reason "<one line>"
 ```
 
-Never trigger `Vacuum Yan's Rooms`.
+That triggers `Vacuum Yan` and records the start. Never trigger `Vacuum Yan's Rooms`.
 
-Only after that command succeeds:
-
-```bash
-node server/home-agent.js record-start --reason "<one line>"
-```
+HomeClaw often lists `action_count` 0 for this scene. The Roomba still starts. Record the start unless the trigger command itself fails.
 
 If HomeClaw is down or the trigger fails, do not record a start. Say what failed.
 
