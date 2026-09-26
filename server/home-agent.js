@@ -1,5 +1,6 @@
 /**
- * Hourly home vacuum check. Cheap gates first. Composer 2.5 only when a
+ * Hourly home check. Turns off lights in Yan's Bedroom and Yan's Office
+ * when the phone pin is fresh and clearly away. Composer 2.5 only when a
  * vacuum might be due. Local Cursor SDK one-shot. Yan only.
  * Does not run on server boot. Does not git-commit.
  */
@@ -15,7 +16,8 @@ import {
   requireCursorApiKey,
 } from "./cursor-sdk-auth.js";
 import { runHome } from "./home-cli.js";
-import { haversineMeters, KNOWN_PLACES } from "./life-state-snapshot.js";
+import { readCurrentLifeState } from "./life-state.js";
+import { haversineMeters, homeBooleanKind, KNOWN_PLACES } from "./life-state-snapshot.js";
 import { readPhoneLocation, YAN_EMAIL } from "./phone-location.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -33,6 +35,13 @@ export const HOME_AGENT_INTERVAL_MS = 60 * 60 * 1000;
 export const VACUUM_DUE_MS = 72 * 60 * 60 * 1000;
 export const VACUUM_SCENE = "Vacuum Yan";
 export const VACUUM_SCENE_FORBIDDEN = "Vacuum Yan's Rooms";
+/** Silence longer than this means he may already be home. */
+export const LIGHTS_LOCATION_FRESH_MS = 20 * 60 * 1000;
+/** Fast drive used only to ask whether he could have reached the house. */
+const LIGHTS_FAST_MPS = 25;
+/** A recent life-state sample at the house blocks a lights-off. */
+export const LIGHTS_LIFE_STATE_FRESH_MS = 30 * 60 * 1000;
+const YAN_LIGHT_ROOMS = new Set(["yan's bedroom", "yan's office"]);
 const LOCK_STALE_MS = 15 * 60 * 1000;
 
 const HOME_PLACE = KNOWN_PLACES.find((p) => p.slug === "kirkland-home");
@@ -57,6 +66,13 @@ const laterAuthRetry = createLaterAuthRetry({
  */
 export function vacuumStatePath(root = REPO_ROOT) {
   return join(root, "education", YAN_EMAIL, "home", "vacuum.json");
+}
+
+/**
+ * @param {string} [root]
+ */
+export function lightsStatePath(root = REPO_ROOT) {
+  return join(root, "education", YAN_EMAIL, "home", "lights.json");
 }
 
 /**
@@ -171,6 +187,269 @@ export function homeVacuumGate(opts = {}) {
 }
 
 /**
+ * How long a clearly-away pin stays trustworthy. At least 20 minutes, longer
+ * when the dot is far enough that even a fast drive could not have reached
+ * the house yet.
+ * @param {number} meters
+ */
+export function lightsPinMaxAgeMs(meters) {
+  const m = Number(meters);
+  const driveMs = Number.isFinite(m) && m > 0 ? (m / LIGHTS_FAST_MPS) * 1000 : 0;
+  return Math.max(LIGHTS_LOCATION_FRESH_MS, driveMs);
+}
+
+/**
+ * Turn lights off only when the pin is fresh, has an accuracy, and the
+ * accuracy circle sits entirely outside the house. Anything else is home.
+ * A recent life-state sample at kirkland-home also blocks it.
+ * @param {{ latitude?: number, longitude?: number, accuracyMeters?: number, timestamp?: string, receivedAt?: string }|null|undefined} location
+ * @param {number} [nowMs]
+ * @param {{ place?: string, at?: string }|null} [lifeState]
+ */
+export function classifyLightsPresence(location, nowMs = Date.now(), lifeState = null) {
+  const where = classifyVacuumLocation(location);
+  if (where.kind === "missing") return { turnOff: false, reason: "no-pin" };
+  if (where.kind === "home") return { turnOff: false, reason: "at-home" };
+  if (where.kind === "unclear") return { turnOff: false, reason: "not-clearly-away" };
+  const accuracy = Number(location?.accuracyMeters);
+  if (!Number.isFinite(accuracy) || accuracy <= 0) {
+    return { turnOff: false, reason: "no-accuracy" };
+  }
+  const iso = location?.timestamp || location?.receivedAt || "";
+  const at = Date.parse(String(iso));
+  if (!Number.isFinite(at) || nowMs - at > lightsPinMaxAgeMs(where.meters)) {
+    return { turnOff: false, reason: "stale-pin" };
+  }
+  if (freshHomeLifeState(lifeState, nowMs)) {
+    return { turnOff: false, reason: "life-state-home" };
+  }
+  return { turnOff: true, reason: "away", meters: where.meters };
+}
+
+/**
+ * @param {{ place?: string, at?: string }|null|undefined} life
+ * @param {number} nowMs
+ */
+function freshHomeLifeState(life, nowMs) {
+  if (!life || typeof life !== "object") return false;
+  if (String(life.place || "").toLowerCase() !== "kirkland-home") return false;
+  const at = Date.parse(String(life.at || ""));
+  if (!Number.isFinite(at)) return true;
+  return nowMs - at <= LIGHTS_LIFE_STATE_FRESH_MS;
+}
+
+/**
+ * @param {unknown} room
+ */
+export function normalizeHomeRoomName(room) {
+  const raw =
+    room && typeof room === "object"
+      ? room.name || room.display_name || ""
+      : room;
+  return String(raw || "")
+    .replace(/[\u2018\u2019\u02BC]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function accessoryLabel(row) {
+  return String(row?.display_name || row?.name || "").trim();
+}
+
+function accessoryId(row) {
+  return String(row?.id || row?.uuid || "").trim();
+}
+
+function accessoryPowerOn(row) {
+  const cands = [
+    row?.power,
+    row?.on,
+    row?.power_state,
+    row?.state?.power,
+    row?.state?.on,
+    row?.characteristics?.power,
+  ];
+  for (const v of cands) {
+    if (v === true || v === "true" || v === "on" || v === 1 || v === "1") return true;
+    if (v === false || v === "false" || v === "off" || v === 0 || v === "0") return false;
+  }
+  return null;
+}
+
+/**
+ * Lights in Yan's Bedroom and Yan's Office only. Booleans, the bathroom
+ * fan, the office TV, and the desk port are not lights. The rest of the
+ * house is not these rooms.
+ * @param {Record<string, unknown>} row
+ */
+export function isYanRoomLight(row) {
+  const id = accessoryId(row);
+  const label = accessoryLabel(row);
+  const blob = `${row?.display_name || ""} ${row?.name || ""}`.trim();
+  const room = normalizeHomeRoomName(row?.room || row?.room_name);
+  if (!id || !YAN_LIGHT_ROOMS.has(room)) return false;
+  if (row?.reachable === false) return false;
+  if (homeBooleanKind(blob) || homeBooleanKind(label)) return false;
+  const category = String(row?.category || row?.type || "").toLowerCase();
+  const n = blob.toLowerCase();
+  if (/fan/.test(category) || /\bfan\b/.test(n)) return false;
+  if (/window|sensor|lock|thermostat|door/.test(category)) return false;
+  if (/\bdesk port\b/.test(n) || (/\boffice tv\b/.test(n) && !/light/.test(n))) return false;
+  if (/lightbulb|lighting/.test(category)) return true;
+  if (category === "switch" && /light|lamp|main|closet|accent|skyline|chandelier|overhead|nanoleaf/.test(n)) {
+    return true;
+  }
+  if (category === "outlet" && /lamp|light|laser|skyline|nanoleaf/.test(n)) return true;
+  return false;
+}
+
+function asAccessoryRows(listRaw) {
+  if (Array.isArray(listRaw)) return listRaw;
+  if (!listRaw || typeof listRaw !== "object") return [];
+  for (const key of ["accessories", "devices", "items", "list"]) {
+    if (Array.isArray(listRaw[key])) return listRaw[key];
+  }
+  return [];
+}
+
+/**
+ * @param {unknown} listRaw
+ * @returns {{ id: string, name: string, room: string }[]}
+ */
+export function yanRoomLightsToTurnOff(listRaw) {
+  /** @type {{ id: string, name: string, room: string }[]} */
+  const out = [];
+  for (const row of asAccessoryRows(listRaw)) {
+    if (!row || typeof row !== "object") continue;
+    if (!isYanRoomLight(row)) continue;
+    if (accessoryPowerOn(row) !== true) continue;
+    const roomRaw = row.room && typeof row.room === "object" ? row.room.name || "" : row.room;
+    out.push({
+      id: accessoryId(row),
+      name: accessoryLabel(row),
+      room: String(roomRaw || row.room_name || "").trim(),
+    });
+  }
+  return out;
+}
+
+/**
+ * @param {string} [path]
+ */
+export async function readLightsState(path = lightsStatePath()) {
+  try {
+    const raw = JSON.parse(await readFile(path, "utf8"));
+    return raw && typeof raw === "object" ? raw : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * @param {{
+ *   path?: string,
+ *   at?: string,
+ *   reason?: string,
+ *   turnedOff?: { name: string, room: string }[],
+ *   failed?: { name: string, room: string }[],
+ * }} opts
+ */
+export async function recordLightsCheck(opts = {}) {
+  const path = opts.path || lightsStatePath();
+  const prev = await readLightsState(path);
+  const at = opts.at || new Date().toISOString();
+  const turnedOff = (opts.turnedOff || []).map((row) => ({
+    room: String(row.room || ""),
+    name: String(row.name || ""),
+  }));
+  /** @type {Record<string, unknown>} */
+  const next = {
+    ...prev,
+    lastCheckedAt: at,
+    reason: String(opts.reason || "").trim().slice(0, 80),
+    turnedOff,
+  };
+  if (opts.failed?.length) {
+    next.failed = opts.failed.map((row) => ({
+      room: String(row.room || ""),
+      name: String(row.name || ""),
+    }));
+  } else {
+    delete next.failed;
+  }
+  if (turnedOff.length) next.lastTurnedOffAt = at;
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  return next;
+}
+
+/**
+ * @param {{
+ *   location?: object|null,
+ *   lifeState?: { place?: string, at?: string }|null,
+ *   nowMs?: number,
+ *   path?: string,
+ *   listAccessories: () => Promise<unknown>,
+ *   setOff: (id: string) => Promise<unknown>,
+ * }} opts
+ */
+export async function turnOffYanRoomLightsIfAway(opts) {
+  const nowMs = Number.isFinite(opts.nowMs) ? opts.nowMs : Date.now();
+  const presence = classifyLightsPresence(opts.location, nowMs, opts.lifeState);
+  if (!presence.turnOff) {
+    const prev = await readLightsState(opts.path);
+    const already =
+      prev.reason === presence.reason &&
+      Array.isArray(prev.turnedOff) &&
+      prev.turnedOff.length === 0 &&
+      !prev.failed;
+    if (already) {
+      return { ok: true, skipped: true, reason: presence.reason, turnedOff: [], state: prev };
+    }
+    const state = await recordLightsCheck({
+      path: opts.path,
+      at: new Date(nowMs).toISOString(),
+      reason: presence.reason,
+      turnedOff: [],
+    });
+    return { ok: true, skipped: true, reason: presence.reason, turnedOff: [], state };
+  }
+
+  const targets = yanRoomLightsToTurnOff(await opts.listAccessories());
+  /** @type {{ id: string, name: string, room: string }[]} */
+  const turnedOff = [];
+  /** @type {{ id: string, name: string, room: string, error: string }[]} */
+  const failed = [];
+  for (const target of targets) {
+    try {
+      await opts.setOff(target.id);
+      turnedOff.push(target);
+    } catch (err) {
+      failed.push({
+        ...target,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  const state = await recordLightsCheck({
+    path: opts.path,
+    at: new Date(nowMs).toISOString(),
+    reason: failed.length ? "away-partial" : "away",
+    turnedOff: turnedOff.map(({ name, room }) => ({ name, room })),
+    failed: failed.map(({ name, room }) => ({ name, room })),
+  });
+  return {
+    ok: failed.length === 0,
+    skipped: false,
+    reason: failed.length ? "away-partial" : "away",
+    turnedOff,
+    failed,
+    state,
+  };
+}
+
+/**
  * @param {{ dateKey: string, timezone: string, vacuumPath: string, location?: object|null }} opts
  */
 export function buildHomeAgentPrompt(opts) {
@@ -201,6 +480,7 @@ export function buildHomeAgentPrompt(opts) {
     "If no: node server/home-agent.js record-skip --reason \"<one line>\" --next-check <ISO time>",
     "A skip must not change lastStartedAt.",
     "Do not git commit. Do not edit any other file.",
+    "Do not turn any lights, switches, or outlets on or off. The script already did the away-lights check.",
   ].join("\n");
 }
 
@@ -370,6 +650,26 @@ async function runHomeAgentOnce({ force = false } = {}) {
   const nowMs = Date.now();
   const state = await readVacuumState();
   const location = await readPhoneLocation();
+  let lights = { ok: true, skipped: true, reason: "not-run", turnedOff: [] };
+  try {
+    const lifeState = await readCurrentLifeState();
+    lights = await turnOffYanRoomLightsIfAway({
+      location,
+      lifeState,
+      nowMs,
+      listAccessories: () => runHome(["list"]),
+      setOff: (id) => runHome(["set", id, "off"]),
+    });
+    const names = (lights.turnedOff || []).map((row) => row.name).filter(Boolean);
+    console.log(
+      `[home-agent] lights ${dateKey}: ${lights.reason}${
+        names.length ? ` off ${names.join(", ")}` : ""
+      }`
+    );
+  } catch (err) {
+    console.error("[home-agent] lights check failed", err);
+    lights = { ok: false, skipped: true, reason: "lights-error", turnedOff: [] };
+  }
   const gate = homeVacuumGate({
     nowMs,
     force,
@@ -380,7 +680,7 @@ async function runHomeAgentOnce({ force = false } = {}) {
 
   if (!gate.run) {
     console.log(`[home-agent] skip ${dateKey}: ${gate.reason}`);
-    return { ok: true, skipped: true, reason: gate.reason, dateKey };
+    return { ok: true, skipped: true, reason: gate.reason, dateKey, lights };
   }
 
   const handle = await acquireLock();
@@ -428,6 +728,7 @@ async function runHomeAgentOnce({ force = false } = {}) {
       ok: true,
       dateKey,
       status: result?.status || "finished",
+      lights,
     };
   } finally {
     await releaseLock(handle);

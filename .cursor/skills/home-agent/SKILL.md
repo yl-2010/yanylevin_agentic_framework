@@ -1,25 +1,41 @@
 ---
 name: home-agent
 description: >-
-  Hourly home vacuum check. Composer 2.5 decides whether to start the
-  Vacuum Yan scene when Yan has been away and the last run is at least
-  72 hours old. Yan only.
+  Hourly home check. Turns off lights in Yan's Bedroom and Yan's Office
+  when he is clearly away, then Composer 2.5 decides whether to start
+  the Vacuum Yan scene. Yan only.
 disable-model-invocation: true
 ---
 
-# Home agent — vacuum
+# Home agent
 
 Yan only (`you@example.com`). Local Cursor agent on the Mac Studio. Never a cloud agent. Model is Composer 2.5 with Fast off.
 
-The hourly script in `server/home-agent.js` does the cheap checks. This skill is the decision after those checks pass. Do not start the Roomba from a chat turn. When Yan says run the home agent or check the vacuum, run:
+The hourly script in `server/home-agent.js` does the cheap checks, including the lights. This skill is the vacuum decision after those checks pass. Do not start the Roomba from a chat turn. When Yan says run the home agent, check the vacuum, or turn off my room lights if I'm away, run:
 
 ```bash
 node --env-file=server/.env server/home-agent.js --force
 ```
 
-`--force` skips the cheap gates and still lets this decision stand. It does not force the scene on.
+`--force` skips the vacuum gates and still lets this decision stand. It does not force the scene on, and it does not force lights off.
 
-## State
+## Lights
+
+Every hourly run checks lights before the vacuum gates. The script does this itself. Do not turn lights, switches, or outlets on or off from this decision.
+
+Only two rooms: Yan's Bedroom and Yan's Office. Bathroom and closet lights live in the bedroom room in Home, so they are included. The rest of the house stays as it is. Guest bedroom, master, Sunny's room, kitchen, living room, outside.
+
+Not lights, even in those two rooms: Bedroom Boolean, Bathroom Boolean, Office Boolean, Leaving Bath Bool, Bathroom Fan, Office TV, Desk Port.
+
+Turn them off only when the phone pin is clearly outside the house. The accuracy circle has to sit fully outside the home radius, and the pin needs a real accuracy. A missing pin, a pin at the house, or a pin whose accuracy reaches the house means he is home.
+
+A quiet pin is also home. The floor is 20 minutes. Farther away, the script allows the pin to be older only for as long as a fast drive (about 90 km/h) would need to reach the house. Older than that, he may have come back without a new dot. Leave the lights.
+
+A life-state sample from the last 30 minutes with place `kirkland-home` also means he is home, even if the phone dot says otherwise.
+
+Receipts go in `education/you@example.com/home/lights.json`. Names and rooms only.
+
+## Vacuum state
 
 `education/you@example.com/home/vacuum.json`
 

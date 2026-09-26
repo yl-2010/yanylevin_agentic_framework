@@ -10,13 +10,18 @@ import {
   VACUUM_SCENE,
   VACUUM_SCENE_FORBIDDEN,
   buildHomeAgentPrompt,
+  classifyLightsPresence,
   classifyVacuumLocation,
   homeAgentModelSpec,
   homeVacuumGate,
+  isYanRoomLight,
+  lightsPinMaxAgeMs,
   msUntilNextHomeAgentTick,
   recordVacuumSkip,
   recordVacuumStart,
+  turnOffYanRoomLightsIfAway,
   vacuumIsDue,
+  yanRoomLightsToTurnOff,
 } from "./home-agent.js";
 
 const HOME = { latitude: 47.7001, longitude: -122.2305 };
@@ -109,6 +114,243 @@ describe("home agent prompt", () => {
     assert.match(prompt, /action_count 0 is normal/);
     assert.match(prompt, /record-start/);
     assert.match(prompt, /record-skip/);
+    assert.match(prompt, /Do not turn any lights/);
+  });
+});
+
+describe("away lights presence", () => {
+  const freshAway = {
+    ...EPS,
+    accuracyMeters: 12,
+    timestamp: new Date(NOW - 5 * 60 * 1000).toISOString(),
+  };
+
+  it("turns lights off only when the pin is fresh and clearly away", () => {
+    assert.equal(classifyLightsPresence(freshAway, NOW).turnOff, true);
+    assert.equal(classifyLightsPresence(HOME, NOW).reason, "at-home");
+    assert.equal(classifyLightsPresence(null, NOW).reason, "no-pin");
+    assert.equal(
+      classifyLightsPresence(
+        {
+          latitude: 47.7011,
+          longitude: -122.2305,
+          accuracyMeters: 500,
+          timestamp: freshAway.timestamp,
+        },
+        NOW
+      ).reason,
+      "not-clearly-away"
+    );
+    assert.equal(
+      classifyLightsPresence(
+        { ...EPS, timestamp: freshAway.timestamp },
+        NOW
+      ).reason,
+      "no-accuracy"
+    );
+    assert.equal(
+      classifyLightsPresence(
+        { ...freshAway, timestamp: new Date(NOW - 21 * 60 * 1000).toISOString() },
+        NOW
+      ).reason,
+      "stale-pin"
+    );
+    assert.equal(
+      classifyLightsPresence(
+        freshAway,
+        NOW,
+        { place: "kirkland-home", at: new Date(NOW - 5 * 60 * 1000).toISOString() }
+      ).reason,
+      "life-state-home"
+    );
+    assert.equal(
+      classifyLightsPresence(
+        freshAway,
+        NOW,
+        { place: "kirkland-home", at: new Date(NOW - 31 * 60 * 1000).toISOString() }
+      ).turnOff,
+      true
+    );
+  });
+
+  it("keeps a far pin until a fast drive could have reached the house", () => {
+    const far = { latitude: 47.0, longitude: -122.2305, accuracyMeters: 20 };
+    const where = classifyVacuumLocation(far);
+    assert.equal(where.kind, "away");
+    const max = lightsPinMaxAgeMs(where.meters);
+    assert.ok(max > 20 * 60 * 1000);
+    assert.equal(
+      classifyLightsPresence(
+        { ...far, timestamp: new Date(NOW - max + 1000).toISOString() },
+        NOW
+      ).turnOff,
+      true
+    );
+    assert.equal(
+      classifyLightsPresence(
+        { ...far, timestamp: new Date(NOW - max - 1000).toISOString() },
+        NOW
+      ).reason,
+      "stale-pin"
+    );
+  });
+});
+
+describe("Yan's room lights", () => {
+  const on = (row) => ({ power: "true", reachable: true, ...row });
+
+  it("selects lights in his two rooms and leaves the rest of the house", () => {
+    const rows = [
+      on({
+        id: "lamp",
+        display_name: "Jellyfish Lamp",
+        room: "Yan\u2019s Bedroom",
+        category: "outlet",
+      }),
+      on({
+        id: "sky",
+        display_name: "Yan\u2019s Bedroom Right Skyline",
+        room: "Yan\u2019s Bedroom",
+        category: "lightbulb",
+      }),
+      on({
+        id: "main",
+        display_name: "Main",
+        room: "Yan\u2019s Office",
+        category: "switch",
+      }),
+      on({
+        id: "laser",
+        display_name: "Disco Lasers",
+        room: "Yan\u2019s Office",
+        category: "outlet",
+      }),
+      on({
+        id: "closet",
+        display_name: "Closet Main",
+        room: "Yan\u2019s Bedroom",
+        category: "switch",
+      }),
+      on({
+        id: "bool",
+        display_name: "Bedroom Boolean",
+        room: "Yan\u2019s Bedroom",
+        category: "outlet",
+      }),
+      on({
+        id: "fan",
+        display_name: "Bathroom Fan",
+        room: "Yan\u2019s Bedroom",
+        category: "switch",
+      }),
+      on({
+        id: "tv",
+        display_name: "Office TV",
+        room: "Yan\u2019s Office",
+        category: "outlet",
+      }),
+      on({
+        id: "port",
+        display_name: "Desk Port",
+        room: "Yan\u2019s Office",
+        category: "outlet",
+      }),
+      on({
+        id: "guest",
+        display_name: "Guest Bedroom Main Lights",
+        room: "Guest Bedroom",
+        category: "switch",
+      }),
+      on({
+        id: "kitchen",
+        display_name: "Kitchen Main Lights",
+        room: "Kitchen",
+        category: "lightbulb",
+      }),
+      on({
+        id: "off",
+        display_name: "Reading Lamp",
+        room: "Yan\u2019s Bedroom",
+        category: "outlet",
+        power: "false",
+      }),
+      on({
+        id: "dark",
+        display_name: "Nanoleaf Lamp",
+        room: "Yan\u2019s Office",
+        category: "lightbulb",
+        reachable: false,
+      }),
+    ];
+
+    assert.equal(isYanRoomLight(rows[5]), false);
+    assert.equal(isYanRoomLight(rows[7]), false);
+    const names = yanRoomLightsToTurnOff(rows).map((row) => row.name);
+    assert.deepEqual(names, [
+      "Jellyfish Lamp",
+      "Yan\u2019s Bedroom Right Skyline",
+      "Main",
+      "Disco Lasers",
+      "Closet Main",
+    ]);
+  });
+
+  it("turns off only the selected lights and records the skip when he might be home", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "home-lights-"));
+    const path = join(dir, "lights.json");
+    const calls = [];
+    const away = await turnOffYanRoomLightsIfAway({
+      path,
+      nowMs: NOW,
+      location: {
+        ...EPS,
+        accuracyMeters: 12,
+        timestamp: new Date(NOW - 5 * 60 * 1000).toISOString(),
+      },
+      listAccessories: async () => [
+        {
+          id: "lamp",
+          display_name: "Desk Lamp",
+          room: "Yan\u2019s Office",
+          category: "outlet",
+          state: { power: "true" },
+        },
+        {
+          id: "kitchen",
+          display_name: "Island Chandelier",
+          room: "Kitchen",
+          category: "lightbulb",
+          state: { power: "true" },
+        },
+      ],
+      setOff: async (id) => {
+        calls.push(id);
+      },
+    });
+    assert.deepEqual(calls, ["lamp"]);
+    assert.equal(away.reason, "away");
+    const saved = JSON.parse(await readFile(path, "utf8"));
+    assert.equal(saved.turnedOff[0].name, "Desk Lamp");
+    assert.equal(saved.turnedOff[0].id, undefined);
+
+    calls.length = 0;
+    const home = await turnOffYanRoomLightsIfAway({
+      path,
+      nowMs: NOW,
+      location: { ...HOME, accuracyMeters: 8, timestamp: new Date(NOW).toISOString() },
+      listAccessories: async () => {
+        throw new Error("should not list");
+      },
+      setOff: async (id) => {
+        calls.push(id);
+      },
+    });
+    assert.equal(home.reason, "at-home");
+    assert.deepEqual(calls, []);
+    const after = JSON.parse(await readFile(path, "utf8"));
+    assert.equal(after.reason, "at-home");
+    assert.deepEqual(after.turnedOff, []);
+    assert.equal(after.lastTurnedOffAt, saved.lastTurnedOffAt);
   });
 });
 

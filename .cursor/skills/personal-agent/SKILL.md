@@ -81,7 +81,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Apple Health / workouts / sleep / HR (Yan only) | `.cursor/skills/personal-health/SKILL.md`. Dump sleep is actual sleep. |
 | Apple Calendar on the Studio (read/write) | `.cursor/skills/personal-calendar/SKILL.md` |
 | Apple Home accessories / lights / sensors (Yan only) | `.cursor/skills/personal-home/SKILL.md` |
-| Home vacuum schedule (hourly, Vacuum Yan scene) | `.cursor/skills/home-agent/SKILL.md` |
+| Home vacuum and away-lights (hourly) | `.cursor/skills/home-agent/SKILL.md` |
 | EPS Canvas (sync, submit file/text/URL, teacher files, comments/pages/modules) | `.cursor/skills/personal-canvas/SKILL.md` |
 | iMessage read and send | `.cursor/skills/personal-imessage/SKILL.md` |
 | Apple Screen Time / app usage (Yan only) | `.cursor/skills/personal-screentime/SKILL.md` |
