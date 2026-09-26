@@ -35,7 +35,10 @@ import {
   queueEducationNavigate,
   publishQueuedEducationNavigate,
   deliverIMessageFinalReply,
+  deliverIMessageProgressReply,
   deliverTeamsFinalReply,
+  channelProgressKind,
+  shouldSkipDuplicateChannelSend,
 } from "./personal-agent.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -149,6 +152,7 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /Always Read SOUL\.md/);
     assert.match(prompt, /send_chat_message/);
     assert.match(prompt, /Send more mid-run/);
+    assert.match(prompt, /posted to the chat before you start the work/);
     assert.doesNotMatch(prompt, /once, first/);
     assert.match(prompt, /open_education_page/);
     assert.match(prompt, /No period when the reply is one word/);
@@ -443,6 +447,8 @@ describe("Personal Agent skill files", () => {
     assert.match(schoolTeams, /JYPE \(iMessage or Teams\)/);
     assert.match(schoolTeams, /@agent/);
     assert.match(schoolTeams, /keep that final bubble/);
+    assert.match(schoolTeams, /before they start/);
+    assert.match(schoolTeams, /posted to this Teams chat immediately/);
     assert.match(schoolTeams, /class channel/);
     assert.match(schoolTeams, /Anyone can call/);
     assert.match(schoolTeams, /except the Class of 2028/);
@@ -498,6 +504,8 @@ describe("Personal Agent skill files", () => {
     assert.match(imessage, /Apple Contacts/);
     assert.match(imessage, /From Name on iMessage/);
     assert.match(imessage, /keep that final bubble/);
+    assert.match(imessage, /before they start/);
+    assert.match(imessage, /posted to this iMessage chat immediately/);
     assert.match(imessage, /never put it in Personal Agent app or website bubbles/);
     assert.match(imessage, /JYPE \(iMessage or Teams\)/);
     assert.match(imessage, /\/\/ Sent by Yan's Personal Agent/);
@@ -529,6 +537,8 @@ describe("Personal Agent skill files", () => {
     const agent = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.agent), "utf8");
     assert.match(agent, /send_chat_message/);
     assert.match(agent, /Send more intermediate bubbles/);
+    assert.match(agent, /posted to the same chat, before you start/);
+    assert.match(agent, /@agent` \/ `@agentg`/);
     assert.doesNotMatch(agent, /once, first/);
     assert.doesNotMatch(agent, /One status bubble is enough/);
     assert.match(agent, /open_education_page/);
@@ -1019,6 +1029,37 @@ describe("open_education_page navigate payload", () => {
       JSON.stringify(snap).includes("nav-1"),
       false
     );
+  });
+});
+
+describe("channel progress replies", () => {
+  it("marks mention first turns and skips a duplicate final", () => {
+    assert.equal(channelProgressKind({ imessageDeliverFinal: true }), "imessage");
+    assert.equal(channelProgressKind({ teamsDeliverFinal: true }), "teams");
+    assert.equal(
+      channelProgressKind({ imessageDeliverFinal: true, teamsDeliverFinal: true }),
+      "imessage"
+    );
+    assert.equal(channelProgressKind({}), "");
+    assert.equal(
+      shouldSkipDuplicateChannelSend("Making the page", "Making the page"),
+      true
+    );
+    assert.equal(
+      shouldSkipDuplicateChannelSend("Making the page", "Live at https://yanylevin.com/x"),
+      false
+    );
+    assert.equal(shouldSkipDuplicateChannelSend("", "Done"), false);
+  });
+
+  it("does not take queued files when a progress line is skipped", async () => {
+    resetIMessageReplyFiles();
+    queueIMessageReplyFiles({ to: "+14255550100" }, ["/tmp/a.jpg"]);
+    const empty = await deliverIMessageProgressReply({ to: "+14255550100" }, "   ");
+    assert.equal(empty.skipped, "empty");
+    const missing = await deliverIMessageProgressReply({}, "Making the Spanish page");
+    assert.equal(missing.skipped, "no-target");
+    assert.deepEqual(takeIMessageReplyFiles({ to: "+14255550100" }), ["/tmp/a.jpg"]);
   });
 });
 

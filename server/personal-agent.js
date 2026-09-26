@@ -126,6 +126,9 @@ const PA_ERROR_REPLY =
  *   imessageDeliverFinal?: boolean,
  *   teamsOrigin?: object|null,
  *   teamsDeliverFinal?: boolean,
+ *   channelProgress?: ''|'imessage'|'teams',
+ *   lastChannelProgressText?: string,
+ *   activeTurnId?: string,
  *   guestCaller?: object|null,
  *   ephemeralPinned?: boolean,
  * }} Session
@@ -749,7 +752,7 @@ function sendChatMessageTool(sid, session) {
   return {
     send_chat_message: {
       description:
-        "Send a user-visible chat bubble immediately without ending the turn. App and website only; never iMessage or Teams. For longer agentic work (education writes, widgets, scanning lots of data): first a short status, then more whenever new info, a change, or a useful update appears, including when this turn started from @agent on iMessage or Teams. The turn still ends with your final reply (usually Done). Do not call for a normal short answer.",
+        "Send a user-visible chat bubble immediately without ending the turn. On an iMessage or Teams @agent or @agentg first turn, this also posts that text to the same chat right away. Before a long job (a new page, a study guide, a big write), send one short line of what you are about to do, then start the work. Send another only when that chat should hear something new. Do not send still working with no news. The server still sends your final reply when the work is done, so do not put that same final text here. On a normal app chat this stays in the app and website only. Do not call this for a short answer.",
       inputSchema: {
         type: "object",
         properties: {
@@ -760,7 +763,7 @@ function sendChatMessageTool(sid, session) {
         },
         required: ["text"],
       },
-      execute({ text }) {
+      async execute({ text }) {
         const raw = String(text || "").trim();
         if (!raw) return "ignored empty";
         if (!sessions.has(sid) || sessions.get(sid) !== session) {
@@ -780,7 +783,11 @@ function sendChatMessageTool(sid, session) {
           sessionId: sid,
           status: "running",
         });
-        return "delivered";
+        if (!session.channelProgress || !content) return "delivered";
+        const sent = await deliverChannelProgress(session, content);
+        if (sent?.ok) return "delivered to the chat";
+        if (sent?.skipped) return "delivered";
+        return "delivered in the app, chat send failed";
       },
     },
   };
@@ -844,6 +851,72 @@ function persistSessionHistory(sid, session) {
 }
 
 /**
+ * @param {TurnOpts|null|undefined} opts
+ * @returns {''|'imessage'|'teams'}
+ */
+export function channelProgressKind(opts) {
+  if (opts?.imessageDeliverFinal) return "imessage";
+  if (opts?.teamsDeliverFinal) return "teams";
+  return "";
+}
+
+/**
+ * The early plan line already went out. Skip a second copy of that same text.
+ * @param {unknown} last
+ * @param {unknown} finalText
+ */
+export function shouldSkipDuplicateChannelSend(last, finalText) {
+  const prev = String(last || "").trim();
+  const next = String(finalText || "").trim();
+  return Boolean(prev) && prev === next;
+}
+
+/**
+ * Early @agent / @agentg line. Text only, so a later final reply can still attach files.
+ * @param {object|null|undefined} origin
+ * @param {string} content
+ */
+export async function deliverIMessageProgressReply(origin, content) {
+  const body = applyAgentSentFooter(content, origin);
+  if (!body) return { ok: false, skipped: "empty" };
+  if (body.includes(PA_ERROR_REPLY)) return { ok: false, skipped: "error" };
+  const to = String(origin?.to || origin?.chatId || origin?.handle || "").trim();
+  const chatGuid = String(origin?.chatGuid || "").trim();
+  if (!to && !chatGuid) return { ok: false, skipped: "no-target" };
+  return sendIMessage({
+    to: to || chatGuid,
+    text: body,
+    chatGuid: chatGuid || undefined,
+  });
+}
+
+/**
+ * Post one in-progress line to the iMessage or Teams chat this turn came from.
+ * @param {Session} session
+ * @param {string} content
+ */
+async function deliverChannelProgress(session, content) {
+  const kind = session.channelProgress;
+  const body = String(content || "").trim();
+  if (!kind || !body) return { ok: false, skipped: "empty" };
+  if (body.includes(PA_ERROR_REPLY)) return { ok: false, skipped: "error" };
+  const origin = kind === "imessage" ? session.imessageOrigin : session.teamsOrigin;
+  try {
+    const result =
+      kind === "imessage"
+        ? await deliverIMessageProgressReply(origin, body)
+        : await deliverTeamsFinalReply(origin, body);
+    if (result?.ok && !result?.skipped) {
+      session.lastChannelProgressText = body;
+    }
+    return result;
+  } catch (err) {
+    console.error(`[personal-agent] ${kind} progress`, err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
  * First turn of an iMessage-originated chat: send the final bubble to that thread.
  * @param {object|null|undefined} origin
  * @param {string} content
@@ -900,6 +973,7 @@ async function confirmOutboundDelivery(session, content, opts) {
   const imessage = Boolean(opts?.imessageDeliverFinal);
   const teams = Boolean(opts?.teamsDeliverFinal);
   if (!imessage && !teams) return;
+  if (shouldSkipDuplicateChannelSend(session.lastChannelProgressText, content)) return;
 
   const origin = imessage ? session.imessageOrigin : session.teamsOrigin;
   try {
@@ -1182,7 +1256,7 @@ export function systemPrompt(email, opts = {}) {
     "",
     "Reply: short. School mutations 1-3 lines. Markdown OK in the text bubble; never HTML tags or markdown images. Never em dashes. No thinking aloud. Do not tell the user to refresh. Read the widgets skill before emitting any widget fence. Never put Sent by Yan's Personal Agent in app or website bubbles; that footer is only for iMessage, email, and Teams.",
     "Send to a person with no channel named: iMessage, then Teams, then email. Named channel (on Teams / iMessage / email) wins for text. iMessage files are native attachments (iMessage skill), never a URL stand-in. Each file is its own message, then the text. Teams and school Outlook cannot attach a file. A file asked for on Teams goes out from Apple Mail (personal-mail skill). Say you emailed it.",
-    "Long work: send_chat_message first with a short status. Send more mid-run when new info, a change, or a useful update appears. Then a final Done. Quick answers: one reply only (that is the end of turn).",
+    "Long work: send_chat_message first with a short status. Send more mid-run when new info, a change, or a useful update appears. Then a final Done. Quick answers: one reply only (that is the end of turn). On an iMessage or Teams @agent or @agentg first turn, that first status is also posted to the chat before you start the work.",
     "To show one education page on web/iOS, call open_education_page (education-dashboard skill). The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Skip if already on that page. Not on Cursor Desktop.",
     "No period when the reply is one word, one phrase, or one sentence.",
   ].join("\n");
@@ -2125,6 +2199,10 @@ async function executeAgentTurn(sid, session, opts) {
   } = opts;
 
   session.pendingNavigate = null;
+  const turnId = mintNavigateId();
+  session.activeTurnId = turnId;
+  session.channelProgress = channelProgressKind(opts);
+  session.lastChannelProgressText = "";
 
   try {
     /** @type {string[]} */
@@ -2344,6 +2422,7 @@ async function executeAgentTurn(sid, session, opts) {
       notifyTurnFinished(session, sid, { status: "error" });
     }
   } finally {
+    if (session.activeTurnId === turnId) session.channelProgress = "";
     if (session.status !== "running") {
       let otherRunning = false;
       for (const [id, s] of sessions.entries()) {

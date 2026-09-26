@@ -278,17 +278,18 @@ export function formatIMessageOriginBlock(origin, opts = {}) {
   }
   lines.push(
     `Read the surrounding thread before answering: curl -sS --unix-socket /tmp/personal-agent-local.sock "http://localhost/imessage/thread?person=${threadQ}&limit=${threadLimit}" (iMessage skill).`,
-    "The app and website thread is a normal Personal Agent chat. On long work, call send_chat_message first with a short status, then again when something new happens, the same as if this were typed in the app. Those bubbles stay in the app and website only. They are never sent to iMessage.",
+    "The app and website thread is a normal Personal Agent chat.",
     "Write the final bubble as the text that should land in that iMessage. Newlines work. Fake lists with • or dashes if you want them. iMessage does not render markdown (no bold or italic). No HTML tags, no @agent. The app and website keep that final bubble as the end of the turn (the answer or what you did). Do not write Sent on iMessage. Do not add // Sent by Yan's Personal Agent. The server appends that footer on the iMessage only, never in the app or website thread."
   );
   if (opts.deliverFinal !== false) {
     lines.push(
+      "On a long job, call send_chat_message with one short plain line of what you are about to do before you start the work. A new page, a study guide, or a big write counts. @agent and @agentg both do this. That message is posted to this iMessage chat immediately. Then do the work. Send another the same way only when this chat should hear something new. Do not send still working with no news. Quick answers stay one message, so skip send_chat_message. The server still sends your final bubble when you are done. Do not also send_chat_message that same final text.",
       "The server delivers your final bubble to that same iMessage chat. Do not also sendIMessage that same final text.",
       "This is a full Personal Agent turn. You can send native iMessage files (photos, PDFs, anything on disk). Never a yanylevin.com stand-in. Files are never in the same message as text. If this reply includes files, decide the text first, then POST /imessage/send with files and attachToReply true (no text) to this same chat as the last action, then write that text as the final bubble. The server sends each file as its own message, then the text, immediately. Extra sends to someone else still use files + text in one /imessage/send (files first, then text)."
     );
   } else {
     lines.push(
-      "This chat started from that iMessage thread. Later app turns do not auto-text it; send via the iMessage skill when a reply belongs there."
+      "This chat started from that iMessage thread. Later app turns do not auto-text it. send_chat_message stays in the app and website only. Send via the iMessage skill when a reply belongs there."
     );
   }
   return lines.join("\n");

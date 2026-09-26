@@ -73,10 +73,15 @@ describe("teams-mention trigger", () => {
     assert.match(block, /Apple Mail/);
     assert.match(block, /School Outlook cannot send/);
     assert.match(block, /keep that final bubble/);
-    assert.match(block, /send_chat_message first with a short status/);
+    assert.match(block, /before you start the work/);
+    assert.match(block, /posted to this Teams chat immediately/);
+    assert.match(block, /@agent and @agentg both do this/);
+    assert.doesNotMatch(block, /never sent to Teams/);
     assert.doesNotMatch(block, /send confirmation/);
     const later = formatTeamsOriginBlock(origin, { deliverFinal: false });
     assert.match(later, /Later app turns do not auto-post/);
+    assert.doesNotMatch(later, /posted to this Teams chat immediately/);
+    assert.match(later, /stays in the app and website only/);
     const guest = formatTeamsOriginBlock(origin, {
       deliverFinal: true,
       guestCaller: { displayName: "Alex", slug: "alex-rivera" },

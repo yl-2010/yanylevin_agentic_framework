@@ -187,12 +187,15 @@ describe("imessage-mention", () => {
     assert.match(block, /full Personal Agent turn/);
     assert.match(block, /attachToReply/);
     assert.match(block, /native iMessage files/);
-    assert.match(block, /send_chat_message first with a short status/);
+    assert.match(block, /before you start the work/);
+    assert.match(block, /posted to this iMessage chat immediately/);
+    assert.match(block, /@agent and @agentg both do this/);
+    assert.doesNotMatch(block, /never sent to iMessage/);
     assert.doesNotMatch(block, /send confirmation/);
-    assert.doesNotMatch(
-      formatIMessageOriginBlock(origin, { deliverFinal: false }),
-      /server delivers your final bubble/
-    );
+    const later = formatIMessageOriginBlock(origin, { deliverFinal: false });
+    assert.doesNotMatch(later, /server delivers your final bubble/);
+    assert.doesNotMatch(later, /posted to this iMessage chat immediately/);
+    assert.match(later, /stays in the app and website only/);
   });
 
   it("tells the agent a guest called, not Yan", () => {

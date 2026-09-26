@@ -97,16 +97,17 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
     `Read the surrounding thread before answering: node server/school-teams.js thread --chat ${JSON.stringify(chatArg)} --limit ${threadLimit} (school Teams skill).`,
     "Each row in that thread has its own speaker. That field is who wrote the text. The chat name is the group, not the author. Do not attribute one person's message to someone else, including the person who just called @agent. Check speaker before you say they said it.",
     "Teams cannot attach a file. When Yan wants a PDF or other file delivered to a person, email it from Apple Mail and say so in the reply. Do not paste a file path into this chat. School Outlook cannot send that file.",
-    "The app and website thread is a normal Personal Agent chat. On long work, call send_chat_message first with a short status, then again when something new happens, the same as if this were typed in the app. Those bubbles stay in the app and website only. They are never sent to Teams.",
+    "The app and website thread is a normal Personal Agent chat.",
     "Write the final bubble as the text that should land in that Teams chat. Markdown is fine, same as the app bubble (bold, italic, lists, links, headings, code). The server converts it to Teams HTML so desktop and mobile keep newlines and formatting. No HTML tags, no @agent. The app and website keep that final bubble as the end of the turn (the answer or what you did). Do not write Sent on Teams. Do not add // Sent by Yan's Personal Agent. The server appends that footer on the Teams message only, never in the app or website thread."
   );
   if (opts.deliverFinal !== false) {
     lines.push(
+      "On a long job, call send_chat_message with one short line of what you are about to do before you start the work. A new page, a study guide, or a big write counts. @agent and @agentg both do this. That message is posted to this Teams chat immediately. Markdown is fine on that line. Then do the work. Send another the same way only when this chat should hear something new. Do not send still working with no news. Quick answers stay one message, so skip send_chat_message. The server still sends your final bubble when you are done. Do not also send_chat_message that same final text.",
       "The server delivers your final bubble to that same Teams chat. Do not also school-teams send that same final text."
     );
   } else {
     lines.push(
-      "This chat started from that Teams thread. Later app turns do not auto-post it; send via the school Teams skill when a reply belongs there."
+      "This chat started from that Teams thread. Later app turns do not auto-post it. send_chat_message stays in the app and website only. Send via the school Teams skill when a reply belongs there."
     );
   }
   return lines.join("\n");
