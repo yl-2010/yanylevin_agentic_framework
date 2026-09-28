@@ -190,6 +190,8 @@ describe("imessage-mention", () => {
     assert.match(block, /before you start the work/);
     assert.match(block, /posted to this iMessage chat immediately/);
     assert.match(block, /@agent and @agentg both do this/);
+    assert.match(block, /Keep the reply that lands in this chat short/);
+    assert.match(block, /put each on its own line/);
     assert.doesNotMatch(block, /never sent to iMessage/);
     assert.doesNotMatch(block, /send confirmation/);
     const later = formatIMessageOriginBlock(origin, { deliverFinal: false });

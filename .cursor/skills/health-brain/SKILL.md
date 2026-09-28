@@ -22,7 +22,7 @@ Model: **composer-2.5** (fast=false).
 | `education/you@example.com/health/takeaways.md` | Nightly prose. Read. |
 | `education/you@example.com/health/history-patterns.md` | Archive essay. Read. First run distills this. |
 | `education/you@example.com/health/workouts.md` | Skim for mix, not every line. |
-| `/tmp/yanylevin-context-life-state.json` | Rooms, gym, computer. Dump sleep in takeaways is actual overnight. Do not copy 5-minute samples onto health.md. |
+| `/tmp/yanylevin-context-life-state.json` | Rooms, gym, computer. Sleep dumps through the 2026-09-26 10:49 AM PT ingest are actual overnight. Later Health-app sleep is inflated until Yan says otherwise. Do not copy 5-minute samples onto health.md. |
 | `education/you@example.com/health/raw/apple-export-*.json` | Do not open. Too large. |
 | `education/you@example.com/health/state.json` | Ingest/takeaways cursors plus your `brainHealth` object. Home timezone is America/Los_Angeles; Austin trip workouts after 2026-08-12 through 2026-08-26 use America/Chicago. |
 | `education/you@example.com/brain/schema.md` | Memory-page contract. Required. |
@@ -43,7 +43,8 @@ Identity-shaped. Rewrite freely. Standing bullets. Inferred lines labeled (infer
 
 First run: distill `history-patterns.md`. Later nights: only promote what new takeaways actually changed. Do not copy every daily paragraph.
 
-Promote dump sleep hours into the typical band and recovery-sleep bullets. Health dump sleep is actual sleep. Do not keep a standing "inflated sleep" or "parent-facing" line.
+Promote dump sleep hours from the actual window into the typical band and recovery-sleep bullets. Do not promote hours after the 2026-09-26 10:49 AM PT ingest.
+
 ## state.json
 
 Keep `lastIngestAt`, `lastTakeawaysAt`, and `timezone`. Set:
@@ -65,7 +66,8 @@ The Node wrapper also writes this cursor after you finish.
 - Diagnoses, conditions, or advice Yan did not already own
 - Dumping `takeaways.md` into the page
 - Mixing gym stack weights into Watch workouts
-- Preferring life-state sleeping spans over Health dump sleep
+- Preferring life-state sleeping spans over Health dump sleep from the actual window
+- Treating Health-app sleep after the 2026-09-26 10:49 AM PT ingest as actual hours
 - Git commit (the Node wrapper does that)
 
 ## Verify

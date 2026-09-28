@@ -42,8 +42,8 @@ describe("health takeaways prompt", () => {
     assert.match(prompt, /takeaways\.md/);
     assert.match(prompt, /## YYYY-MM-DD Weekday/);
     assert.match(prompt, /life-state/);
-    assert.match(prompt, /Health dump sleep is actual overnight/);
-    assert.doesNotMatch(prompt, /parent-facing/);
+    assert.match(prompt, /Later Health-app sleep is inflated until Yan says otherwise/);
+    assert.doesNotMatch(prompt, /Health dump sleep is actual overnight/);
     assert.match(prompt, /Never spawn a Cursor cloud agent/);
     assert.match(prompt, /Do not invent diagnoses/);
     assert.match(prompt, /apple-export/);

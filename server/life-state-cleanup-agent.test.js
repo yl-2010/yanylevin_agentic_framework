@@ -51,7 +51,8 @@ describe("life-state cleanup prompt", () => {
     assert.match(prompt, /school Teams/);
     assert.match(prompt, /rewrite-day 2026-09-13/);
     assert.match(prompt, /yanylevin-life-state-cleanup\.json/);
-    assert.match(prompt, /Health dump sleep is actual overnight/);
+    assert.match(prompt, /Later Health-app sleep is inflated until Yan says otherwise/);
+    assert.doesNotMatch(prompt, /Health dump sleep is actual overnight/);
     assert.doesNotMatch(prompt, /Force: re-clean/);
   });
 

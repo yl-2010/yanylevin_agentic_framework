@@ -148,7 +148,7 @@ export function buildHealthTakeawaysPrompt({ dateKey, timezone, force }) {
     weekDateHelper(dateKey, timezone),
     `Health folder: ${hist}/.`,
     "Read new shortcut raw/*.json after state.json lastTakeawaysAt, plus workouts.md and the existing takeaways.md.",
-    "Also read /tmp/yanylevin-context-life-state.json or node server/life-state.js day <yesterday>. Life-state sleeping / at_gym / on_computer is rooms and movement. Health dump sleep is actual overnight. Prefer dump onset, wake, and stages for sleep hours.",
+    "Also read /tmp/yanylevin-context-life-state.json or node server/life-state.js day <yesterday>. Life-state sleeping / at_gym / on_computer is rooms and movement. Sleep dumps through the 2026-09-26 10:49 AM PT ingest are actual. Later Health-app sleep is inflated until Yan says otherwise. Prefer life-state, screens, and lights over those later hours.",
     "Skip raw/apple-export-*.json. That is the compact full-history archive from Apple's XML export, too large for this pass.",
     "Write takeaways.md: short prose per day, newest day on top. Headings are ## YYYY-MM-DD Weekday matching that calendar day in this timezone (example ## 2026-09-10 Thursday). Do not copy the previous day's weekday. A rest day does not smear onto a lift day. Call out workouts by name, duration, and effort. Sleep as hours plus quality tells. Mention RHR/HRV/steps only when they moved versus that same day, not a neighbor.",
     "Do not dump tables of every sample. Do not invent diagnoses. This is lifestyle context, not a medical chart.",

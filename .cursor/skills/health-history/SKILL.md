@@ -33,7 +33,7 @@ All under `education/you@example.com/health/`:
 `history-patterns.md`: a few sections of prose, not a spreadsheet.
 
 - Training mix over 2022–2026 (swim seasons, strength, running, climbing)
-- Sleep timing that repeats (late nights, short nights before hard days). Dump sleep hours are actual sleep. Fold them into the pattern.
+- Sleep timing that repeats (late nights, short nights before hard days). Dump sleep through the 2026-09-26 10:49 AM PT ingest is actual. Fold that window into the pattern. Do not fold later Health-app hours in. Those are inflated until Yan says otherwise.
 - Recovery tells that show up more than once (RHR jumps, HRV crashes)
 - Anything that clearly changed after a move or a season
 

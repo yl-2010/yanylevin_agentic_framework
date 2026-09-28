@@ -57,8 +57,10 @@ only when the digest is ambiguous and you need the source. Yesterday's
 life-state timeline is `/tmp/yanylevin-context-life-state.json` (collapsed
 kinds, not 288 JSONL lines). Use it when the journal take needs what he was
 doing (class vs still at home, shower vs fan, computer vs sleep). Overnight
-duration and stages come from Health dump / takeaways, not from a shorter
-life-state sleeping span. Dump sleep is actual. Do not copy samples onto
+duration and stages through the 2026-09-26 10:49 AM PT ingest come from
+Health dump / takeaways, not from a shorter life-state sleeping span. Later
+Health-app sleep is inflated until Yan says otherwise. Do not write those
+later hours as how he slept. Do not copy samples onto
 identity.md. Do not copy them onto `location/places.md` either. That file is
 the address.
 
@@ -172,8 +174,10 @@ force run, still think; do not only append a re-ran line.
 - Passwords, API keys, card numbers, diagnoses, or medical details that did
   not come from Yan or from the Apple Health dump (`health/takeaways.md`,
   `health/workouts.md`). Workouts, sleep, and HR from that dump are fair
-  game for journal / patterns / identity. Dump sleep is actual. Do not
-  write overnight hours from a shorter life-state sleeping span.
+  game for journal / patterns / identity. Dump sleep through the
+  2026-09-26 10:49 AM PT ingest is actual. Do not write those overnight
+  hours from a shorter life-state sleeping span. Later Health-app sleep is
+  inflated until Yan says otherwise.
 - Full texts or emails copied into pages
 - Agent behavior instructions in brain pages (they live in `SOUL.md` and `.cursor/skills/`)
 - Editing past journal days, deleting threads content without resolving it

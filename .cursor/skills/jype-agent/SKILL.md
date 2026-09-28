@@ -10,7 +10,7 @@ description: >-
 
 Workspace: `education/projects/jype/`. Dashboard: `yanylevin.com/jype`. Chats: `education/projects/jype/.chat-history/` (always listed, no 10-minute hide).
 
-Member quiz and study prefs: `education/projects/jype/agent-alignment.md` (read before generating US History MC or Spanish frases sheets).
+Member quiz and study prefs: `education/projects/jype/agent-alignment.md` (read before generating US History MC, Spanish frases sheets, or any practice-test PDF).
 
 ## Who said what
 

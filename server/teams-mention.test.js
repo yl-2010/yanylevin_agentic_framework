@@ -76,6 +76,8 @@ describe("teams-mention trigger", () => {
     assert.match(block, /before you start the work/);
     assert.match(block, /posted to this Teams chat immediately/);
     assert.match(block, /@agent and @agentg both do this/);
+    assert.match(block, /Keep the reply that lands in this chat short/);
+    assert.match(block, /bold on the key fact/);
     assert.doesNotMatch(block, /never sent to Teams/);
     assert.doesNotMatch(block, /send confirmation/);
     const later = formatTeamsOriginBlock(origin, { deliverFinal: false });

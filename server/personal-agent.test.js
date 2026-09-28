@@ -568,6 +568,9 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /SOUL\.md/);
     assert.match(agent, /identity-school\.md/);
     assert.match(agent, /No period/);
+    assert.match(agent, /`@agent` and `@agentg`, any chat/);
+    assert.match(agent, /Write at length only when the prompt needs a lot of text/);
+    assert.match(agent, /Format so it scans/);
     assert.match(agent, /end of turn/i);
     assert.match(agent, /brain\/schema\.md/);
     assert.match(agent, /identity\.md/);

@@ -122,6 +122,8 @@ Do not post to a class channel as a send-to-person fallback.
 
 ## @agent
 
+`@agent` and `@agentg` replies in this chat stay short. A few sentences, or a short list. Answer and stop. Write at length only when they asked for a lot of text. A study guide or plan still goes on a page. The message gets the URL and one line. Use markdown when it scans faster than a paragraph: a list, bold on the key fact, or a short heading.
+
 Express polls school Teams **chats** (1:1 and group, not class channels,
 plus Chat with yourself) for `@agent` / `@Agent`. Yan `fromMe` starts a
 normal Personal Agent chat, including messages to himself. The first user

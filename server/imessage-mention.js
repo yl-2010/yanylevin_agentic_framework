@@ -279,7 +279,8 @@ export function formatIMessageOriginBlock(origin, opts = {}) {
   lines.push(
     `Read the surrounding thread before answering: curl -sS --unix-socket /tmp/personal-agent-local.sock "http://localhost/imessage/thread?person=${threadQ}&limit=${threadLimit}" (iMessage skill).`,
     "The app and website thread is a normal Personal Agent chat.",
-    "Write the final bubble as the text that should land in that iMessage. Newlines work. Fake lists with • or dashes if you want them. iMessage does not render markdown (no bold or italic). No HTML tags, no @agent. The app and website keep that final bubble as the end of the turn (the answer or what you did). Do not write Sent on iMessage. Do not add // Sent by Yan's Personal Agent. The server appends that footer on the iMessage only, never in the app or website thread."
+    "Write the final bubble as the text that should land in that iMessage. Newlines work. When there is more than one point, put each on its own line with • or a dash. Do not leave those as one paragraph. iMessage does not render markdown (no bold or italic). No HTML tags, no @agent. The app and website keep that final bubble as the end of the turn (the answer or what you did). Do not write Sent on iMessage. Do not add // Sent by Yan's Personal Agent. The server appends that footer on the iMessage only, never in the app or website thread.",
+    "Keep the reply that lands in this chat short. A few sentences, or a short list. Answer and stop. Write at length only when they asked for a lot of text, such as an essay, a full explanation, or a drafted message. A study guide or plan still goes on a page. This chat gets the URL and one line."
   );
   if (opts.deliverFinal !== false) {
     lines.push(
