@@ -223,18 +223,29 @@ private struct ClassLiveActivityAssignmentTile: View {
 
     private var tileHeight: CGFloat { island ? 54 : 58 }
 
+    private var tagColor: Color {
+        island ? YLTheme.darkAccent : YLTheme.accent(colorScheme)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(tag)
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(island ? YLTheme.darkAccent : YLTheme.accent(colorScheme))
-                    .strikethrough(done, color: island ? LiveActivityPalette.islandMuted : YLTheme.muted(colorScheme))
+                    .foregroundStyle(tagColor)
+                    // ActivityKit never paints Text.strikethrough, so the done line is drawn here.
+                    .overlay {
+                        if done {
+                            Rectangle()
+                                .fill(island ? LiveActivityPalette.islandMuted : YLTheme.muted(colorScheme))
+                                .frame(height: 1.5)
+                        }
+                    }
                 Spacer(minLength: 0)
                 if !scoreLabel.isEmpty {
                     Text(scoreLabel)
                         .font(.caption2.weight(.bold))
-                        .foregroundStyle(island ? YLTheme.darkAccent : YLTheme.accent(colorScheme))
+                        .foregroundStyle(tagColor)
                         .monospacedDigit()
                         .strikethrough(false)
                 }
