@@ -23,6 +23,7 @@ import { promisify } from "node:util";
 import {
   SSH_PRIMARY,
   STALE_LOCK_RELS,
+  lsofBin,
   pickSshCommand,
   remoteUpdateArgs,
   shouldRemoveStaleLock,
@@ -163,13 +164,17 @@ async function git(args, opts = {}) {
 /** True if a live process has the lock file open. */
 async function lockHasHolder(lockPath) {
   try {
-    const { stdout } = await execFileAsync("lsof", [lockPath], {
+    const { stdout } = await execFileAsync(lsofBin(), [lockPath], {
       timeout: 5000,
       maxBuffer: 64 * 1024,
     });
     return Boolean(String(stdout || "").trim());
   } catch (err) {
     if (err && err.code === 1) return false;
+    log(
+      "lsof failed, leaving lock in place:",
+      err && err.code ? err.code : err
+    );
     return true;
   }
 }

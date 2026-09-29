@@ -61,3 +61,8 @@ export function shouldRemoveStaleLock({ ageMs, hasHolder, staleMs }) {
   if (hasHolder) return false;
   return Number(ageMs) >= Number(staleMs);
 }
+
+/** macOS ships lsof in /usr/sbin. The education-sync LaunchAgent PATH does not include that directory, so a bare `lsof` never runs and every stale lock looks held. */
+export function lsofBin(platform = process.platform) {
+  return platform === "darwin" ? "/usr/sbin/lsof" : "lsof";
+}
