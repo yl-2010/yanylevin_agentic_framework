@@ -15,6 +15,10 @@ import {
   todoFolderShouldBeVisible,
 } from "./education-class-todo.js";
 import {
+  assignmentLooksComplete,
+  todoCanvasAssignmentId,
+} from "./canvas-grades.js";
+import {
   findTodo,
   listClassEntriesForRoot,
   userEducationRoot,
@@ -127,6 +131,40 @@ export async function hideBookkeepingFiles(dir) {
   }
 }
 
+/**
+ * Finder uses the same completion signal as the dashboard overlay.
+ * Does not write `done` back to the file.
+ * @param {object} todo
+ * @param {Map<number, object>} byId
+ */
+export function finderTodoFromCanvas(todo, byId) {
+  if (!todo) return todo;
+  const id = todoCanvasAssignmentId(todo);
+  if (id == null) return todo;
+  const row = byId instanceof Map ? byId.get(id) : null;
+  if (!assignmentLooksComplete(row)) return todo;
+  const next = { ...todo, done: true };
+  if (!next.completedAt && row?.submittedAt) next.completedAt = row.submittedAt;
+  return next;
+}
+
+async function canvasCompleteById() {
+  try {
+    const { getLiveCanvasSnapshot } = await import("./canvas-sync.js");
+    const snap = await getLiveCanvasSnapshot();
+    const map = new Map();
+    for (const row of snap?.assignments || []) {
+      const id = Number(row?.id);
+      if (!Number.isFinite(id) || id <= 0) continue;
+      if (assignmentLooksComplete(row)) map.set(id, row);
+    }
+    return map;
+  } catch (err) {
+    console.error("[onedrive-visibility] canvas", err);
+    return new Map();
+  }
+}
+
 function canvasFileNameSet(props) {
   const out = new Set();
   const rows = Array.isArray(props?.canvasFiles) ? props.canvasFiles : [];
@@ -172,6 +210,38 @@ async function clearFinderHiddenFlag(absPath) {
 }
 
 /**
+ * OneDrive sometimes keeps both the plain name and the dotted name.
+ * Move anything only in `fromDir` into `intoDir`, then remove `fromDir`.
+ * @param {string} fromDir
+ * @param {string} intoDir
+ */
+async function absorbDuplicateFolder(fromDir, intoDir) {
+  const entries = await readdir(fromDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const src = join(fromDir, entry.name);
+    const dest = join(intoDir, entry.name);
+    let destExists = false;
+    try {
+      await stat(dest);
+      destExists = true;
+    } catch {
+      destExists = false;
+    }
+    if (!destExists) {
+      await rename(src, dest);
+      continue;
+    }
+    const srcSt = await stat(src);
+    const destSt = await stat(dest);
+    if (srcSt.mtimeMs > destSt.mtimeMs) {
+      await rm(dest, { recursive: true, force: true });
+      await rename(src, dest);
+    }
+  }
+  await rm(fromDir, { recursive: true, force: true });
+}
+
+/**
  * Hide with `.id`, show as `id`. Clears leftover chflags so OneDrive can sync.
  * @param {string} parent
  * @param {string} id
@@ -190,7 +260,7 @@ export async function setObjectFolderHidden(parent, id, hidden) {
       return hiddenPath;
     }
     if (vis && hid) {
-      await clearFinderHiddenFlag(visiblePath);
+      await absorbDuplicateFolder(visiblePath, hiddenPath);
       await clearFinderHiddenFlag(hiddenPath);
       return hiddenPath;
     }
@@ -207,8 +277,8 @@ export async function setObjectFolderHidden(parent, id, hidden) {
     return visiblePath;
   }
   if (vis && hid) {
+    await absorbDuplicateFolder(hiddenPath, visiblePath);
     await clearFinderHiddenFlag(visiblePath);
-    await clearFinderHiddenFlag(hiddenPath);
     return visiblePath;
   }
   if (hid) {
@@ -375,6 +445,7 @@ async function syncKind(
   schedule,
   now,
   seen,
+  canvasById,
   { renameFinder = false } = {}
 ) {
   const fileName = kind === "todo" ? "todo.json" : "date.json";
@@ -416,7 +487,10 @@ async function syncKind(
       }
     }
     seen.add(id);
-    const obj = { id, ...props };
+    const obj =
+      kind === "todo"
+        ? finderTodoFromCanvas({ id, ...props }, canvasById)
+        : { id, ...props };
     const [visPath, hidPath] = objectFolderPaths(parent, id);
     const folderPath = (await dirExists(visPath)) ? visPath : hidPath;
     const hasUserFiles = await objectFolderHasUserFiles(
@@ -436,7 +510,7 @@ async function syncKind(
   }
 }
 
-async function syncClassFolder(entry, cls, schedule, now) {
+async function syncClassFolder(entry, cls, schedule, now, canvasById) {
   const classFolder = entry.classFolder || entry.objectDir;
   if (!classFolder) return;
   const metaDir = join(classFolder, ".education");
@@ -449,14 +523,14 @@ async function syncClassFolder(entry, cls, schedule, now) {
   const nestedDates = join(entry.objectDir, "dates");
   const seenTodos = new Set();
   const seenDates = new Set();
-  await syncKind(classFolder, "todo", cls, schedule, now, seenTodos, {
+  await syncKind(classFolder, "todo", cls, schedule, now, seenTodos, canvasById, {
     renameFinder: true,
   });
-  await syncKind(nestedTodos, "todo", cls, schedule, now, seenTodos);
-  await syncKind(classFolder, "date", cls, schedule, now, seenDates, {
+  await syncKind(nestedTodos, "todo", cls, schedule, now, seenTodos, canvasById);
+  await syncKind(classFolder, "date", cls, schedule, now, seenDates, canvasById, {
     renameFinder: true,
   });
-  await syncKind(nestedDates, "date", cls, schedule, now, seenDates);
+  await syncKind(nestedDates, "date", cls, schedule, now, seenDates, canvasById);
 }
 
 /**
@@ -469,11 +543,12 @@ export async function syncOnedriveObjectVisibility(email = YAN_EMAIL) {
   const schedule = (await readJson(join(root, "schedule.json"))) || {};
   if (!gradeDirFromMeta(meta)) return;
   const now = new Date();
+  const canvasById = await canvasCompleteById();
   for (const entry of await listClassEntriesForRoot(root)) {
     if (entry.source !== "onedrive") continue;
     const props = await readJson(join(entry.objectDir, "class.json"));
     if (!props) continue;
     const cls = { id: entry.id, ...props };
-    await syncClassFolder(entry, cls, schedule, now);
+    await syncClassFolder(entry, cls, schedule, now, canvasById);
   }
 }

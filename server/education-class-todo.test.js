@@ -6,6 +6,7 @@ import {
   todoFolderShouldBeVisible,
   todoVisibleFromMeeting,
 } from "./education-class-todo.js";
+import { finderTodoFromCanvas } from "./education-onedrive-visibility.js";
 import { classPeriodOnDate } from "./education-data.js";
 
 const schedule = {
@@ -109,6 +110,35 @@ describe("todo folder visibility", () => {
     );
     assert.equal(
       todoFolderShouldBeVisible(todo, cls, schedule, at("2026-09-15T09:40:00-07:00")),
+      false
+    );
+  });
+
+  it("hides a Canvas submission once it belongs in Completed", () => {
+    const open = {
+      id: "hw-late",
+      tag: "HW",
+      dueDate: "2026-09-08",
+      dueTime: "08:30",
+      done: false,
+      canvasId: 40367161,
+      folderRevealedAt: "2026-09-08T16:00:00.000Z",
+    };
+    const byId = new Map([
+      [
+        40367161,
+        {
+          id: 40367161,
+          submittedAt: "2026-09-08T15:00:00Z",
+          workflowState: "submitted",
+        },
+      ],
+    ]);
+    const turnedIn = finderTodoFromCanvas(open, byId);
+    assert.equal(turnedIn.done, true);
+    assert.equal(open.done, false);
+    assert.equal(
+      todoFolderShouldBeVisible(turnedIn, cls, schedule, at("2026-09-15T12:00:00-07:00")),
       false
     );
   });

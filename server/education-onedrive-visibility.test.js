@@ -45,6 +45,24 @@ describe("setObjectFolderHidden", () => {
   });
 });
 
+describe("setObjectFolderHidden duplicates", () => {
+  it("drops the plain folder when a dotted copy already exists", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "edu-both-"));
+    const visible = join(parent, "HW Sep 28 Articulo");
+    const hidden = join(parent, ".HW Sep 28 Articulo");
+    await mkdir(visible);
+    await mkdir(hidden);
+    await writeFile(join(visible, "only-visible.pdf"), "a");
+    await writeFile(join(hidden, ".todo.json"), "{}\n");
+    const result = await setObjectFolderHidden(parent, "HW Sep 28 Articulo", true);
+    assert.equal(result, hidden);
+    await stat(join(hidden, "only-visible.pdf"));
+    await stat(join(hidden, ".todo.json"));
+    await assert.rejects(stat(visible));
+    await rm(parent, { recursive: true, force: true });
+  });
+});
+
 describe("objectFolderHasUserFiles", () => {
   it("ignores property JSON, CONTEXT.md, and junk", async () => {
     const dir = await mkdtemp(join(tmpdir(), "edu-files-"));
