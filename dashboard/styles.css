@@ -490,7 +490,7 @@ html.lg-chrome .dash-agent.lg-static.lg-refraction::after {
 
 .dash-agent-band {
   display: grid;
-  grid-template-columns: 4.75rem minmax(0, 1fr);
+  grid-template-columns: 8.5rem minmax(0, 1fr);
   gap: 0.75rem 0.9rem;
   align-items: center;
 }
@@ -501,7 +501,7 @@ html.lg-chrome .dash-agent.lg-static.lg-refraction::after {
   font-size: var(--text-caption);
   font-weight: 600;
   color: var(--muted);
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
 .dash-agent-row {

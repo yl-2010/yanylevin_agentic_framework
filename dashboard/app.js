@@ -192,96 +192,139 @@
       ],
     },
     {
-      time: "Jev",
+      time: "incoming message",
       items: [
         {
           id: "calendar-on-demand",
-          name: "Calendar on demand",
+          name: "Calendar",
+          model: "Jev, then Composer 2.5",
+          kind: "clock",
+        },
+      ],
+    },
+    {
+      time: "you @agent",
+      items: [
+        {
+          id: "you-mention",
+          name: "iMessage or Teams",
+          model: "Grok 4.7",
+          kind: "clock",
+        },
+      ],
+    },
+    {
+      time: "someone @agent",
+      items: [
+        {
+          id: "guest-agent",
+          name: "Guest",
           model: "Composer 2.5",
           kind: "clock",
         },
       ],
     },
     {
-      time: "@",
+      time: "@agentg",
       items: [
         {
-          id: "imessage-agent",
-          name: "iMessage @agent",
-          model: "Grok 4.7",
-          kind: "clock",
-        },
-        {
-          id: "teams-agent",
-          name: "Teams @agent",
-          model: "Grok 4.7",
-          kind: "clock",
-        },
-        {
-          id: "guest-agent",
-          name: "Guest @agent",
+          id: "agentg",
+          name: "Guest",
           model: "Grok 4.7",
           kind: "clock",
         },
       ],
     },
     {
-      time: "chat",
+      time: "education chat",
       items: [
         {
           id: "education",
-          name: "Education",
+          name: "Personal agent",
           model: "Grok 4.7",
           kind: "clock",
         },
+      ],
+    },
+    {
+      time: "iOS app",
+      items: [
         {
           id: "ios",
-          name: "iOS app",
+          name: "Personal agent",
           model: "Grok 4.7",
           kind: "clock",
         },
+      ],
+    },
+    {
+      time: "Cursor",
+      items: [
         {
           id: "cursor",
-          name: "Cursor",
+          name: "Personal agent",
           model: "Grok 4.7",
           kind: "clock",
         },
-        { edge: true },
-        {
-          id: "brain-extraction",
-          name: "Brain extraction",
-          model: "Composer 2.5",
-          kind: "after",
-        },
-        { gap: true },
+      ],
+    },
+    {
+      time: "JYPE site",
+      items: [
         {
           id: "jype",
-          name: "JYPE",
+          name: "JYPE agent",
           model: "Grok 4.7",
           kind: "clock",
         },
+      ],
+    },
+    {
+      time: "fitness",
+      items: [
         {
           id: "fitness",
           name: "Fitness",
           model: "Composer 2.5",
           kind: "clock",
         },
+      ],
+    },
+    {
+      time: "debate",
+      items: [
         {
           id: "debate",
-          name: "Debate",
+          name: "Personal agent",
           model: "Grok 4.7",
           kind: "clock",
         },
+      ],
+    },
+    {
+      time: "public question",
+      items: [
         {
           id: "public-faq",
-          name: "Public site FAQ",
+          name: "Site FAQ",
           model: "GPT-OSS 20b",
           kind: "clock",
         },
       ],
     },
     {
-      time: "manual",
+      time: "after a reply",
+      items: [
+        {
+          id: "brain-extraction",
+          name: "Brain extraction",
+          model: "Composer 2.5",
+          kind: "clock",
+        },
+      ],
+    },
+    {
+      time: "you run it",
       items: [
         {
           id: "health-history",
