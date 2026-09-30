@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AGENT_SENT_FOOTER } from "./imessage-mention.js";
 import { loadCalendarTombstones } from "./calendar-memory.js";
+import { addLocalDays, zonedParts } from "./calendar-cli.js";
 import { noul, systemOne, typesafeConfig } from "./typesafe.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -204,6 +205,28 @@ function clipPackMessage(source, message) {
  *   skillText?: string,
  * }} pack
  */
+/**
+ * Pacific dates with weekday names, today first. The model looks these up
+ * instead of counting "next Saturday" from an ISO timestamp.
+ * @param {Date} [now]
+ * @param {number} [days]
+ */
+export function pacificWeekdayLines(now = new Date(), days = 21) {
+  const tz = "America/Los_Angeles";
+  const startKey = zonedParts(now, tz).dateKey;
+  const lines = [];
+  for (let i = 0; i < days; i++) {
+    const key = addLocalDays(startKey, i);
+    const noon = new Date(`${key}T20:00:00Z`);
+    const weekday = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      weekday: "long",
+    }).format(noon);
+    lines.push(`${key} ${weekday}`);
+  }
+  return lines.join("\n");
+}
+
 export function buildOnDemandPrompt(pack) {
   const source = pack.source;
   const triggers = (pack.messages || []).map((item) =>
@@ -235,7 +258,9 @@ export function buildOnDemandPrompt(pack) {
     "Follow .cursor/skills/calendar-on-demand/SKILL.md and .cursor/skills/personal-calendar/SKILL.md.",
     "You are the realtime calendar agent for Yan (you@example.com). Local only. Never spawn a Cursor cloud agent. ",
     "One plan only: the event this message is about. Do not sweep the inbox, other chats, or the rest of the day for unrelated events.",
-    "Jev only asked whether this message might be a plan. Jev is that classifier, not a person in the chat and not a guest. Never put Jev in the title, notes, or guest list. Name the event after the people in the thread. You still decide if it is calendar-worthy. Create nothing when it is not. Add an event he is actually showing up for. A named day helps. Count the weekday from the timestamp on this prompt. Do not guess that a date is Saturday. TBD venue is fine when the plan is real. Do not invent a clock. Skip college spam, including recruitment mail, Scoir, apply-now, and info sessions he did not register for. Skip the weekly EPS college-visit list unless Yan said he signed up for that visit. Skip education todos, homework, Canvas, due dates, and other dashboard items. Those stay on the education dashboard. The calendar is events. Also skip the EPS bell schedule, and EPS Ventures unless there is a signup confirmation.",
+    "Jev only asked whether this message might be a plan. Jev is that classifier, not a person in the chat and not a guest. Never put Jev in the title, notes, or guest list. Name the event after the people in the thread. You still decide if it is calendar-worthy. Create nothing when it is not. Add an event he is actually showing up for. A named day helps. Look up the weekday on the list below. This Saturday is the first Saturday. Next Saturday is the second. Do not count days yourself. TBD venue is fine when the plan is real. Do not invent a clock. Skip college spam, including recruitment mail, Scoir, apply-now, and info sessions he did not register for. Skip the weekly EPS college-visit list unless Yan said he signed up for that visit. Skip education todos, homework, Canvas, due dates, and other dashboard items. Those stay on the education dashboard. The calendar is events. Also skip the EPS bell schedule, and EPS Ventures unless there is a signup confirmation.",
+    "Weekdays in America/Los_Angeles, today first:",
+    pacificWeekdayLines(pack.now instanceof Date ? pack.now : new Date()),
     "If a similar event is already on that day and this message moves the time, place, or link, update that event. If the old one is only a tombstone and the new time, place, or link differs, create the new one. If create prints skipped deleted-identical, stop. Do not pass --force unless Yan explicitly asked for that exact event back.",
     "Put a join or register URL on --location, --url, and a one-line --notes. PathIvy and Zoom registration links come from Mail.app message source when the body dropped the href.",
     `Trigger (${source}):`,

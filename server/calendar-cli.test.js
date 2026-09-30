@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { zonedParts, addLocalDays } from "./calendar-cli.js";
+import { zonedParts, addLocalDays, jevTitleRefusal } from "./calendar-cli.js";
 import { logCalendarCommand, splitVia } from "./agent-actions.js";
 import {
   eventsAreIdentical,
@@ -25,6 +25,25 @@ describe("calendar-cli date helpers", () => {
   it("adds calendar days on the UTC date key", () => {
     assert.equal(addLocalDays("2026-08-16", 1), "2026-08-17");
     assert.equal(addLocalDays("2026-08-31", 1), "2026-09-01");
+  });
+
+  it("refuses a calendar-on-demand title that names Jev", () => {
+    const blocked = jevTitleRefusal(
+      "calendar-on-demand",
+      "create",
+      "ExampleCo: meet Jev (competition prep)",
+      ""
+    );
+    assert.equal(blocked?.skipped, "jev-title");
+    assert.equal(
+      jevTitleRefusal("calendar-on-demand", "update", "Coffee", "with Jev")?.skipped,
+      "jev-title"
+    );
+    assert.equal(jevTitleRefusal("chat", "create", "ExampleCo: meet Jev", ""), null);
+    assert.equal(
+      jevTitleRefusal("calendar-on-demand", "create", "ExampleCo: meet Nikita", ""),
+      null
+    );
   });
 });
 

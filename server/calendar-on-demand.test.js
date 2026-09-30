@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { classifyMailRow } from "./apple-mail-file.js";
 import {
   buildOnDemandPrompt,
+  pacificWeekdayLines,
   calendarSignalYes,
   considerCalendarMessage,
   enqueueCalendarThread,
@@ -157,8 +158,24 @@ describe("calendar on-demand prompt", () => {
     assert.match(prompt, /signed up for that visit/);
     assert.match(prompt, /education todos/);
     assert.match(prompt, /Jev is that classifier, not a person/);
-    assert.match(prompt, /Count the weekday/);
+    assert.match(prompt, /Next Saturday is the second/);
+    assert.match(prompt, /\d{4}-\d{2}-\d{2} (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/);
     assert.doesNotMatch(prompt, /Bias is add/);
+  });
+
+  it("lists next Saturday as Oct 10 when today is Wed Sep 30", () => {
+    const lines = pacificWeekdayLines(new Date("2026-09-30T21:00:00.000Z"));
+    assert.match(lines, /^2026-09-30 Wednesday/);
+    assert.match(lines, /2026-10-03 Saturday/);
+    assert.match(lines, /2026-10-10 Saturday/);
+    assert.match(lines, /2026-10-11 Sunday/);
+    const prompt = buildOnDemandPrompt({
+      source: "imessage",
+      messages: [{ message: { text: "next sat", at: "2026-09-30T20:56:59Z" } }],
+      now: new Date("2026-09-30T21:00:00.000Z"),
+    });
+    assert.match(prompt, /2026-10-10 Saturday/);
+    assert.doesNotMatch(prompt, /Count the weekday/);
   });
 
   it("asks the mail filer and the calendar gate in one Jev call", async () => {

@@ -167,6 +167,27 @@ export function addLocalDays(dateKey, days) {
   return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
 }
 
+/**
+ * Calendar-on-demand must not write the classifier's name onto an event.
+ * @param {string} via
+ * @param {string} cmd
+ * @param {string} title
+ * @param {string} [notes]
+ * @returns {{ ok: false, skipped: string, error: string }|null}
+ */
+export function jevTitleRefusal(via, cmd, title, notes) {
+  if (String(via || "") !== "calendar-on-demand") return null;
+  if (cmd !== "create" && cmd !== "update") return null;
+  const blob = `${title || ""}\n${notes || ""}`;
+  if (!/\bjev\b/i.test(blob)) return null;
+  return {
+    ok: false,
+    skipped: "jev-title",
+    error:
+      "Jev is the classifier, not a person in the chat. Name the event after the people in the thread.",
+  };
+}
+
 function formatEventLine(ev, timeZone) {
   const title = String(ev.title || "(no title)").trim() || "(no title)";
   const cal = String(ev.calendar || "").trim();
@@ -288,6 +309,16 @@ if (isCli) {
   const force = args.includes("--force");
   const swiftArgs = args.filter((arg) => arg !== "--force");
   const finish = async () => {
+    const jevBlock = jevTitleRefusal(
+      via,
+      cmd,
+      flagValue(args, "--title"),
+      flagValue(args, "--notes")
+    );
+    if (jevBlock) {
+      console.log(JSON.stringify(jevBlock, null, 2));
+      return;
+    }
     if (cmd === "create" && !force) {
       const candidate = candidateFromArgs(args);
       const tombstones = await loadCalendarTombstones();
