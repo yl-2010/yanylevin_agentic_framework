@@ -1482,7 +1482,7 @@ export function buildCanvasSyncPrompt({
     "Do not POST to Canvas. Do not delete education todos just because Canvas dropped a row.",
     "Leave canvasFiles on .todo.json alone. Express downloads teacher attachments into the OneDrive todo folder after you finish. Spanish 4 pasted decoration images (image-<uuid>, image.png) are not downloaded.",
     "Do not recreate a todo or date that looks like a manually deleted.md row. Judgement, not exact due clocks. canvasId is a strong hint.",
-    "OneNote links are attached after you finish, including on todos imported on earlier nights. Do not add or delete sites whose oneNote is personal or content-library. Preserve every other sites entry if you rewrite a todo. Do not put OneNote URLs in description.",
+    "After the Canvas writes, link OneNote pages yourself, including todos imported on earlier nights. Use node server/school-onenote.js (status, sections, pages). Read _Content Library and the Yan Levin group. You decide which page goes with which todo. Do not run link-todos. A page in Yan's notebook is a site named with the assignment name, oneNote personal. A Content Library page is a site named Content Library: plus the page title, oneNote content-library. Copy url (https webUrl), clientUrl (onenote:), and pageId. The same teacher page may go on more than one todo. Keep sites that are not OneNote. If OneNote is signed out or a notebook fails, leave existing OneNote sites in place. Do not put OneNote URLs in description.",
     rebuild,
     hourly,
     deleted,
@@ -1507,7 +1507,7 @@ export function buildCanvasHourlyPrompt({ dateKey, hourKey, timezone, deletedBlo
     "If the snapshot matches existing todos, do nothing.",
     "NEVER write done or completedAt from Canvas. Do not POST to Canvas. Do not delete todos because Canvas dropped a row. Do not recreate deleted.md rows. Preserve finderHidden when it is already set.",
     "Leave canvasFiles on .todo.json alone. Express downloads teacher attachments into the OneDrive todo folder after you finish. Spanish 4 pasted decoration images (image-<uuid>, image.png) are not downloaded.",
-    "Do not run link-todos. OneNote page links are the nightly pass.",
+    "Do not run link-todos. Do not link OneNote pages on the hourly pass. That is the nightly Grok pass.",
     deleted,
   ]
     .filter(Boolean)
@@ -1743,20 +1743,10 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
     } catch (err) {
       console.error("[canvas-sync] mark comments seen", err);
     }
-    let onenote = null;
-    try {
-      const { linkClassTodos } = await import("./school-onenote.js");
-      onenote = await linkClassTodos();
-      const n = Array.isArray(onenote?.updates) ? onenote.updates.length : 0;
-      console.log(`[canvas-sync] onenote links updated ${n}`);
-    } catch (err) {
-      console.error("[canvas-sync] onenote links", err);
-    }
     await writeLastAgentSync(dir, {
       dateKey,
       at: new Date().toISOString(),
       status: result?.status || "finished",
-      onenote: Array.isArray(onenote?.updates) ? onenote.updates.length : 0,
     });
     await gitAddCommitPush({
       paths: [`education/${YAN_EMAIL}`],

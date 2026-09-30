@@ -185,18 +185,22 @@ Junk Canvas names get renamed when they land. `image-` plus a uuid, `image-` plu
 
 ## OneNote links
 
-Teachers post the Class Notebook page after the Canvas todo exists. Nightly sync attaches those pages onto todos that are already imported, not only todos created that night. The runner calls `link-todos` after your writes. On a manual sync in this chat, run it yourself at the end.
+Teachers post the Class Notebook page after the Canvas todo exists. On the nightly pass, after the Canvas writes, you link those pages onto todos that already exist, not only todos created that night. Read the notebook and decide which page belongs on which todo. Do not run `link-todos`. That command scores titles in code and misses real pages.
 
 ```bash
-node server/school-onenote.js link-todos
+node server/school-onenote.js status
+node server/school-onenote.js sections --notebook "US History 26-27"
+node server/school-onenote.js pages --notebook "US History 26-27" --section "_Content Library/I. Forming A Nation"
 ```
 
-It reads `_Content Library` and Yan's section group (`Yan Levin`) in the class notebook. A todo gets at most two sites:
+Notebook names are in personal-onenote. Read `_Content Library` and `Yan Levin`. Skip `_Collaboration Space`. Yoga has no notebook. `pages` returns every page in the section.
 
-- Personal page. The tile name is the assignment `name`.
-- Content Library page. The tile name is `Content Library: ` plus the OneNote page title.
+A todo gets at most two OneNote sites. The same teacher page may sit on more than one todo when Canvas split one lesson.
 
-Each site stores the https `url` and a `clientUrl` that starts with `onenote:`. The website opens desktop OneNote. The iOS app opens the OneNote app. Other `sites` stay. Do not put these URLs in `description`. Do not add or delete sites whose `oneNote` is `personal` or `content-library`. If OneNote is signed out, skip it and still finish the Canvas sync. Hourly Composer does not run this.
+- Yan's page. `name` is the assignment name. `oneNote` is `personal`.
+- Teacher page. `name` is `Content Library: ` plus the page title. `oneNote` is `content-library`.
+
+Copy `url` from the page `webUrl` (https) and `clientUrl` from the page (`onenote:`). Store `pageId` from the page `id`. Keep every site whose `oneNote` is not `personal` or `content-library`. Replace an old OneNote site when you have a better page. If `status` is signed out, or a notebook fails to load, leave the OneNote sites that are already there and finish the Canvas sync. Do not put these URLs in `description`. Hourly Composer does not do this.
 
 ## Nightly review of hourly Composer
 

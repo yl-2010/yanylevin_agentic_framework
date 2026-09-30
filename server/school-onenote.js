@@ -740,28 +740,6 @@ async function listAllSectionPages(token, { siteId, sectionId }) {
   return pages;
 }
 
-async function listSectionPages(token, { siteId, sectionId, limit }) {
-  if (siteId) {
-    return apiGet(buildSitePagesUrl(siteId, sectionId, { limit }), token);
-  }
-  try {
-    return await apiGet(buildPagesUrl(sectionId, { limit }), token);
-  } catch (err) {
-    if (Number(err?.status) !== 404) throw err;
-    const notebooks = await listNotebooks(token);
-    for (const nb of notebooks) {
-      const tree = await loadNotebookFromSite(token, nb).catch(() => null);
-      if (!tree?.siteId) continue;
-      try {
-        return await apiGet(buildSitePagesUrl(tree.siteId, sectionId, { limit }), token);
-      } catch {
-        continue;
-      }
-    }
-    throw err;
-  }
-}
-
 async function readPageHtml(token, pageId) {
   try {
     return await apiGet(buildPageContentUrl(pageId), token, { html: true });
@@ -1122,17 +1100,12 @@ export async function runSchoolOnenote(argv, opts = {}) {
         sectionName = sec.match.name;
         siteId = tree.siteId;
       }
-      const data = await listSectionPages(token, {
-        siteId,
-        sectionId,
-        limit: parsed.limit,
-      });
-      const rows = Array.isArray(data.value) ? data.value : [];
+      const pages = await listAllSectionPages(token, { siteId, sectionId });
       return {
         ok: true,
         account: SCHOOL_EMAIL,
         section: sectionName,
-        pages: rows.map((row) => normalizePage(row)),
+        pages,
       };
     });
   }

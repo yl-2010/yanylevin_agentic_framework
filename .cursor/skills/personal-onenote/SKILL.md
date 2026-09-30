@@ -38,9 +38,9 @@ Do **not** list every notebook "just in case." Do **not** run a history
 fill. There is no `school-onenote-fill`. This is not a default nightly
 source. Nightly triage, synthesis, and fact-check do not scan OneNote
 unless a claim they are already handling is specifically about a page.
-The canvas nightly is the exception. After it writes todos it runs
-`node server/school-onenote.js link-todos`, which attaches Content Library
-and Yan Levin pages onto todos that already exist. See personal-canvas.
+The canvas nightly is the exception. After it writes todos, that Grok
+agent reads the class notebook and writes the sites itself. See
+personal-canvas. Do not run `link-todos` for that.
 
 Yoga has no Class Notebook. Free periods neither. Speech & Debate 26-27
 is not in this account yet (only last year's Hayes notebooks).
