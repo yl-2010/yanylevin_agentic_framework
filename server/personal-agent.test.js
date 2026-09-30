@@ -38,6 +38,10 @@ import {
   deliverIMessageProgressReply,
   deliverTeamsFinalReply,
   channelProgressKind,
+  channelSendToolResult,
+  dropRejectedChatGuid,
+  nextOutboundAction,
+  outboundResumePrompt,
   shouldSkipDuplicateChannelSend,
 } from "./personal-agent.js";
 
@@ -1058,6 +1062,51 @@ describe("channel progress replies", () => {
       false
     );
     assert.equal(shouldSkipDuplicateChannelSend("", "Done"), false);
+  });
+
+  it("keeps the turn going when the chat send is rejected", () => {
+    const origin = {
+      to: "+14255550100",
+      chatGuid: "any;-;+14255550100",
+    };
+    const refused = {
+      ok: false,
+      failed: true,
+      error:
+        "no Messages chat for +14255550100. Refusing to text a person with that name.",
+    };
+    assert.equal(
+      nextOutboundAction({ delivery: refused, guidDropped: false, resumes: 0 }),
+      "drop-guid"
+    );
+    assert.equal(dropRejectedChatGuid(origin, refused.error), true);
+    assert.equal(origin.chatGuid, "");
+    assert.equal(
+      nextOutboundAction({ delivery: refused, guidDropped: true, resumes: 0 }),
+      "resume"
+    );
+    assert.equal(
+      nextOutboundAction({ delivery: refused, guidDropped: true, resumes: 3 }),
+      "give-up"
+    );
+    assert.equal(
+      nextOutboundAction({
+        delivery: { ok: true, skipped: "duplicate" },
+        guidDropped: true,
+        resumes: 1,
+      }),
+      "done"
+    );
+    assert.equal(dropRejectedChatGuid(origin, "Messages send timed out"), false);
+    const prompt = outboundResumePrompt("imessage", refused.error, "Moved it to Saturday");
+    assert.match(prompt, /This turn is not done/);
+    assert.match(prompt, /Moved it to Saturday/);
+    assert.match(prompt, /leave chatGuid off/);
+    assert.equal(
+      channelSendToolResult({ ok: false, error: refused.error }),
+      `not sent. ${refused.error} This turn is not done until that text is in the chat. Send it again.`
+    );
+    assert.equal(channelSendToolResult({ ok: true }), "delivered to the chat");
   });
 
   it("does not take queued files when a progress line is skipped", async () => {

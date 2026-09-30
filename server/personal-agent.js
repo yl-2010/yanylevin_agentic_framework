@@ -785,9 +785,7 @@ function sendChatMessageTool(sid, session) {
         });
         if (!session.channelProgress || !content) return "delivered";
         const sent = await deliverChannelProgress(session, content);
-        if (sent?.ok) return "delivered to the chat";
-        if (sent?.skipped) return "delivered";
-        return "delivered in the app, chat send failed";
+        return channelSendToolResult(sent);
       },
     },
   };
@@ -962,29 +960,240 @@ export async function deliverTeamsFinalReply(origin, content) {
   });
 }
 
+/** How many times to wake the same agent after a chat send fails. */
+export const OUTBOUND_RESUME_LIMIT = 3;
+
+/**
+ * @param {unknown} err
+ */
+export function outboundFailureText(err) {
+  if (!err) return "send failed";
+  return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * The Nikita miss: Messages rejected a chat id and the turn ended.
+ * @param {unknown} error
+ */
+export function shouldDropRejectedChatGuid(error) {
+  return /no Messages chat|Refusing to text a person/i.test(String(error || ""));
+}
+
+/**
+ * @param {object|null|undefined} origin
+ * @param {unknown} error
+ */
+export function dropRejectedChatGuid(origin, error) {
+  if (!origin || typeof origin !== "object") return false;
+  if (!String(origin.chatGuid || "").trim()) return false;
+  if (!shouldDropRejectedChatGuid(error)) return false;
+  origin.chatGuid = "";
+  return true;
+}
+
+/**
+ * @param {{ ok?: boolean, skipped?: string, failed?: boolean, error?: string }|null|undefined} delivery
+ */
+export function shouldResumeOutboundSend(delivery) {
+  if (!delivery || delivery.ok || delivery.skipped) return false;
+  return Boolean(delivery.failed || delivery.error);
+}
+
+/**
+ * @param {{
+ *   delivery?: { ok?: boolean, skipped?: string, failed?: boolean, error?: string }|null,
+ *   guidDropped?: boolean,
+ *   resumes?: number,
+ * }} state
+ * @returns {"done"|"drop-guid"|"resume"|"give-up"}
+ */
+export function nextOutboundAction(state) {
+  const delivery = state?.delivery;
+  if (!shouldResumeOutboundSend(delivery)) return "done";
+  if (!state?.guidDropped && shouldDropRejectedChatGuid(delivery?.error)) {
+    return "drop-guid";
+  }
+  if ((state?.resumes || 0) >= OUTBOUND_RESUME_LIMIT) return "give-up";
+  return "resume";
+}
+
+/**
+ * @param {string} channel
+ * @param {unknown} error
+ * @param {string} text
+ */
+export function outboundResumePrompt(channel, error, text) {
+  const where = channel === "teams" ? "Teams" : "iMessage";
+  return [
+    `The ${where} send failed. This turn is not done.`,
+    `Error: ${error || "send failed"}`,
+    "Send the text below to that same chat. If the error is a rejected chat id, send to the person or phone and leave chatGuid off.",
+    "Do not stop until a send returns ok. Do not redo work that already finished.",
+    "",
+    String(text || "").trim(),
+  ].join("\n");
+}
+
+/**
+ * What send_chat_message tells the model. A failure must not look like success.
+ * @param {{ ok?: boolean, skipped?: string, error?: string }|null|undefined} sent
+ */
+export function channelSendToolResult(sent) {
+  if (sent?.ok) return "delivered to the chat";
+  if (sent?.skipped) return "delivered";
+  const error = sent?.error ? String(sent.error) : "send failed";
+  return `not sent. ${error} This turn is not done until that text is in the chat. Send it again.`;
+}
+
 /**
  * First-turn @agent: send the final to iMessage/Teams. App and website keep
  * that bubble, plus any send_chat_message updates from the same turn.
  * @param {Session} session
  * @param {string} content
  * @param {TurnOpts} opts
+ * @returns {Promise<{ ok?: boolean, skipped?: string, failed?: boolean, error?: string }>}
  */
-async function confirmOutboundDelivery(session, content, opts) {
+export async function confirmOutboundDelivery(session, content, opts) {
   const imessage = Boolean(opts?.imessageDeliverFinal);
   const teams = Boolean(opts?.teamsDeliverFinal);
-  if (!imessage && !teams) return;
-  if (shouldSkipDuplicateChannelSend(session.lastChannelProgressText, content)) return;
+  if (!imessage && !teams) return { ok: true, skipped: "no-channel" };
+  if (shouldSkipDuplicateChannelSend(session.lastChannelProgressText, content)) {
+    return { ok: true, skipped: "duplicate" };
+  }
 
   const origin = imessage ? session.imessageOrigin : session.teamsOrigin;
   try {
-    if (imessage) await deliverIMessageFinalReply(origin, content);
-    else await deliverTeamsFinalReply(origin, content);
+    const result = imessage
+      ? await deliverIMessageFinalReply(origin, content)
+      : await deliverTeamsFinalReply(origin, content);
+    if (result?.skipped) return { ok: false, skipped: result.skipped };
+    if (result?.ok === false) {
+      return {
+        ok: false,
+        failed: true,
+        error: result.error || "send failed",
+      };
+    }
+    session.lastChannelProgressText = String(content || "").trim();
+    return { ok: true };
   } catch (err) {
+    const error = outboundFailureText(err);
     console.error(
       `[personal-agent] ${imessage ? "imessage" : "teams"} reply`,
       err
     );
+    return { ok: false, failed: true, error };
   }
+}
+
+/**
+ * One more send on the agent that just finished, so a failed text does not end the turn.
+ * @param {Session} session
+ * @param {string} sid
+ * @param {string} text
+ * @param {ModelSelection} model
+ */
+async function continueAgentSend(session, sid, text, model) {
+  if (!session.agent || typeof session.agent.send !== "function") return "";
+  const chunks = [];
+  try {
+    const run = await session.agent.send(text, {
+      model,
+      local: { customTools: sessionCustomTools(sid, session) },
+    });
+    session.activeRun = run;
+    if (session.interrupting && typeof run.cancel === "function") {
+      await run.cancel().catch(() => {});
+      return "";
+    }
+    if (typeof run.stream === "function") {
+      for await (const event of run.stream()) {
+        if (session.interrupting) break;
+        if (event?.type === "assistant" && event.message?.content) {
+          for (const block of event.message.content) {
+            if (block?.type === "text" && typeof block.text === "string") {
+              chunks.push(block.text);
+            }
+          }
+        }
+      }
+    }
+    if (session.interrupting) return "";
+    const result = await run.wait();
+    let content =
+      result && typeof result.result === "string" ? result.result.trim() : "";
+    if (!content) {
+      for (let i = chunks.length - 1; i >= 0; i--) {
+        const piece = String(chunks[i] || "").trim();
+        if (piece) {
+          content = piece;
+          break;
+        }
+      }
+    }
+    return content;
+  } catch (err) {
+    console.error("[personal-agent] outbound resume", err);
+    return "";
+  }
+}
+
+/**
+ * Send the final bubble. If Messages or Teams rejects it, drop a bad chat id
+ * and keep the same agent working until a send lands.
+ * @param {Session} session
+ * @param {string} sid
+ * @param {string} content
+ * @param {TurnOpts} opts
+ * @param {ModelSelection} model
+ */
+async function settleOutboundSend(session, sid, content, opts, model) {
+  const channel = channelProgressKind(opts);
+  if (!channel) return content;
+  let guidDropped = false;
+  let resumes = 0;
+  for (let guard = 0; guard < 8; guard++) {
+    if (session.interrupting || !sessions.has(sid) || sessions.get(sid) !== session) {
+      return content;
+    }
+    const delivery = await confirmOutboundDelivery(session, content, opts);
+    const action = nextOutboundAction({ delivery, guidDropped, resumes });
+    if (action === "done") return content;
+    if (action === "drop-guid") {
+      const origin =
+        channel === "imessage" ? session.imessageOrigin : session.teamsOrigin;
+      dropRejectedChatGuid(origin, delivery.error);
+      guidDropped = true;
+      continue;
+    }
+    if (action === "give-up" || !session.agent) {
+      const where = channel === "teams" ? "Teams" : "iMessage";
+      const note = `The ${where} send still failed: ${delivery.error || "send failed"}`;
+      session.messages.push(
+        stampMessage("assistant", note, undefined, { endOfTurn: true })
+      );
+      await persistSessionHistory(sid, session);
+      return content;
+    }
+    resumes += 1;
+    setSessionWorkingLabel(session, sid, "Sending the reply");
+    const next = await continueAgentSend(
+      session,
+      sid,
+      outboundResumePrompt(channel, delivery.error, content),
+      model
+    );
+    if (session.interrupting) return content;
+    const parsed = parseAgentReply(next);
+    const resumed = stripAgentSentFooter(parsed.content || "").trim();
+    if (!resumed) continue;
+    content = resumed;
+    if (shouldAppendEndOfTurn(session.messages, content, parsed.widgets)) {
+      session.messages.push(stampMessage("assistant", content, parsed.widgets));
+    }
+    await persistSessionHistory(sid, session);
+  }
+  return content;
 }
 
 /**
@@ -2337,8 +2546,18 @@ async function executeAgentTurn(sid, session, opts) {
       session.replayUiTranscript = false;
     }
     const finishedStatus = result?.status === "error" ? "error" : "idle";
-    if (finishedStatus === "idle") {
-      await confirmOutboundDelivery(session, content, opts);
+    if (finishedStatus === "idle" && !session.interrupting) {
+      content = await settleOutboundSend(
+        session,
+        sid,
+        content,
+        opts,
+        outcome.model || model
+      );
+    }
+    if (session.interrupting) {
+      releaseTurnRun(session);
+      return;
     }
     releaseTurnRun(session);
     session.lastResult = {
