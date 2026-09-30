@@ -192,13 +192,20 @@
       ],
     },
     {
-      time: "incoming message",
+      time: "message or email",
       items: [
+        {
+          id: "jev-calendar",
+          name: "Jev",
+          model: "yes or no",
+          kind: "clock",
+        },
+        { edge: true },
         {
           id: "calendar-on-demand",
           name: "Calendar",
-          model: "Jev, then Composer 2.5",
-          kind: "clock",
+          model: "Composer 2.5",
+          kind: "after",
         },
       ],
     },
@@ -236,32 +243,10 @@
       ],
     },
     {
-      time: "education chat",
+      time: "your chat",
       items: [
         {
-          id: "education",
-          name: "Personal agent",
-          model: "Grok 4.7",
-          kind: "clock",
-        },
-      ],
-    },
-    {
-      time: "iOS app",
-      items: [
-        {
-          id: "ios",
-          name: "Personal agent",
-          model: "Grok 4.7",
-          kind: "clock",
-        },
-      ],
-    },
-    {
-      time: "Cursor",
-      items: [
-        {
-          id: "cursor",
+          id: "personal",
           name: "Personal agent",
           model: "Grok 4.7",
           kind: "clock",
@@ -286,17 +271,6 @@
           id: "fitness",
           name: "Fitness",
           model: "Composer 2.5",
-          kind: "clock",
-        },
-      ],
-    },
-    {
-      time: "debate",
-      items: [
-        {
-          id: "debate",
-          name: "Personal agent",
-          model: "Grok 4.7",
           kind: "clock",
         },
       ],
