@@ -39,11 +39,9 @@ Read `SOUL.md` at the repo root on **every** turn for persona, voice, and judgme
 
 education-sync already commits and pushes these paths. Do not commit them yourself.
 
-- `education/you@example.com`
-- `education/you@example.com`
+- `education/<email>/`
 - `education/projects/jype`
-- `fitness/you@example.com`
-- `fitness/you@example.com`
+- `fitness/<email>/`
 - `data/chat-log.md`
 - `data/login-log.md`
 
