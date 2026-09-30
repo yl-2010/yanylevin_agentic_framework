@@ -504,7 +504,8 @@ describe("buildCanvasSyncPrompt", () => {
     assert.match(prompt, /comments-new\.md/);
     assert.match(prompt, /pages\.md/);
     assert.match(prompt, /todos imported on earlier nights/);
-    assert.match(prompt, /You decide which page goes with which todo/);
+    assert.match(prompt, /Go todo by todo/);
+    assert.match(prompt, /Do not start from a page and hunt for a todo/);
     assert.match(prompt, /Do not run link-todos/);
     assert.match(prompt, /oneNote content-library/);
   });

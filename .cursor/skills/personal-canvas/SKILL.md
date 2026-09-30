@@ -185,7 +185,7 @@ Junk Canvas names get renamed when they land. `image-` plus a uuid, `image-` plu
 
 ## OneNote links
 
-Teachers post the Class Notebook page after the Canvas todo exists. On the nightly pass, after the Canvas writes, you link those pages onto todos that already exist, not only todos created that night. Read the notebook and decide which page belongs on which todo. Do not run `link-todos`. That command scores titles in code and misses real pages.
+Teachers post the Class Notebook page after the Canvas todo exists. On the nightly pass, after the Canvas writes, go todo by todo, including todos imported on earlier nights. For each todo, look through that class notebook for pages that belong to it. Do not list pages and then hunt for a todo to attach them to. Do not run `link-todos`. That command scores titles in code and misses real pages.
 
 ```bash
 node server/school-onenote.js status
@@ -193,7 +193,7 @@ node server/school-onenote.js sections --notebook "US History 26-27"
 node server/school-onenote.js pages --notebook "US History 26-27" --section "_Content Library/I. Forming A Nation"
 ```
 
-Notebook names are in personal-onenote. Read `_Content Library` and `Yan Levin`. Skip `_Collaboration Space`. Yoga has no notebook. `pages` returns every page in the section.
+Notebook names are in personal-onenote. For the todo you are on, read `_Content Library` and `Yan Levin` in that class. Skip `_Collaboration Space`. Yoga has no notebook. `pages` returns every page in the section. Finish that todo, then go to the next one. `search` often misses Class Notebooks.
 
 A todo gets at most two OneNote sites. The same teacher page may sit on more than one todo when Canvas split one lesson.
 
