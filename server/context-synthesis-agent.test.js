@@ -105,6 +105,9 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /Do not open OneNote/);
     assert.match(prompt, /Calendar plans/);
     assert.match(prompt, /biased to include/);
+    assert.match(prompt, /College spam stays out/);
+    assert.match(prompt, /weekly EPS college-visit list stays out/);
+    assert.match(prompt, /education todos/);
     assert.match(prompt, /Big dates/);
     assert.match(prompt, /biased to omit/);
     assert.match(prompt, /update <path>/);
@@ -223,6 +226,9 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /Calendar plans \(or Locked-in calendar\)/);
     assert.match(prompt, /Big dates/);
     assert.match(prompt, /biased to add/);
+    assert.match(prompt, /Skip college spam/);
+    assert.match(prompt, /weekly EPS college-visit list/);
+    assert.match(prompt, /education todos/);
     assert.match(prompt, /biased to skip/);
     assert.match(prompt, /Do not need a Yan add-this quote/);
     assert.match(prompt, /TBD venue/);

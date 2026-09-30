@@ -128,7 +128,12 @@ Tentative, maybe, TBD venue, and "Saturday 4:30" all belong. One line per
 event: title, local date, start to end (or all-day), calendar hint, evidence,
 and the meeting URL when mail or chat has one. PathIvy webinars: the Zoom
 registration href from Mail.app `source` for that date's row, not the words
-"Registration Link". "None" if none. Homework, Canvas, and bells do not belong.
+"Registration Link". "None" if none. Homework, Canvas, bells, education todos,
+and other dashboard items do not belong. The calendar is events.
+College spam does not belong. Recruitment mail, Scoir, apply-now, and info
+sessions Yan did not register for stay out even when they name a day.
+The weekly EPS college-visit email does not belong as a list of events. Only
+a visit Yan said he signed up for, or a form receipt for that visit.
 If it matches a deleted calendar fingerprint (similar title and the same start,
 end, location, and link), omit it. A new time, place, or link is a new plan.
 A realtime calendar agent may already have filed today's messages. If that
@@ -140,7 +145,7 @@ to Gaps.
 ## Big dates
 Rare, high-stakes items for the education Dates panel. Bias is omit.
 First/last day, orientation, advisor/parent conferences, travel that takes
-Yan out of school, college visits, graduation-scale milestones. One line per
+Yan out of school, a college visit Yan said he signed up for, graduation-scale milestones. One line per
 date: name, YYYY-MM-DD, optional time, parent (user-level or class id),
 evidence. The prompt lists existing dates and `deleted.md`. If one already
 matches (same parent + date + similar name, including advisor/advisory and

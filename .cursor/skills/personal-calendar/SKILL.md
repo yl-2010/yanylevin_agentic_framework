@@ -45,9 +45,10 @@ Infer from the title, people, and time:
 - Otherwise the personal / default iCloud calendar
 
 If it is not obvious, **ask** before creating. Nightly actions is the
-exception: it creates any plan with a date without asking (tentative and TBD
+exception: it creates a real plan with a date without asking (tentative and TBD
 venue included), and uses the personal / default iCloud calendar when the
-target is unclear. Do not invent a day that nobody named.
+target is unclear. College spam, the weekly EPS college-visit list, and
+dashboard todos stay off. Do not invent a day that nobody named.
 
 When adding a named person as a guest, use the address on their people card (or Contacts). Do not keep a second address table here.
 
@@ -67,10 +68,22 @@ If `yl-calendar` returns Calendar access denied, Calendar.app osascript still wo
 
 - Homework, CW/HW/QA/MA, class due dates → education todos/dates (education-dashboard skill)
 - Appointments, family, travel, timed events → Apple Calendar
-- If Yan says to put homework on the calendar, write the Calendar event **and** keep the education todo
+- If Yan says to put a specific homework item or todo on the calendar, write the Calendar event **and** keep the education todo
 
 Do not duplicate the EPS bell schedule (`schedule.json`) as Calendar events unless asked.
 
-Before creating, list overlapping events that day. The CLI also refuses the create when a similar title is already at that start, or when `calendar/deleted-events.jsonl` (and older `deleted.md` calendar rows) describe the same title, start, end, location, and link. Similar means the same event: lowercase, strip year tokens (`2026`, `2026-27`), treat advisor/advisory as one word, singular/plural on the last word. If the JSON says `skipped: deleted-identical` or `skipped: already-on-calendar`, stop. Do not retry with `--force` unless Yan explicitly asked for that exact event back. A different time, place, or link is a new event: update the live one if it is still there, or create it if the old one was only a tombstone. Nightly actions uses this same rule, and leaves an event the realtime agent already filed. Skip EPS Ventures unless there is a signup confirmation (form receipt or Yan said he signed up). A Student News or Weekly News announcement is not enough.
+## What stays off
+
+The calendar is events he is showing up for. Appointments, meetings, hangouts, meals, travel, reservations.
+
+Leave these off unless Yan explicitly asked for that item on the calendar:
+
+- College spam. Recruitment and marketing from colleges, Scoir blasts, apply-now mail, and info sessions he did not register for. A date in the email is not an event.
+- The weekly EPS college-visit list. School sends one about once a week. Do not add each visit. Only a visit Yan said he signed up for, or a form receipt for that visit. The announcement is not a signup.
+- Education todos, homework, Canvas assignments, and other dashboard items. Those stay on the education dashboard.
+
+EPS Ventures stays off unless there is a signup confirmation, a form receipt or Yan said he signed up. A Student News or Weekly News announcement is not enough.
+
+Before creating, list overlapping events that day. The CLI also refuses the create when a similar title is already at that start, or when `calendar/deleted-events.jsonl` (and older `deleted.md` calendar rows) describe the same title, start, end, location, and link. Similar means the same event: lowercase, strip year tokens (`2026`, `2026-27`), treat advisor/advisory as one word, singular/plural on the last word. If the JSON says `skipped: deleted-identical` or `skipped: already-on-calendar`, stop. Do not retry with `--force` unless Yan explicitly asked for that exact event back. A different time, place, or link is a new event: update the live one if it is still there, or create it if the old one was only a tombstone. Nightly actions uses this same rule, and leaves an event the realtime agent already filed. College spam, the weekly EPS college-visit list, and dashboard todos stay off, per What stays off above. EPS Ventures stays off unless there is a signup confirmation.
 
 Express live context already lists today + tomorrow. Open this skill when you need other days, or to create/change events.

@@ -26,7 +26,8 @@ and rare big dates on the education dashboard, even when Yan never said
   dated plan that belongs on Apple Calendar.
 - Re-verify every item against its evidence before executing. Triage can be
   wrong; you are the second check. For Calendar, triage is often too shy:
-  still create a dated plan it left off the list. For education dates, triage
+  still create a real plan it left off the list. Do not create college spam,
+  the weekly EPS visit list, or a dashboard todo that triage left off. For education dates, triage
   is often too eager: skip unless it clears the high bar below.
 - Allowed action classes: iMessage/Mail sends, education todo/date/project
   writes, Apple Calendar writes, repo/file work on this Mac.
@@ -48,9 +49,9 @@ in Yan's threads. When in doubt, do not send; note it for the journal.
 
 ## Apple Calendar (standing)
 
-Bias is **add**. Any plan with a date goes on Apple Calendar. You do **not**
+Bias is **add** for a real plan. A hangout, meal, appointment, or trip with a date goes on Apple Calendar. You do **not**
 need a Yan quote that says to add it. You do **not** need a booking, an
-accepted invite, or "yes that works." When you are unsure, create it.
+accepted invite, or "yes that works." When you are unsure about a real plan, create it. The skip list below is not that case.
 
 A named day is enough. A clock time is better. All-day is fine when they did
 not name a time. TBD venue is fine. "Maybe Friday" is fine. A proposal Yan
@@ -61,22 +62,26 @@ Create when there is a specific day plus any of:
 
 - Hangout, meal, pickup, drop-off, sports, club, performance
 - Appointment, reservation, flight, hotel, tickets
-- School event with a day named
-- Travel or college visit
+- School event with a day named, other than the skips below
+- Travel
+- A college visit only when Yan said he signed up for that visit, or a form receipt names it
 - Yan `fromMe` naming a slot
-- An invite sitting in mail or iMessage
+- An invite he is actually attending
 
 Missing venue does not skip it. "Saturday 4:30, location TBD" is still a
 create. Put the TBD in the event location or notes. Triage may have parked it
 in Gaps; re-verify against the iMessage, not the Gaps line.
 
-Skip only:
+Skip these even when they name a day. For this list, unsure means skip:
 
-- Homework due dates, Canvas assignments, the EPS bell schedule
+- College spam. Recruitment and marketing from colleges, Scoir, apply-now, and info sessions he did not register for. A date in the mail is not a plan.
+- The weekly EPS college-visit list. Do not add each campus visit. Only a visit Yan said he signed up for, or a form receipt for that visit. The announcement is not a signup.
+- Education todos, homework, Canvas assignments, due dates, and other dashboard items. Those stay on the education dashboard. The calendar is events.
+- The EPS bell schedule
 - "we should hang out" with no day named
 - A similar title already on that local day (duplicate check below). A realtime calendar agent may already have filed it. Leave it.
 - An identical deleted calendar event (similar title and the same start, end, location, and link). A new time, place, or link is a new event.
-- EPS Ventures outings unless Yan has a signup confirmation (form receipt or he said he signed up). Student News / Weekly News announcements are not enough
+- EPS Ventures outings unless Yan has a signup confirmation, a form receipt or he said he signed up. Student News / Weekly News announcements are not enough
 
 Do not invent a clock. Use the time they named, or all-day.
 
@@ -117,7 +122,7 @@ Big dates:
 - School-year milestones: first or last day, orientation, advisor or parent
   conferences
 - Travel that takes Yan out of school (itinerary fly day)
-- College visits
+- A college visit Yan said he signed up for
 - Graduation-scale or family/performance milestones that belong on Dates
 
 Not big dates: routine appointments (dentist, haircut), homework, CW/HW/QA/MA
@@ -166,7 +171,8 @@ Do not git commit; the Node wrapper does that.
 
 - Acting on inference for sends, todos, or education dates. "He probably
   wants X" is a journal note, not an education date. Calendar is the
-  exception: a named day for a plan is enough, even if the plan is tentative.
+  exception: a named day for a real plan is enough, even if the plan is tentative.
+  College spam, the weekly EPS visit list, and todos are not that exception.
   `timezoneAfter` and Airbnb checkout are not a flight confirmation. A travel
   `date.json` date is the itinerary fly day. If the digest says "no flight
   number in mail," search Mail.app (personal-mail skill) anyway. The

@@ -1,8 +1,9 @@
 ---
 name: calendar-on-demand
 description: >-
-  Realtime Apple Calendar writer. One Composer run for the plan in a new
-  iMessage, Mail, school Outlook, or Teams message. Not the nightly scan.
+  Realtime Apple Calendar writer. One Composer run when Jev flags a new
+  iMessage, Mail, school Outlook, or Teams message. Composer decides if it
+  is calendar-worthy. Not the nightly scan.
 disable-model-invocation: true
 ---
 
@@ -12,11 +13,19 @@ Yan only. Local only. Never a cloud agent.
 
 This job is one plan. The message that woke you up is the subject. Do not sweep the inbox, other chats, or the rest of the day for unrelated events. The nightly job still does that scan.
 
-## Add
+## Worth adding
 
-Bias is add for this plan. A named day is enough. A clock is better. All-day is fine when nobody named a time. TBD venue is fine. A maybe is fine. Do not invent a clock.
+Jev only asked whether this message might be a plan. You still decide if it is calendar-worthy. Create nothing when it is not.
 
-Skip homework, Canvas, the EPS bell schedule, and "we should hang out" with no day. Skip EPS Ventures unless there is a signup confirmation.
+Add an event he is actually showing up for. A hangout, meal, appointment, reservation, flight, or meeting with a day. A clock is better. All-day is fine when nobody named a time. TBD venue is fine when the plan is real. Do not invent a clock.
+
+Skip these even when they name a day:
+
+- College spam. Recruitment and marketing from colleges, Scoir blasts, apply-now mail, and info sessions he did not register for. A date in the email is not an event.
+- The weekly EPS college-visit list. School sends one about once a week. Do not add each visit. Only a visit Yan said he signed up for, or a form receipt for that visit. The announcement is not a signup.
+- Education todos, homework, Canvas, due dates, and other dashboard items. Those stay on the education dashboard. The calendar is events.
+- The EPS bell schedule, and "we should hang out" with no day.
+- EPS Ventures unless there is a signup confirmation.
 
 ## Already there, or deleted
 

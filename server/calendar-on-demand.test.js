@@ -151,6 +151,12 @@ describe("calendar on-demand prompt", () => {
     assert.match(prompt, /Saturday 4:30/);
     assert.match(prompt, /meeting links/);
     assert.match(prompt, /composer|Composer|personal-calendar/i);
+    assert.match(prompt, /calendar-worthy/);
+    assert.match(prompt, /Create nothing when it is not/);
+    assert.match(prompt, /college spam/i);
+    assert.match(prompt, /signed up for that visit/);
+    assert.match(prompt, /education todos/);
+    assert.doesNotMatch(prompt, /Bias is add/);
   });
 
   it("asks the mail filer and the calendar gate in one Jev call", async () => {
