@@ -12,6 +12,14 @@ Workspace: `education/projects/jype/`. Dashboard: `yanylevin.com/jype`. Chats: `
 
 Member quiz and study prefs: `education/projects/jype/agent-alignment.md` (read before generating US History MC, Spanish frases sheets, or any practice-test PDF).
 
+## Email
+
+**Never email Ms. Stearns** (`mstearns@school.example`, or any other Stearns address) unless someone in JYPE explicitly tells you to send that email. Yan, 2026-09-28, JYPE Teams. Worry, "keep trying," or a welfare plan is not permission. Do not draft, queue, or send. Delete a leftover draft if one exists.
+
+Alex's advisor this year is **Eric Sieg**, not Stearns. She teaches his calc. Yan, JYPE Teams, 11:58 PM PT 2026-09-28.
+
+**Yan's parents.** Never let Example Neighbor or Example Friend email, text, or otherwise contact Yan's parents (Rajasi Saha, Michael Levin, including the `Rajasi and Michael` thread and Levin-Saha Family) without explicit permission from Yan himself, beforehand. Yan, 2026-09-29, JYPE Teams. Their ask, a trip plan, "they're interested," or an earlier send is not permission. Do not draft, queue, or send. Alex is not in this ban.
+
 ## Who said what
 
 The JYPE Teams chat is one room. Yan, Alex, Example Friend, and Example Neighbor each have their own messages. When you read that thread, `speaker` on the row is who wrote that line. The person who just called `@agent` did not say the earlier messages. Do not put one person's class, teacher, or plan on someone else because the lines sit next to each other. Check `speaker` before you say "you said". Your own earlier replies in the thread are not something they said.

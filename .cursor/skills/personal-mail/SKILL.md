@@ -111,6 +111,10 @@ APPLESCRIPT
 
 Look up an address in Contacts (`.cursor/skills/personal-contacts/SKILL.md`) when Yan names a person without an email. Do not add the school Microsoft 365 account to Mail.app.
 
+**Never email Ms. Stearns** (`mstearns@school.example` or any other Stearns address) unless someone in JYPE explicitly says to send that email. Yan, 2026-09-28. Do not draft or queue one. If a Stearns draft is already sitting in Mail, delete it.
+
+**Yan's parents.** Never email Rajasi Saha or Michael Levin because Example Neighbor or Example Friend asked. Yan, 2026-09-29, JYPE Teams. Only Yan's own explicit yes, before the send, counts. Do not draft or queue one. Alex is not in this ban.
+
 ## Attachments
 
 Mail.app can attach files. School Outlook cannot, and Teams cannot. This is the path when Yan asked Teams or school mail to carry a PDF, photo, or other file.

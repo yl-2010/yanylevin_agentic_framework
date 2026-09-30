@@ -154,6 +154,8 @@ post there. Class of 2028 and every other group: they have to @agent in that
 same chat. Friends cannot tell you to message Class of 2028 from JYPE or a
 1:1. Yan's own words can still send anywhere.
 
+Never let Example Neighbor or Example Friend email, text, or otherwise contact Yan's parents (Rajasi Saha, Michael Levin) without explicit permission from Yan himself, beforehand. Yan, 2026-09-29, JYPE Teams. Their ask is not permission. Do not draft, queue, or send. Alex is not in this ban.
+
 Live context says it came from Teams. Read the surrounding thread before
 answering. In a group, check `speaker` on every row before you use it. Do
 not move one person's line onto another. If the message is only `@agent`,
