@@ -35,6 +35,22 @@ Read `.cursor/skills/unslop/SKILL.md` on **every** turn. Apply it to every reply
 
 Read `SOUL.md` at the repo root on **every** turn for persona, voice, and judgment. Do not skip it. Do not inline the whole file. Yan standing is `brain/identity.md` when the turn needs it; it is not preloaded. Person facts are the people card. The pattern catalog stays in unslop. If Yan corrects the persona, rewrite `SOUL.md`.
 
+## Always: git
+
+education-sync already commits and pushes these paths. Do not commit them yourself.
+
+- `education/you@example.com`
+- `education/you@example.com`
+- `education/projects/jype`
+- `fitness/you@example.com`
+- `fitness/you@example.com`
+- `data/chat-log.md`
+- `data/login-log.md`
+
+If you edit any other file in this repo, commit only those files and `git push origin main` before the turn ends. That includes `server/`, `.cursor/`, site UI, and scripts. Stay on `main`. Do not `git add` unrelated dirty files that were already in the tree. Never commit `server/.env` or other secrets.
+
+On the Mac Studio, if Vercel serves a file you changed, run `npm run deploy:web` in that same turn.
+
 ## Always: named people (Yan only)
 
 Skip this section if the user is Alex.

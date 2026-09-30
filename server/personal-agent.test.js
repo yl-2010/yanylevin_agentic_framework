@@ -181,6 +181,9 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.home));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.canvas));
     assert.match(prompt, /Class files go on OneDrive/);
+    assert.match(prompt, /pushed to origin\/main before the turn ends/);
+    assert.match(prompt, /Commit only files from this turn/);
+    assert.match(prompt, /Never commit server\/\.env/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.imessage));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.screentime));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.contacts));
@@ -535,6 +538,8 @@ describe("Personal Agent skill files", () => {
     assert.match(people, /\[GPS\]/);
 
     const agent = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.agent), "utf8");
+    assert.match(agent, /education-sync already commits/);
+    assert.match(agent, /git push origin main/);
     assert.match(agent, /send_chat_message/);
     assert.match(agent, /Send more intermediate bubbles/);
     assert.match(agent, /posted to the same chat, before you start/);
