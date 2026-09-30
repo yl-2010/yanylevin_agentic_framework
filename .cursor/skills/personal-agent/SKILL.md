@@ -94,7 +94,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Location brain places (manual run) | `.cursor/skills/location-brain/SKILL.md` |
 | Health takeaways (manual run) | `.cursor/skills/health-takeaways/SKILL.md` |
 | Health brain facts (manual run) | `.cursor/skills/health-brain/SKILL.md` |
-| Health history patterns (manual) | `.cursor/skills/health-history/SKILL.md` |
+| Health history patterns (01:00 takeaways may edit) | `.cursor/skills/health-history/SKILL.md` |
 | Person iMessage fill (manual, one-shot) | `.cursor/skills/brain-person-imessage/SKILL.md` |
 | School Outlook fill (manual, one-shot) | `.cursor/skills/brain-school-mail/SKILL.md` |
 | School Teams fill (manual, one-shot) | `.cursor/skills/brain-school-teams/SKILL.md` |

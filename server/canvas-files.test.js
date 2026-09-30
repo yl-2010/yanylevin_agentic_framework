@@ -7,6 +7,7 @@ import {
   allocateFileName,
   canvasDownloadName,
   displayUploadName,
+  isSpanishDecorationImage,
   pickSubmitFiles,
   pickCanvasSubmitKind,
   writeFileIntoFolder,
@@ -90,6 +91,32 @@ describe("canvasDownloadName", () => {
     assert.equal(
       allocateFileName("Practica.png", taken, "practica.png"),
       "Practica.png"
+    );
+  });
+});
+
+describe("isSpanishDecorationImage", () => {
+  it("skips Spanish pasted images and keeps named files and other classes", () => {
+    assert.equal(
+      isSpanishDecorationImage(
+        "spanish-4",
+        "image-e8147842-2f41-4494-b5dc-05152c750e1b.png",
+        "image/png"
+      ),
+      true
+    );
+    assert.equal(isSpanishDecorationImage("spanish-4", "image.png", "image/png"), true);
+    assert.equal(
+      isSpanishDecorationImage("spanish-4", "lectura pagina 1.png"),
+      false
+    );
+    assert.equal(isSpanishDecorationImage("spanish-4", "Busca un articulo.pdf"), false);
+    assert.equal(
+      isSpanishDecorationImage(
+        "physics",
+        "image-e8147842-2f41-4494-b5dc-05152c750e1b.png"
+      ),
+      false
     );
   });
 });

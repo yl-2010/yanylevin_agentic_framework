@@ -297,17 +297,6 @@
         },
       ],
     },
-    {
-      time: "you run it",
-      items: [
-        {
-          id: "health-history",
-          name: "Health history",
-          model: "Composer 2.5",
-          kind: "clock",
-        },
-      ],
-    },
   ];
 
   function show(name) {

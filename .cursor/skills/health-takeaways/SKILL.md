@@ -27,7 +27,8 @@ All under `education/you@example.com/health/`:
 | `raw/apple-export-YYYY.json` | Compact full Apple XML archive. Skip in this job. Too large to load. |
 | `log-YYYY-MM.jsonl` | Ingest index. Do not rewrite. |
 | `workouts.md` | Deterministic workout list. Newest day on top. Node already merged it. |
-| `takeaways.md` | Your output. Newest day on top. |
+| `takeaways.md` | Daily prose. Newest day on top. |
+| `history-patterns.md` | Standing essay. Update only when a pattern changed. Rules in `.cursor/skills/health-history/SKILL.md`. |
 | `state.json` | Cursor. Set `lastTakeawaysAt` when you finish. |
 
 Gym stack weights are a different log (`fitness/you@example.com/`). Leave them alone unless a Health workout name clearly matches a gym session.
@@ -37,10 +38,11 @@ Gym stack weights are a different log (`fitness/you@example.com/`). Leave them a
 1. Read `state.json` if it exists (`lastTakeawaysAt`). Missing cursor means all raw files are new, but still merge into existing takeaways.md instead of wiping it.
 2. Read shortcut raw JSON files newer than that cursor, plus `workouts.md` and the current `takeaways.md`. Ignore `raw/apple-export-*.json`.
 3. Also read `/tmp/yanylevin-context-life-state.json` or `node server/life-state.js day <the takeaways day>`. Life-state `sleeping` / `at_gym` / `on_computer` is rooms and movement. Sleep dumps through the 2026-09-26 10:49 AM PT ingest are actual. Later Health-app sleep is inflated until Yan says otherwise. Prefer dump onset, wake, and stages only inside that actual window. Prefer life-state, screens, and lights over later sleep hours. Use life-state for office vs class vs gym vs screens. `.cursor/skills/life-state/SKILL.md`.
-4. If nothing is new, stop without rewriting markdown.
+4. If nothing is new, stop. Do not rewrite `takeaways.md` or `history-patterns.md`.
 5. For each local calendar day that has new evidence, write a short take: what he did with his body, not a spreadsheet. Workouts by name, duration, and effort. Sleep as hours plus anything that looks off (short night, lots of awake). Write dump sleep as how he slept only through the 2026-09-26 10:49 AM PT ingest. Omit later sleep hours, or label them as Health-app display, not actual sleep. Steps / RHR / HRV only when they moved versus the surrounding days.
 6. Merge into `takeaways.md`. Newest day on top. Update that day's section; do not rewrite older days unless the new dump clearly corrects one.
-7. Write `state.json` keeping `lastIngestAt` and `timezone`, and set `lastTakeawaysAt` to now.
+7. Read `history-patterns.md` and `.cursor/skills/health-history/SKILL.md`. If this day changes a standing pattern, edit that essay in place. Leave it when the day already fits. Same freedom for other standing health notes in this folder. Do not rewrite `workouts.md`, digest files, raw JSON, or `brain/health.md`.
+8. Write `state.json` keeping `lastIngestAt` and `timezone`, and set `lastTakeawaysAt` to now.
 
 ## Summer backfill
 
@@ -72,6 +74,7 @@ The weekday in the heading must match that `YYYY-MM-DD` in America/Los_Angeles (
 - Copying a weekday, rest/lift flag, or RHR onto the neighboring day
 - Preferring life-state sleeping spans over Health dump sleep from the actual window
 - Writing Health-app sleep after the 2026-09-26 10:49 AM PT ingest as actual hours
+- Rewriting `history-patterns.md` for an ordinary day that already fits
 - Git commit (the Node wrapper does that)
 
 ## Verify

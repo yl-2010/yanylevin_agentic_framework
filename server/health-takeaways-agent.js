@@ -139,7 +139,7 @@ export function buildHealthTakeawaysPrompt({ dateKey, timezone, force }) {
   const hist = HEALTH_REL;
   const rebuild = force
     ? "Force: write takeaways even if you already processed today's dump. Merge; do not wipe older days."
-    : "If there are no raw JSON files newer than state.json lastTakeawaysAt, stop without rewriting takeaways.md.";
+    : "If there are no raw JSON files newer than state.json lastTakeawaysAt, stop without rewriting takeaways.md or history-patterns.md.";
   return [
     "Follow the health-takeaways skill (.cursor/skills/health-takeaways/SKILL.md).",
     "Turn Yan's Apple Health dumps into natural-language takeaways. Yan only (you@example.com).",
@@ -153,6 +153,7 @@ export function buildHealthTakeawaysPrompt({ dateKey, timezone, force }) {
     "Write takeaways.md: short prose per day, newest day on top. Headings are ## YYYY-MM-DD Weekday matching that calendar day in this timezone (example ## 2026-09-10 Thursday). Do not copy the previous day's weekday. A rest day does not smear onto a lift day. Call out workouts by name, duration, and effort. Sleep as hours plus quality tells. Mention RHR/HRV/steps only when they moved versus that same day, not a neighbor.",
     "Do not dump tables of every sample. Do not invent diagnoses. This is lifestyle context, not a medical chart.",
     "Gym machine weights live under fitness/ and are a different log. Do not mix them in unless a workout name clearly matches.",
+    "If the new day changes a standing pattern, edit history-patterns.md in place. Follow the health-history skill (.cursor/skills/health-history/SKILL.md). Leave that file alone when the day already fits. You may update other standing health notes in this folder the same way. Do not rewrite workouts.md, digest files, raw JSON, or brain/health.md.",
     "Update state.json lastTakeawaysAt when you finish.",
     rebuild,
   ].join("\n");
