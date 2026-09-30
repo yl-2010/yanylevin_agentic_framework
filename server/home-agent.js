@@ -39,6 +39,10 @@ export const VACUUM_DUE_MS = 72 * 60 * 60 * 1000;
 export const FAMILY_VACUUM_DUE_MS = 7 * 24 * 60 * 60 * 1000;
 export const VACUUM_WARN_LEAD_MS = 15 * 60 * 1000;
 export const VACUUM_CONFIRM_GRACE_MS = 20 * 60 * 1000;
+/** Family sleep, Pacific. The Roomba has to be finished before this starts. */
+export const FAMILY_SLEEP_START_MIN = 21 * 60;
+export const FAMILY_SLEEP_END_MIN = 7 * 60;
+export const VACUUM_AWAKE_BUFFER_MS = 2 * 60 * 60 * 1000;
 export const VACUUM_SCENE = "Vacuum Yan";
 export const SUNNY_VACUUM_SCENE = "Roomba Sunny Boy Landing Laundry Room";
 export const MASTER_VACUUM_SCENE = "Roomba Master Rooms";
@@ -213,6 +217,32 @@ export function schoolInSessionAt(nowMs, schedule, timeZone = TZ) {
   const window = bellWindowMinutes(schedule);
   if (!window) return false;
   return clock.minutes >= window.startMin && clock.minutes < window.endMin;
+}
+
+/**
+ * 9:00 PM through 7:00 AM Pacific. 7:00 AM is awake.
+ * @param {number} nowMs
+ * @param {string} [timeZone]
+ */
+export function houseAsleepAt(nowMs, timeZone = TZ) {
+  if (!Number.isFinite(nowMs)) return true;
+  const minutes = scheduleNowParts({ timezone: timeZone }, new Date(nowMs)).minutes;
+  return minutes >= FAMILY_SLEEP_START_MIN || minutes < FAMILY_SLEEP_END_MIN;
+}
+
+/**
+ * True when a start at now+lead would run into family sleep.
+ * The run buffer is 2 hours. lead is 0 for an immediate start, 15 minutes for a warning.
+ * @param {number} nowMs
+ * @param {string} [timeZone]
+ * @param {number} [leadMs]
+ */
+export function vacuumOverlapsFamilySleep(nowMs, timeZone = TZ, leadMs = 0) {
+  const start = nowMs + (Number.isFinite(leadMs) ? leadMs : 0);
+  return (
+    houseAsleepAt(start, timeZone) ||
+    houseAsleepAt(start + VACUUM_AWAKE_BUFFER_MS, timeZone)
+  );
 }
 
 /**
@@ -408,6 +438,9 @@ export function pickVacuumZone(opts = {}) {
   if (anyZoneStartedOnDate(zones, dateKey, timeZone)) {
     return { run: false, reason: "already-ran-today", zone: null };
   }
+  if (vacuumOverlapsFamilySleep(nowMs, timeZone)) {
+    return { run: false, reason: "house-asleep", zone: null };
+  }
   if (!force) {
     const where = classifyVacuumLocation(opts.location);
     if (where.kind === "home") return { run: false, reason: "at-home", zone: null };
@@ -424,7 +457,9 @@ export function pickVacuumZone(opts = {}) {
     startedWithin(yanAt, nowMs, VACUUM_DUE_MS) &&
     !vacuumStampOnDate(yanAt, dateKey, timeZone);
   const sunnyAt = zones.sunny?.lastStartedAt || null;
+  const familyAsleep = vacuumOverlapsFamilySleep(nowMs, timeZone, VACUUM_WARN_LEAD_MS);
   if (yanFresh && vacuumIsDue(sunnyAt, nowMs, FAMILY_VACUUM_DUE_MS)) {
+    if (familyAsleep) return { run: false, reason: "house-asleep", zone: null };
     if (!opts.familyWindowOpen) return { run: false, reason: "not-in-session", zone: null };
     return { run: true, reason: force ? "force" : "due", zone: "sunny" };
   }
@@ -434,6 +469,7 @@ export function pickVacuumZone(opts = {}) {
     !vacuumStampOnDate(sunnyAt, dateKey, timeZone);
   const masterAt = zones.master?.lastStartedAt || null;
   if (yanFresh && sunnyFresh && vacuumIsDue(masterAt, nowMs, FAMILY_VACUUM_DUE_MS)) {
+    if (familyAsleep) return { run: false, reason: "house-asleep", zone: null };
     if (!opts.familyWindowOpen) return { run: false, reason: "not-in-session", zone: null };
     return { run: true, reason: force ? "force" : "due", zone: "master" };
   }
@@ -909,6 +945,10 @@ export async function recordVacuumStart(opts = {}) {
   const at = opts.at || new Date().toISOString();
   const zone = normalizeVacuumZone(opts.zone || "yan");
   if (!zone) throw new Error(`unknown vacuum zone ${opts.zone}`);
+  const atMs = Date.parse(at);
+  if (!Number.isFinite(atMs) || vacuumOverlapsFamilySleep(atMs)) {
+    throw new Error("not recording a start, the house is in family sleep hours");
+  }
   const prev = await readVacuumState(path);
   const zones = vacuumZonesFromState(prev);
   const reason = String(opts.reason || "").trim().slice(0, 240);
@@ -939,6 +979,9 @@ export async function recordVacuumWarn(opts = {}) {
   const path = opts.path || vacuumStatePath();
   const warnedMs = Date.parse(opts.at || new Date().toISOString());
   if (!Number.isFinite(warnedMs)) throw new Error("record-warn needs a valid time");
+  if (vacuumOverlapsFamilySleep(warnedMs, TZ, VACUUM_WARN_LEAD_MS)) {
+    throw new Error("not warning, the Roomba would run into family sleep");
+  }
   const reason = String(opts.reason || "").trim().slice(0, 240);
   return writeVacuumPatch(path, {
     pending: {
@@ -1102,6 +1145,7 @@ const HARD_VACUUM_SKIPS = new Set([
   "pending-confirm",
   "already-ran-today",
   "denied-today",
+  "house-asleep",
 ]);
 
 function scheduleConfirmRetry(delayMs) {
@@ -1294,6 +1338,11 @@ async function runVacuumConfirmOnce() {
     console.log("[home-agent] confirm window missed, pending dropped");
     return { ok: true, skipped: true, reason: "confirm-expired" };
   }
+  if (vacuumOverlapsFamilySleep(nowMs)) {
+    await clearVacuumPending();
+    console.log("[home-agent] confirm skipped, house asleep");
+    return { ok: true, skipped: true, reason: "house-asleep" };
+  }
   const attempts = Number(state.pending.confirmAttempts || 0);
   if (attempts >= 2) {
     await clearVacuumPending();
@@ -1397,6 +1446,9 @@ if (isMain) {
     if (cmd === "trigger") {
       const zone = normalizeVacuumZone(argValue("--zone") || "yan");
       if (!zone) throw new Error(`unknown vacuum zone ${argValue("--zone")}`);
+      if (vacuumOverlapsFamilySleep(Date.now())) {
+        throw new Error("not starting the Roomba, the house is in family sleep hours");
+      }
       await runHome(["trigger", VACUUM_ZONE_SPECS[zone].scene]);
       const state = await recordVacuumStart({
         zone,

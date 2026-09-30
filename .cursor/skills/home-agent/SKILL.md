@@ -18,7 +18,7 @@ The hourly script in `server/home-agent.js` does the cheap checks, including the
 node --env-file=server/.env server/home-agent.js --force
 ```
 
-`--force` skips the phone-pin gate and an open `nextCheckAt`. It still lets this decision stand. It does not force the scene on, and it does not force lights off. It does not skip one scene a day, an open family warning, a denial already sent today, or the school-session window on the family zones.
+`--force` skips the phone-pin gate and an open `nextCheckAt`. It still lets this decision stand. It does not force the scene on, and it does not force lights off. It does not skip one scene a day, an open family warning, a denial already sent today, the school-session window on the family zones, or family sleep hours.
 
 ## Lights
 
@@ -74,12 +74,20 @@ The phone pin in the prompt is last-known GPS. A stale home pin means he is stil
 
 Parents live in the Kirkland house. Yan being out does not mean the house is empty.
 
+## Family sleep
+
+No scene can run while the family is asleep. That includes `Vacuum Yan`. Sleep is 9:00 PM through 7:00 AM Pacific. 7:00 AM is awake.
+
+The Roomba also needs two hours clear of that window, so the run is finished before anyone is in bed. The script will not start a scene from 7:00 PM to 7:00 AM. A family warning needs the start 15 minutes later to still have those two hours, so Sunny and master are not warned from 6:45 PM on.
+
+`--force` does not override this. `trigger`, `record-warn`, and `record-start` refuse during the window. The confirm pass does not start the Roomba and does not text if the window has arrived. It drops the pending warning instead.
+
 ## Start only if both are true
 
 For `yan`, both of these:
 
 - He is unlikely to be home within 2 hours. Use the calendar, the school day, life-state, and the usual leave and return pattern. The run should be finished before he walks in. Two hours is that buffer.
-- The house will not be asleep during those 2 hours. Early morning is no. An evening where people will be in bed within 2 hours is no. A long absence does not override that.
+- The house will not be asleep during those 2 hours. The script already blocked 9:00 PM to 7:00 AM. Still say no if people will be in bed earlier than that. A long absence does not override that.
 
 For `sunny` and `master`, the same two rules, applied to the people who use that part of the house, not only to Yan. The script already checked that school is in session across the 15-minute warning. If those two rules fail, record a skip and do not text.
 

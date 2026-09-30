@@ -19,6 +19,7 @@ import {
   classifyLightsPresence,
   classifyVacuumLocation,
   familyWarnWindowOpen,
+  houseAsleepAt,
   homeAgentModelSpec,
   homeVacuumGate,
   isYanRoomLight,
@@ -33,6 +34,7 @@ import {
   turnOffYanRoomLightsIfAway,
   vacuumConfirmPlan,
   vacuumIsDue,
+  vacuumOverlapsFamilySleep,
   vacuumZonesFromState,
   yanRoomLightsToTurnOff,
 } from "./home-agent.js";
@@ -138,6 +140,82 @@ describe("school session", () => {
 
     const closed = Date.parse("2026-09-18T17:00:00.000Z");
     assert.equal(schoolInSessionAt(closed, SCHOOL), false);
+  });
+});
+
+describe("family sleep", () => {
+  const tenPm = Date.parse("2026-09-26T05:00:00.000Z");
+  const sixAm = Date.parse("2026-09-25T13:00:00.000Z");
+  const sevenAm = Date.parse("2026-09-25T14:00:00.000Z");
+  const eightPm = Date.parse("2026-09-26T03:00:00.000Z");
+  const sixFifty = Date.parse("2026-09-26T01:50:00.000Z");
+
+  it("blocks every zone from 7pm through 7am, including force", () => {
+    assert.equal(houseAsleepAt(tenPm), true);
+    assert.equal(houseAsleepAt(sixAm), true);
+    assert.equal(houseAsleepAt(sevenAm), false);
+    assert.equal(vacuumOverlapsFamilySleep(eightPm), true);
+    assert.equal(vacuumOverlapsFamilySleep(sevenAm), false);
+
+    const night = pickVacuumZone({
+      nowMs: tenPm,
+      dateKey: "2026-09-25",
+      timeZone: "America/Los_Angeles",
+      location: EPS,
+      force: true,
+      zones: {
+        yan: { lastStartedAt: null },
+        sunny: { lastStartedAt: null },
+        master: { lastStartedAt: null },
+      },
+    });
+    assert.equal(night.reason, "house-asleep");
+    assert.equal(night.zone, null);
+
+    const morning = pickVacuumZone({
+      nowMs: sevenAm,
+      dateKey: "2026-09-25",
+      timeZone: "America/Los_Angeles",
+      location: EPS,
+      zones: {
+        yan: { lastStartedAt: null },
+        sunny: { lastStartedAt: null },
+        master: { lastStartedAt: null },
+      },
+    });
+    assert.equal(morning.zone, "yan");
+  });
+
+  it("still allows Yan just before 7pm, and blocks a family warning that would start after that", () => {
+    assert.equal(vacuumOverlapsFamilySleep(sixFifty), false);
+    assert.equal(vacuumOverlapsFamilySleep(sixFifty, "America/Los_Angeles", VACUUM_WARN_LEAD_MS), true);
+
+    const yan = pickVacuumZone({
+      nowMs: sixFifty,
+      dateKey: "2026-09-25",
+      timeZone: "America/Los_Angeles",
+      location: EPS,
+      zones: {
+        yan: { lastStartedAt: null },
+        sunny: { lastStartedAt: null },
+        master: { lastStartedAt: null },
+      },
+    });
+    assert.equal(yan.zone, "yan");
+
+    const sunny = pickVacuumZone({
+      nowMs: sixFifty,
+      dateKey: "2026-09-25",
+      timeZone: "America/Los_Angeles",
+      location: EPS,
+      familyWindowOpen: true,
+      zones: {
+        yan: { lastStartedAt: new Date(sixFifty - 24 * 60 * 60 * 1000).toISOString() },
+        sunny: { lastStartedAt: null },
+        master: { lastStartedAt: null },
+      },
+    });
+    assert.equal(sunny.reason, "house-asleep");
   });
 });
 
@@ -663,5 +741,29 @@ describe("vacuum state writes", () => {
     assert.equal(started.zones.master.lastStartedAt, "2026-09-25T18:15:00.000Z");
     assert.equal(started.pending, undefined);
     assert.equal(VACUUM_SCENE_FORBIDDEN.includes("Rooms"), true);
+  });
+
+  it("refuses to record a start or a warning that runs into family sleep", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "home-agent-"));
+    const path = join(dir, "vacuum.json");
+    await assert.rejects(
+      () =>
+        recordVacuumStart({
+          path,
+          at: "2026-09-26T05:00:00.000Z",
+          reason: "night",
+        }),
+      /family sleep/
+    );
+    await assert.rejects(
+      () =>
+        recordVacuumWarn({
+          path,
+          zone: "sunny",
+          at: "2026-09-26T01:50:00.000Z",
+          reason: "too late",
+        }),
+      /family sleep/
+    );
   });
 });
