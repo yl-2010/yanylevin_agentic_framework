@@ -110,6 +110,8 @@ node server/school-teams.js send --chat "Alex" --text "Body here"
 node server/school-teams.js send --chat myself --text "Body here"
 ```
 
+Do not pass `--via`. A Teams send already shows in that chat. It does not get a card on the dashboard Actions rail.
+
 `--chat myself` / `me` / `Me` is Chat with yourself (`48:notes`). CSA does not list that thread, so use those names (or the id) instead of guessing from members.
 
 Class channel only when Yan named the team **and** channel:

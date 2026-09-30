@@ -1,11 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { appendFile, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   appendAgentAction,
   ensureHomeSeeds,
+  isDashboardAction,
   lightsActionSummary,
   readAgentActions,
   vacuumSeedRows,
@@ -79,6 +80,49 @@ describe("agent action log", () => {
       assert.equal(entries[0].summary, "Started Vacuum Yan");
       assert.equal(entries[1].summary, "Turned off Yan's room lights");
       assert.equal(entries[0].agent, "home-agent");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps chat sends off the dashboard", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "agent-actions-chat-"));
+    const path = join(dir, "actions.jsonl");
+    try {
+      assert.equal(isDashboardAction("teams"), false);
+      assert.equal(isDashboardAction("imessage"), false);
+      assert.equal(isDashboardAction("calendar"), true);
+      const dropped = await appendAgentAction(
+        {
+          agent: "jype",
+          kind: "teams",
+          summary: "Sent Teams message to JYPE",
+        },
+        { path }
+      );
+      assert.equal(dropped, null);
+      await appendFile(
+        path,
+        `${JSON.stringify({
+          at: "2026-09-30T16:16:01.064Z",
+          agent: "jype",
+          kind: "teams",
+          summary: "Sent Teams message to JYPE",
+        })}\n`,
+        "utf8"
+      );
+      await appendAgentAction(
+        {
+          at: "2026-09-22T18:00:00.000Z",
+          agent: "home-agent",
+          kind: "vacuum",
+          summary: "Started Vacuum Yan",
+        },
+        { path }
+      );
+      const { entries } = await readAgentActions({ path, seed: false });
+      assert.equal(entries.length, 1);
+      assert.equal(entries[0].kind, "vacuum");
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

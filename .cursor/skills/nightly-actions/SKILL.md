@@ -169,11 +169,9 @@ Do not git commit; the Node wrapper does that.
 
 ## Action log
 
-Tag background writes so they show on the dashboard Actions rail. Reads stay untagged.
+The dashboard Actions rail is for side effects Yan would not already see in a chat he is in. Calendar, mail, education dates, lights, and the vacuum belong there. A Teams or iMessage send does not. The message is already in that chat. Do not pass `--via` on those sends, and do not append a `teams` or `imessage` action. Reads stay untagged.
 
 - Calendar `create`, `update`, and `delete` take `--via nightly-actions`.
-- `node server/imessage-send.js` takes `--via nightly-actions`.
-- `node server/school-teams.js send` takes `--via nightly-actions`.
 - After a Mail.app send, run `node server/agent-actions.js append --agent nightly-actions --kind mail --summary "Sent mail to Name"`.
 - After you add or change a `date.json`, run `node server/agent-actions.js append --agent nightly-actions --kind education-date --summary "Added Fall orientation"`. Say Updated when the date was already there.
 

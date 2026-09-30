@@ -10,7 +10,6 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { applyAgentSentFooter } from "./imessage-mention.js";
-import { appendAgentAction } from "./agent-actions.js";
 
 const execFileAsync = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)));
@@ -474,17 +473,6 @@ if (isCli) {
       text: applyAgentSentFooter(text, { chat: parsed.to, handle: parsed.to }),
       files: parsed.files,
     });
-    if (parsed.actionAgent && sent?.ok) {
-      try {
-        await appendAgentAction({
-          agent: parsed.actionAgent,
-          kind: "imessage",
-          summary: `Sent iMessage to ${parsed.to}`,
-        });
-      } catch (err) {
-        console.error("[agent-actions]", err instanceof Error ? err.message : err);
-      }
-    }
     return sent;
   };
   run()

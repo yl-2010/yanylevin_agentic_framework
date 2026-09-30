@@ -1,6 +1,7 @@
 /**
- * Append-only log of side effects from background agents.
- * Clock jobs and Jev-started jobs write here. Interactive chat does not.
+ * Append-only log of side effects Yan would not already see.
+ * Calendar, mail, education dates, lights, and the vacuum belong here.
+ * Teams and iMessage sends do not. Those already show in the chat.
  * File stays on the Mac. data/agent-actions.jsonl is gitignored.
  */
 
@@ -17,6 +18,16 @@ const AGENT_LABELS = {
   "calendar-on-demand": "Calendar on demand",
   "nightly-actions": "Nightly actions",
 };
+
+/** Already visible in Teams or Messages. The Actions rail skips these. */
+const CHAT_KINDS = new Set(["teams", "imessage"]);
+
+/**
+ * @param {string} kind
+ */
+export function isDashboardAction(kind) {
+  return !CHAT_KINDS.has(String(kind || "").trim());
+}
 
 /**
  * @param {string} agent
@@ -75,6 +86,7 @@ export async function appendAgentAction(entry, opts = {}) {
     .trim();
   const at = entry?.at ? String(entry.at) : new Date().toISOString();
   if (!agent || !kind || !summary) return null;
+  if (!isDashboardAction(kind)) return null;
   if (Number.isNaN(Date.parse(at))) return null;
   const id = String(entry?.id || "").trim();
   if (id && (await actionIdExists(path, id))) return null;
@@ -219,6 +231,7 @@ export async function readAgentActions(opts = {}) {
     try {
       const row = JSON.parse(trimmed);
       if (!row?.summary || !row?.at) continue;
+      if (!isDashboardAction(row.kind)) continue;
       entries.push(publicEntry(row));
     } catch {
       /* skip a torn line */

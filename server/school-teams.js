@@ -13,7 +13,6 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { applyAgentSentFooter } from "./imessage-mention.js";
-import { appendAgentAction } from "./agent-actions.js";
 import { markdownToTeamsHtml } from "./teams-format.js";
 import { applyDumpClock, givenName } from "./local-clock.js";
 import {
@@ -1862,7 +1861,7 @@ export async function runSchoolTeams(argv, opts = {}) {
 
   if (cmd === "send") {
     return withSession(parsed, root, async (session) => {
-      const result = await sendTeamsMessage({
+      return sendTeamsMessage({
         session,
         chat: parsed.chat,
         team: parsed.team,
@@ -1870,22 +1869,6 @@ export async function runSchoolTeams(argv, opts = {}) {
         text: parsed.text,
         root,
       });
-      if (parsed.via && result?.ok) {
-        const who =
-          result.kind === "channel"
-            ? [result.team, result.channel].filter(Boolean).join(" / ")
-            : result.chat || parsed.chat;
-        try {
-          await appendAgentAction({
-            agent: parsed.via,
-            kind: "teams",
-            summary: `Sent Teams message to ${who}`,
-          });
-        } catch (err) {
-          console.error("[agent-actions]", err instanceof Error ? err.message : err);
-        }
-      }
-      return result;
     });
   }
 
