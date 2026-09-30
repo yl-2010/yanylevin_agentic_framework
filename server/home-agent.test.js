@@ -4,23 +4,36 @@ import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  FAMILY_VACUUM_DUE_MS,
   HOME_AGENT_INTERVAL_MS,
   HOME_AGENT_MODEL_SPEC,
+  MASTER_VACUUM_SCENE,
+  SUNNY_VACUUM_SCENE,
+  VACUUM_CONFIRM_GRACE_MS,
   VACUUM_DUE_MS,
   VACUUM_SCENE,
   VACUUM_SCENE_FORBIDDEN,
+  VACUUM_WARN_LEAD_MS,
   buildHomeAgentPrompt,
+  buildVacuumConfirmPrompt,
   classifyLightsPresence,
   classifyVacuumLocation,
+  familyWarnWindowOpen,
   homeAgentModelSpec,
   homeVacuumGate,
   isYanRoomLight,
   lightsPinMaxAgeMs,
   msUntilNextHomeAgentTick,
+  pickVacuumZone,
+  recordVacuumDeny,
   recordVacuumSkip,
   recordVacuumStart,
+  recordVacuumWarn,
+  schoolInSessionAt,
   turnOffYanRoomLightsIfAway,
+  vacuumConfirmPlan,
   vacuumIsDue,
+  vacuumZonesFromState,
   yanRoomLightsToTurnOff,
 } from "./home-agent.js";
 
@@ -79,7 +92,7 @@ describe("vacuum location gate", () => {
         location: EPS,
         lastStartedAt: new Date(NOW - 60 * 60 * 1000).toISOString(),
       }).reason,
-      "recent-vacuum"
+      "already-ran-today"
     );
     assert.equal(
       homeVacuumGate({
@@ -93,6 +106,184 @@ describe("vacuum location gate", () => {
       homeVacuumGate({ nowMs: NOW, location: HOME, force: true }).reason,
       "force"
     );
+    assert.equal(
+      homeVacuumGate({ nowMs: NOW, location: HOME, force: true }).zone,
+      "yan"
+    );
+  });
+});
+
+const SCHOOL = {
+  timezone: "America/Los_Angeles",
+  schoolStart: "2026-09-02",
+  schoolEnd: "2027-06-11",
+  closedDates: ["2026-09-18"],
+  bells: [
+    { slot: 1, start: "08:30", end: "09:40" },
+    { slot: 4, start: "13:50", end: "15:00" },
+  ],
+};
+
+describe("school session", () => {
+  it("is open on a school-day afternoon and closed for the 15-minute tail", () => {
+    assert.equal(schoolInSessionAt(NOW, SCHOOL), true);
+    assert.equal(familyWarnWindowOpen(NOW, SCHOOL), true);
+
+    const late = Date.parse("2026-09-25T21:50:00.000Z");
+    assert.equal(schoolInSessionAt(late, SCHOOL), true);
+    assert.equal(familyWarnWindowOpen(late, SCHOOL), false);
+
+    const saturday = Date.parse("2026-09-26T17:00:00.000Z");
+    assert.equal(schoolInSessionAt(saturday, SCHOOL), false);
+
+    const closed = Date.parse("2026-09-18T17:00:00.000Z");
+    assert.equal(schoolInSessionAt(closed, SCHOOL), false);
+  });
+});
+
+describe("vacuum zone priority", () => {
+  const dayAgo = new Date(NOW - 24 * 60 * 60 * 1000).toISOString();
+  const twoDaysAgo = new Date(NOW - 2 * 24 * 60 * 60 * 1000).toISOString();
+
+  function pick(zones, extra = {}) {
+    return pickVacuumZone({
+      nowMs: NOW,
+      dateKey: "2026-09-25",
+      timeZone: "America/Los_Angeles",
+      location: EPS,
+      zones,
+      ...extra,
+    });
+  }
+
+  it("keeps a legacy Yan start on the Yan clock", () => {
+    const zones = vacuumZonesFromState({
+      lastStartedAt: "2026-09-29T16:00:17.936Z",
+      scene: VACUUM_SCENE,
+      reason: "school day",
+    });
+    assert.equal(zones.yan.lastStartedAt, "2026-09-29T16:00:17.936Z");
+    assert.equal(zones.sunny.lastStartedAt, null);
+    assert.equal(zones.master.lastStartedAt, null);
+  });
+
+  it("picks Yan at exactly 72 hours even when Sunny is also due", () => {
+    const yanAt = new Date(NOW - VACUUM_DUE_MS).toISOString();
+    const picked = pick(
+      {
+        yan: { lastStartedAt: yanAt },
+        sunny: { lastStartedAt: null },
+        master: { lastStartedAt: null },
+      },
+      { familyWindowOpen: true }
+    );
+    assert.equal(picked.zone, "yan");
+    assert.equal(vacuumIsDue(yanAt, NOW), true);
+    assert.equal(vacuumIsDue(new Date(NOW - VACUUM_DUE_MS + 1).toISOString(), NOW), false);
+  });
+
+  it("picks Sunny only inside the school window after a recent Yan run", () => {
+    const open = pick(
+      {
+        yan: { lastStartedAt: dayAgo },
+        sunny: { lastStartedAt: null },
+        master: { lastStartedAt: null },
+      },
+      { familyWindowOpen: true }
+    );
+    assert.equal(open.zone, "sunny");
+
+    const shut = pick({
+      yan: { lastStartedAt: dayAgo },
+      sunny: { lastStartedAt: null },
+      master: { lastStartedAt: null },
+    });
+    assert.equal(shut.reason, "not-in-session");
+  });
+
+  it("picks master only after both earlier zones are still fresh", () => {
+    const ready = pick(
+      {
+        yan: { lastStartedAt: dayAgo },
+        sunny: { lastStartedAt: twoDaysAgo },
+        master: { lastStartedAt: null },
+      },
+      { familyWindowOpen: true }
+    );
+    assert.equal(ready.zone, "master");
+
+    const sunnyDue = new Date(NOW - FAMILY_VACUUM_DUE_MS).toISOString();
+    const sunnyInstead = pick(
+      {
+        yan: { lastStartedAt: dayAgo },
+        sunny: { lastStartedAt: sunnyDue },
+        master: { lastStartedAt: null },
+      },
+      { familyWindowOpen: true }
+    );
+    assert.equal(sunnyInstead.zone, "sunny");
+    assert.equal(vacuumIsDue(sunnyDue, NOW, FAMILY_VACUUM_DUE_MS), true);
+    assert.equal(
+      vacuumIsDue(new Date(NOW - FAMILY_VACUUM_DUE_MS + 1).toISOString(), NOW, FAMILY_VACUUM_DUE_MS),
+      false
+    );
+  });
+
+  it("blocks the rest of the day after a start, a warning, or a denial", () => {
+    const started = pick(
+      {
+        yan: { lastStartedAt: new Date(NOW - 60 * 60 * 1000).toISOString() },
+        sunny: { lastStartedAt: null },
+        master: { lastStartedAt: null },
+      },
+      { familyWindowOpen: true }
+    );
+    assert.equal(started.reason, "already-ran-today");
+
+    const pending = pick(
+      {
+        yan: { lastStartedAt: dayAgo },
+        sunny: { lastStartedAt: null },
+        master: { lastStartedAt: null },
+      },
+      {
+        familyWindowOpen: true,
+        pending: {
+          zone: "sunny",
+          confirmAt: new Date(NOW + VACUUM_WARN_LEAD_MS).toISOString(),
+        },
+      }
+    );
+    assert.equal(pending.reason, "pending-confirm");
+
+    const denied = pick(
+      {
+        yan: { lastStartedAt: dayAgo },
+        sunny: { lastStartedAt: null },
+        master: { lastStartedAt: null },
+      },
+      { familyWindowOpen: true, blockedDate: "2026-09-25" }
+    );
+    assert.equal(denied.reason, "denied-today");
+  });
+
+  it("drops a confirm that missed the grace window", () => {
+    const warnedAt = new Date(NOW - VACUUM_WARN_LEAD_MS - VACUUM_CONFIRM_GRACE_MS - 1000).toISOString();
+    const plan = vacuumConfirmPlan(
+      {
+        zone: "sunny",
+        confirmAt: new Date(Date.parse(warnedAt) + VACUUM_WARN_LEAD_MS).toISOString(),
+      },
+      NOW
+    );
+    assert.equal(plan.action, "drop");
+
+    const soon = vacuumConfirmPlan(
+      { zone: "master", confirmAt: new Date(NOW + 5 * 60 * 1000).toISOString() },
+      NOW
+    );
+    assert.equal(soon.action, "wait");
+    assert.equal(soon.delayMs, 5 * 60 * 1000);
   });
 });
 
@@ -115,6 +306,40 @@ describe("home agent prompt", () => {
     assert.match(prompt, /record-start/);
     assert.match(prompt, /record-skip/);
     assert.match(prompt, /Do not turn any lights/);
+    assert.match(prompt, /trigger --zone yan/);
+  });
+
+  it("warns for Sunny and does not trigger on that pass", () => {
+    const prompt = buildHomeAgentPrompt({
+      dateKey: "2026-09-25",
+      timezone: "America/Los_Angeles",
+      vacuumPath: "/tmp/vacuum.json",
+      location: { ...EPS, timestamp: "2026-09-25T19:00:00.000Z", accuracyMeters: 12 },
+      zone: "sunny",
+    });
+    assert.match(prompt, /Roomba Sunny Boy Landing Laundry Room/);
+    assert.match(prompt, /Do not trigger the scene on this pass/);
+    assert.match(prompt, /record-warn --zone sunny/);
+    assert.match(prompt, /Levin-Saha Family/);
+    assert.match(prompt, /Sent by Yan's Personal Agent/);
+    assert.doesNotMatch(prompt, /trigger --zone sunny/);
+  });
+
+  it("confirm pass starts on silence and acks a rejection", () => {
+    const prompt = buildVacuumConfirmPrompt({
+      dateKey: "2026-09-25",
+      timezone: "America/Los_Angeles",
+      vacuumPath: "/tmp/vacuum.json",
+      zone: "master",
+      warnedAt: "2026-09-25T18:00:00.000Z",
+    });
+    assert.match(prompt, /15-minute confirm/);
+    assert.match(prompt, /Roomba Master Rooms/);
+    assert.match(prompt, /Silence is a yes/);
+    assert.match(prompt, /trigger --zone master/);
+    assert.match(prompt, /record-deny/);
+    assert.match(prompt, /clear-pending/);
+    assert.match(prompt, /Send no iMessage/);
   });
 });
 
@@ -372,7 +597,71 @@ describe("vacuum state writes", () => {
     const saved = JSON.parse(await readFile(path, "utf8"));
     assert.equal(saved.lastStartedAt, "2026-09-22T18:00:00.000Z");
     assert.equal(saved.scene, VACUUM_SCENE);
+    assert.equal(saved.zones.yan.lastStartedAt, "2026-09-22T18:00:00.000Z");
     assert.equal(saved.nextCheckAt, "2026-09-25T23:00:00.000Z");
     assert.equal(saved.skipReason, "back within 2 hours");
+  });
+
+  it("warns Sunny without moving Yan's start, then a denial blocks the day", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "home-agent-"));
+    const path = join(dir, "vacuum.json");
+    await recordVacuumStart({
+      path,
+      at: "2026-09-22T18:00:00.000Z",
+      reason: "yan rooms",
+    });
+    const warned = await recordVacuumWarn({
+      path,
+      zone: "sunny",
+      at: "2026-09-25T18:00:00.000Z",
+      reason: "school afternoon",
+    });
+    assert.equal(warned.lastStartedAt, "2026-09-22T18:00:00.000Z");
+    assert.equal(warned.pending.zone, "sunny");
+    assert.equal(warned.pending.scene, SUNNY_VACUUM_SCENE);
+    assert.equal(
+      Date.parse(warned.pending.confirmAt) - Date.parse(warned.pending.warnedAt),
+      VACUUM_WARN_LEAD_MS
+    );
+
+    const denied = await recordVacuumDeny({
+      path,
+      at: "2026-09-25T18:15:00.000Z",
+      reason: "mom said no",
+      nextCheckAt: "2026-09-28T15:30:00.000Z",
+    });
+    assert.equal(denied.pending, undefined);
+    assert.equal(denied.blockedDate, "2026-09-25");
+    assert.equal(denied.zones.yan.lastStartedAt, "2026-09-22T18:00:00.000Z");
+    assert.equal(denied.zones.sunny, undefined);
+  });
+
+  it("records a master start on its own clock and clears a pending warning", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "home-agent-"));
+    const path = join(dir, "vacuum.json");
+    await recordVacuumStart({
+      path,
+      zone: "yan",
+      at: "2026-09-22T18:00:00.000Z",
+      reason: "yan rooms",
+    });
+    await recordVacuumWarn({
+      path,
+      zone: "master",
+      at: "2026-09-25T18:00:00.000Z",
+      reason: "school afternoon",
+    });
+    const started = await recordVacuumStart({
+      path,
+      zone: "master",
+      at: "2026-09-25T18:15:00.000Z",
+      reason: "no reply",
+    });
+    assert.equal(started.scene, MASTER_VACUUM_SCENE);
+    assert.equal(started.lastStartedAt, "2026-09-25T18:15:00.000Z");
+    assert.equal(started.zones.yan.lastStartedAt, "2026-09-22T18:00:00.000Z");
+    assert.equal(started.zones.master.lastStartedAt, "2026-09-25T18:15:00.000Z");
+    assert.equal(started.pending, undefined);
+    assert.equal(VACUUM_SCENE_FORBIDDEN.includes("Rooms"), true);
   });
 });
