@@ -65,6 +65,8 @@ The `/imessage/send` path and the server's @agent final-bubble delivery append `
 
 `to` can be a phone, iMessage email, a unique Contacts name, or the display name of an **existing** group chat (`JYPE`). Look up numbers on the person card or in Contacts. Do not run `osascript` from Cursor for send. If Yan is sending a yanylevin.com class or study-guide URL to Alex, Example Friend, Example Neighbor, or JYPE, also add that URL as `sites[]` on the matching JYPE class.
 
+Live context labels a thread id for the read URL. That id is a `chat_identifier`, not a Messages guid. Send with `to` set to the chat name and leave `chatGuid` off. A `chatGuid` looks like `iMessage;+;…`. Passing the thread id makes Messages miss the group and open a new chat with that name.
+
 ```bash
 curl -sS --unix-socket /tmp/personal-agent-local.sock \
   -H "Content-Type: application/json" \

@@ -246,6 +246,11 @@ function sqlLiteral(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
+/** Messages.app chat ids look like `iMessage;+;…`, not a chat.db chat_identifier. */
+export function isMessagesChatGuid(value) {
+  return /^(?:iMessage|SMS|RCS);/i.test(String(value || "").trim());
+}
+
 /**
  * @param {string} handle
  * @param {{ queryMessages?: (sql: string) => Promise<object[]>, db?: string }} [deps]
@@ -366,9 +371,19 @@ export async function sendIMessage(opts = {}, deps = {}) {
   const findNamed = deps.findNamedChat || findNamedChat;
   const findGuid = deps.findChatGuid || findChatGuid;
   let handle = "";
-  let chatGuid = String(opts.chatGuid || "").trim();
+  const requestedChat = String(opts.chatGuid || "").trim();
+  let chatGuid = requestedChat;
   const to = String(opts.to || "").trim();
-  if (chatGuid && to) {
+  // A chat_identifier (the hex in live context) is not a Messages guid.
+  // Passing it through made AppleScript miss the group and text a person
+  // with the group name. Levin-Saha Family, 2026-09-30.
+  if (requestedChat && !isMessagesChatGuid(requestedChat)) {
+    const resolved = await findGuid(requestedChat, {
+      queryMessages: deps.queryMessages,
+    });
+    chatGuid = isMessagesChatGuid(resolved) ? resolved : "";
+  }
+  if (isMessagesChatGuid(chatGuid) && to) {
     handle = to;
   } else {
     try {
@@ -379,16 +394,24 @@ export async function sendIMessage(opts = {}, deps = {}) {
       const named = await findNamed(to, {
         queryMessages: deps.queryMessages,
       });
-      if (named?.guid) {
+      if (named?.guid && isMessagesChatGuid(named.guid)) {
         handle = named.name || named.ident || to;
-        if (!chatGuid) chatGuid = named.guid;
+        chatGuid = named.guid;
       } else {
-        const identGuid = chatGuid || (await findGuid(to, {
+        const identGuid = await findGuid(to, {
           queryMessages: deps.queryMessages,
-        }));
-        if (!identGuid) throw err;
-        handle = to;
-        chatGuid = identGuid;
+        });
+        if (isMessagesChatGuid(identGuid)) {
+          handle = to;
+          chatGuid = identGuid;
+        } else if (requestedChat) {
+          throw statusError(
+            `no Messages chat for ${to || requestedChat}. Refusing to text a person with that name.`,
+            400
+          );
+        } else {
+          throw err;
+        }
       }
     }
   }
@@ -396,6 +419,12 @@ export async function sendIMessage(opts = {}, deps = {}) {
     chatGuid = await findGuid(handle, {
       queryMessages: deps.queryMessages,
     });
+  }
+  if (requestedChat && !isMessagesChatGuid(chatGuid)) {
+    throw statusError(
+      `no Messages chat for ${to || requestedChat}. Refusing to text a person with that name.`,
+      400
+    );
   }
 
   const dir = await mkdtemp(join(tmpdir(), "yanylevin-imessage-send-"));

@@ -161,6 +161,8 @@ describe("imessage-mention", () => {
     assert.match(block, /Called from iMessage/);
     assert.match(block, /JYPE/);
     assert.match(block, /chat123/);
+    assert.match(block, /never pass as chatGuid/);
+    assert.doesNotMatch(block, /iMessage chat: JYPE \(chat123\)/);
     assert.match(block, /imessage\/thread\?person=chat123/);
     assert.match(block, /limit=40/);
     assert.doesNotMatch(block, /only @agent/);

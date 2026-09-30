@@ -26,6 +26,13 @@ on run argv
           send targetMessage to chat id chatGuid
         end if
         return "sent-chat"
+      on error errMsg
+        -- Only a phone or email may fall through to a buddy. A group
+        -- display name must not become a new 1:1. Levin-Saha Family, 2026-09-30.
+        set allowBuddy to false
+        if targetHandle starts with "+" then set allowBuddy to true
+        if targetHandle contains "@" then set allowBuddy to true
+        if allowBuddy is false then error "Messages chat id failed (" & chatGuid & "): " & errMsg
       end try
     end if
     set targetAccount to 1st account whose service type = iMessage

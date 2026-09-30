@@ -7,6 +7,7 @@ import {
   IMESSAGE_SEND_SCRIPT,
   findChatGuid,
   findNamedChat,
+  isMessagesChatGuid,
   normalizeHandle,
   normalizeSendFiles,
   queueIMessageReplyFiles,
@@ -114,6 +115,92 @@ describe("imessage-send", () => {
     assert.equal(result.to, "JYPE");
     assert.equal(result.chatGuid, "iMessage;+;chat123");
     assert.equal(args?.[3], "iMessage;+;chat123");
+  });
+
+  it("treats only Messages service ids as chat guids", () => {
+    assert.equal(isMessagesChatGuid("iMessage;+;chat123"), true);
+    assert.equal(isMessagesChatGuid("SMS;-;+14255550100"), true);
+    assert.equal(isMessagesChatGuid("1eb74a7864eb4e95a3c4d6420027ab19"), false);
+    assert.equal(isMessagesChatGuid("Levin-Saha Family"), false);
+  });
+
+  it("resolves a chat_identifier passed as chatGuid before sending", async () => {
+    /** @type {string[]|null} */
+    let args = null;
+    const result = await sendIMessage(
+      {
+        to: "Levin-Saha Family",
+        text: "hi",
+        chatGuid: "1eb74a7864eb4e95a3c4d6420027ab19",
+      },
+      {
+        resolveHandle: async () => {
+          throw new Error("should not resolve");
+        },
+        findChatGuid: async (q) =>
+          q === "1eb74a7864eb4e95a3c4d6420027ab19" ? "iMessage;+;chatfamily" : "",
+        execFile: async (_cmd, argv) => {
+          args = argv;
+          return { stdout: "sent-chat\n", stderr: "" };
+        },
+      }
+    );
+    assert.equal(result.chatGuid, "iMessage;+;chatfamily");
+    assert.equal(args?.[1], "Levin-Saha Family");
+    assert.equal(args?.[3], "iMessage;+;chatfamily");
+  });
+
+  it("uses the group name when a passed chat id does not resolve", async () => {
+    const result = await sendIMessage(
+      { to: "Levin-Saha Family", text: "hi", chatGuid: "not-a-guid" },
+      {
+        resolveHandle: async () => {
+          const err = new Error("no iMessage handle");
+          err.status = 400;
+          throw err;
+        },
+        findChatGuid: async () => "",
+        findNamedChat: async () => ({
+          guid: "iMessage;+;chatfamily",
+          name: "Levin-Saha Family",
+          ident: "1eb74a",
+        }),
+        execFile: async (_cmd, argv) => {
+          assert.equal(argv[3], "iMessage;+;chatfamily");
+          return { stdout: "sent-chat\n", stderr: "" };
+        },
+      }
+    );
+    assert.equal(result.chatGuid, "iMessage;+;chatfamily");
+  });
+
+  it("refuses a bad chat id instead of texting a person with the group name", async () => {
+    let called = false;
+    await assert.rejects(
+      () =>
+        sendIMessage(
+          {
+            to: "Levin-Saha Family",
+            text: "hi",
+            chatGuid: "1eb74a7864eb4e95a3c4d6420027ab19",
+          },
+          {
+            resolveHandle: async () => {
+              const err = new Error("no iMessage handle");
+              err.status = 400;
+              throw err;
+            },
+            findNamedChat: async () => null,
+            findChatGuid: async () => "",
+            execFile: async () => {
+              called = true;
+              return { stdout: "sent-buddy\n", stderr: "" };
+            },
+          }
+        ),
+      /Refusing to text a person with that name/
+    );
+    assert.equal(called, false);
   });
 
   it("sends with an explicit chatGuid without Contacts", async () => {

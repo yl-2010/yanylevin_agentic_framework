@@ -267,8 +267,14 @@ export function formatIMessageOriginBlock(origin, opts = {}) {
       ? guestLines[0]
       : "Called from iMessage. This Personal Agent chat is otherwise normal (app and website bubbles, send_chat_message, tools).",
     ...guestLines.slice(1),
-    `- iMessage chat: ${chat || "?"}${chatId && chatId !== chat ? ` (${chatId})` : ""}`,
+    `- iMessage chat: ${chat || "?"}`,
   ];
+  if (chatId && chatId !== chat && !chatId.startsWith("+") && !chatId.includes("@")) {
+    lines.push(`- thread id for reads only, never pass as chatGuid: ${chatId}`);
+    lines.push(
+      "Send with to set to the name on send replies to. Leave chatGuid off. That thread id is not a Messages guid. Passing it opens a new chat with the group name."
+    );
+  }
   if (handle) lines.push(`- handle: ${handle}`);
   if (to) lines.push(`- send replies to: ${to}`);
   if (bare) {
