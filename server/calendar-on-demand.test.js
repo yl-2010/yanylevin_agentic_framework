@@ -156,6 +156,8 @@ describe("calendar on-demand prompt", () => {
     assert.match(prompt, /college spam/i);
     assert.match(prompt, /signed up for that visit/);
     assert.match(prompt, /education todos/);
+    assert.match(prompt, /Jev is that classifier, not a person/);
+    assert.match(prompt, /Count the weekday/);
     assert.doesNotMatch(prompt, /Bias is add/);
   });
 

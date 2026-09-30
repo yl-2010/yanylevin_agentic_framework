@@ -246,9 +246,9 @@ function sqlLiteral(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
-/** Messages.app chat ids look like `iMessage;+;…`, not a chat.db chat_identifier. */
+/** Messages.app chat ids look like `iMessage;+;…` or `any;-;+1555…`, not a chat.db chat_identifier. */
 export function isMessagesChatGuid(value) {
-  return /^(?:iMessage|SMS|RCS);/i.test(String(value || "").trim());
+  return /^(?:iMessage|SMS|RCS|any);/i.test(String(value || "").trim());
 }
 
 /**

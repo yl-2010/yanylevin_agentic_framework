@@ -15,7 +15,9 @@ This job is one plan. The message that woke you up is the subject. Do not sweep 
 
 ## Worth adding
 
-Jev only asked whether this message might be a plan. You still decide if it is calendar-worthy. Create nothing when it is not.
+Jev only asked whether this message might be a plan. Jev is that classifier, not a person in the chat and not a guest. Never put Jev in the title, notes, or guest list. Name the event after the people in the thread. You still decide if it is calendar-worthy. Create nothing when it is not.
+
+Count the weekday from the timestamp on this prompt. Do not guess that a date is Saturday.
 
 Add an event he is actually showing up for. A hangout, meal, appointment, reservation, flight, or meeting with a day. A clock is better. All-day is fine when nobody named a time. TBD venue is fine when the plan is real. Do not invent a clock.
 

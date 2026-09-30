@@ -120,8 +120,11 @@ describe("imessage-send", () => {
   it("treats only Messages service ids as chat guids", () => {
     assert.equal(isMessagesChatGuid("iMessage;+;chat123"), true);
     assert.equal(isMessagesChatGuid("SMS;-;+14255550100"), true);
+    assert.equal(isMessagesChatGuid("any;-;+12066976688"), true);
+    assert.equal(isMessagesChatGuid("any;+;chat208844834112653410"), true);
     assert.equal(isMessagesChatGuid("1eb74a7864eb4e95a3c4d6420027ab19"), false);
     assert.equal(isMessagesChatGuid("Levin-Saha Family"), false);
+    assert.equal(isMessagesChatGuid("+12066976688"), false);
   });
 
   it("resolves a chat_identifier passed as chatGuid before sending", async () => {
@@ -201,6 +204,34 @@ describe("imessage-send", () => {
       /Refusing to text a person with that name/
     );
     assert.equal(called, false);
+  });
+
+  it("sends to an any-service 1:1 without treating the guid as a name", async () => {
+    /** @type {string[]|null} */
+    let args = null;
+    const result = await sendIMessage(
+      {
+        to: "+12066976688",
+        text: "moved it to Saturday",
+        chatGuid: "any;-;+12066976688",
+      },
+      {
+        resolveHandle: async () => {
+          throw new Error("should not resolve");
+        },
+        findChatGuid: async () => {
+          throw new Error("should not look up");
+        },
+        execFile: async (_cmd, argv) => {
+          args = argv;
+          return { stdout: "sent-chat\n", stderr: "" };
+        },
+      }
+    );
+    assert.equal(result.ok, true);
+    assert.equal(result.chatGuid, "any;-;+12066976688");
+    assert.equal(args?.[1], "+12066976688");
+    assert.equal(args?.[3], "any;-;+12066976688");
   });
 
   it("sends with an explicit chatGuid without Contacts", async () => {
