@@ -2073,6 +2073,7 @@ if (isMain) {
           : "[canvas-sync]";
       console.log(tag, result && { ...result, snapshot: undefined });
       if (!result?.ok && !result?.skipped) process.exitCode = 1;
+      process.exit(process.exitCode || 0);
     })
     .catch((err) => {
       console.error(
@@ -2083,6 +2084,6 @@ if (isMain) {
             : "[canvas-sync] failed",
         err
       );
-      process.exitCode = 1;
+      process.exit(1);
     });
 }
