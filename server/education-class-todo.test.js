@@ -192,6 +192,24 @@ describe("todo folder visibility", () => {
     );
   });
 
+  it("stays hidden when finderHidden is set", () => {
+    const todo = {
+      id: "cw-grammar",
+      tag: "CW",
+      dueDate: "2026-11-17",
+      dueTime: "15:05",
+      done: true,
+      folderRevealedAt: "2026-09-18T00:34:20.330Z",
+      finderHidden: true,
+    };
+    assert.equal(
+      todoFolderShouldBeVisible(todo, cls, schedule, at("2026-09-30T01:43:00-07:00"), {
+        hasUserFiles: true,
+      }),
+      false
+    );
+  });
+
   it("does not unhide a Completed todo just because it has files", () => {
     const todo = {
       id: "hw-one",
@@ -251,6 +269,21 @@ describe("date folder visibility", () => {
         hasUserFiles: true,
       }),
       true
+    );
+  });
+
+  it("stays hidden when finderHidden is set", () => {
+    const dateObj = {
+      id: "exam",
+      date: "2026-11-01",
+      finderHidden: true,
+      folderRevealedAt: "2026-09-15T16:00:00.000Z",
+    };
+    assert.equal(
+      dateFolderShouldBeVisible(dateObj, schedule, at("2026-09-15T12:00:00-07:00"), {
+        hasUserFiles: true,
+      }),
+      false
     );
   });
 

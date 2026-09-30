@@ -191,6 +191,7 @@ export function todoFolderShouldBeVisible(
   { hasUserFiles = false } = {}
 ) {
   if (!todo) return false;
+  if (todo.finderHidden) return false;
   if (todo.done && classTodoReadyForCompleted(todo, cls, schedule, now)) {
     return false;
   }
@@ -219,6 +220,7 @@ export function dateFolderShouldBeVisible(
   { hasUserFiles = false } = {}
 ) {
   if (!dateObj) return false;
+  if (dateObj.finderHidden) return false;
   const clock = scheduleNowParts(schedule, now);
   const key = String(dateObj.date || "").trim();
   if (dateObj.folderRevealedAt) {
