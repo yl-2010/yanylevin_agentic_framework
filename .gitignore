@@ -24,6 +24,7 @@ ios/shortcuts/**/workflow.filled.shortcut
 ios/shortcuts/**/workflow.json
 education/*/.projects-opened.json
 data/headlines-assignments.json
+data/agent-actions.jsonl
 **/.venv/
 **/venv/
 **/__pycache__/
@@ -39,3 +40,4 @@ education/*/brain/journal/
 education/*/brain/threads/
 data/chat-log.md
 data/login-log.md
+data/agent-actions.jsonl

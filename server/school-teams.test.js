@@ -76,6 +76,20 @@ describe("school-teams parseArgs", () => {
     assert.throws(() => parseArgs(["chats", "--nope"]), /unknown arg/);
   });
 
+  it("keeps --via off the message text", () => {
+    const a = parseArgs([
+      "send",
+      "--chat",
+      "Alex",
+      "--text",
+      "On it",
+      "--via",
+      "nightly-actions",
+    ]);
+    assert.equal(a.via, "nightly-actions");
+    assert.equal(a.text, "On it");
+  });
+
   it("parses dump --full", () => {
     const a = parseArgs(["dump", "--full", "--since", "2024-04-01", "--out", "/tmp/x"]);
     assert.equal(a.cmd, "dump");

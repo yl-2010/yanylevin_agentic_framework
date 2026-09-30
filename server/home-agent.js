@@ -22,6 +22,7 @@ import { runHome } from "./home-cli.js";
 import { readCurrentLifeState } from "./life-state.js";
 import { haversineMeters, homeBooleanKind, KNOWN_PLACES } from "./life-state-snapshot.js";
 import { readPhoneLocation, YAN_EMAIL } from "./phone-location.js";
+import { appendAgentAction, lightsActionSummary } from "./agent-actions.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = "/tmp/yanylevin-home-agent.lock";
@@ -715,6 +716,24 @@ export async function recordLightsCheck(opts = {}) {
 }
 
 /**
+ * Background home-agent only. A custom state path (tests) stays quiet
+ * unless actionsPath is set.
+ * @param {{ path?: string, actionsPath?: string|false }} opts
+ * @param {object} entry
+ */
+async function logHomeAction(opts, entry) {
+  if (opts.actionsPath === false) return;
+  if (!opts.actionsPath && opts.path) return;
+  try {
+    await appendAgentAction(entry, {
+      path: opts.actionsPath || undefined,
+    });
+  } catch (err) {
+    console.error("[agent-actions]", err instanceof Error ? err.message : err);
+  }
+}
+
+/**
  * @param {{
  *   location?: object|null,
  *   lifeState?: { place?: string, at?: string }|null,
@@ -762,13 +781,23 @@ export async function turnOffYanRoomLightsIfAway(opts) {
       });
     }
   }
+  const at = new Date(nowMs).toISOString();
   const state = await recordLightsCheck({
     path: opts.path,
-    at: new Date(nowMs).toISOString(),
+    at,
     reason: failed.length ? "away-partial" : "away",
     turnedOff: turnedOff.map(({ name, room }) => ({ name, room })),
     failed: failed.map(({ name, room }) => ({ name, room })),
   });
+  if (turnedOff.length) {
+    await logHomeAction(opts, {
+      at,
+      agent: "home-agent",
+      kind: "lights",
+      summary: lightsActionSummary({ turnedOff }),
+      id: `home-agent:lights:${at}`,
+    });
+  }
   return {
     ok: failed.length === 0,
     skipped: false,
@@ -957,7 +986,7 @@ export async function recordVacuumStart(opts = {}) {
     scene: VACUUM_ZONE_SPECS[zone].scene,
     reason,
   };
-  return writeVacuumPatch(
+  const next = await writeVacuumPatch(
     path,
     {
       lastStartedAt: at,
@@ -967,6 +996,14 @@ export async function recordVacuumStart(opts = {}) {
     },
     { clear: ["nextCheckAt", "lastSkippedAt", "skipReason", "pending"] }
   );
+  await logHomeAction(opts, {
+    at,
+    agent: "home-agent",
+    kind: "vacuum",
+    summary: `Started ${VACUUM_ZONE_SPECS[zone].scene}`,
+    id: `home-agent:vacuum:${zone}:${at}`,
+  });
+  return next;
 }
 
 /**

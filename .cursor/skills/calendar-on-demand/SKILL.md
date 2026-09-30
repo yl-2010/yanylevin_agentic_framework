@@ -38,6 +38,10 @@ List the day with `node server/calendar-cli.js events`.
 
 `--force` bypasses the refuse. Chat uses it only when Yan asked.
 
+## Action log
+
+On `create`, `update`, and `delete`, add `--via calendar-on-demand`. List and get stay without it. The dashboard Actions rail uses that flag to tell a Jev job from a chat.
+
 ## Fields
 
 Same write rules as the personal-calendar skill. Meeting URL goes on `--location`, `--url`, and one `--notes` line. PathIvy and Zoom registration links come from Mail.app message `source` when the plain body dropped the href. Do not leave location as the word virtual.

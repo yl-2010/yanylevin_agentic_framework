@@ -10,9 +10,38 @@
 
   const listEl = document.getElementById("dash-list");
   const loginListEl = document.getElementById("login-list");
+  const actionsEl = document.getElementById("action-list");
   const agentsEl = document.getElementById("dash-agents");
 
   const AGENT_BANDS = [
+    {
+      time: "every 5m",
+      items: [
+        {
+          id: "life-state",
+          name: "Life state",
+          model: "Composer 2.5",
+          kind: "clock",
+        },
+      ],
+    },
+    {
+      time: "hourly",
+      items: [
+        {
+          id: "home-agent",
+          name: "Home agent",
+          model: "Composer 2.5",
+          kind: "clock",
+        },
+        {
+          id: "canvas-hourly",
+          name: "Canvas hourly",
+          model: "Composer 2.5",
+          kind: "clock",
+        },
+      ],
+    },
     {
       time: "every 4h",
       items: [
@@ -141,9 +170,123 @@
       time: "06:00",
       items: [
         {
-          id: "briefing",
-          name: "Daily briefing",
+          id: "briefing-news",
+          name: "Daily news",
           model: "Grok 4.7 xhigh",
+          kind: "clock",
+        },
+        { edge: true },
+        {
+          id: "briefing-recap",
+          name: "Agent recap",
+          model: "Grok 4.7 xhigh",
+          kind: "after",
+        },
+        { edge: true },
+        {
+          id: "briefing-unslop",
+          name: "Unslop",
+          model: "Composer 2.5",
+          kind: "after",
+        },
+      ],
+    },
+    {
+      time: "Jev",
+      items: [
+        {
+          id: "calendar-on-demand",
+          name: "Calendar on demand",
+          model: "Composer 2.5",
+          kind: "clock",
+        },
+      ],
+    },
+    {
+      time: "@",
+      items: [
+        {
+          id: "imessage-agent",
+          name: "iMessage @agent",
+          model: "Grok 4.7",
+          kind: "clock",
+        },
+        {
+          id: "teams-agent",
+          name: "Teams @agent",
+          model: "Grok 4.7",
+          kind: "clock",
+        },
+        {
+          id: "guest-agent",
+          name: "Guest @agent",
+          model: "Grok 4.7",
+          kind: "clock",
+        },
+      ],
+    },
+    {
+      time: "chat",
+      items: [
+        {
+          id: "education",
+          name: "Education",
+          model: "Grok 4.7",
+          kind: "clock",
+        },
+        {
+          id: "ios",
+          name: "iOS app",
+          model: "Grok 4.7",
+          kind: "clock",
+        },
+        {
+          id: "cursor",
+          name: "Cursor",
+          model: "Grok 4.7",
+          kind: "clock",
+        },
+        { edge: true },
+        {
+          id: "brain-extraction",
+          name: "Brain extraction",
+          model: "Composer 2.5",
+          kind: "after",
+        },
+        { gap: true },
+        {
+          id: "jype",
+          name: "JYPE",
+          model: "Grok 4.7",
+          kind: "clock",
+        },
+        {
+          id: "fitness",
+          name: "Fitness",
+          model: "Composer 2.5",
+          kind: "clock",
+        },
+        {
+          id: "debate",
+          name: "Debate",
+          model: "Grok 4.7",
+          kind: "clock",
+        },
+        {
+          id: "public-faq",
+          name: "Public site FAQ",
+          model: "GPT-OSS 20b",
+          kind: "clock",
+        },
+      ],
+    },
+    {
+      time: "manual",
+      items: [
+        {
+          id: "health-history",
+          name: "Health history",
+          model: "Composer 2.5",
           kind: "clock",
         },
       ],
@@ -197,6 +340,36 @@
         <p class="dash-when">${escapeHtml(shortWhen(entry))}</p>
         <pre class="dash-text">${escapeHtml(entry.user || "")}</pre>
         <pre class="dash-text is-assistant">${escapeHtml(entry.assistant || "")}</pre>
+      </div>
+    </li>`;
+  }
+
+  function renderActionEntry(entry, index) {
+    const id = `lg-action-${index}`;
+    return `<li
+      class="dash-entry dash-action"
+      data-liquid-glass="rounded"
+      data-lg-radius="18"
+      data-filter-id="${escapeHtml(id)}"
+      data-key="${escapeHtml(`${entry.utc || ""}|${entry.kind || ""}|${index}`)}"
+    >
+      <div class="dash-entry-in">
+        <p class="dash-when">${escapeHtml(shortWhen(entry))}</p>
+        <p class="dash-action-agent">${escapeHtml(entry.agentName || entry.agent || "")}</p>
+        <p class="dash-action-line">${escapeHtml(entry.summary || "")}</p>
+      </div>
+    </li>`;
+  }
+
+  function renderEmptyAction() {
+    return `<li
+      class="dash-entry dash-action is-empty"
+      data-liquid-glass="rounded"
+      data-lg-radius="18"
+      data-filter-id="lg-action-empty"
+    >
+      <div class="dash-entry-in">
+        <p class="dash-action-line">No actions yet</p>
       </div>
     </li>`;
   }
@@ -264,6 +437,16 @@
     queueMicrotask(() => window.reinitLiquidGlass?.());
   }
 
+  function renderActions(entries) {
+    if (!actionsEl) return;
+    const rows = entries.length
+      ? entries.map(renderActionEntry)
+      : [renderEmptyAction()];
+    actionsEl.innerHTML = rows.join("");
+    resetRailScroll(actionsEl);
+    queueMicrotask(() => window.reinitLiquidGlass?.());
+  }
+
   async function fetchJson(url, options) {
     const res = await fetch(url, {
       credentials: "same-origin",
@@ -286,6 +469,22 @@
     }
     if (!res.ok || !data.ok) {
       throw new Error(data.error || `chat-log failed (${res.status})`);
+    }
+    return data;
+  }
+
+  async function fetchAgentActions() {
+    const { res, data } = await fetchJson("/api/dashboard/agent-actions");
+    if (res.status === 401) {
+      show("login");
+      return null;
+    }
+    if (res.status === 403) {
+      show("denied");
+      return null;
+    }
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || `agent-actions failed (${res.status})`);
     }
     return data;
   }
@@ -329,13 +528,15 @@
 
   async function loadOnce() {
     try {
-      const [chat, logins] = await Promise.all([
+      const [chat, logins, actions] = await Promise.all([
         fetchChatLog(),
         fetchLoginLog(),
+        fetchAgentActions(),
       ]);
-      if (!chat || !logins) return;
+      if (!chat || !logins || !actions) return;
       renderChats(Array.isArray(chat.entries) ? chat.entries : []);
       renderLogins(Array.isArray(logins.entries) ? logins.entries : []);
+      renderActions(Array.isArray(actions.entries) ? actions.entries : []);
     } catch (err) {
       console.error("[dashboard]", err);
     }

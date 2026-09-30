@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { zonedParts, addLocalDays } from "./calendar-cli.js";
+import { logCalendarCommand, splitVia } from "./agent-actions.js";
 import {
   eventsAreIdentical,
   findCreateBlock,
@@ -188,6 +189,57 @@ describe("calendar delete memory", () => {
       });
       const text = await readFile(deletedMdPath, "utf8");
       assert.equal(text.split("ev-9").length - 1, 1);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("calendar --via action log", () => {
+  it("strips --via and records a background create", async () => {
+    const split = splitVia([
+      "create",
+      "--title",
+      "Dinner",
+      "--via",
+      "nightly-actions",
+      "--calendar",
+      "Home",
+    ]);
+    assert.equal(split.via, "nightly-actions");
+    assert.deepEqual(split.args, ["create", "--title", "Dinner", "--calendar", "Home"]);
+
+    const quiet = splitVia(["events", "--from", "2026-09-01"]);
+    assert.equal(quiet.via, "");
+    assert.deepEqual(quiet.args, ["events", "--from", "2026-09-01"]);
+
+    const dir = await mkdtemp(join(tmpdir(), "calendar-via-"));
+    const path = join(dir, "actions.jsonl");
+    try {
+      const row = await logCalendarCommand({
+        via: "calendar-on-demand",
+        cmd: "create",
+        event: { title: "Dinner Friday", calendar: "Home", id: "ev-1" },
+        path,
+      });
+      assert.equal(row.summary, "Added Dinner Friday on Home");
+      const skipped = await logCalendarCommand({
+        via: "",
+        cmd: "create",
+        event: { title: "Nope", calendar: "Home" },
+        path,
+      });
+      assert.equal(skipped, null);
+      const updated = await logCalendarCommand({
+        via: "nightly-actions",
+        cmd: "update",
+        event: { title: "Dinner Friday", calendar: "Home", id: "ev-1" },
+        path,
+      });
+      assert.equal(updated.summary, "Updated Dinner Friday on Home");
+      const raw = await readFile(path, "utf8");
+      assert.equal(raw.trim().split("\n").length, 2);
+      assert.equal(raw.includes("Nope"), false);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

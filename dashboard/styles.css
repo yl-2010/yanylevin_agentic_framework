@@ -444,6 +444,36 @@ html.lg-chrome .dash-agent.lg-static.lg-refraction::after {
   flex: 1 1 auto;
 }
 
+.dash-action {
+  flex-basis: min(260px, 70vw);
+}
+
+.dash-action .dash-entry-in {
+  max-height: none;
+}
+
+.dash-action-agent,
+.dash-action-line {
+  margin: 0;
+  font-family: var(--display);
+}
+
+.dash-action-agent {
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.dash-action-line {
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  font-weight: 400;
+}
+
+.dash-action.is-empty .dash-action-line {
+  color: var(--muted);
+}
+
 /* ---- Scheduled agents ---- */
 
 .dash-section-agents {

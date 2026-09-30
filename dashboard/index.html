@@ -20,7 +20,7 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" media="(prefers-color-scheme: light)" />
     <link rel="icon" href="/favicon-dark.svg" type="image/svg+xml" media="(prefers-color-scheme: dark)" />
     <link rel="stylesheet" href="/education/styles.css?v=light-glow-3" />
-    <link rel="stylesheet" href="/dashboard/styles.css?v=sf-type-1" />
+    <link rel="stylesheet" href="/dashboard/styles.css?v=actions-1" />
   </head>
   <body>
     <a
@@ -79,13 +79,27 @@
 
     <div id="stage-full" class="stage stage-dashboard" hidden>
       <main class="dash" aria-label="Dashboard">
-        <section class="dash-section" aria-labelledby="dash-logins-title">
+        <!-- Hidden for now. Remove hidden to show Logins again. -->
+        <section class="dash-section" hidden aria-labelledby="dash-logins-title">
           <h2 id="dash-logins-title" class="dash-section-title">Logins</h2>
           <div class="dash-rail-wrap">
             <div class="dash-rail-blur dash-rail-blur-left" aria-hidden="true">
               <span></span><span></span><span></span>
             </div>
             <ol id="login-list" class="dash-rail dash-rail-logins"></ol>
+            <div class="dash-rail-blur dash-rail-blur-right" aria-hidden="true">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        </section>
+
+        <section class="dash-section" aria-labelledby="dash-actions-title">
+          <h2 id="dash-actions-title" class="dash-section-title">Actions</h2>
+          <div class="dash-rail-wrap">
+            <div class="dash-rail-blur dash-rail-blur-left" aria-hidden="true">
+              <span></span><span></span><span></span>
+            </div>
+            <ol id="action-list" class="dash-rail dash-rail-actions"></ol>
             <div class="dash-rail-blur dash-rail-blur-right" aria-hidden="true">
               <span></span><span></span><span></span>
             </div>
@@ -106,10 +120,11 @@
         </section>
 
         <section class="dash-section dash-section-agents" aria-labelledby="dash-agents-title">
-          <h2 id="dash-agents-title" class="dash-section-title">Scheduled agents</h2>
+          <h2 id="dash-agents-title" class="dash-section-title">Agents</h2>
           <p class="dash-section-lede">
-            Circles fire on a clock in Chicago time. Rectangles start when the
-            previous one finishes. Nightly actions is dashed because it can skip.
+            Circles start on their own. Rectangles start when the previous one
+            finishes. Nightly actions is dashed because it can skip. Clock times
+            are Pacific.
           </p>
           <div id="dash-agents" class="dash-agent-graph"></div>
         </section>
@@ -132,6 +147,6 @@
     <script src="/liquid-glass.js?v=chrome-perf11"></script>
     <script src="/theme-orb.js?v=chrome-perf6"></script>
     <script src="/yl-home-link.js?v=3"></script>
-    <script src="/dashboard/app.js?v=agents2"></script>
+    <script src="/dashboard/app.js?v=agents3"></script>
   </body>
 </html>

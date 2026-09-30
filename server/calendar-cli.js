@@ -14,6 +14,9 @@ import {
   recordAgentEvent,
   tombstoneAgentEvent,
 } from "./calendar-memory.js";
+import { logCalendarCommand, splitVia } from "./agent-actions.js";
+
+export { splitVia };
 
 const execFileAsync = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -278,7 +281,9 @@ const isCli =
   process.argv[1] &&
   fileURLToPath(import.meta.url) === process.argv[1];
 if (isCli) {
-  const args = process.argv.slice(2);
+  const split = splitVia(process.argv.slice(2));
+  const via = split.via;
+  const args = split.args;
   const cmd = args[0] || "";
   const force = args.includes("--force");
   const swiftArgs = args.filter((arg) => arg !== "--force");
@@ -312,6 +317,17 @@ if (isCli) {
     }
     if (cmd === "delete" && result?.ok && prior) {
       await tombstoneAgentEvent(prior, "cli-delete");
+    }
+    if (via && result?.ok && (cmd === "create" || cmd === "update" || cmd === "delete")) {
+      try {
+        await logCalendarCommand({
+          via,
+          cmd,
+          event: result.event || prior || {},
+        });
+      } catch (err) {
+        console.error("[agent-actions]", err instanceof Error ? err.message : err);
+      }
     }
   };
   finish().catch((err) => {

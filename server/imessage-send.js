@@ -10,6 +10,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { applyAgentSentFooter } from "./imessage-mention.js";
+import { appendAgentAction } from "./agent-actions.js";
 
 const execFileAsync = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)));
@@ -433,8 +434,8 @@ export async function sendIMessage(opts = {}, deps = {}) {
 }
 
 function parseCliArgs(argv) {
-  /** @type {{ to: string, text: string, textFile: string, files: string[] }} */
-  const out = { to: "", text: "", textFile: "", files: [] };
+  /** @type {{ to: string, text: string, textFile: string, files: string[], actionAgent: string }} */
+  const out = { to: "", text: "", textFile: "", files: [], actionAgent: "" };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = argv[i + 1];
@@ -449,6 +450,9 @@ function parseCliArgs(argv) {
       i += 1;
     } else if ((a === "--attach" || a === "--attachment") && next != null) {
       out.files.push(next);
+      i += 1;
+    } else if (a === "--via" && next != null && !String(next).startsWith("--")) {
+      out.actionAgent = next;
       i += 1;
     }
   }
@@ -465,11 +469,23 @@ if (isCli) {
       const { readFile } = await import("node:fs/promises");
       text = await readFile(parsed.textFile, "utf8");
     }
-    return sendIMessage({
+    const sent = await sendIMessage({
       to: parsed.to,
       text: applyAgentSentFooter(text, { chat: parsed.to, handle: parsed.to }),
       files: parsed.files,
     });
+    if (parsed.actionAgent && sent?.ok) {
+      try {
+        await appendAgentAction({
+          agent: parsed.actionAgent,
+          kind: "imessage",
+          summary: `Sent iMessage to ${parsed.to}`,
+        });
+      } catch (err) {
+        console.error("[agent-actions]", err instanceof Error ? err.message : err);
+      }
+    }
+    return sent;
   };
   run()
     .then((r) => {

@@ -53,7 +53,8 @@ import { startLocationBrainScheduler } from "./location-brain-agent.js";
 import { startHealthBrainScheduler } from "./health-brain-agent.js";
 import { startFactCheckScheduler } from "./fact-check-agent.js";
 import { startLifeStateScheduler } from "./life-state-agent.js";
-import { startHomeAgentScheduler } from "./home-agent.js";
+import { lightsStatePath, startHomeAgentScheduler, vacuumStatePath } from "./home-agent.js";
+import { readAgentActions } from "./agent-actions.js";
 import { attachEducationEvents } from "./education-events.js";
 import {
   startAgent,
@@ -384,6 +385,35 @@ app.post("/api/account-delete", requireAuth, async (req, res) => {
 /**
  * Login audit log for the gated /dashboard (operator only).
  */
+app.get("/api/agent-actions", requireAuth, async (req, res) => {
+  try {
+    if (!isChatLogViewer(req.user?.email)) {
+      res.status(403).json({ ok: false, error: "forbidden" });
+      return;
+    }
+
+    const { entries, mtimeMs, size } = await readAgentActions({
+      lightsPath: lightsStatePath(),
+      vacuumPath: vacuumStatePath(),
+    });
+
+    res.setHeader("Cache-Control", "no-store");
+    res.json({
+      ok: true,
+      count: entries.length,
+      mtimeMs,
+      size,
+      entries,
+    });
+  } catch (err) {
+    console.error("[/api/agent-actions]", err);
+    res.status(500).json({
+      ok: false,
+      error: err.message || "agent-actions read failed",
+    });
+  }
+});
+
 app.get("/api/login-log", requireAuth, async (req, res) => {
   try {
     if (!isChatLogViewer(req.user?.email)) {

@@ -601,9 +601,11 @@ describe("Yan's room lights", () => {
   it("turns off only the selected lights and records the skip when he might be home", async () => {
     const dir = await mkdtemp(join(tmpdir(), "home-lights-"));
     const path = join(dir, "lights.json");
+    const actionsPath = join(dir, "actions.jsonl");
     const calls = [];
     const away = await turnOffYanRoomLightsIfAway({
       path,
+      actionsPath,
       nowMs: NOW,
       location: {
         ...EPS,
@@ -635,6 +637,9 @@ describe("Yan's room lights", () => {
     const saved = JSON.parse(await readFile(path, "utf8"));
     assert.equal(saved.turnedOff[0].name, "Desk Lamp");
     assert.equal(saved.turnedOff[0].id, undefined);
+    const logged = await readFile(actionsPath, "utf8");
+    assert.match(logged, /Turned off Desk Lamp/);
+    assert.match(logged, /"agent":"home-agent"/);
 
     calls.length = 0;
     const home = await turnOffYanRoomLightsIfAway({
@@ -654,6 +659,8 @@ describe("Yan's room lights", () => {
     assert.equal(after.reason, "at-home");
     assert.deepEqual(after.turnedOff, []);
     assert.equal(after.lastTurnedOffAt, saved.lastTurnedOffAt);
+    const still = await readFile(actionsPath, "utf8");
+    assert.equal(still.trim().split("\n").length, 1);
   });
 });
 
@@ -765,5 +772,29 @@ describe("vacuum state writes", () => {
         }),
       /family sleep/
     );
+  });
+
+  it("writes a vacuum start to the action log", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "home-agent-actions-"));
+    const path = join(dir, "vacuum.json");
+    const actionsPath = join(dir, "actions.jsonl");
+    await recordVacuumStart({
+      path,
+      actionsPath,
+      at: "2026-09-22T18:00:00.000Z",
+      zone: "yan",
+      reason: "away until evening",
+    });
+    const raw = await readFile(actionsPath, "utf8");
+    assert.match(raw, /Started Vacuum Yan/);
+    assert.match(raw, /"kind":"vacuum"/);
+    await recordVacuumSkip({
+      path,
+      at: "2026-09-25T20:00:00.000Z",
+      reason: "back within 2 hours",
+      nextCheckAt: "2026-09-25T23:00:00.000Z",
+    });
+    const afterSkip = await readFile(actionsPath, "utf8");
+    assert.equal(afterSkip.trim().split("\n").length, 1);
   });
 });

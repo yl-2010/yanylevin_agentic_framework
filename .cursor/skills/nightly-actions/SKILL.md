@@ -167,6 +167,16 @@ Do not git commit; the Node wrapper does that.
   item, use `.cursor/skills/personal-onenote/SKILL.md`. Do not list notebooks
   otherwise.
 
+## Action log
+
+Tag background writes so they show on the dashboard Actions rail. Reads stay untagged.
+
+- Calendar `create`, `update`, and `delete` take `--via nightly-actions`.
+- `node server/imessage-send.js` takes `--via nightly-actions`.
+- `node server/school-teams.js send` takes `--via nightly-actions`.
+- After a Mail.app send, run `node server/agent-actions.js append --agent nightly-actions --kind mail --summary "Sent mail to Name"`.
+- After you add or change a `date.json`, run `node server/agent-actions.js append --agent nightly-actions --kind education-date --summary "Added Fall orientation"`. Say Updated when the date was already there.
+
 ## Anti-patterns
 
 - Acting on inference for sends, todos, or education dates. "He probably
