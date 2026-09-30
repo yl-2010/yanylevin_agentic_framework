@@ -1482,6 +1482,7 @@ export function buildCanvasSyncPrompt({
     "Do not POST to Canvas. Do not delete education todos just because Canvas dropped a row.",
     "Leave canvasFiles on .todo.json alone. Express downloads teacher attachments into the OneDrive todo folder after you finish. Spanish 4 pasted decoration images (image-<uuid>, image.png) are not downloaded.",
     "Do not recreate a todo or date that looks like a manually deleted.md row. Judgement, not exact due clocks. canvasId is a strong hint.",
+    "OneNote links are attached after you finish, including on todos imported on earlier nights. Do not add or delete sites whose oneNote is personal or content-library. Preserve every other sites entry if you rewrite a todo. Do not put OneNote URLs in description.",
     rebuild,
     hourly,
     deleted,
@@ -1506,6 +1507,7 @@ export function buildCanvasHourlyPrompt({ dateKey, hourKey, timezone, deletedBlo
     "If the snapshot matches existing todos, do nothing.",
     "NEVER write done or completedAt from Canvas. Do not POST to Canvas. Do not delete todos because Canvas dropped a row. Do not recreate deleted.md rows. Preserve finderHidden when it is already set.",
     "Leave canvasFiles on .todo.json alone. Express downloads teacher attachments into the OneDrive todo folder after you finish. Spanish 4 pasted decoration images (image-<uuid>, image.png) are not downloaded.",
+    "Do not run link-todos. OneNote page links are the nightly pass.",
     deleted,
   ]
     .filter(Boolean)
@@ -1741,10 +1743,20 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
     } catch (err) {
       console.error("[canvas-sync] mark comments seen", err);
     }
+    let onenote = null;
+    try {
+      const { linkClassTodos } = await import("./school-onenote.js");
+      onenote = await linkClassTodos();
+      const n = Array.isArray(onenote?.updates) ? onenote.updates.length : 0;
+      console.log(`[canvas-sync] onenote links updated ${n}`);
+    } catch (err) {
+      console.error("[canvas-sync] onenote links", err);
+    }
     await writeLastAgentSync(dir, {
       dateKey,
       at: new Date().toISOString(),
       status: result?.status || "finished",
+      onenote: Array.isArray(onenote?.updates) ? onenote.updates.length : 0,
     });
     await gitAddCommitPush({
       paths: [`education/${YAN_EMAIL}`],

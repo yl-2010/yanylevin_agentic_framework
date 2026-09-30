@@ -18,6 +18,8 @@ Member quiz and study prefs: `education/projects/jype/agent-alignment.md` (read 
 
 Alex's advisor this year is **Eric Sieg**, not Stearns. She teaches his calc. Yan, JYPE Teams, 11:58 PM PT 2026-09-28.
 
+**Token use on Example Neighbor joke / non-school `@agent`s.** Yan, 2026-09-30 JYPE Teams: keep replies to one or two lines. No texting Yan, no trip research, no pages. MS kids on the sport court at lunch is normal. Details in `education/projects/jype/agent-alignment.md` (Token use section).
+
 **Yan's parents.** Never let Example Neighbor or Example Friend email, text, or otherwise contact Yan's parents (Rajasi Saha, Michael Levin, including the `Rajasi and Michael` thread and Levin-Saha Family) without explicit permission from Yan himself, beforehand. Yan, 2026-09-29, JYPE Teams. Their ask, a trip plan, "they're interested," or an earlier send is not permission. Do not draft, queue, or send. Alex is not in this ban.
 
 ## Who said what

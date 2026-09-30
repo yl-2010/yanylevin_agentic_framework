@@ -6,10 +6,18 @@
  * On demand only. No history fill. Not a nightly default source.
  */
 
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { listClassEntriesForRoot } from "./education-data.js";
+import {
+  CLASS_NOTEBOOKS,
+  CONTENT_LIBRARY_GROUP,
+  PERSONAL_GROUP,
+  mergeOneNoteSites,
+  pickOneNoteLinks,
+} from "./onenote-todo-links.js";
 import {
   GRAPH_BASE,
   SCHOOL_EMAIL,
@@ -61,6 +69,7 @@ export function parseArgs(argv) {
     force: false,
     headed: false,
     html: false,
+    dryRun: false,
     limit: 20,
     query: "",
     id: "",
@@ -72,6 +81,7 @@ export function parseArgs(argv) {
     if (a === "--force") out.force = true;
     else if (a === "--headed") out.headed = true;
     else if (a === "--html") out.html = true;
+    else if (a === "--dry-run") out.dryRun = true;
     else if (a === "--notebook") {
       const rest = [];
       while (args.length && !String(args[0]).startsWith("--")) rest.push(args.shift());
@@ -294,14 +304,30 @@ export function flattenNotebookSections(notebook) {
   return out;
 }
 
+/**
+ * Desktop / OneNote app URL. Graph's oneNoteClientUrl, or `onenote:` plus the https page.
+ * @param {string} webUrl
+ * @param {object|undefined} links
+ */
+export function oneNoteClientUrl(webUrl, links) {
+  const fromGraph = String(links?.oneNoteClientUrl?.href || "").trim();
+  if (/^onenote:/i.test(fromGraph)) return fromGraph;
+  const web = String(webUrl || "").trim();
+  if (/^https:\/\//i.test(web)) return `onenote:${web}`;
+  return "";
+}
+
 export function normalizePage(raw) {
   const parent = raw?.parentSection || {};
+  const links = raw?.links || {};
+  const webUrl = String(links.oneNoteWebUrl?.href || "").trim();
   return {
     id: String(raw?.id || "").trim(),
     title: String(raw?.title || "(untitled)").trim(),
     modified: String(raw?.lastModifiedDateTime || raw?.createdDateTime || "").trim(),
     section: String(parent.displayName || "").trim(),
-    webUrl: String(raw?.links?.oneNoteWebUrl?.href || "").trim(),
+    webUrl,
+    clientUrl: oneNoteClientUrl(webUrl, links),
   };
 }
 
@@ -600,9 +626,10 @@ async function apiGet(url, token, { html = false } = {}) {
       },
     });
     const text = await res.text();
-    if (res.status === 429 || res.status === 503) {
+    if (res.status === 429 || res.status === 502 || res.status === 503) {
       lastErr = new Error(`OneNote API ${res.status}`);
       lastErr.status = res.status;
+      console.error(`[onenote] ${res.status}, retry ${attempt + 1}`);
       await sleep(1000 * 2 ** attempt);
       continue;
     }
@@ -698,6 +725,21 @@ async function loadNotebookTree(token, picked) {
   throw err;
 }
 
+async function listAllSectionPages(token, { siteId, sectionId }) {
+  let url = siteId
+    ? buildSitePagesUrl(siteId, sectionId, { limit: 50 })
+    : buildPagesUrl(sectionId, { limit: 50 });
+  /** @type {object[]} */
+  const pages = [];
+  for (let i = 0; i < 20 && url; i++) {
+    const data = await apiGet(url, token);
+    const rows = Array.isArray(data?.value) ? data.value : [];
+    for (const raw of rows) pages.push(normalizePage(raw));
+    url = String(data?.["@odata.nextLink"] || "").trim();
+  }
+  return pages;
+}
+
 async function listSectionPages(token, { siteId, sectionId, limit }) {
   if (siteId) {
     return apiGet(buildSitePagesUrl(siteId, sectionId, { limit }), token);
@@ -774,6 +816,189 @@ async function withToken(parsed, root, fn) {
   }
 }
 
+const YAN_EDUCATION_ROOT = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "education",
+  "you@example.com"
+);
+
+/**
+ * @param {string} classFolder
+ */
+async function listClassTodoFiles(classFolder) {
+  /** @type {string[]} */
+  const out = [];
+  let entries = [];
+  try {
+    entries = await readdir(classFolder, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name === ".education") continue;
+    for (const name of [".todo.json", "todo.json"]) {
+      const path = join(classFolder, entry.name, name);
+      try {
+        const st = await stat(path);
+        if (st.isFile()) {
+          out.push(path);
+          break;
+        }
+      } catch {
+        /* missing */
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Attach Content Library and personal OneNote sites onto existing class todos.
+ * Safe to re-run. A signed-out session does not wipe links already stored.
+ * @param {{ dryRun?: boolean, headed?: boolean, force?: boolean, root?: string }} [opts]
+ */
+export async function linkClassTodos(opts = {}) {
+  return withToken(
+    { headed: Boolean(opts.headed), force: Boolean(opts.force) },
+    opts.root || schoolOnenoteDir(),
+    (token) => linkClassTodosWithToken(token, opts)
+  );
+}
+
+/**
+ * @param {string} token
+ * @param {{ dryRun?: boolean }} opts
+ */
+async function linkClassTodosWithToken(token, opts) {
+  const classes = await listClassEntriesForRoot(YAN_EDUCATION_ROOT);
+  const notebooks = await listNotebooks(token);
+  /** @type {object[]} */
+  const updates = [];
+  /** @type {object[]} */
+  const classReports = [];
+  for (const [classId, notebookName] of Object.entries(CLASS_NOTEBOOKS)) {
+    const entry = classes.find((row) => row.id === classId);
+    if (!entry?.classFolder) {
+      classReports.push({ id: classId, skipped: "no-class-folder" });
+      continue;
+    }
+    let tree;
+    try {
+      const picked = pickByName(notebooks, notebookName);
+      if (!picked.match) {
+        classReports.push({ id: classId, skipped: "notebook-not-found", notebook: notebookName });
+        continue;
+      }
+      tree = await loadNotebookTree(token, picked.match);
+    } catch (err) {
+      classReports.push({
+        id: classId,
+        skipped: "notebook-unreadable",
+        error: err instanceof Error ? err.message : String(err),
+      });
+      continue;
+    }
+    const wanted = (tree.sections || []).filter(
+      (section) =>
+        section.group === CONTENT_LIBRARY_GROUP || section.group === PERSONAL_GROUP
+    );
+    /** @type {object[]} */
+    const pages = [];
+    let sectionErrors = 0;
+    for (const section of wanted) {
+      try {
+        const rows = await listAllSectionPages(token, {
+          siteId: tree.siteId,
+          sectionId: section.id,
+        });
+        for (const row of rows) {
+          pages.push({ ...row, group: section.group, sectionName: section.name });
+        }
+      } catch (err) {
+        sectionErrors += 1;
+        console.error(
+          `[onenote-links] ${classId} section ${section.group}/${section.name}: ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
+      }
+    }
+    console.error(
+      `[onenote-links] ${classId} pages=${pages.length} sections=${wanted.length} errors=${sectionErrors}`
+    );
+    if (!pages.length) {
+      classReports.push({
+        id: classId,
+        notebook: tree.notebook?.name || notebookName,
+        skipped: sectionErrors ? "sections-failed" : "no-pages",
+      });
+      continue;
+    }
+    const todoPaths = await listClassTodoFiles(entry.classFolder);
+    /** @type {{ path: string, props: object }[]} */
+    const todos = [];
+    for (const path of todoPaths) {
+      try {
+        const props = JSON.parse(await readFile(path, "utf8"));
+        if (!props || typeof props !== "object" || !String(props.name || "").trim()) continue;
+        todos.push({ path, props });
+      } catch {
+        /* leave a broken todo alone */
+      }
+    }
+    const picks = pickOneNoteLinks(
+      todos.map((row) => row.props),
+      pages
+    );
+    let wrote = 0;
+    for (let i = 0; i < todos.length; i++) {
+      const row = todos[i];
+      const pick = picks[i];
+      const next = [pick?.personal, pick?.content].filter(Boolean).map((site) => {
+        const stored = {
+          name: site.name,
+          url: site.url,
+          oneNote: site.oneNote,
+          pageId: site.pageId,
+        };
+        if (site.clientUrl) stored.clientUrl = site.clientUrl;
+        return stored;
+      });
+      const sites = mergeOneNoteSites(row.props.sites, next);
+      const before = JSON.stringify(row.props.sites || []);
+      if (before === JSON.stringify(sites)) continue;
+      const update = {
+        classId,
+        todo: row.props.name,
+        personal: pick?.personal?.pageTitle || "",
+        content: pick?.content?.pageTitle || "",
+        client: Boolean(pick?.personal?.clientUrl || pick?.content?.clientUrl),
+      };
+      updates.push(update);
+      if (opts.dryRun) continue;
+      if (sites.length) row.props.sites = sites;
+      else delete row.props.sites;
+      await writeFile(row.path, `${JSON.stringify(row.props, null, 2)}\n`);
+      wrote += 1;
+    }
+    classReports.push({
+      id: classId,
+      notebook: tree.notebook?.name || notebookName,
+      pages: pages.length,
+      todos: todos.length,
+      wrote: opts.dryRun ? updates.filter((u) => u.classId === classId).length : wrote,
+    });
+  }
+  return {
+    ok: true,
+    dryRun: Boolean(opts.dryRun),
+    account: SCHOOL_EMAIL,
+    classes: classReports,
+    updates,
+  };
+}
+
 export async function runSchoolOnenote(argv, opts = {}) {
   const parsed = parseArgs(argv);
   const root = opts.root || schoolOnenoteDir();
@@ -783,7 +1008,7 @@ export async function runSchoolOnenote(argv, opts = {}) {
     return {
       ok: true,
       usage:
-        "node server/school-onenote.js login|status|notebooks|sections --notebook <name>|pages --section <name>|page <id>|search <q>",
+        "node server/school-onenote.js login|status|notebooks|sections --notebook <name>|pages --section <name>|page <id>|search <q>|link-todos",
       account: SCHOOL_EMAIL,
     };
   }
@@ -924,6 +1149,15 @@ export async function runSchoolOnenote(argv, opts = {}) {
         text: stripHtml(html, PAGE_TEXT_MAX),
         ...(parsed.html ? { html: html.slice(0, PAGE_TEXT_MAX) } : {}),
       };
+    });
+  }
+
+  if (cmd === "link-todos") {
+    return linkClassTodos({
+      dryRun: parsed.dryRun,
+      headed: parsed.headed,
+      force: parsed.force,
+      root,
     });
   }
 

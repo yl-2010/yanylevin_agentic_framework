@@ -303,6 +303,13 @@ describe("siteFilesFromProps", () => {
         { name: "QA #1", url: "https://yanylevin.com/spanish4/fall-qa-1/" },
         { title: "dup", href: "https://yanylevin.com/spanish4/fall-qa-1/" },
         { name: "skip", url: "ftp://nope.example" },
+        {
+          name: "problem set one",
+          url: "https://example.com/p1",
+          clientUrl: "onenote:https://example.com/p1",
+          oneNote: "personal",
+          pageId: "p1",
+        },
         "nope",
       ],
     });
@@ -314,6 +321,15 @@ describe("siteFilesFromProps", () => {
         url: "https://yanylevin.com/spanish4/fall-qa-1/",
         webUrl: "https://yanylevin.com/spanish4/fall-qa-1/",
         webViewUrl: "https://yanylevin.com/spanish4/fall-qa-1/",
+      },
+      {
+        name: "problem set one",
+        kind: "url",
+        source: "site",
+        url: "https://example.com/p1",
+        webUrl: "https://example.com/p1",
+        webViewUrl: "https://example.com/p1",
+        officeUri: "onenote:https://example.com/p1",
       },
     ]);
   });

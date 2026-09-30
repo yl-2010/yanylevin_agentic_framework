@@ -183,6 +183,21 @@ Junk Canvas names get renamed when they land. `image-` plus a uuid, `image-` plu
 - **Never** mix this with Fitness OS gym logs.
 - **Never** put Canvas comments, pages, modules, or course-file dumps on the education UI.
 
+## OneNote links
+
+Teachers post the Class Notebook page after the Canvas todo exists. Nightly sync attaches those pages onto todos that are already imported, not only todos created that night. The runner calls `link-todos` after your writes. On a manual sync in this chat, run it yourself at the end.
+
+```bash
+node server/school-onenote.js link-todos
+```
+
+It reads `_Content Library` and Yan's section group (`Yan Levin`) in the class notebook. A todo gets at most two sites:
+
+- Personal page. The tile name is the assignment `name`.
+- Content Library page. The tile name is `Content Library: ` plus the OneNote page title.
+
+Each site stores the https `url` and a `clientUrl` that starts with `onenote:`. The website opens desktop OneNote. The iOS app opens the OneNote app. Other `sites` stay. Do not put these URLs in `description`. Do not add or delete sites whose `oneNote` is `personal` or `content-library`. If OneNote is signed out, skip it and still finish the Canvas sync. Hourly Composer does not run this.
+
 ## Nightly review of hourly Composer
 
 Read `last-hourly-sync.json`. Walk mapped class todos against the **full** snapshot. Fix wrong tags, `HW:` prefixes left on names, Adv Calc HW dues pulled back to Canvas time, yoga CW `hiddenFromHome`, missing `canvasId`/`canvasLink`, duplicates, and course-map drift. Then do the usual full map (new junior-year courses may have appeared). Then fold `comments-new.md` into class/todo `CONTEXT.md` as above.

@@ -70,6 +70,10 @@ struct EducationContextFilesView: View {
 
     private func open(_ file: EducationContextFile) {
         if file.kind == "url" {
+            if file.opensInOfficeApp {
+                openInOffice(file)
+                return
+            }
             if let url = file.browserURL ?? URL(string: file.webUrl ?? "") {
                 UIApplication.shared.open(url)
             }

@@ -19,6 +19,8 @@ import {
   isMicrosoftLoginUrl,
   isNotesToken,
   looksLikeSchoolAccountLabel,
+  normalizePage,
+  oneNoteClientUrl,
   parseArgs,
   pickByName,
   runSchoolOnenote,
@@ -33,6 +35,12 @@ function fakeJwt(payload) {
 }
 
 describe("school-onenote parseArgs", () => {
+  it("parses link-todos dry-run", () => {
+    const a = parseArgs(["link-todos", "--dry-run"]);
+    assert.equal(a.cmd, "link-todos");
+    assert.equal(a.dryRun, true);
+  });
+
   it("parses notebooks and section flags", () => {
     const a = parseArgs(["sections", "--notebook", "Spanish", "4", "--limit", "8"]);
     assert.equal(a.cmd, "sections");
@@ -128,6 +136,22 @@ describe("school-onenote login screens", () => {
 });
 
 describe("school-onenote urls and shapes", () => {
+  it("keeps the OneNote client URL and falls back to onenote: plus https", () => {
+    assert.equal(
+      oneNoteClientUrl("https://example.com/p", {
+        oneNoteClientUrl: { href: "onenote:https://example.com/client" },
+      }),
+      "onenote:https://example.com/client"
+    );
+    const page = normalizePage({
+      id: "1-x",
+      title: "Day 1 problem set",
+      links: { oneNoteWebUrl: { href: "https://example.com/p" } },
+    });
+    assert.equal(page.webUrl, "https://example.com/p");
+    assert.equal(page.clientUrl, "onenote:https://example.com/p");
+  });
+
   it("builds Graph notebook and page URLs", () => {
     assert.match(buildNotebooksUrl(), /\/me\/onenote\/notebooks/);
     assert.equal(buildPageContentUrl("1-x"), `${GRAPH_BASE}/me/onenote/pages/1-x/content`);

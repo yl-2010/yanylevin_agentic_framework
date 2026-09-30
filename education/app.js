@@ -2228,9 +2228,12 @@
             : "");
         if (String(f?.kind || "") === "url" && (f.url || webUrl)) {
           const href = String(f.url || webUrl).trim();
+          const officeAttr = officeUri
+            ? ` data-edu-office="${escapeHtml(officeUri)}"`
+            : "";
           return `<a class="edu-file-tile" href="${escapeHtml(
             href
-          )}" target="_blank" rel="noopener noreferrer" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
+          )}" target="_blank" rel="noopener noreferrer"${officeAttr} data-liquid-glass="rounded" data-filter-id="${escapeHtml(
             filterId
           )}" title="${escapeHtml(name)}"><span class="edu-file-name">${escapeHtml(
             name

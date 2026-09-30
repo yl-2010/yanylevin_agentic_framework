@@ -35,9 +35,12 @@ Canvas is still the due date and the upload. The dashboard todo is the
 tracking row. OneNote is the worksheet.
 
 Do **not** list every notebook "just in case." Do **not** run a history
-fill. There is no `school-onenote-fill`. Nightly triage, synthesis, and
-fact-check do not scan OneNote unless a claim they are already handling is
-specifically about a page.
+fill. There is no `school-onenote-fill`. This is not a default nightly
+source. Nightly triage, synthesis, and fact-check do not scan OneNote
+unless a claim they are already handling is specifically about a page.
+The canvas nightly is the exception. After it writes todos it runs
+`node server/school-onenote.js link-todos`, which attaches Content Library
+and Yan Levin pages onto todos that already exist. See personal-canvas.
 
 Yoga has no Class Notebook. Free periods neither. Speech & Debate 26-27
 is not in this account yet (only last year's Hayes notebooks).

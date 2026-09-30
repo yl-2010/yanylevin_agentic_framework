@@ -40,6 +40,7 @@
 		<string>ms-word</string>
 		<string>ms-excel</string>
 		<string>ms-powerpoint</string>
+		<string>onenote</string>
 	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>

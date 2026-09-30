@@ -503,6 +503,8 @@ describe("buildCanvasSyncPrompt", () => {
     assert.match(prompt, /Fix mistakes/);
     assert.match(prompt, /comments-new\.md/);
     assert.match(prompt, /pages\.md/);
+    assert.match(prompt, /todos imported on earlier nights/);
+    assert.match(prompt, /oneNote is personal or content-library/);
   });
 });
 
@@ -519,6 +521,7 @@ describe("buildCanvasHourlyPrompt", () => {
     assert.match(prompt, /Do not edit course-map\.json/);
     assert.match(prompt, /NEVER write done/);
     assert.match(prompt, /Do not fold Canvas comments/);
+    assert.match(prompt, /Do not run link-todos/);
   });
 });
 

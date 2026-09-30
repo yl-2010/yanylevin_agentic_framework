@@ -82,6 +82,10 @@ const URL_TILE_KEYS = new Set([
   "title",
   "weburl",
   "webviewurl",
+  "clienturl",
+  "onenoteclienturl",
+  "pageid",
+  "onenote",
 ]);
 
 /**
@@ -89,7 +93,7 @@ const URL_TILE_KEYS = new Set([
  * Accepts `kind: "url"` or an object that is only name/title + url/href.
  * @param {unknown} obj
  * @param {string} [fallbackName]
- * @returns {{ name: string, kind: string, url: string, webUrl: string, webViewUrl: string }|null}
+ * @returns {{ name: string, kind: string, url: string, webUrl: string, webViewUrl: string, officeUri?: string }|null}
  */
 export function urlTileFromObject(obj, fallbackName) {
   if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
@@ -101,13 +105,16 @@ export function urlTileFromObject(obj, fallbackName) {
   if (kind !== "url" && !onlyLinkKeys) return null;
   const name =
     String(obj.name || obj.title || fallbackName || url).trim() || url;
-  return {
+  const tile = {
     name,
     kind: "url",
     url,
     webUrl: url,
     webViewUrl: url,
   };
+  const clientUrl = String(obj.clientUrl || obj.oneNoteClientUrl || "").trim();
+  if (/^onenote:/i.test(clientUrl)) tile.officeUri = clientUrl;
+  return tile;
 }
 
 /**
