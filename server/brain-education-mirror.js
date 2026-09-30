@@ -71,8 +71,23 @@ function stub({ outPath, name, kind, source, fields = {}, edges = [], descriptio
   return { outPath, text: frontmatter + "\n" + body.join("\n") + "\n" };
 }
 
+function objectJsonPath(dirPath, fileName) {
+  const plain = String(fileName || "").replace(/^\.+/, "");
+  const dotted = path.join(dirPath, `.${plain}`);
+  if (fs.existsSync(dotted)) return dotted;
+  const visible = path.join(dirPath, plain);
+  if (fs.existsSync(visible)) return visible;
+  return null;
+}
+
+function readObjectJson(dirPath, fileName) {
+  const filePath = objectJsonPath(dirPath, fileName);
+  if (!filePath) return null;
+  return readJson(filePath);
+}
+
 function collectTodo({ slug, parentEdge, dirPath, sourceRel }) {
-  const todo = readJson(path.join(dirPath, "todo.json"));
+  const todo = readObjectJson(dirPath, "todo.json");
   if (!todo) return null;
   return stub({
     outPath: path.join(MIRROR_ROOT, "todos", `${slug}.md`),
@@ -91,7 +106,7 @@ function collectTodo({ slug, parentEdge, dirPath, sourceRel }) {
 }
 
 function collectDate({ slug, parentEdge, dirPath, sourceRel }) {
-  const date = readJson(path.join(dirPath, "date.json"));
+  const date = readObjectJson(dirPath, "date.json");
   if (!date) return null;
   return stub({
     outPath: path.join(MIRROR_ROOT, "dates", `${slug}.md`),
@@ -122,8 +137,8 @@ function collectChildren(stubs, parentDir, parentId, parentSlug, classFolder) {
     for (const child of listObjectDirs(dir)) {
       const id = objectDirId(child);
       if (!id || seenTodos.has(id)) continue;
-      const todoPath = path.join(dir, child, "todo.json");
-      if (!fs.existsSync(todoPath)) continue;
+      const todoPath = objectJsonPath(path.join(dir, child), "todo.json");
+      if (!todoPath) continue;
       seenTodos.add(id);
       stubs.push(
         collectTodo({
@@ -139,8 +154,8 @@ function collectChildren(stubs, parentDir, parentId, parentSlug, classFolder) {
     for (const child of listObjectDirs(dir)) {
       const id = objectDirId(child);
       if (!id || seenDates.has(id)) continue;
-      const datePath = path.join(dir, child, "date.json");
-      if (!fs.existsSync(datePath)) continue;
+      const datePath = objectJsonPath(path.join(dir, child), "date.json");
+      if (!datePath) continue;
       seenDates.add(id);
       stubs.push(
         collectDate({

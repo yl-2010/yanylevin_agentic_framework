@@ -9,7 +9,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isFixture, listClassEntriesForRoot } from "./education-data.js";
-import { objectDirId } from "./education-onedrive.js";
+import { objectDirId, resolveBookkeepingFile } from "./education-onedrive.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const DEFAULT_EDUCATION_EMAIL = "you@example.com";
@@ -219,7 +219,11 @@ async function loadObjects(parentDir, fileName, parent, pathPrefix) {
   /** @type {object[]} */
   const out = [];
   for (const [id, dirName] of dirById) {
-    const props = await readJson(join(parentDir, dirName, fileName));
+    const jsonPath = await resolveBookkeepingFile(
+      join(parentDir, dirName),
+      fileName
+    );
+    const props = jsonPath ? await readJson(jsonPath) : null;
     if (!props || typeof props !== "object") continue;
     const item = { id, ...props };
     if (isFixture(item) || isFixture({ id })) continue;

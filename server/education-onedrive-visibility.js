@@ -8,8 +8,8 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 import {
   dateFolderShouldBeVisible,
   todoFolderShouldBeVisible,
@@ -24,6 +24,7 @@ import {
   gradeDirFromMeta,
   objectDirId,
   objectFolderPaths,
+  resolveBookkeepingFile,
   uniqueFinderFolderName,
 } from "./education-onedrive.js";
 import { canonicalizeEmail, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
@@ -50,10 +51,14 @@ function isJunkFsName(name) {
 }
 
 /**
- * True when the folder has a dropped/user/agent file besides property JSON.
+ * True when the folder has a file Yan put there, or a file an agent put
+ * there because Yan asked. Canvas downloads passed in `ignoreNames` do not
+ * count. Property JSON and markdown bookkeeping do not count.
  * @param {string} dir
+ * @param {number} [depth]
+ * @param {Set<string>|null} [ignoreNames] lowercase basenames
  */
-export async function objectFolderHasUserFiles(dir, depth = 0) {
+export async function objectFolderHasUserFiles(dir, depth = 0, ignoreNames = null) {
   if (depth > 8) return false;
   let entries;
   try {
@@ -64,9 +69,10 @@ export async function objectFolderHasUserFiles(dir, depth = 0) {
   }
   for (const entry of entries) {
     if (isJunkFsName(entry.name)) continue;
+    if (ignoreNames?.has(String(entry.name).toLowerCase())) continue;
     const abs = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (await objectFolderHasUserFiles(abs, depth + 1)) return true;
+      if (await objectFolderHasUserFiles(abs, depth + 1, ignoreNames)) return true;
       continue;
     }
     if (!entry.isFile()) continue;
@@ -74,6 +80,61 @@ export async function objectFolderHasUserFiles(dir, depth = 0) {
     return true;
   }
   return false;
+}
+
+const BOOKKEEPING_HIDES = [
+  ["todo.json", ".todo.json"],
+  ["date.json", ".date.json"],
+  ["CONTEXT.md", ".CONTEXT.md"],
+  ["context.md", ".CONTEXT.md"],
+  ["deleted.md", ".deleted.md"],
+];
+
+async function fileExists(path) {
+  try {
+    const st = await stat(path);
+    return st.isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Rename OneDrive bookkeeping to a leading-dot name so Finder hides it.
+ * A newer plain file replaces the dotted one. The dotted file wins otherwise.
+ * @param {string} dir
+ */
+export async function hideBookkeepingFiles(dir) {
+  for (const [from, to] of BOOKKEEPING_HIDES) {
+    const src = join(dir, from);
+    const dest = join(dir, to);
+    const srcOk = await fileExists(src);
+    if (!srcOk) continue;
+    const destOk = await fileExists(dest);
+    if (!destOk) {
+      await rename(src, dest);
+      continue;
+    }
+    if (src === dest) continue;
+    const srcStat = await stat(src);
+    const destStat = await stat(dest);
+    if (srcStat.mtimeMs >= destStat.mtimeMs) {
+      await rm(dest, { force: true });
+      await rename(src, dest);
+    } else {
+      await rm(src, { force: true });
+    }
+  }
+}
+
+function canvasFileNameSet(props) {
+  const out = new Set();
+  const rows = Array.isArray(props?.canvasFiles) ? props.canvasFiles : [];
+  for (const row of rows) {
+    const name = String(row?.name || "").trim().toLowerCase();
+    if (name) out.add(name);
+  }
+  return out;
 }
 
 function isSafeObjectId(id) {
@@ -255,19 +316,20 @@ async function findDate(email, dateId, { classId = null } = {}) {
     }
   }
   for (const path of candidates) {
-    const props = await readJson(path);
+    const resolved = await resolveBookkeepingFile(dirname(path), basename(path));
+    const props = resolved ? await readJson(resolved) : null;
     if (!props) continue;
     let resolvedClass = scopedClass;
     if (!resolvedClass) {
       const entries = await listClassEntriesForRoot(root);
       const hit = entries.find(
         (e) =>
-          path === e.objectDir ||
-          path.startsWith((e.classFolder || e.objectDir) + "/")
+          resolved === e.objectDir ||
+          resolved.startsWith((e.classFolder || e.objectDir) + "/")
       );
       if (hit) resolvedClass = hit.id;
     }
-    return { path, props, classId: resolvedClass };
+    return { path: resolved, props, classId: resolvedClass };
   }
   return null;
 }
@@ -325,8 +387,14 @@ async function syncKind(
   for (const name of names) {
     let id = objectDirId(name);
     if (!id || seen.has(id)) continue;
-    const jsonPath = join(parent, name, fileName);
-    const props = await readJson(jsonPath);
+    const folder = join(parent, name);
+    try {
+      await hideBookkeepingFiles(folder);
+    } catch (err) {
+      console.error("[onedrive-visibility] hide bookkeeping", folder, err);
+    }
+    const jsonPath = await resolveBookkeepingFile(folder, fileName);
+    const props = jsonPath ? await readJson(jsonPath) : null;
     if (!props) continue;
     if (renameFinder) {
       const desired = uniqueFinderFolderName(
@@ -351,7 +419,11 @@ async function syncKind(
     const obj = { id, ...props };
     const [visPath, hidPath] = objectFolderPaths(parent, id);
     const folderPath = (await dirExists(visPath)) ? visPath : hidPath;
-    const hasUserFiles = await objectFolderHasUserFiles(folderPath);
+    const hasUserFiles = await objectFolderHasUserFiles(
+      folderPath,
+      0,
+      canvasFileNameSet(props)
+    );
     const visible =
       kind === "todo"
         ? todoFolderShouldBeVisible(obj, cls, schedule, now, { hasUserFiles })
@@ -367,6 +439,12 @@ async function syncKind(
 async function syncClassFolder(entry, cls, schedule, now) {
   const classFolder = entry.classFolder || entry.objectDir;
   if (!classFolder) return;
+  const metaDir = join(classFolder, ".education");
+  try {
+    await hideBookkeepingFiles(metaDir);
+  } catch (err) {
+    console.error("[onedrive-visibility] hide bookkeeping", metaDir, err);
+  }
   const nestedTodos = join(entry.objectDir, "todos");
   const nestedDates = join(entry.objectDir, "dates");
   const seenTodos = new Set();

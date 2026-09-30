@@ -6,7 +6,7 @@
 import { createReadStream } from "node:fs";
 import { createRequire } from "node:module";
 import { readdir, readFile, writeFile, stat } from "node:fs/promises";
-import { dirname, extname, join, resolve, sep } from "node:path";
+import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gitAddCommitPush } from "./git-publish.js";
 import { attachCanvasOverlay } from "./canvas-grades.js";
@@ -20,6 +20,7 @@ import {
   isSafeRelativePath,
   objectDirId,
   objectFolderPaths,
+  resolveBookkeepingFile,
   resolveOnedriveAbsolutePath,
   statOnedriveFile,
   attachOfficeOpenFields,
@@ -1204,7 +1205,8 @@ async function loadObjectFolder(
   const out = [];
   for (const [id, dirName] of dirById) {
     const objectDir = join(parentDir, dirName);
-    const jsonPath = join(objectDir, fileName);
+    const jsonPath = await resolveBookkeepingFile(objectDir, fileName);
+    if (!jsonPath) continue;
     const props = await readJsonFile(jsonPath);
     if (!props || typeof props !== "object") continue;
     const item = { id, ...props };
@@ -2151,7 +2153,8 @@ export async function findTodo(
   }
 
   for (const path of candidates) {
-    const props = await readJsonFile(path);
+    const resolved = await resolveBookkeepingFile(dirname(path), basename(path));
+    const props = resolved ? await readJsonFile(resolved) : null;
     if (props && typeof props === "object") {
       let resolvedClass = scopedClass;
       let resolvedProject = scopedProject;
@@ -2160,16 +2163,16 @@ export async function findTodo(
         const hit = entries.find((e) => {
           const classFolder = e.classFolder || e.objectDir;
           return (
-            path.startsWith(classFolder + "/") ||
-            path.startsWith(e.objectDir + "/")
+            resolved.startsWith(classFolder + "/") ||
+            resolved.startsWith(e.objectDir + "/")
           );
         });
         if (hit) resolvedClass = hit.id;
-        const pm = path.match(/\/projects\/([^/]+)\/todos\//);
+        const pm = resolved.match(/\/projects\/([^/]+)\/todos\//);
         if (pm) resolvedProject = pm[1];
       }
       return {
-        path,
+        path: resolved,
         props,
         classId: resolvedClass,
         projectId: resolvedProject,

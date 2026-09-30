@@ -60,8 +60,8 @@ education/you@example.com/.canvas/
 OneDrive <gradeFolder>/<onedriveFolder>/.education/
   class.json
   CONTEXT.md
-<Finder todo folder>/todo.json + student files + teacher attachments
-  canvasFiles[] on todo.json lists teacher attachment names (Express writes this)
+<Finder todo folder>/.todo.json + student files + teacher attachments
+  canvasFiles[] on .todo.json lists teacher attachment names (Express writes this)
 <Finder date folder>/date.json + that date's files
 ```
 
@@ -166,9 +166,11 @@ If Canvas only accepts a quiz or on-paper (`unsupported` / `not-online-upload` w
 
 ## Teacher files (Express)
 
-Hourly/nightly/fetch-only download assignment attachments into the matching OneDrive todo folder and record them on `todo.json` `canvasFiles`. Leave that key alone. Those files show on the todo page because they sit in the OneDrive folder. Do not submit them as Yan's work.
+Hourly/nightly/fetch-only download assignment attachments into the matching OneDrive todo folder and record them on `.todo.json` `canvasFiles`. Leave that key alone. Those files show on the todo page because they sit in the OneDrive folder. They do not unhide the Finder folder. A Canvas download is not Yan starting the work. Do not submit them as Yan's work.
 
-Junk Canvas names get renamed when they land. `image-` plus a uuid, `image-` plus a long random token, and scanner names like `Scanned Document 17.pdf` become the assignment title, with the original extension. A second junk file in that folder is `Title 2.png`. A real filename such as Ping Pong WS.pdf stays. Express does this on pull. Do not leave `image-<random>` in the todo folder.
+Spanish 4 skips pasted decoration images. Canvas names those `image-<uuid>` or `image.png` (emoji, clipart, logos). Do not download them, and delete one that is already in the folder. A real filename such as `lectura pagina 1.png`, and every PDF or doc, still downloads.
+
+Junk Canvas names get renamed when they land. `image-` plus a uuid, `image-` plus a long random token, and scanner names like `Scanned Document 17.pdf` become the assignment title, with the original extension. A second junk file in that folder is `Title 2.png`. A real filename such as Ping Pong WS.pdf stays. Express does this on pull. Do not leave `image-<random>` in the todo folder. Spanish decoration images are the exception: drop them, do not retitle them into the folder.
 
 ## Never
 

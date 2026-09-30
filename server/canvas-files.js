@@ -23,7 +23,7 @@ import {
 import { canvasAssignmentIdFromLink, canvasCourseIdFromLink } from "./canvas-grades.js";
 import { fetchAssignmentComments } from "./canvas-context.js";
 import { listClassEntriesForRoot } from "./education-data.js";
-import { objectDirId } from "./education-onedrive.js";
+import { objectDirId, resolveBookkeepingFile } from "./education-onedrive.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SKIP_SUBMIT_NAMES = new Set([
@@ -91,6 +91,35 @@ function sanitizeFileBase(raw) {
     s = cut.length >= 16 ? cut : s.slice(0, 120).trim();
   }
   return s;
+}
+
+const IMAGE_EXTS = new Set([
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".heic",
+  ".avif",
+]);
+
+/**
+ * Spanish 4 pasted decoration. Canvas names those `image-<uuid>` or `image.png`.
+ * A real filename, and every non-image, still downloads.
+ * @param {unknown} classId
+ * @param {unknown} rawName
+ * @param {unknown} [contentType]
+ */
+export function isSpanishDecorationImage(classId, rawName, contentType = "") {
+  if (String(classId || "").trim() !== "spanish-4") return false;
+  const type = String(contentType || "").toLowerCase();
+  const base = basename(String(rawName || "").trim());
+  const ext = extname(base).toLowerCase();
+  const isImage = IMAGE_EXTS.has(ext) || type.startsWith("image/");
+  if (!isImage) return false;
+  const stem = basename(base, ext).trim();
+  if (!stem || /^image$/i.test(stem) || isJunkFileBase(stem)) return true;
+  return false;
 }
 
 /** Scanner names and Canvas `image-<random>` tokens. Real titles stay. */
@@ -284,8 +313,11 @@ export async function retitleJunkCanvasFiles() {
     for (const d of dirs) {
       if (!d.isDirectory()) continue;
       if (d.name === ".education" || d.name === ".Trash") continue;
-      const jsonPath = join(entry.classFolder, d.name, "todo.json");
-      const props = await readJsonFile(jsonPath);
+      const jsonPath = await resolveBookkeepingFile(
+        join(entry.classFolder, d.name),
+        "todo.json"
+      );
+      const props = jsonPath ? await readJsonFile(jsonPath) : null;
       const rows = Array.isArray(props?.canvasFiles) ? props.canvasFiles : [];
       if (!rows.length) continue;
       const dir = join(entry.classFolder, d.name);
@@ -341,8 +373,11 @@ export async function findYanTodoByCanvasId(canvasId) {
     for (const d of dirs) {
       if (!d.isDirectory()) continue;
       if (d.name === ".education" || d.name === ".Trash") continue;
-      const jsonPath = join(classFolder, d.name, "todo.json");
-      const props = await readJsonFile(jsonPath);
+      const jsonPath = await resolveBookkeepingFile(
+        join(classFolder, d.name),
+        "todo.json"
+      );
+      const props = jsonPath ? await readJsonFile(jsonPath) : null;
       if (!props || typeof props !== "object") continue;
       const id = Number(props.canvasId);
       if (id !== want) continue;
@@ -368,8 +403,11 @@ export async function findYanTodoByFolder({ classId, todoId } = {}) {
   if (!entry) return null;
   const names = [tid, tid.startsWith(".") ? tid.slice(1) : `.${tid}`];
   for (const name of names) {
-    const jsonPath = join(entry.classFolder, name, "todo.json");
-    const props = await readJsonFile(jsonPath);
+    const jsonPath = await resolveBookkeepingFile(
+      join(entry.classFolder, name),
+      "todo.json"
+    );
+    const props = jsonPath ? await readJsonFile(jsonPath) : null;
     if (props && typeof props === "object") {
       return {
         path: jsonPath,
@@ -405,6 +443,81 @@ async function mergeCanvasFiles(todoPath, files) {
   if (JSON.stringify(next) === prevJson) return;
   props.canvasFiles = next;
   await writeFile(todoPath, `${JSON.stringify(props, null, 2)}\n`, "utf8");
+}
+
+async function removeCanvasFileIds(todoPath, ids) {
+  const drop = new Set((Array.isArray(ids) ? ids : []).map((id) => Number(id)));
+  const props = await readJsonFile(todoPath);
+  if (!props || typeof props !== "object") return;
+  const prev = Array.isArray(props.canvasFiles) ? props.canvasFiles : [];
+  const next = prev.filter((row) => !drop.has(Number(row?.id)));
+  if (next.length === prev.length) return;
+  if (next.length) props.canvasFiles = next;
+  else delete props.canvasFiles;
+  await writeFile(todoPath, `${JSON.stringify(props, null, 2)}\n`, "utf8");
+}
+
+function canvasMetaName(meta, fallback = "") {
+  return String(meta?.display_name || meta?.filename || fallback || "").trim();
+}
+
+function canvasMetaType(meta) {
+  return String(meta?.["content-type"] || meta?.content_type || "");
+}
+
+/**
+ * Delete Spanish 4 Canvas images that are pasted decoration, and forget them
+ * on canvasFiles so the next pull does not put them back.
+ */
+export async function dropSpanishDecorationFiles() {
+  const { base, token, configured } = canvasConfig();
+  if (!configured) return { ok: false, reason: "not configured", removed: 0 };
+  const entries = await listClassEntriesForRoot(yanRoot());
+  const entry = entries.find((e) => e.id === "spanish-4" && e.source === "onedrive");
+  if (!entry?.classFolder) return { ok: true, removed: 0 };
+  let dirs;
+  try {
+    dirs = await readdir(entry.classFolder, { withFileTypes: true });
+  } catch {
+    return { ok: true, removed: 0 };
+  }
+  let removed = 0;
+  for (const d of dirs) {
+    if (!d.isDirectory()) continue;
+    const dir = join(entry.classFolder, d.name);
+    const jsonPath = await resolveBookkeepingFile(dir, "todo.json");
+    const props = jsonPath ? await readJsonFile(jsonPath) : null;
+    const rows = Array.isArray(props?.canvasFiles) ? props.canvasFiles : [];
+    if (!jsonPath || !rows.length) continue;
+    /** @type {number[]} */
+    const drop = [];
+    for (const row of rows) {
+      const id = Number(row?.id);
+      if (!Number.isFinite(id) || id <= 0) continue;
+      let meta = null;
+      try {
+        meta = await canvasFileMeta(base, token, id);
+      } catch (err) {
+        console.error(`[canvas-files] spanish decoration ${id}`, err);
+        continue;
+      }
+      if (
+        !isSpanishDecorationImage(
+          "spanish-4",
+          canvasMetaName(meta, row?.name),
+          canvasMetaType(meta)
+        )
+      ) {
+        continue;
+      }
+      const name = basename(String(row?.name || "").trim());
+      if (name) await rm(join(dir, name), { force: true }).catch(() => {});
+      drop.push(id);
+      removed += 1;
+    }
+    if (drop.length) await removeCanvasFileIds(jsonPath, drop);
+  }
+  return { ok: true, removed };
 }
 
 function mimeForName(name) {
@@ -833,6 +946,7 @@ export async function pullCanvasAssignmentFiles(opts = {}) {
   const snapshot = opts.snapshot || (await readCanvasSnapshot());
   if (!snapshot) return { ok: false, reason: "no-snapshot" };
 
+  const decoration = await dropSpanishDecorationFiles();
   const retitled = await retitleJunkCanvasFiles();
 
   let downloaded = 0;
@@ -865,6 +979,18 @@ export async function pullCanvasAssignmentFiles(opts = {}) {
       const stored = (todo.props?.canvasFiles || []).find(
         (row) => Number(row?.id) === id
       );
+      if (
+        isSpanishDecorationImage(
+          todo.classId,
+          canvasMetaName(meta, ref.name),
+          canvasMetaType(meta)
+        )
+      ) {
+        const victim = basename(String(stored?.name || "").trim());
+        if (victim) await rm(join(todo.dir, victim), { force: true }).catch(() => {});
+        skipped += 1;
+        continue;
+      }
       const storedName = basename(String(stored?.name || "").trim());
       const storedStem = basename(storedName, extname(storedName));
       const computed = canvasDownloadName(
@@ -924,6 +1050,7 @@ export async function pullCanvasAssignmentFiles(opts = {}) {
     skipped,
     missingTodo,
     renamed: retitled.renamed,
+    decorationRemoved: decoration.removed || 0,
   };
 }
 

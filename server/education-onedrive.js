@@ -17,6 +17,44 @@ const PROPERTY_JSON = new Set([
 ]);
 
 /**
+ * Finder names for OneDrive bookkeeping. Leading dot hides the file.
+ * Plain names still resolve so a writer that has not caught up keeps working.
+ * @param {string} fileName
+ * @returns {string[]}
+ */
+export function bookkeepingBasenames(fileName) {
+  const plain = String(fileName || "").replace(/^\.+/, "");
+  const lower = plain.toLowerCase();
+  if (lower === "context.md") {
+    return [".CONTEXT.md", ".context.md", "CONTEXT.md", "context.md"];
+  }
+  if (lower === "deleted.md") {
+    return [".deleted.md", ".DELETED.md", "deleted.md"];
+  }
+  if (!plain) return [];
+  return [`.${plain}`, plain];
+}
+
+/**
+ * @param {string} dir
+ * @param {string} fileName todo.json, date.json, CONTEXT.md, deleted.md
+ * @returns {Promise<string|null>}
+ */
+export async function resolveBookkeepingFile(dir, fileName) {
+  if (!dir) return null;
+  for (const name of bookkeepingBasenames(fileName)) {
+    const path = join(dir, name);
+    try {
+      const st = await stat(path);
+      if (st.isFile()) return path;
+    } catch {
+      /* missing */
+    }
+  }
+  return null;
+}
+
+/**
  * Same basename rules as education object files (no traversal, no property JSON).
  * @param {unknown} name
  * @returns {string|null}
@@ -572,12 +610,7 @@ function isIgnorableFsName(name) {
 
 async function dirHasPropertyJson(abs) {
   for (const name of ["todo.json", "date.json"]) {
-    try {
-      const st = await stat(join(abs, name));
-      if (st.isFile()) return true;
-    } catch {
-      /* missing */
-    }
+    if (await resolveBookkeepingFile(abs, name)) return true;
   }
   return false;
 }
