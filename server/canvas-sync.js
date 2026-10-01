@@ -10,7 +10,8 @@
  * Yan saying submit uses canvas-files.js (OneDrive file, text, or URL).
  * Hourly/nightly agents still do not POST submissions.
  * Full fetch also dumps comments, pages, modules, and course files into
- * .canvas/ for the agent. Not education UI.
+ * .canvas/ for the agent. Teacher comments also overlay onto todo pages.
+ * Pages, modules, and course files stay off the education UI.
  */
 
 import { mkdir, open, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -26,7 +27,7 @@ import {
 import { listClassEntriesForRoot, scheduleTodayKey } from "./education-data.js";
 import { formatDeletedBlock, loadDeletedMarkdown } from "./education-match.js";
 import { gitAddCommitPush } from "./git-publish.js";
-import { attachCanvasOverlay, canvasAssignmentIdFromLink } from "./canvas-grades.js";
+import { attachCanvasComments, attachCanvasOverlay, canvasAssignmentIdFromLink } from "./canvas-grades.js";
 import {
   createLaterAuthRetry,
   promptWithAuthRetry,
@@ -77,6 +78,10 @@ let hourlyInFlight = null;
 let liveCache = null;
 /** @type {Promise<object|null>|null} */
 let liveFetchInFlight = null;
+/** @type {{ comments: object[], at: number }|null} */
+let liveCommentCache = null;
+/** @type {Promise<object[]>|null} */
+let liveCommentFetchInFlight = null;
 const PENDING_COMPLETE_MS = 90_000;
 /** @type {Map<number, { complete: boolean, overrideId?: string, at: number }>} */
 const pendingComplete = new Map();
@@ -1471,7 +1476,7 @@ export function buildCanvasSyncPrompt({
     "Yan only (you@example.com). Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} (timezone ${timezone}).`,
     `Snapshot: ${CANVAS_REL}/snapshot.json (also assignments.md). Optional map: ${CANVAS_REL}/course-map.json.`,
-    `Agent context dumps (not UI): ${CANVAS_REL}/comments.md, comments-new.md, pages.md, modules.md, files.md (and the matching .json).`,
+    `Agent context dumps: ${CANVAS_REL}/comments.md, comments-new.md, pages.md, modules.md, files.md (and the matching .json). Teacher comments show on the todo page from the live overlay. Pages, modules, and course files stay off the UI.`,
     "Read comments-new.md. Fold new teacher comments into that class or todo .CONTEXT.md on OneDrive (Finder-hidden, and hidden from the education UI). Skip a comment already in .CONTEXT.md. Do not copy comments into .todo.json description. Do not create dashboard tiles from pages, modules, or course files. Use those dumps when writing todo descriptions or class .CONTEXT.md if they explain the work.",
     `Hourly Composer log: ${CANVAS_REL}/last-hourly-sync.json. Read it. Fix mistakes those daytime Composer 2.5 passes made (wrong tags, HW: prefixes left on names, Adv Calc HW dues pulled back to Canvas time, yoga CW hiddenFromHome, missing canvasId, duplicate todos, course-map drift).`,
     "Yan is a 2026-27 junior. Those academic dashboard classes are often missing from Canvas until school publishes them. That is expected.",
@@ -1545,14 +1550,80 @@ export async function getLiveCanvasSnapshot({ force = false } = {}) {
   return liveFetchInFlight;
 }
 
+function rememberLiveComments(comments) {
+  liveCommentCache = {
+    comments: Array.isArray(comments) ? comments : [],
+    at: Date.now(),
+  };
+}
+
+async function readCanvasComments(dir) {
+  try {
+    const raw = JSON.parse(
+      await readFile(join(canvasDir(dir), "comments.json"), "utf8")
+    );
+    return Array.isArray(raw?.comments) ? raw.comments : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Same 10s gate as grades. Force refetches mapped-course submission
+ * comments. Otherwise memory, then comments.json. Does not rewrite the file.
+ * @param {{ force?: boolean }} [opts]
+ */
+export async function getLiveCanvasComments({ force = false } = {}) {
+  if (liveCommentFetchInFlight) return liveCommentFetchInFlight;
+  if (!force) {
+    if (liveCommentCache) return liveCommentCache.comments;
+    const disk = await readCanvasComments();
+    rememberLiveComments(disk);
+    return disk;
+  }
+  if (liveCommentCache && Date.now() - liveCommentCache.at < LIVE_MIN_INTERVAL_MS) {
+    return liveCommentCache.comments;
+  }
+  liveCommentFetchInFlight = (async () => {
+    try {
+      const { base, token, configured } = canvasConfig();
+      if (!configured) throw new Error("canvas not configured");
+      const map = await readCourseMap();
+      const ids = mappedCourseIds(map);
+      if (!ids.length) throw new Error("no mapped courses");
+      const { fetchSubmissionComments } = await import("./canvas-context.js");
+      const comments = await fetchSubmissionComments(
+        base,
+        token,
+        ids.map((id) => ({ id })),
+        { timeoutMs: LIVE_TIMEOUT_MS }
+      );
+      rememberLiveComments(comments);
+      return comments;
+    } catch (err) {
+      console.error("[canvas-sync] live comments", err);
+    }
+    if (liveCommentCache) return liveCommentCache.comments;
+    return readCanvasComments();
+  })().finally(() => {
+    liveCommentFetchInFlight = null;
+  });
+  return liveCommentFetchInFlight;
+}
+
 export async function applyLiveCanvasOverlay(tree, { force = false } = {}) {
   const { configured } = canvasConfig();
   if (!configured || !tree) return tree;
   try {
-    const snapshot = await getLiveCanvasSnapshot({ force });
-    if (!snapshot) return tree;
-    const map = await readCourseMap();
-    attachCanvasOverlay(tree, snapshot, map);
+    const [snapshot, comments] = await Promise.all([
+      getLiveCanvasSnapshot({ force }),
+      getLiveCanvasComments({ force }),
+    ]);
+    if (snapshot) {
+      const map = await readCourseMap();
+      attachCanvasOverlay(tree, snapshot, map);
+    }
+    attachCanvasComments(tree, comments);
   } catch (err) {
     console.error("[canvas-sync] live overlay", err);
   }

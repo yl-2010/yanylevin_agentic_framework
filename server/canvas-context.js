@@ -1,6 +1,8 @@
 /**
  * Canvas pages, modules, course files, and submission comments.
- * Agent-only dumps under education/<yan>/.canvas/. Not education UI.
+ * Dumps under education/<yan>/.canvas/ feed the agent.
+ * Teacher comments also overlay onto education todos (web and iOS).
+ * Pages, modules, and course files stay off the education UI.
  * Full (nightly / --fetch-only) snapshot pulls these. Hourly light does not.
  */
 
@@ -22,9 +24,31 @@ const MAX_FILES_PER_COURSE = 200;
  * @param {unknown} raw
  * @param {number} [max]
  */
+function commentPlainText(html, max = COMMENT_MAX) {
+  const text = String(html || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<\s*br\s*\/?\s*>/gi, "\n")
+    .replace(/<\/\s*(?:p|div|li|h[1-6]|tr)\s*>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'");
+  return text
+    .split("\n")
+    .map((line) => line.replace(/[ \t\f\v]+/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, max);
+}
+
 export function commentRow(raw, extra = {}) {
   const id = Number(raw?.id);
-  const text = stripHtml(raw?.comment || raw?.body || "", COMMENT_MAX);
+  const text = commentPlainText(raw?.comment || raw?.body || "");
   if (!Number.isFinite(id) || id <= 0 || !text) return null;
   const authorObj = raw?.author && typeof raw.author === "object" ? raw.author : null;
   const authorId = Number(raw?.author_id ?? authorObj?.id);
@@ -174,7 +198,7 @@ export function formatCommentsMarkdown(comments, { heading = "Canvas comments", 
       const asg = row.assignment ? ` on ${row.assignment}` : "";
       const id = row.assignmentId != null ? ` [canvasId ${row.assignmentId}]` : "";
       lines.push(`- **${who}${own}**${asg}${id}${when ? ` — ${when}` : ""}`);
-      lines.push(`  ${row.comment}`);
+      lines.push(`  ${String(row.comment || "").replace(/\n+/g, " ")}`);
     }
     lines.push("");
   }
@@ -552,11 +576,56 @@ async function fetchCourseFiles(base, token, course, fetchOpts) {
  * @param {{ id: number, name?: string }[]} courses
  * @param {{ timeoutMs?: number }} [fetchOpts]
  */
+/**
+ * Submission comments for the given courses. Mapped-course live overlay
+ * and the nightly context dump both use this. Does not write files.
+ * @param {string} base
+ * @param {string} token
+ * @param {{ id: number, name?: string }[]} courses
+ * @param {{ timeoutMs?: number }} [fetchOpts]
+ * @param {number|null} [knownSelfUserId]
+ */
+export async function fetchSubmissionComments(
+  base,
+  token,
+  courses,
+  fetchOpts = {},
+  knownSelfUserId
+) {
+  const list = Array.isArray(courses) ? courses.filter((c) => c && c.id) : [];
+  const selfUserId =
+    knownSelfUserId !== undefined
+      ? knownSelfUserId
+      : await fetchSelfUserId(base, token, fetchOpts);
+  const chunks = await Promise.all(
+    list.map(async (course) => {
+      try {
+        return await fetchCourseComments(base, token, course, selfUserId, fetchOpts);
+      } catch (err) {
+        console.error(`[canvas-context] comments ${course.name || course.id}`, err);
+        return [];
+      }
+    })
+  );
+  const comments = chunks.flat();
+  comments.sort((a, b) => {
+    const byTime = String(a.createdAt).localeCompare(String(b.createdAt));
+    if (byTime !== 0) return byTime;
+    return (Number(a.id) || 0) - (Number(b.id) || 0);
+  });
+  return comments;
+}
+
 export async function fetchCanvasContext(base, token, courses, fetchOpts = {}) {
   const list = Array.isArray(courses) ? courses.filter((c) => c && c.id) : [];
   const selfUserId = await fetchSelfUserId(base, token, fetchOpts);
-  /** @type {object[]} */
-  const comments = [];
+  const comments = await fetchSubmissionComments(
+    base,
+    token,
+    list,
+    fetchOpts,
+    selfUserId
+  );
   /** @type {object[]} */
   const pages = [];
   /** @type {object[]} */
@@ -566,13 +635,6 @@ export async function fetchCanvasContext(base, token, courses, fetchOpts = {}) {
 
   for (const course of list) {
     const label = course.name || course.id;
-    try {
-      comments.push(
-        ...(await fetchCourseComments(base, token, course, selfUserId, fetchOpts))
-      );
-    } catch (err) {
-      console.error(`[canvas-context] comments ${label}`, err);
-    }
     try {
       pages.push(...(await fetchCoursePages(base, token, course, fetchOpts)));
     } catch (err) {
@@ -590,7 +652,6 @@ export async function fetchCanvasContext(base, token, courses, fetchOpts = {}) {
     }
   }
 
-  comments.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
   return { comments, pages, modules, files, selfUserId };
 }
 

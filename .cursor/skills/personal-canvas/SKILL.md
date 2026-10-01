@@ -4,7 +4,8 @@ description: >-
   Sync Yan's EPS Canvas into the education dashboard (assignments, syllabus
   dates, canvasLink), submit file/text/URL when Yan asks, pull teacher
   attachments into OneDrive todos. Nightly also dumps comments, pages,
-  modules, and course files for agent context (not UI). Yan only.
+  modules, and course files for agent context. Teacher comments also show
+  on the todo page. Pages, modules, and course files stay off the UI. Yan only.
 disable-model-invocation: true
 ---
 
@@ -123,11 +124,11 @@ Read each mapped course `syllabus` plus snapshot `events[]`. Create/update **imp
 - Set `date`, optional `time`, markdown `description` when there are real facts, `canvasLink` (event url or course `syllabusUrl`), optional `canvasId`.
 - Do not turn syllabus fluff into dates.
 
-## Comments, pages, modules, course files (agent only)
+## Comments, pages, modules, course files
 
-Full fetch (nightly, `--fetch-only`, manual sync) writes those dumps. Hourly does not. **Never** show them on `/education` or iOS. Do not copy them into `todo.json` `description`. Do not download course-file dumps into OneDrive class folders (assignment attachments still use `canvas-files.js pull`).
+Full fetch (nightly, `--fetch-only`, manual sync) writes those dumps. Hourly does not. Pages, modules, and course files stay off `/education` and iOS. Teacher comments are the exception. The live overlay paints them on the todo page, on the same 10 second Canvas pull as grades. Do not copy comments into `todo.json` `description`. Do not download course-file dumps into OneDrive class folders (assignment attachments still use `canvas-files.js pull`).
 
-**Comments.** Read `comments.md` anytime Yan asks what a teacher said, or `canvas-files.js comments --canvas-id <id>` for a live pull. Nightly / manual: read `comments-new.md`. Fold new **teacher** comments into that class or todo OneDrive `CONTEXT.md` (hidden from tiles). Skip if that comment is already there. Skip Yan's own comments unless they matter. One short dated line per comment is enough (`2026-09-18 Seeley on Average Speed Write-up: …`).
+**Comments.** The todo page shows teacher comments (not Yan's own). Read `comments.md` anytime Yan asks what a teacher said, or `canvas-files.js comments --canvas-id <id>` for a live pull. Nightly / manual: read `comments-new.md`. Fold new teacher comments into that class or todo OneDrive `CONTEXT.md` (hidden from tiles). Skip if that comment is already there. Skip Yan's own comments unless they matter. One short dated line per comment is enough (`2026-09-18 Seeley on Average Speed Write-up: …`).
 
 **Pages and modules.** Read `pages.md` / `modules.md` when a todo is thin, locked, or clearly a module item. Copy a useful fact into class `CONTEXT.md` if it will help later (unit name, locked until score). Do not invent dates from every module item.
 

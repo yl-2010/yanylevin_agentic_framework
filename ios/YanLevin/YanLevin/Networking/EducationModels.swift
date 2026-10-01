@@ -445,6 +445,23 @@ struct EducationCanvasWork: Decodable, Hashable {
     var label: String { display }
 }
 
+struct EducationCanvasComment: Decodable, Hashable, Identifiable {
+    let id: Int
+    let createdAt: String
+    let comment: String
+
+    enum CodingKeys: String, CodingKey { case id, createdAt, comment }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        createdAt = (try c.decodeIfPresent(String.self, forKey: .createdAt) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        comment = (try c.decodeIfPresent(String.self, forKey: .comment) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
 struct EducationTodo: Decodable, Identifiable, Hashable {
     /// Folder id under todos/ (not globally unique across classes/projects).
     let todoId: String
@@ -467,6 +484,7 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
     /// Optional Canvas LMS assignment/page URL — toolbar button only when set.
     let canvasLink: String?
     let canvasWork: EducationCanvasWork?
+    let canvasComments: [EducationCanvasComment]?
     let classId: String?
     let projectId: String?
     let detail: String?
@@ -478,7 +496,7 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case todoId = "id"
-        case name, title, tag, type, dueDate, dueTime, due, done, completedAt, createdAt, showInDates, hiddenFromHome, canvasLink, canvasWork, classId, projectId, notes, files, kind, capsules, citations
+        case name, title, tag, type, dueDate, dueTime, due, done, completedAt, createdAt, showInDates, hiddenFromHome, canvasLink, canvasWork, canvasComments, classId, projectId, notes, files, kind, capsules, citations
         case detail = "description"
     }
 
@@ -616,6 +634,7 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
             hiddenFromHome: hiddenFromHome,
             canvasLink: canvasLink,
             canvasWork: canvasWork,
+            canvasComments: canvasComments,
             classId: classId,
             projectId: projectId,
             detail: detail,
@@ -645,6 +664,7 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
             hiddenFromHome: hiddenFromHome,
             canvasLink: canvasLink,
             canvasWork: canvasWork,
+            canvasComments: canvasComments,
             classId: classId,
             projectId: projectId,
             detail: detail,

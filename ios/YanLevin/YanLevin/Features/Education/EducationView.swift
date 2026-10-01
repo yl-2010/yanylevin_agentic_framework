@@ -1765,7 +1765,7 @@ struct TodoDetailView: View {
                     }
                 }
 
-                todoFilesPanel
+                todoLower
             }
             .padding(.horizontal, isWide ? 28 : 16)
             .padding(.vertical, 12)
@@ -1789,7 +1789,7 @@ struct TodoDetailView: View {
     }
 
     @ViewBuilder
-    private var todoFilesPanel: some View {
+    private func todoFiles(pairColumns: Bool) -> some View {
         let files = liveTodo.files ?? []
         if !files.isEmpty {
             EducationContextFilesView(
@@ -1800,11 +1800,82 @@ struct TodoDetailView: View {
                     classId: liveTodo.classId,
                     projectId: liveTodo.projectId
                 ),
-                pairColumns: isWide,
+                pairColumns: pairColumns,
                 store: store
             )
         }
     }
+
+    @ViewBuilder
+    private func commentStack(_ comments: [EducationCanvasComment]) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ForEach(Array(comments.enumerated()), id: \.element.id) { index, comment in
+                EducationCommentBox(
+                    title: index == 0 ? "Comment" : "Comment \(index + 1)",
+                    when: commentReleased(comment.createdAt),
+                    text: comment.comment
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var todoLower: some View {
+        let files = liveTodo.files ?? []
+        let comments = (liveTodo.canvasComments ?? []).filter {
+            !$0.comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        if comments.isEmpty {
+            todoFiles(pairColumns: isWide)
+        } else if isWide && !files.isEmpty {
+            HStack(alignment: .top, spacing: 14) {
+                todoFiles(pairColumns: false)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                commentStack(comments)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        } else {
+            commentStack(comments)
+            if !files.isEmpty {
+                todoFiles(pairColumns: false)
+            }
+        }
+    }
+
+    private func commentReleased(_ iso: String) -> String {
+        let trimmed = iso.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let date = Self.parseCommentDate(trimmed) else { return "" }
+        let calendar = Calendar.current
+        let dateStr = String(
+            format: "%04d-%02d-%02d",
+            calendar.component(.year, from: date),
+            calendar.component(.month, from: date),
+            calendar.component(.day, from: date)
+        )
+        let timeStr = String(
+            format: "%02d:%02d",
+            calendar.component(.hour, from: date),
+            calendar.component(.minute, from: date)
+        )
+        return NaturalWhen.formatDetail(date: dateStr, time: timeStr, use24Hour: use24Hour)
+    }
+
+    private static func parseCommentDate(_ iso: String) -> Date? {
+        if let date = commentDateFractional.date(from: iso) { return date }
+        return commentDatePlain.date(from: iso)
+    }
+
+    private static let commentDateFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    private static let commentDatePlain: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
 
     private func toggleDone() {
         guard let token = auth.session?.token else { return }
@@ -2247,6 +2318,33 @@ private struct EducationDateFilterBar: View {
 private enum EducationFilterChrome {
     static func selectedTint(_ scheme: ColorScheme, palette: YLPalette = .standard) -> Color {
         YLTheme.accent(scheme, palette: palette).opacity(scheme == .dark ? 0.55 : 0.72)
+    }
+}
+
+private struct EducationCommentBox: View {
+    let title: String
+    let when: String
+    let text: String
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(YLTheme.fg(colorScheme))
+            if !when.isEmpty {
+                Text(when)
+                    .font(.subheadline)
+                    .foregroundStyle(YLTheme.muted(colorScheme))
+            }
+            Text(text)
+                .font(.body)
+                .foregroundStyle(YLTheme.fg(colorScheme))
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .ylGlassRounded(cornerRadius: 22, interactive: true)
     }
 }
 

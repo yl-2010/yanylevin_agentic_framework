@@ -38,6 +38,10 @@ describe("commentRow", () => {
     assert.equal(row.own, false);
     assert.equal(row.comment, "Nice diagram.");
     assert.equal(row.assignmentId, 40335975);
+    assert.equal(
+      commentRow({ id: 2, comment: "Line one<br>Line two" })?.comment,
+      "Line one\nLine two"
+    );
     assert.equal(commentRow({ id: 1, comment: "   " }), null);
   });
 });

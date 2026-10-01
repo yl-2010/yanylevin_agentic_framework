@@ -239,3 +239,65 @@ export function attachCanvasOverlay(tree, snapshot, courseMap = null) {
   attachCanvasCompletion(tree, snapshot);
   return tree;
 }
+
+function eachEducationTodo(tree, fn) {
+  if (!tree || typeof tree !== "object") return;
+  for (const cls of tree.classes || []) {
+    for (const t of cls?.todos || []) fn(t);
+    for (const t of cls?.classOnlyTodos || []) fn(t);
+  }
+  for (const t of tree.todos || []) fn(t);
+  for (const p of tree.projects || []) {
+    for (const t of p?.todos || []) fn(t);
+  }
+}
+
+/**
+ * Teacher submission comments for the todo page. Drops Yan's own notes.
+ * Oldest first. Clears canvasComments when a Canvas todo has none left.
+ * Does not write files.
+ * @param {object} tree
+ * @param {object[]|null|undefined} comments
+ */
+export function attachCanvasComments(tree, comments) {
+  if (!tree) return tree;
+  /** @type {Map<number, { id: number, createdAt: string, comment: string }[]>} */
+  const byAssignment = new Map();
+  const seen = new Set();
+  for (const row of Array.isArray(comments) ? comments : []) {
+    if (!row || row.own === true) continue;
+    const text = String(row.comment || "").trim();
+    const assignmentId = Number(row.assignmentId);
+    const id = Number(row.id);
+    if (!text || !Number.isFinite(assignmentId) || !Number.isFinite(id)) continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const bucket = byAssignment.get(assignmentId) || [];
+    bucket.push({
+      id,
+      createdAt: String(row.createdAt || ""),
+      comment: text,
+    });
+    byAssignment.set(assignmentId, bucket);
+  }
+  for (const bucket of byAssignment.values()) {
+    bucket.sort((a, b) => {
+      const byTime = a.createdAt.localeCompare(b.createdAt);
+      if (byTime !== 0) return byTime;
+      return a.id - b.id;
+    });
+  }
+
+  eachEducationTodo(tree, (todo) => {
+    if (!todo || typeof todo !== "object") return;
+    const assignmentId = todoCanvasAssignmentId(todo);
+    if (assignmentId == null) return;
+    const rows = byAssignment.get(assignmentId);
+    if (!rows || !rows.length) {
+      delete todo.canvasComments;
+      return;
+    }
+    todo.canvasComments = rows;
+  });
+  return tree;
+}

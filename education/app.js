@@ -917,6 +917,36 @@
     return dated;
   }
 
+  function formatCommentWhen(iso) {
+    const ms = Date.parse(String(iso || ""));
+    if (!Number.isFinite(ms)) return "";
+    const d = new Date(ms);
+    const dateStr = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    const timeStr = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    return formatDetailWhen(dateStr, timeStr);
+  }
+
+  function commentBoxesHtml(comments) {
+    const list = Array.isArray(comments) ? comments : [];
+    if (!list.length) return "";
+    return list
+      .map((row, i) => {
+        const text = String(row?.comment || "").trim();
+        if (!text) return "";
+        const title = i === 0 ? "Comment" : `Comment ${i + 1}`;
+        const when = formatCommentWhen(row?.createdAt);
+        const body = `
+        ${when ? `<p class="edu-detail-meta">${escapeHtml(when)}</p>` : ""}
+        <p class="edu-comment-body">${escapeHtml(text)}</p>`;
+        return panelHtml(title, body, {
+          extraClass: "edu-panel--comment",
+          filterId: `lg-edu-todo-comment-${i + 1}`,
+        });
+      })
+      .filter(Boolean)
+      .join("");
+  }
+
   function weekdayLabel(weekday, y, m, d) {
     return `${WEEKDAYS_SHORT[weekday]} ${m}/${d}`;
   }
@@ -2355,7 +2385,16 @@
     )})" d="${EDU_BACK_PATH}"/></svg><span class="edu-back-glass" aria-hidden="true"></span></a>`;
   }
 
-  function detailShell(backHref, title, bodyHtml, filterId, { canvasLink = "", filesHtml = "", titleHtml = "", canvasScore = "" } = {}) {
+  function todoLowerHtml(filesHtml, commentsHtml) {
+    if (!commentsHtml) return filesHtml || "";
+    if (!filesHtml) return `<div class="edu-todo-comments">${commentsHtml}</div>`;
+    return `<div class="edu-todo-split">
+      <div class="edu-todo-split-comments">${commentsHtml}</div>
+      <div class="edu-todo-split-files">${filesHtml}</div>
+    </div>`;
+  }
+
+  function detailShell(backHref, title, bodyHtml, filterId, { canvasLink = "", filesHtml = "", commentsHtml = "", titleHtml = "", canvasScore = "" } = {}) {
     const canvas = canvasOrbHtml(canvasLink, canvasScore);
     return `
       <header class="edu-hero edu-hero--detail${canvas ? " edu-hero--detail-canvas" : ""}">
@@ -2368,7 +2407,7 @@
       <div class="edu-grid edu-grid--detail">
         ${panelHtml("Details", bodyHtml, { filterId })}
       </div>
-      ${filesHtml}`;
+      ${todoLowerHtml(filesHtml, commentsHtml)}`;
   }
 
   function renderHome() {
@@ -2888,6 +2927,7 @@
     appEl.innerHTML = detailShell(backHrefForItem(t), t.name || t.id, body, "lg-edu-todo-detail", {
       canvasLink: t.canvasLink,
       filesHtml: fileTiles,
+      commentsHtml: commentBoxesHtml(t.canvasComments),
       titleHtml: taggedNameHtml(tag, t.name || t.id),
       canvasScore: todoScoreLabel(t),
     });

@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  attachCanvasComments,
   attachCanvasCompletion,
   attachCanvasGrades,
   assignmentLooksComplete,
@@ -206,5 +207,93 @@ describe("attachCanvasGrades", () => {
       ],
     });
     assert.equal(tree.classes[0].canvasScoreLabel, undefined);
+  });
+});
+
+describe("attachCanvasComments", () => {
+  it("keeps teacher comments oldest first and drops Yan's own", () => {
+    const tree = {
+      classes: [
+        {
+          todos: [
+            {
+              id: "lab",
+              canvasId: 10,
+              canvasComments: [{ id: 1, createdAt: "old", comment: "stale" }],
+            },
+            { id: "plain" },
+          ],
+        },
+      ],
+      todos: [
+        {
+          id: "link",
+          canvasLink: "https://canvas.instructure.com/courses/1/assignments/20",
+        },
+      ],
+    };
+    attachCanvasComments(tree, [
+      {
+        id: 3,
+        assignmentId: 10,
+        own: false,
+        createdAt: "2026-09-29T20:30:05Z",
+        comment: "later",
+      },
+      {
+        id: 2,
+        assignmentId: 10,
+        own: false,
+        createdAt: "2026-09-28T20:30:05Z",
+        comment: "earlier",
+      },
+      {
+        id: 9,
+        assignmentId: 10,
+        own: true,
+        createdAt: "2026-09-30T20:30:05Z",
+        comment: "mine",
+      },
+      {
+        id: 4,
+        assignmentId: 10,
+        own: false,
+        createdAt: "2026-09-27T20:30:05Z",
+        comment: "   ",
+      },
+      {
+        id: 5,
+        assignmentId: 20,
+        own: false,
+        createdAt: "2026-09-01T00:00:00Z",
+        comment: "on link",
+      },
+    ]);
+    assert.deepEqual(tree.classes[0].todos[0].canvasComments, [
+      { id: 2, createdAt: "2026-09-28T20:30:05Z", comment: "earlier" },
+      { id: 3, createdAt: "2026-09-29T20:30:05Z", comment: "later" },
+    ]);
+    assert.equal(tree.classes[0].todos[1].canvasComments, undefined);
+    assert.deepEqual(tree.todos[0].canvasComments, [
+      { id: 5, createdAt: "2026-09-01T00:00:00Z", comment: "on link" },
+    ]);
+  });
+
+  it("clears a stale comment when the live list no longer has it", () => {
+    const tree = {
+      classes: [
+        {
+          todos: [
+            {
+              id: "lab",
+              canvasId: 10,
+              canvasComments: [{ id: 1, createdAt: "x", comment: "gone" }],
+            },
+          ],
+        },
+      ],
+    };
+    attachCanvasComments(tree, []);
+    assert.equal(tree.classes[0].todos[0].canvasComments, undefined);
   });
 });
