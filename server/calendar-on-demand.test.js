@@ -155,10 +155,13 @@ describe("calendar on-demand prompt", () => {
     assert.match(prompt, /calendar-worthy/);
     assert.match(prompt, /Create nothing when it is not/);
     assert.match(prompt, /college spam/i);
+    assert.match(prompt, /another account/);
     assert.match(prompt, /signed up for that visit/);
     assert.match(prompt, /education todos/);
     assert.match(prompt, /Jev is that classifier, not a person/);
     assert.match(prompt, /Next Saturday is the second/);
+    assert.match(prompt, /Look up the real start and end/);
+    assert.doesNotMatch(prompt, /Do not invent a clock/);
     assert.match(prompt, /\d{4}-\d{2}-\d{2} (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/);
     assert.doesNotMatch(prompt, /Bias is add/);
   });

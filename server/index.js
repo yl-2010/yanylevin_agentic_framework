@@ -42,6 +42,7 @@ import { startLocationEnrichmentScheduler } from "./location-enrichment-agent.js
 import { startContextSynthesisScheduler } from "./context-synthesis-agent.js";
 import { startChatTitleRefreshScheduler } from "./chat-title-refresh-agent.js";
 import { startLifeStateCleanupScheduler } from "./life-state-cleanup-agent.js";
+import { startCalendarSortScheduler } from "./calendar-sort-agent.js";
 import { startCanvasSyncScheduler, applyLiveCanvasOverlay, seedLiveCanvasTodoDone, syncCanvasTodoDone, YAN_EMAIL } from "./canvas-sync.js";
 import { canonicalizeEmail, isJypeAccessEmail } from "./identity.js";
 import {
@@ -1355,6 +1356,7 @@ app.use((_req, res) => {
   startCanvasSyncScheduler();
   startChatTitleRefreshScheduler();
   startLifeStateCleanupScheduler();
+  startCalendarSortScheduler();
   startContextSynthesisScheduler();
   startLocationBrainScheduler();
   startHealthBrainScheduler();

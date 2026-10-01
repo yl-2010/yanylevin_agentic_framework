@@ -96,6 +96,7 @@ export const BRIEFING_UNSLOP_MODEL_SPEC = {
 export const DEFAULT_NIGHTLY_HM = "01:00";
 export const DEFAULT_CHAT_TITLE_REFRESH_HM = "01:30";
 export const DEFAULT_LIFE_STATE_CLEANUP_HM = "01:30";
+export const DEFAULT_CALENDAR_SORT_HM = "01:15";
 export const DEFAULT_SYNTHESIS_HM = "02:30";
 export const DEFAULT_BRAIN_PROJECTION_HM = "03:00";
 export const DEFAULT_COMPILE_HM = "06:00";
@@ -301,6 +302,10 @@ export function lifeStateCleanupHm(meta) {
     meta?.lifeStateCleanupLocalTime,
     DEFAULT_LIFE_STATE_CLEANUP_HM
   );
+}
+
+export function calendarSortHm(meta) {
+  return clockHm(meta?.calendarSortLocalTime, DEFAULT_CALENDAR_SORT_HM);
 }
 
 export function contextSynthesisHm(meta) {

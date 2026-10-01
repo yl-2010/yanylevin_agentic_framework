@@ -125,8 +125,12 @@ own sections. "None" if none.
 ## Calendar plans
 Any plan with a date that should go on Apple Calendar. Bias is include.
 Tentative, maybe, TBD venue, and "Saturday 4:30" all belong. One line per
-event: title, local date, start to end (or all-day), calendar hint, evidence,
-and the meeting URL when mail or chat has one. PathIvy webinars: the Zoom
+event: title, local date, real start to end, calendar hint, evidence,
+and the meeting URL when mail or chat has one. Write all-day only when the
+event has no clock (no school, a birthday, a holiday, a date-range delivery).
+A game, dinner, practice, appointment, or gym session is not all-day. If the
+source has no clock, write `time unknown` and where to look (team site, invite,
+earlier event). Do not write all-day as a stand-in. PathIvy webinars: the Zoom
 registration href from Mail.app `source` for that date's row, not the words
 "Registration Link". "None" if none. Homework, Canvas, bells, education todos,
 and other dashboard items do not belong. The calendar is events.

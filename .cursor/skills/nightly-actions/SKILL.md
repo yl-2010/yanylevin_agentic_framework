@@ -53,10 +53,7 @@ Bias is **add** for a real plan. A hangout, meal, appointment, or trip with a da
 need a Yan quote that says to add it. You do **not** need a booking, an
 accepted invite, or "yes that works." When you are unsure about a real plan, create it. The skip list below is not that case.
 
-A named day is enough. A clock time is better. All-day is fine when they did
-not name a time. TBD venue is fine. "Maybe Friday" is fine. A proposal Yan
-has not refused is fine. Scan Calendar plans, What happened, and Suggested
-actions. If triage left a dated plan off the list, still create it.
+A named day is enough to decide it belongs. TBD venue is fine. "Maybe Friday" is fine. A proposal Yan has not refused is fine. The clock is separate. Look up the real start and end before create. Use the time they named when they named one. When they did not, check the thread, the mail, the official page, and an earlier copy of the same event. A game, dinner, practice, appointment, or gym session gets that window. Pass `--all-day` only when the event has no clock (no school, a birthday, a holiday, a date-range delivery). If you cannot find the time, skip the create and say what you looked for. Do not file a full-day block. Scan Calendar plans, What happened, and Suggested actions. If triage left a dated plan off the list, still create it.
 
 Create when there is a specific day plus any of:
 
@@ -83,7 +80,7 @@ Skip these even when they name a day. For this list, unsure means skip:
 - An identical deleted calendar event (similar title and the same start, end, location, and link). A new time, place, or link is a new event.
 - EPS Ventures outings unless Yan has a signup confirmation, a form receipt or he said he signed up. Student News / Weekly News announcements are not enough
 
-Do not invent a clock. Use the time they named, or all-day.
+Do not file a full-day timed block. Use the time you found, or `--all-day` when there is no clock. The personal-calendar skill has the start and end rule. The CLI refuses a timed event that lasts 20 hours or more.
 
 Before `create`, list overlapping events with `node server/calendar-cli.js`
 (personal-calendar skill) and skip if a **similar title** already sits on
@@ -94,8 +91,7 @@ in `calendar/deleted-events.jsonl` or a `deleted.md` calendar row with the
 same start, end, location, and link. A new time, place, or link is a new
 event. The CLI refuses an identical create. If it is already on that day
 from the realtime agent, leave it. Convert local times in the digest timezone to UTC for `--start` and `--end`. Pick
-the calendar from the personal-calendar skill. Do not ask; if the calendar
-is not obvious, use the personal / default iCloud calendar.
+the calendar from the personal-calendar skill. Do not ask. Unclear is iCloud Personal. Inviting someone else is the matching Exchange calendar, with `--attendees`.
 
 Meeting links are required on create and update. If mail, chat, or an invite
 has a Zoom / Meet / Teams / FaceTime / registration / booking URL, pass it as

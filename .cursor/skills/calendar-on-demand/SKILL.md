@@ -19,7 +19,7 @@ Jev only asked whether this message might be a plan. Jev is that classifier, not
 
 Look up the weekday on the list in the prompt. This Saturday is the first Saturday. Next Saturday is the second. Do not count days yourself.
 
-Add an event he is actually showing up for. A hangout, meal, appointment, reservation, flight, or meeting with a day. A clock is better. All-day is fine when nobody named a time. TBD venue is fine when the plan is real. Do not invent a clock.
+Add an event he is actually showing up for. A hangout, meal, appointment, reservation, flight, or meeting with a day. TBD venue is fine when the plan is real. Look up the real start and end before you create. The personal-calendar skill has the rule. Pass `--all-day` only when the event has no clock. If you cannot find the time, create nothing.
 
 Skip these even when they name a day:
 
@@ -48,4 +48,4 @@ On `create`, `update`, and `delete`, add `--via calendar-on-demand`. List and ge
 
 Same write rules as the personal-calendar skill. Meeting URL goes on `--location`, `--url`, and one `--notes` line. PathIvy and Zoom registration links come from Mail.app message `source` when the plain body dropped the href. Do not leave location as the word virtual.
 
-School, family, or personal calendar from the title and people. If it is not obvious, use the personal / default iCloud calendar. Do not ask.
+Personal, School/Work, or Family from the personal-calendar skill. iCloud unless this message is inviting someone else, then Exchange, with `--attendees`. Unclear is iCloud Personal. Do not ask. Never create on Google. Do not move an existing event onto another account. A category fix stays on the account the event is already on.

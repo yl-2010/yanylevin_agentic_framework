@@ -92,6 +92,15 @@ function timeToMinutes(t) {
   return Number(m[1]) * 60 + Number(m[2]);
 }
 
+function minutesToTime(mins) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** US lunch does not start when morning class ends. Clubs middle band runs until 11:45. */
+const LUNCH_NOT_BEFORE_MIN = 11 * 60 + 45;
+
 /** @param {number} aLat @param {number} aLng @param {number} bLat @param {number} bLng */
 export function haversineMeters(aLat, aLng, bLat, bLng) {
   const R = 6_371_000;
@@ -387,9 +396,13 @@ export function inferLunch(nowContext) {
     const gap = next.startMin - cur.endMin;
     if (gap < 40) continue;
     if (minutes >= cur.endMin && minutes < next.startMin) {
+      const lunchStart = Math.max(cur.endMin, LUNCH_NOT_BEFORE_MIN);
+      if (minutes < lunchStart || lunchStart >= next.startMin) {
+        return { inLunch: false };
+      }
       return {
         inLunch: true,
-        start: cur.end,
+        start: minutesToTime(lunchStart),
         end: next.start,
         after: cur.name || undefined,
         before: next.name || undefined,

@@ -20,8 +20,10 @@ From the repo root:
 ```bash
 node server/calendar-cli.js list
 node server/calendar-cli.js events --from 2026-08-16T07:00:00Z --to 2026-08-18T06:59:59Z
-node server/calendar-cli.js create --title "Dentist" --start 2026-08-20T16:00:00Z --end 2026-08-20T16:45:00Z --calendar "Home"
-node server/calendar-cli.js create --title "PathIvy: PSAT 101" --start 2026-09-06T23:00:00Z --end 2026-09-07T00:00:00Z --calendar "Home" --location "https://us06web.zoom.us/webinar/register/<id-from-mail>" --url "https://us06web.zoom.us/webinar/register/<id-from-mail>" --notes "Zoom registration: https://us06web.zoom.us/webinar/register/<id-from-mail>"
+node server/calendar-cli.js create --title "Dentist" --start 2026-08-20T16:00:00Z --end 2026-08-20T16:45:00Z --calendar "iCloud Personal" --source iCloud
+node server/calendar-cli.js create --title "PathIvy: PSAT 101" --start 2026-09-06T23:00:00Z --end 2026-09-07T00:00:00Z --calendar "iCloud School/Work" --source iCloud --location "https://us06web.zoom.us/webinar/register/<id-from-mail>" --url "https://us06web.zoom.us/webinar/register/<id-from-mail>" --notes "Zoom registration: https://us06web.zoom.us/webinar/register/<id-from-mail>"
+node server/calendar-cli.js create --title "Dinner with Alex" --start 2026-08-20T02:00:00Z --end 2026-08-20T04:00:00Z --calendar "Calendar" --source Exchange --attendees "you@example.com"
+node server/calendar-cli.js create --title "No school" --start 2026-09-07T07:00:00Z --end 2026-09-08T07:00:00Z --all-day --calendar "iCloud School/Work" --source iCloud
 node server/calendar-cli.js update --id "<eventIdentifier>" --title "Dentist (moved)"
 node server/calendar-cli.js delete --id "<eventIdentifier>"
 ```
@@ -36,19 +38,38 @@ First Studio run should prompt for Calendar access (`yl-calendar.app`). If JSON 
 
 Output is JSON. Use `id` from create/list when updating or deleting. `--calendar` matches calendar title (or `--calendar-id`).
 
+## Start and end
+
+Pass a real `--start` and a real `--end`. A game, practice, dinner, gym session, appointment, flight, show, or meeting happens at a clock. If the message names the time, use it. If it does not, look it up before you create. Check the thread, the mail, the invite, the official page (team schedule, venue, school, airline), and any earlier copy of the same event. The end is when it finishes. Use the published length, or the length of the last copy of that event. A one-hour default is only for a short appointment whose length was never published.
+
+`--all-day` is for a date that has no clock. No school, a birthday, a holiday, a delivery window that is a range of dates. Pass `--all-day`, with `--start` at local midnight and `--end` at the next local midnight, or the morning after the last day. That flag is what Calendar shows as an all-day event.
+
+A start at midnight and an end a day later, without `--all-day`, is a timed block that fills the day. The CLI refuses a timed event that lasts 20 hours or more. When you correct a wrong all-day event to a real window, pass `--all-day 0` with the new start and end.
+
+If you still cannot find a start and end after looking, do not create the event. Say what you could not find.
+
 ## Which calendar
 
-Infer from the title, people, and time:
+Each of iCloud, Exchange, and Google has Personal, School/Work, and Family. New events go on iCloud unless Yan is inviting someone else, in which case they go on Exchange. Never create on Google.
 
-- School / EPS / class / advisory / orientation → a school calendar if one exists
-- Family names / household → a family/shared calendar if one exists
-- Otherwise the personal / default iCloud calendar
+Category, in this order:
 
-If it is not obvious, **ask** before creating. Nightly actions is the
-exception: it creates a real plan with a date without asking (tentative and TBD
-venue included), and uses the personal / default iCloud calendar when the
-target is unclear. College spam, the weekly EPS college-visit list, and
-dashboard todos stay off. Do not invent a day that nobody named.
+- Family if Rajasi, Michael, Adi, or Sunny is part of it. Nicknames count: mama, mommy, mom, papa, dad, sb, Sunny Boy. Family wins even when the topic is also school, so a PathIvy parent consult with Rajasi is Family.
+- School/Work for school, EPS, work, college prep, PathIvy, ExampleCo, debate, and college visits. A hangout with friends is not school.
+- Personal otherwise. Friends such as JYPE, Alex, Example Friend, and Example Neighbor are Personal. Unclear is Personal.
+
+Pass both flags. The calendars are named with the account so three Family calendars are not the same title. Exchange Personal is still titled Calendar, because that is the Outlook default invites land on.
+
+- Solo personal: `--calendar "iCloud Personal" --source iCloud`
+- Solo school or work: `--calendar "iCloud School/Work" --source iCloud`
+- Solo family: `--calendar "iCloud Family" --source iCloud`
+- Inviting someone, personal: `--calendar Calendar --source Exchange --attendees email`
+- Inviting someone, school or work: `--calendar "Outlook School/Work" --source Exchange --attendees email`
+- Inviting someone, family: `--calendar "Outlook Family" --source Exchange --attendees email`
+
+Use the address on their people card. `--attendees` is a comma-separated list. Do not ask which calendar. Nightly actions uses the same rules and does not ask. College spam, the weekly EPS college-visit list, and dashboard todos stay off. Do not invent a day that nobody named.
+
+Do not move an existing event onto another account. A category fix stays on the account the event is already on. New events pick the account when they are created: iCloud, unless the event invites someone else, then Exchange.
 
 When adding a named person as a guest, use the address on their people card (or Contacts). Do not keep a second address table here.
 

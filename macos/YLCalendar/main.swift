@@ -9,7 +9,9 @@ enum ToolError: Error {
 
 func fail(_ msg: String) -> Never {
     let payload: [String: Any] = ["ok": false, "error": msg]
-    print(jsonString(payload))
+    let text = jsonString(payload)
+    try? text.write(to: URL(fileURLWithPath: "/tmp/yl-calendar-last.json"), atomically: true, encoding: .utf8)
+    print(text)
     exit(1)
 }
 
@@ -83,33 +85,105 @@ func calendarsJSON() -> [[String: Any]] {
     }
 }
 
-func findCalendar(id: String?, title: String?) -> EKCalendar? {
+enum CalMatch {
+    case found(EKCalendar)
+    case none
+    case ambiguous([String])
+}
+
+func matchCalendar(id: String?, title: String?, source: String?) -> CalMatch {
     let all = store.calendars(for: .event)
     if let id, !id.isEmpty {
-        if let match = all.first(where: { $0.calendarIdentifier == id }) { return match }
+        if let match = all.first(where: { $0.calendarIdentifier == id }) {
+            return .found(match)
+        }
+    }
+    var pool = all
+    if let source, !source.isEmpty {
+        let want = source.lowercased()
+        pool = all.filter { ($0.source?.title ?? "").lowercased() == want }
     }
     if let title, !title.isEmpty {
         let want = title.lowercased()
-        if let exact = all.first(where: { $0.title.lowercased() == want }) { return exact }
-        if let part = all.first(where: { $0.title.lowercased().contains(want) }) { return part }
+        let exact = pool.filter { $0.title.lowercased() == want }
+        if exact.count == 1, let only = exact.first { return .found(only) }
+        if exact.count > 1 {
+            return .ambiguous(exact.map { $0.source?.title ?? "" })
+        }
+        if source == nil || source?.isEmpty == true {
+            let part = pool.filter { $0.title.lowercased().contains(want) }
+            if part.count == 1, let only = part.first { return .found(only) }
+            if part.count > 1 {
+                return .ambiguous(part.map { $0.source?.title ?? "" })
+            }
+        }
+        return .none
     }
-    return store.defaultCalendarForNewEvents
+    if let source, !source.isEmpty { return .none }
+    if let def = store.defaultCalendarForNewEvents { return .found(def) }
+    return .none
+}
+
+func requireCalendar(id: String?, title: String?, source: String?) -> EKCalendar {
+    switch matchCalendar(id: id, title: title, source: source) {
+    case .found(let cal):
+        return cal
+    case .none:
+        fail("no calendar matched")
+    case .ambiguous(let sources):
+        fail("calendar title matches more than one account (\(sources.joined(separator: ", "))). Pass --source")
+    }
+}
+
+func findSource(_ name: String) -> EKSource? {
+    let want = name.lowercased()
+    return store.sources.first { $0.title.lowercased() == want }
+}
+
+func participantJSON(_ p: EKParticipant) -> [String: Any] {
+    var email = ""
+    let raw = p.url.absoluteString
+    if !raw.isEmpty {
+        email = raw.replacingOccurrences(of: "mailto:", with: "", options: .caseInsensitive)
+    }
+    return [
+        "name": p.name ?? "",
+        "email": email,
+        "self": p.isCurrentUser,
+    ]
 }
 
 func eventJSON(_ ev: EKEvent) -> [String: Any] {
     var out: [String: Any] = [
         "id": ev.eventIdentifier ?? "",
+        "seriesId": ev.calendarItemExternalIdentifier ?? "",
         "title": ev.title ?? "",
         "calendar": ev.calendar?.title ?? "",
         "calendarId": ev.calendar?.calendarIdentifier ?? "",
+        "source": ev.calendar?.source?.title ?? "",
         "allDay": ev.isAllDay,
+        "recurring": ev.hasRecurrenceRules,
+        "hasAttendees": ev.hasAttendees,
         "start": ev.startDate.map(iso) ?? "",
         "end": ev.endDate.map(iso) ?? "",
     ]
     if let loc = ev.location, !loc.isEmpty { out["location"] = loc }
     if let notes = ev.notes, !notes.isEmpty { out["notes"] = String(notes.prefix(500)) }
     if let url = ev.url?.absoluteString, !url.isEmpty { out["url"] = url }
+    if let org = ev.organizer { out["organizer"] = participantJSON(org) }
+    if let people = ev.attendees, !people.isEmpty {
+        out["attendees"] = people.map(participantJSON)
+    }
     return out
+}
+
+func calendarJSON(_ cal: EKCalendar) -> [String: Any] {
+    [
+        "id": cal.calendarIdentifier,
+        "title": cal.title,
+        "source": cal.source?.title ?? "",
+        "allowModify": cal.allowsContentModifications,
+    ]
 }
 
 func cmdList() {
@@ -122,10 +196,13 @@ func cmdEvents(_ args: [String]) {
         fail("events requires --from and --to ISO dates")
     }
     var cals = store.calendars(for: .event)
-    if let only = argValue(args, "--calendar") {
-        if let match = findCalendar(id: only, title: only) {
-            cals = [match]
-        }
+    if argValue(args, "--calendar") != nil || argValue(args, "--calendar-id") != nil {
+        let match = requireCalendar(
+            id: argValue(args, "--calendar-id"),
+            title: argValue(args, "--calendar"),
+            source: argValue(args, "--source")
+        )
+        cals = [match]
     }
     let pred = store.predicateForEvents(withStart: from, end: to, calendars: cals)
     let events = store.events(matching: pred).sorted { a, b in
@@ -141,16 +218,20 @@ func cmdCreate(_ args: [String]) {
     guard let startS = argValue(args, "--start"), let start = parseDate(startS) else {
         fail("create requires --start ISO")
     }
-    let end = argValue(args, "--end").flatMap(parseDate) ?? start.addingTimeInterval(3600)
-    let cal = findCalendar(id: argValue(args, "--calendar-id"), title: argValue(args, "--calendar"))
-    guard let cal else { fail("no calendar matched") }
+    let allDay = (argValue(args, "--all-day") == "1" || args.contains("--all-day")) && argValue(args, "--all-day") != "0"
+    let end = argValue(args, "--end").flatMap(parseDate) ?? start.addingTimeInterval(allDay ? 86400 : 3600)
+    let cal = requireCalendar(
+        id: argValue(args, "--calendar-id"),
+        title: argValue(args, "--calendar"),
+        source: argValue(args, "--source")
+    )
     if !cal.allowsContentModifications { fail("calendar is read-only: \(cal.title)") }
     let ev = EKEvent(eventStore: store)
     ev.calendar = cal
     ev.title = title
+    ev.isAllDay = allDay
     ev.startDate = start
     ev.endDate = end
-    ev.isAllDay = argValue(args, "--all-day") == "1" || args.contains("--all-day")
     if let loc = argValue(args, "--location") { ev.location = loc }
     if let notes = argValue(args, "--notes") { ev.notes = notes }
     if let urlS = argValue(args, "--url"), let u = URL(string: urlS) { ev.url = u }
@@ -167,19 +248,96 @@ func cmdUpdate(_ args: [String]) {
         fail("update requires a valid --id")
     }
     if let title = argValue(args, "--title") { ev.title = title }
+    if args.contains("--all-day") { ev.isAllDay = argValue(args, "--all-day") != "0" }
     if let startS = argValue(args, "--start"), let start = parseDate(startS) { ev.startDate = start }
     if let endS = argValue(args, "--end"), let end = parseDate(endS) { ev.endDate = end }
     if let loc = argValue(args, "--location") { ev.location = loc }
     if let notes = argValue(args, "--notes") { ev.notes = notes }
     if let urlS = argValue(args, "--url"), let u = URL(string: urlS) { ev.url = u }
-    if args.contains("--all-day") { ev.isAllDay = argValue(args, "--all-day") != "0" }
-    if let calArg = argValue(args, "--calendar") ?? argValue(args, "--calendar-id"),
-       let cal = findCalendar(id: calArg, title: calArg) {
+    if argValue(args, "--calendar") != nil || argValue(args, "--calendar-id") != nil {
+        let cal = requireCalendar(
+            id: argValue(args, "--calendar-id"),
+            title: argValue(args, "--calendar"),
+            source: argValue(args, "--source")
+        )
+        if !cal.allowsContentModifications { fail("calendar is read-only: \(cal.title)") }
         ev.calendar = cal
     }
+    let span: EKSpan = argValue(args, "--span") == "future" ? .futureEvents : .thisEvent
     do {
-        try store.save(ev, span: .thisEvent, commit: true)
+        try store.save(ev, span: span, commit: true)
         print(jsonString(["ok": true, "event": eventJSON(ev)]))
+    } catch {
+        fail(error.localizedDescription)
+    }
+}
+
+func cmdCreateCalendar(_ args: [String]) {
+    guard let title = argValue(args, "--title"), !title.isEmpty else {
+        fail("create-calendar requires --title")
+    }
+    guard let sourceName = argValue(args, "--source"), !sourceName.isEmpty else {
+        fail("create-calendar requires --source")
+    }
+    guard let source = findSource(sourceName) else {
+        fail("no account named \(sourceName)")
+    }
+    switch matchCalendar(id: nil, title: title, source: sourceName) {
+    case .found(let existing):
+        print(jsonString(["ok": true, "created": false, "calendar": calendarJSON(existing)]))
+        return
+    case .ambiguous:
+        fail("calendar \(title) already exists more than once on \(sourceName)")
+    case .none:
+        break
+    }
+    let cal = EKCalendar(for: .event, eventStore: store)
+    cal.title = title
+    cal.source = source
+    do {
+        try store.saveCalendar(cal, commit: true)
+        print(jsonString(["ok": true, "created": true, "calendar": calendarJSON(cal)]))
+    } catch {
+        fail(error.localizedDescription)
+    }
+}
+
+func cmdRenameCalendar(_ args: [String]) {
+    guard let title = argValue(args, "--title"), !title.isEmpty else {
+        fail("rename-calendar requires --title")
+    }
+    let cal = requireCalendar(
+        id: argValue(args, "--calendar-id") ?? argValue(args, "--id"),
+        title: argValue(args, "--calendar"),
+        source: argValue(args, "--source")
+    )
+    if !cal.allowsContentModifications { fail("calendar is read-only: \(cal.title)") }
+    cal.title = title
+    do {
+        try store.saveCalendar(cal, commit: true)
+        print(jsonString(["ok": true, "calendar": calendarJSON(cal)]))
+    } catch {
+        fail(error.localizedDescription)
+    }
+}
+
+func cmdDeleteCalendar(_ args: [String]) {
+    let cal = requireCalendar(
+        id: argValue(args, "--calendar-id") ?? argValue(args, "--id"),
+        title: argValue(args, "--calendar"),
+        source: argValue(args, "--source")
+    )
+    if !cal.allowsContentModifications { fail("calendar is read-only: \(cal.title)") }
+    let from = Date(timeIntervalSince1970: 0)
+    let to = Date(timeIntervalSince1970: 2_200_000_000)
+    let pred = store.predicateForEvents(withStart: from, end: to, calendars: [cal])
+    let events = store.events(matching: pred)
+    if !events.isEmpty && !args.contains("--force") {
+        fail("calendar is not empty (\(events.count) events)")
+    }
+    do {
+        try store.removeCalendar(cal, commit: true)
+        print(jsonString(["ok": true, "deleted": cal.title, "source": cal.source?.title ?? ""]))
     } catch {
         fail(error.localizedDescription)
     }
@@ -213,7 +371,7 @@ let cmd = args.first ?? "help"
 if cmd == "help" || cmd == "--help" {
     print(jsonString([
         "ok": true,
-        "usage": "yl-calendar list | events --from ISO --to ISO | get --id ID | create --title T --start ISO [--end ISO] [--calendar NAME] [--location S] [--url URL] [--notes S] | update --id ID | delete --id ID",
+        "usage": "yl-calendar list | events --from ISO --to ISO [--calendar NAME --source ACCOUNT] | get --id ID | create --title T --start ISO [--end ISO] [--calendar NAME --source ACCOUNT] [--location S] [--url URL] [--notes S] | update --id ID [--calendar NAME --source ACCOUNT] [--span future] | delete --id ID | create-calendar --title T --source ACCOUNT | rename-calendar --calendar NAME --source ACCOUNT --title NEW | delete-calendar --calendar NAME --source ACCOUNT",
     ]))
     exit(0)
 }
@@ -226,5 +384,8 @@ case "get": cmdGet(args)
 case "create": cmdCreate(args)
 case "update": cmdUpdate(args)
 case "delete": cmdDelete(args)
+case "create-calendar": cmdCreateCalendar(args)
+case "rename-calendar": cmdRenameCalendar(args)
+case "delete-calendar": cmdDeleteCalendar(args)
 default: fail("unknown command \(cmd)")
 }

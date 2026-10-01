@@ -108,7 +108,7 @@ export async function runCalendar(args, opts = {}) {
   const bin = await ensureCalendarBin();
   const { stdout, stderr } = await execFileAsync(bin, args, {
     timeout: opts.timeoutMs || 45_000,
-    maxBuffer: 2 * 1024 * 1024,
+    maxBuffer: opts.maxBuffer || 8 * 1024 * 1024,
   });
   const text = String(stdout || "").trim();
   if (!text) {
@@ -175,6 +175,28 @@ export function addLocalDays(dateKey, days) {
  * @param {string} [notes]
  * @returns {{ ok: false, skipped: string, error: string }|null}
  */
+const FULL_DAY_MS = 20 * 60 * 60 * 1000;
+
+/**
+ * A timed event that lasts most of a day is not an all-day event.
+ * Real all-day events pass --all-day. Everything else needs a real window.
+ * @param {{ allDay?: boolean, start?: string, end?: string }|null|undefined} candidate
+ * @returns {{ ok: false, skipped: string, error: string }|null}
+ */
+export function fullDayTimedRefusal(candidate) {
+  if (!candidate || candidate.allDay) return null;
+  const start = new Date(candidate.start || "");
+  const end = new Date(candidate.end || "");
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  if (end.getTime() - start.getTime() < FULL_DAY_MS) return null;
+  return {
+    ok: false,
+    skipped: "full-day-timed",
+    error:
+      "This timed event lasts most of a day. Pass --all-day only if it really has no clock. Otherwise pass the real start and end.",
+  };
+}
+
 export function jevTitleRefusal(via, cmd, title, notes) {
   if (String(via || "") !== "calendar-on-demand") return null;
   if (cmd !== "create" && cmd !== "update") return null;
@@ -260,6 +282,71 @@ export async function formatCalendarLiveLines(opts = {}) {
   }
 }
 
+function pullFlag(args, name) {
+  const kept = [];
+  let value = "";
+  for (let i = 0; i < args.length; i += 1) {
+    if (args[i] === name) {
+      const next = args[i + 1];
+      if (next && !next.startsWith("--")) {
+        value = next;
+        i += 1;
+      }
+      continue;
+    }
+    kept.push(args[i]);
+  }
+  return { args: kept, value };
+}
+
+/**
+ * EventKit cannot add guests. Calendar.app can, on the calendar id yl-calendar returns.
+ * @param {{ calendarId: string, title: string, startIso: string, emails: string[] }} opts
+ */
+export async function addEventAttendees(opts) {
+  const emails = (opts.emails || []).map((e) => String(e || "").trim()).filter(Boolean);
+  if (!emails.length) return { ok: true, added: 0 };
+  const start = new Date(opts.startIso);
+  if (Number.isNaN(start.getTime())) {
+    return { ok: false, error: "attendees need a start time" };
+  }
+  const title = String(opts.title || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const calendarId = String(opts.calendarId || "").replace(/"/g, "");
+  if (!calendarId) return { ok: false, error: "attendees need a calendar id" };
+  const lines = emails
+    .map((email) => {
+      const safe = email.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      return `make new attendee at end of attendees of theEvent with properties {email:"${safe}"}`;
+    })
+    .join("\n");
+  const script = `
+set targetDate to current date
+set year of targetDate to ${start.getFullYear()}
+set month of targetDate to ${start.getMonth() + 1}
+set day of targetDate to ${start.getDate()}
+set hours of targetDate to ${start.getHours()}
+set minutes of targetDate to ${start.getMinutes()}
+set seconds of targetDate to 0
+set windowStart to targetDate - 2 * minutes
+set windowEnd to targetDate + 2 * minutes
+tell application "Calendar"
+  tell (calendar id "${calendarId}")
+    set matches to every event whose summary is "${title}" and start date ≥ windowStart and start date ≤ windowEnd
+    if (count of matches) is 0 then error "event not found for attendees"
+    set theEvent to item 1 of matches
+    ${lines}
+  end tell
+end tell
+`;
+  try {
+    await execFileAsync("osascript", ["-e", script], { timeout: 30_000 });
+    return { ok: true, added: emails.length };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message.slice(0, 400) };
+  }
+}
+
 function flagValue(args, name) {
   const i = args.indexOf(name);
   if (i < 0 || i + 1 >= args.length) return "";
@@ -268,10 +355,15 @@ function flagValue(args, name) {
   return value;
 }
 
+function allDayFromArgs(args) {
+  if (!args.includes("--all-day")) return false;
+  return flagValue(args, "--all-day") !== "0";
+}
+
 function candidateFromArgs(args) {
   const start = flagValue(args, "--start");
   let end = flagValue(args, "--end");
-  const allDay = args.includes("--all-day");
+  const allDay = allDayFromArgs(args);
   if (!end && start && !allDay) {
     const parsed = new Date(start);
     if (!Number.isNaN(parsed.getTime())) {
@@ -307,7 +399,15 @@ if (isCli) {
   const args = split.args;
   const cmd = args[0] || "";
   const force = args.includes("--force");
-  const swiftArgs = args.filter((arg) => arg !== "--force");
+  const pulled = pullFlag(
+    args.filter((arg) => arg !== "--force"),
+    "--attendees"
+  );
+  const attendeeEmails = pulled.value
+    .split(",")
+    .map((email) => email.trim())
+    .filter(Boolean);
+  const swiftArgs = pulled.args;
   const finish = async () => {
     const jevBlock = jevTitleRefusal(
       via,
@@ -318,6 +418,13 @@ if (isCli) {
     if (jevBlock) {
       console.log(JSON.stringify(jevBlock, null, 2));
       return;
+    }
+    if (cmd === "create" || cmd === "update") {
+      const spanBlock = fullDayTimedRefusal(candidateFromArgs(args));
+      if (spanBlock) {
+        console.log(JSON.stringify(spanBlock, null, 2));
+        return;
+      }
     }
     if (cmd === "create" && !force) {
       const candidate = candidateFromArgs(args);
@@ -342,6 +449,15 @@ if (isCli) {
       }
     }
     const result = await runCalendar(swiftArgs);
+    if (cmd === "create" && result?.ok && result.event && attendeeEmails.length) {
+      const added = await addEventAttendees({
+        calendarId: result.event.calendarId,
+        title: result.event.title,
+        startIso: result.event.start,
+        emails: attendeeEmails,
+      });
+      result.attendees = added;
+    }
     console.log(JSON.stringify(result, null, 2));
     if ((cmd === "create" || cmd === "update") && result?.ok && result.event) {
       await recordAgentEvent(result.event);

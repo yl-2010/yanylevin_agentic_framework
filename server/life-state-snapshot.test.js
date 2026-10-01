@@ -171,7 +171,7 @@ describe("inferLunch", () => {
     { name: "Adv Calc", start: "12:25", end: "13:35" },
   ];
 
-  it("is lunch in the 11:05–12:25 gap", () => {
+  it("is not lunch during the clubs middle band before 11:45", () => {
     const lunch = inferLunch({
       isSchoolDay: true,
       inClass: false,
@@ -179,8 +179,19 @@ describe("inferLunch", () => {
       minutes: 11 * 60 + 20,
       todayClasses: today,
     });
+    assert.equal(lunch.inLunch, false);
+  });
+
+  it("starts lunch at 11:45 inside the morning-afternoon gap", () => {
+    const lunch = inferLunch({
+      isSchoolDay: true,
+      inClass: false,
+      inFreePeriod: false,
+      minutes: 11 * 60 + 45,
+      todayClasses: today,
+    });
     assert.equal(lunch.inLunch, true);
-    assert.equal(lunch.start, "11:05");
+    assert.equal(lunch.start, "11:45");
     assert.equal(lunch.end, "12:25");
   });
 

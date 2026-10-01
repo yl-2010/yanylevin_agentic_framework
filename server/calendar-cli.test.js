@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { zonedParts, addLocalDays, jevTitleRefusal } from "./calendar-cli.js";
+import { zonedParts, addLocalDays, jevTitleRefusal, fullDayTimedRefusal } from "./calendar-cli.js";
 import { logCalendarCommand, splitVia } from "./agent-actions.js";
 import {
   eventsAreIdentical,
@@ -42,6 +42,31 @@ describe("calendar-cli date helpers", () => {
     assert.equal(jevTitleRefusal("chat", "create", "ExampleCo: meet Jev", ""), null);
     assert.equal(
       jevTitleRefusal("calendar-on-demand", "create", "ExampleCo: meet Nikita", ""),
+      null
+    );
+  });
+
+  it("refuses a timed event that lasts most of a day", () => {
+    const blocked = fullDayTimedRefusal({
+      allDay: false,
+      start: "2026-09-27T07:00:00Z",
+      end: "2026-09-28T06:59:59Z",
+    });
+    assert.equal(blocked?.skipped, "full-day-timed");
+    assert.equal(
+      fullDayTimedRefusal({
+        allDay: true,
+        start: "2026-09-27T07:00:00Z",
+        end: "2026-09-28T07:00:00Z",
+      }),
+      null
+    );
+    assert.equal(
+      fullDayTimedRefusal({
+        allDay: false,
+        start: "2026-09-27T23:40:00Z",
+        end: "2026-09-28T02:40:00Z",
+      }),
       null
     );
   });
