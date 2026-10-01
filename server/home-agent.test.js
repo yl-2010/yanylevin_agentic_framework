@@ -18,6 +18,7 @@ import {
   buildVacuumConfirmPrompt,
   classifyLightsPresence,
   classifyVacuumLocation,
+  familyVacuumWarningText,
   familyWarnWindowOpen,
   houseAsleepAt,
   homeAgentModelSpec,
@@ -30,6 +31,7 @@ import {
   recordVacuumSkip,
   recordVacuumStart,
   recordVacuumWarn,
+  warnFamilyVacuumZone,
   schoolInSessionAt,
   turnOffYanRoomLightsIfAway,
   vacuumConfirmPlan,
@@ -102,7 +104,7 @@ describe("vacuum location gate", () => {
         location: EPS,
         nextCheckAt: new Date(NOW + 60 * 60 * 1000).toISOString(),
       }).reason,
-      "next-check"
+      "due"
     );
     assert.equal(
       homeVacuumGate({ nowMs: NOW, location: HOME, force: true }).reason,
@@ -345,6 +347,44 @@ describe("vacuum zone priority", () => {
     assert.equal(denied.reason, "denied-today");
   });
 
+  it("does not let an earlier skip hold the next hour", () => {
+    const held = pick(
+      {
+        yan: { lastStartedAt: dayAgo },
+        sunny: { lastStartedAt: null },
+        master: { lastStartedAt: null },
+      },
+      {
+        familyWindowOpen: true,
+        nextCheckAt: new Date(NOW + 30 * 60 * 1000).toISOString(),
+      }
+    );
+    assert.equal(held.zone, "sunny");
+    assert.equal(held.reason, "due");
+  });
+
+  it("still warns Sunny when the phone is home", () => {
+    const atHome = pick(
+      {
+        yan: { lastStartedAt: dayAgo },
+        sunny: { lastStartedAt: null },
+        master: { lastStartedAt: null },
+      },
+      { familyWindowOpen: true, location: HOME }
+    );
+    assert.equal(atHome.zone, "sunny");
+
+    const noPin = pick(
+      {
+        yan: { lastStartedAt: dayAgo },
+        sunny: { lastStartedAt: null },
+        master: { lastStartedAt: null },
+      },
+      { familyWindowOpen: true, location: null }
+    );
+    assert.equal(noPin.zone, "sunny");
+  });
+
   it("drops a confirm that missed the grace window", () => {
     const warnedAt = new Date(NOW - VACUUM_WARN_LEAD_MS - VACUUM_CONFIRM_GRACE_MS - 1000).toISOString();
     const plan = vacuumConfirmPlan(
@@ -398,9 +438,12 @@ describe("home agent prompt", () => {
     assert.match(prompt, /Roomba Sunny Boy Landing Laundry Room/);
     assert.match(prompt, /Do not trigger the scene on this pass/);
     assert.match(prompt, /record-warn --zone sunny/);
+    assert.match(prompt, /Someone being home is not a reason to skip/);
+    assert.match(prompt, /Do not record a skip on this pass/);
     assert.match(prompt, /Levin-Saha Family/);
     assert.match(prompt, /Sent by Yan's Personal Agent/);
     assert.doesNotMatch(prompt, /trigger --zone sunny/);
+    assert.doesNotMatch(prompt, /unlikely to be home within 2 hours/);
   });
 
   it("confirm pass starts on silence and acks a rejection", () => {
@@ -719,6 +762,51 @@ describe("vacuum state writes", () => {
     assert.equal(denied.blockedDate, "2026-09-25");
     assert.equal(denied.zones.yan.lastStartedAt, "2026-09-22T18:00:00.000Z");
     assert.equal(denied.zones.sunny, undefined);
+  });
+
+  it("sends the family warning even when the last hour asked to wait", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "home-agent-warn-"));
+    const path = join(dir, "vacuum.json");
+    await recordVacuumSkip({
+      path,
+      at: "2026-09-25T16:00:00.000Z",
+      reason: "Michael likely home",
+      nextCheckAt: "2026-09-25T17:30:00.000Z",
+    });
+    const sent = [];
+    const warned = await warnFamilyVacuumZone({
+      path,
+      zone: "sunny",
+      at: "2026-09-25T17:00:00.000Z",
+      send: async (msg) => {
+        sent.push(msg);
+      },
+    });
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].to, "Levin-Saha Family");
+    assert.equal(
+      sent[0].text,
+      "The Roomba starts in 15 minutes in Sunny's room, the landing, and the laundry room. Reply no if it should wait."
+    );
+    assert.equal(familyVacuumWarningText("master"), "The Roomba starts in 15 minutes in the master rooms. Reply no if it should wait.");
+    assert.equal(warned.pending.zone, "sunny");
+    assert.equal(warned.nextCheckAt, undefined);
+    assert.equal(warned.skipReason, "Michael likely home");
+
+    await assert.rejects(
+      () =>
+        warnFamilyVacuumZone({
+          path,
+          zone: "sunny",
+          at: "2026-09-25T18:00:00.000Z",
+          send: async () => {
+            throw new Error("messages down");
+          },
+        }),
+      /messages down/
+    );
+    const after = JSON.parse(await readFile(path, "utf8"));
+    assert.equal(after.pending.warnedAt, "2026-09-25T17:00:00.000Z");
   });
 
   it("records a master start on its own clock and clears a pending warning", async () => {

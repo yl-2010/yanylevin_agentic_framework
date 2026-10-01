@@ -1,9 +1,10 @@
 /**
  * Hourly home check. Turns off lights in Yan's Bedroom and Yan's Office
- * when the phone pin is fresh and clearly away. Composer 2.5 only when a
- * vacuum might be due. Yan's scene is immediate. Sunny and master warn
- * the family chat, then a second Composer pass 15 minutes later.
- * Local Cursor SDK one-shot. Yan only.
+ * when the phone pin is fresh and clearly away. Composer 2.5 decides Yan's
+ * scene. Sunny and master send the family warning from this script when the
+ * school window is open and the house is awake, then a Composer pass 15
+ * minutes later reads the thread. A previous hour's next-check does not
+ * hold the next hour. Local Cursor SDK one-shot. Yan only.
  * Does not run on server boot. Does not git-commit.
  */
 
@@ -376,17 +377,6 @@ export function vacuumConfirmPlan(pending, nowMs) {
 }
 
 /**
- * @param {string|null|undefined} iso
- * @param {number} nowMs
- */
-export function nextCheckStillOpen(iso, nowMs) {
-  if (!iso) return false;
-  const at = Date.parse(iso);
-  if (!Number.isFinite(at)) return false;
-  return at > nowMs;
-}
-
-/**
  * @param {{ latitude?: number, longitude?: number, accuracyMeters?: number }|null|undefined} location
  */
 export function classifyVacuumLocation(location) {
@@ -430,9 +420,7 @@ export function pickVacuumZone(opts = {}) {
   if (pendingConfirmBlocks(opts.pending, nowMs)) {
     return { run: false, reason: "pending-confirm", zone: null };
   }
-  if (!force && nextCheckStillOpen(opts.nextCheckAt, nowMs)) {
-    return { run: false, reason: "next-check", zone: null };
-  }
+  // A previous hour's nextCheckAt is a note, not a hold. Every hour decides again.
   if (opts.blockedDate && opts.blockedDate === dateKey) {
     return { run: false, reason: "denied-today", zone: null };
   }
@@ -442,15 +430,15 @@ export function pickVacuumZone(opts = {}) {
   if (vacuumOverlapsFamilySleep(nowMs, timeZone)) {
     return { run: false, reason: "house-asleep", zone: null };
   }
-  if (!force) {
-    const where = classifyVacuumLocation(opts.location);
-    if (where.kind === "home") return { run: false, reason: "at-home", zone: null };
-    if (where.kind === "missing") return { run: false, reason: "no-pin", zone: null };
-    if (where.kind === "unclear") return { run: false, reason: "not-clearly-away", zone: null };
-  }
 
   const yanAt = zones.yan?.lastStartedAt || null;
   if (vacuumIsDue(yanAt, nowMs, VACUUM_DUE_MS)) {
+    if (!force) {
+      const where = classifyVacuumLocation(opts.location);
+      if (where.kind === "home") return { run: false, reason: "at-home", zone: null };
+      if (where.kind === "missing") return { run: false, reason: "no-pin", zone: null };
+      if (where.kind === "unclear") return { run: false, reason: "not-clearly-away", zone: null };
+    }
     return { run: true, reason: force ? "force" : "due", zone: "yan" };
   }
 
@@ -838,7 +826,7 @@ export function buildHomeAgentPrompt(opts) {
     `Today's date key: ${opts.dateKey} (timezone ${opts.timezone}).`,
     `Vacuum state file: ${opts.vacuumPath}`,
     phonePinLine(opts.location),
-    "Parents live in the house. Yan being out does not mean the house is empty.",
+    "Someone being home does not by itself block a vacuum.",
     "Do not turn any lights, switches, or outlets on or off. The script already did the away-lights check.",
     "Do not git commit. Do not edit any other file.",
   ];
@@ -862,13 +850,14 @@ export function buildHomeAgentPrompt(opts) {
     lines.push(
       `This zone is ${zoneId}. Name this part of the house in the text: ${spec.area}.`,
       "Do not trigger the scene on this pass. This pass only sends the 15-minute warning.",
-      "Send the warning only if the people who use that part of the house are unlikely to be home within 2 hours and the house will not be asleep during those 2 hours.",
-      "Early morning, and an evening where people will be in bed within 2 hours, are no. A long absence does not override that.",
-      `If yes, send one iMessage to ${JSON.stringify(FAMILY_VACUUM_CHAT)} on the local socket. Say the Roomba starts in 15 minutes in that part of the house, and that a reply of no or any other rejection stops it. Do not write the agent footer. The server adds // Sent by Yan's Personal Agent.`,
+      "The script only offers this zone on a school day, inside the bells, while the house is awake.",
+      "Someone being home is not a reason to skip. That is why the warning exists. They can reply no.",
+      "Send the warning. Do not record a skip because a parent or Adi might be in the house.",
+      "A recorded skip does not hold the next hour. The next hour decides again.",
+      `Send one iMessage to ${JSON.stringify(FAMILY_VACUUM_CHAT)} on the local socket. Say the Roomba starts in 15 minutes in that part of the house, and that a reply of no or any other rejection stops it. Do not write the agent footer. The server adds // Sent by Yan's Personal Agent.`,
       IMESSAGE_SEND_CURL,
       `Then: node server/home-agent.js record-warn --zone ${zoneId} --reason "<one line>"`,
-      'If no: node server/home-agent.js record-skip --reason "<one line>" --next-check <ISO time>',
-      "A skip must not change lastStartedAt. Do not send a warning when you skip."
+      "Do not record a skip on this pass."
     );
   } else {
     lines.push(
@@ -877,6 +866,7 @@ export function buildHomeAgentPrompt(opts) {
       `If yes: node server/home-agent.js trigger --zone yan --reason "<one line>"`,
       `That runs home-cli trigger ${JSON.stringify(VACUUM_SCENE)} and then record-start.`,
       'If no: node server/home-agent.js record-skip --reason "<one line>" --next-check <ISO time>',
+      "A recorded skip does not hold the next hour. The next hour decides again. next-check is a note, not a delay.",
       "A skip must not change lastStartedAt."
     );
   }
@@ -904,6 +894,7 @@ export function buildVacuumConfirmPrompt(opts) {
     "Ignore the warning message itself. It carries the agent footer.",
     "Silence is a yes. Unrelated chatter is not a rejection.",
     "A no, or any other clear rejection, from Rajasi, Michael, Adi, or Yan means do not start.",
+    "A rejection blocks every vacuum zone for the rest of today.",
     "If the objection is unclear, do not start.",
     `If nobody rejected: node server/home-agent.js trigger --zone ${opts.zone} --reason "<one line>". Send no iMessage.`,
     `That runs home-cli trigger ${JSON.stringify(scene)} and then record-start.`,
@@ -1020,16 +1011,67 @@ export async function recordVacuumWarn(opts = {}) {
     throw new Error("not warning, the Roomba would run into family sleep");
   }
   const reason = String(opts.reason || "").trim().slice(0, 240);
-  return writeVacuumPatch(path, {
-    pending: {
-      zone,
-      scene: spec.scene,
-      area: spec.area,
-      warnedAt: new Date(warnedMs).toISOString(),
-      confirmAt: new Date(warnedMs + VACUUM_WARN_LEAD_MS).toISOString(),
-      reason,
-      confirmAttempts: 0,
+  return writeVacuumPatch(
+    path,
+    {
+      pending: {
+        zone,
+        scene: spec.scene,
+        area: spec.area,
+        warnedAt: new Date(warnedMs).toISOString(),
+        confirmAt: new Date(warnedMs + VACUUM_WARN_LEAD_MS).toISOString(),
+        reason,
+        confirmAttempts: 0,
+      },
     },
+    { clear: ["nextCheckAt"] }
+  );
+}
+
+/**
+ * Family warning body. The script sends this. A model does not get to
+ * withhold it because someone is home.
+ * @param {string} zone
+ */
+export function familyVacuumWarningText(zone) {
+  const spec = VACUUM_ZONE_SPECS[normalizeVacuumZone(zone) || ""];
+  if (!spec?.family) return "";
+  return `The Roomba starts in 15 minutes in ${spec.area}. Reply no if it should wait.`;
+}
+
+/**
+ * Send the 15-minute warning, then record it. A failed send does not record.
+ * @param {{
+ *   path?: string,
+ *   at?: string,
+ *   zone?: string,
+ *   reason?: string,
+ *   send?: (msg: { to: string, text: string }) => Promise<unknown>,
+ * }} opts
+ */
+export async function warnFamilyVacuumZone(opts = {}) {
+  const zone = normalizeVacuumZone(opts.zone);
+  const text = familyVacuumWarningText(zone || "");
+  if (!text) throw new Error("warn needs --zone sunny or master");
+  const send = opts.send || sendFamilyVacuumWarning;
+  await send({ to: FAMILY_VACUUM_CHAT, text });
+  return recordVacuumWarn({
+    path: opts.path,
+    at: opts.at,
+    zone,
+    reason: opts.reason || "School hours, house is awake. Warning sent.",
+  });
+}
+
+/**
+ * @param {{ to: string, text: string }} msg
+ */
+async function sendFamilyVacuumWarning(msg) {
+  const { sendIMessage } = await import("./imessage-send.js");
+  const { applyAgentSentFooter } = await import("./imessage-mention.js");
+  await sendIMessage({
+    to: msg.to,
+    text: applyAgentSentFooter(msg.text, { chat: msg.to, handle: msg.to }),
   });
 }
 
@@ -1306,6 +1348,22 @@ async function runHomeAgentOnce({ force = false } = {}) {
   }
 
   try {
+    const zoneSpec = gate.zone ? VACUUM_ZONE_SPECS[gate.zone] : null;
+    if (zoneSpec?.family) {
+      console.log(`[home-agent] warning ${dateKey} zone=${gate.zone}`);
+      try {
+        await warnFamilyVacuumZone({
+          zone: gate.zone,
+          reason: "School hours, house is awake. Warning sent.",
+        });
+      } catch (err) {
+        console.error("[home-agent] family warning failed", err);
+        return { ok: false, dateKey, reason: "warn-failed", lights };
+      }
+      console.log(`[home-agent] warned ${gate.zone}`);
+      return { ok: true, dateKey, warned: gate.zone, lights };
+    }
+
     console.log(
       `[home-agent] deciding ${dateKey} tz=${timezone} zone=${gate.zone || "none"} force=${Boolean(force)}`
     );

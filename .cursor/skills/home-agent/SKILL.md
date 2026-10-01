@@ -2,9 +2,11 @@
 name: home-agent
 description: >-
   Hourly home check. Turns off lights in Yan's Bedroom and Yan's Office
-  when he is clearly away, then Composer 2.5 decides whether to start
-  Vacuum Yan, or a school-day family zone after a 15-minute warning.
-  Yan only.
+  when he is clearly away. Composer 2.5 decides Vacuum Yan. On a school
+  day, while the house is awake, the script warns the family before
+  Sunny or the master rooms, then Composer reads the replies. Someone
+  being home is not a skip. A veto blocks the rest of the day. Every
+  hour decides again. Yan only.
 disable-model-invocation: true
 ---
 
@@ -12,13 +14,15 @@ disable-model-invocation: true
 
 Yan only (`you@example.com`). Local Cursor agent on the Mac Studio. Never a cloud agent. Model is Composer 2.5 with Fast off.
 
-The hourly script in `server/home-agent.js` does the cheap checks, including the lights, and picks at most one vacuum zone. This skill is the decision after those checks pass. Do not start the Roomba from a chat turn. When Yan says run the home agent, check the vacuum, or turn off my room lights if I'm away, run:
+The hourly script in `server/home-agent.js` does the cheap checks, including the lights, and picks at most one vacuum zone. Yan's scene is a Composer decision after those checks. Sunny and the master rooms are not. When that zone is due, school is in session, and the house is awake, the script sends the family warning itself. Composer only comes back 15 minutes later to read the thread. Do not start the Roomba from a chat turn. When Yan says run the home agent, check the vacuum, or turn off my room lights if I'm away, run:
 
 ```bash
 node --env-file=server/.env server/home-agent.js --force
 ```
 
-`--force` skips the phone-pin gate and an open `nextCheckAt`. It still lets this decision stand. It does not force the scene on, and it does not force lights off. It does not skip one scene a day, an open family warning, a denial already sent today, the school-session window on the family zones, or family sleep hours.
+`--force` skips the phone-pin gate. It still lets this decision stand. It does not force the scene on, and it does not force lights off. It does not skip one scene a day, an open family warning, a denial already sent today, the school-session window on the family zones, or family sleep hours.
+
+An earlier hour's `nextCheckAt` does not pause this one. Every hour looks again. A skip is a note. A denial is the thing that blocks the rest of the day.
 
 ## Lights
 
@@ -41,8 +45,8 @@ Receipts go in `education/you@example.com/home/lights.json`. Names and rooms onl
 The script names the one zone for this pass. Do not pick a different one.
 
 1. `yan`, scene `Vacuum Yan`. Due when the last start is missing or at least 72 hours old. No family text. Trigger it on this pass when the yes rules below hold.
-2. `sunny`, scene `Roomba Sunny Boy Landing Laundry Room`. Only after Yan is not due, his last start is under 72 hours, and that start was not today. Sunny is due at 7 days. School has to be in session now and still in session 15 minutes from now. This pass sends a warning. It does not start the Roomba.
-3. `master`, scene `Roomba Master Rooms`. Only after Yan's last start is under 72 hours and not today, and Sunny's last start is under 7 days and not today. Master is due at 7 days. Same school window. Same warning, no start on this pass.
+2. `sunny`, scene `Roomba Sunny Boy Landing Laundry Room`. Only after Yan is not due, his last start is under 72 hours, and that start was not today. Sunny is due at 7 days. School has to be in session now and still in session 15 minutes from now. The script sends the warning. It does not start the Roomba, and it does not ask a model whether anyone is home.
+3. `master`, scene `Roomba Master Rooms`. Only after Yan's last start is under 72 hours and not today, and Sunny's last start is under 7 days and not today. Master is due at 7 days. Same school window. Same script warning, no start on this pass.
 
 At exactly 72 hours Yan is due again, so Sunny is not offered. At exactly 7 days Sunny is due again, so master is not offered.
 
@@ -70,9 +74,11 @@ Read the vacuum file. Then:
 - Life state: `node server/life-state.js now` and `node server/life-state.js recent 6`
 - On a school day, today's classes in `education/you@example.com/schedule.json`
 
-The phone pin in the prompt is last-known GPS. A stale home pin means he is still home. Missing GPS is not a reason to vacuum. The script already stopped those cases unless this run was `--force`.
+The phone pin gates `Vacuum Yan` only. A pin at the house, a missing pin, or a pin that is not clearly away means his rooms wait. It does not block Sunny or the master rooms. Those get the warning either way.
 
-Parents live in the Kirkland house. Yan being out does not mean the house is empty.
+Parents live in the Kirkland house. Them being home, or Adi being home, does not block Sunny or the master rooms. The warning is how they stop it. Sleep is the block, because a text they do not see is not a warning. On a weekday school day, inside the bells, they are awake even if they are in the house.
+
+Yan's scene has no warning. It still needs him unlikely to walk into his rooms within 2 hours.
 
 ## Family sleep
 
@@ -89,7 +95,7 @@ For `yan`, both of these:
 - He is unlikely to be home within 2 hours. Use the calendar, the school day, life-state, and the usual leave and return pattern. The run should be finished before he walks in. Two hours is that buffer.
 - The house will not be asleep during those 2 hours. The script already blocked 9:00 PM to 7:00 AM. Still say no if people will be in bed earlier than that. A long absence does not override that.
 
-For `sunny` and `master`, the same two rules, applied to the people who use that part of the house, not only to Yan. The script already checked that school is in session across the 15-minute warning. If those two rules fail, record a skip and do not text.
+For `sunny` and `master`, do not apply those rules to whoever uses that part of the house. The script already checked school and sleep, and it sends the warning itself. Someone being home is not a no. Do not record a skip because Michael, Rajasi, or Adi might be in the house.
 
 ## If yes, Yan
 
@@ -105,7 +111,9 @@ If HomeClaw is down or the trigger fails, do not record a start. Say what failed
 
 ## If yes, Sunny or master
 
-Do not trigger yet. Send one iMessage to the existing group `Levin-Saha Family` through the local socket. The server appends `// Sent by Yan's Personal Agent`. Do not write that line yourself.
+The hourly script already sends this text and records the warning. Do not send a second one from a chat turn. If a run does ask you to send it, send it. Do not skip because someone is home.
+
+Send one iMessage to the existing group `Levin-Saha Family` through the local socket. The server appends `// Sent by Yan's Personal Agent`. Do not write that line yourself.
 
 Say which part of the house, and that they have 15 minutes to stop it. Sunny's area is Sunny's room, the landing, and the laundry room. Master's area is the master rooms.
 
@@ -159,7 +167,7 @@ Then:
 node server/home-agent.js record-deny --reason "<one line>" --next-check <ISO time>
 ```
 
-That blocks the rest of today.
+That blocks every vacuum zone for the rest of today. A later hour does not get another scene. Sleep and an open warning also block. A plain skip does not.
 
 If the thread cannot be read, do not start and do not send. Clear the warning, then record a skip.
 
@@ -174,6 +182,6 @@ node server/home-agent.js record-skip --reason "<one line>" --next-check <ISO ti
 node server/home-agent.js record-skip --reason "<one line>" --next-check <ISO time>
 ```
 
-`next-check` is when it is worth asking again. Next morning, the next time school is in session, or just after the calendar block that would put someone home. The hourly script still runs, and it will not spend another Composer call until then.
+`next-check` is a note. It does not delay the next hour. The hourly script decides again on the hour, including when the last model said to wait until 10:30 or 3:00. Do not use a skip to hold the Roomba for the rest of the morning. A veto is `record-deny`, and that one does hold the rest of the day.
 
 Do not git commit. Do not edit any other file.
