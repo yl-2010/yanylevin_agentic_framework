@@ -934,7 +934,7 @@
     return (Number(b?.id) || 0) - (Number(a?.id) || 0);
   }
 
-  function commentEntryHtml(row, { todoName = "", href = "" } = {}) {
+  function commentEntryHtml(row, { todoName = "", href = "", canvasLink = "" } = {}) {
     const text = String(row?.comment || "").trim();
     if (!text) return "";
     const when = formatCommentWhen(row?.createdAt);
@@ -942,10 +942,18 @@
     const nameHtml = name
       ? `<a class="edu-comment-todo" href="${escapeHtml(href)}">${name}</a>`
       : "";
+    const canvas = normalizeCanvasLink(canvasLink);
+    const body = canvas
+      ? `<a class="edu-comment-body" href="${escapeHtml(
+          canvas
+        )}" target="_blank" rel="noopener noreferrer" aria-label="Open in Canvas">${escapeHtml(
+          text
+        )}</a>`
+      : `<p class="edu-comment-body">${escapeHtml(text)}</p>`;
     return `<div class="edu-comment">
       ${nameHtml}
       ${when ? `<p class="edu-detail-meta">${escapeHtml(when)}</p>` : ""}
-      <p class="edu-comment-body">${escapeHtml(text)}</p>
+      ${body}
     </div>`;
   }
 
@@ -961,6 +969,7 @@
         const entry = commentEntryHtml(row, {
           todoName: row.todoNameHtml || "",
           href: row.href || "",
+          canvasLink: row.canvasLink || "",
         });
         if (!entry) return "";
         const sep = i === 0 ? "" : `<div class="edu-comment-sep" aria-hidden="true"></div>`;
@@ -981,8 +990,12 @@
     });
   }
 
-  function commentBoxesHtml(comments) {
-    return commentsPanelHtml(comments, { filterId: "lg-edu-todo-comments" });
+  function commentBoxesHtml(comments, canvasLink) {
+    const rows = (Array.isArray(comments) ? comments : []).map((row) => ({
+      ...row,
+      canvasLink: canvasLink || "",
+    }));
+    return commentsPanelHtml(rows, { filterId: "lg-edu-todo-comments" });
   }
 
   function classCommentsHtml(cls) {
@@ -997,6 +1010,7 @@
           ...row,
           comment: text,
           href: todoHref(t),
+          canvasLink: t.canvasLink || "",
           todoNameHtml: taggedNameHtml(tag, t.name || t.id),
         });
       });
@@ -2989,7 +3003,7 @@
     appEl.innerHTML = detailShell(backHrefForItem(t), t.name || t.id, body, "lg-edu-todo-detail", {
       canvasLink: t.canvasLink,
       filesHtml: fileTiles,
-      commentsHtml: commentBoxesHtml(t.canvasComments),
+      commentsHtml: commentBoxesHtml(t.canvasComments, t.canvasLink),
       titleHtml: taggedNameHtml(tag, t.name || t.id),
       canvasScore: todoScoreLabel(t),
     });

@@ -1851,7 +1851,7 @@ struct TodoDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 EducationCommentsBox(
                     entries: comments.map {
-                        EducationCommentEntry(comment: $0, todo: nil)
+                        EducationCommentEntry(comment: $0, todo: nil, canvasURL: liveTodo.canvasURL)
                     },
                     use24Hour: use24Hour
                 )
@@ -1860,7 +1860,7 @@ struct TodoDetailView: View {
         } else {
             EducationCommentsBox(
                 entries: comments.map {
-                    EducationCommentEntry(comment: $0, todo: nil)
+                    EducationCommentEntry(comment: $0, todo: nil, canvasURL: liveTodo.canvasURL)
                 },
                 use24Hour: use24Hour
             )
@@ -2319,12 +2319,14 @@ private struct EducationCommentEntry: Identifiable {
     let createdAt: String
     let text: String
     let todo: EducationTodo?
+    let canvasURL: URL?
 
-    init(comment: EducationCanvasComment, todo: EducationTodo?) {
+    init(comment: EducationCanvasComment, todo: EducationTodo?, canvasURL: URL? = nil) {
         id = comment.id
         createdAt = comment.createdAt
         text = comment.comment
         self.todo = todo
+        self.canvasURL = canvasURL ?? todo?.canvasURL
     }
 }
 
@@ -2422,10 +2424,7 @@ private struct EducationCommentsBox: View {
                                 .font(.subheadline)
                                 .foregroundStyle(YLTheme.muted(colorScheme))
                         }
-                        Text(entry.text)
-                            .font(.body)
-                            .foregroundStyle(YLTheme.fg(colorScheme))
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        commentText(entry)
                     }
                     .padding(.vertical, 2)
                 }
@@ -2434,6 +2433,28 @@ private struct EducationCommentsBox: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .ylGlassRounded(cornerRadius: 22, interactive: true)
+    }
+
+    @ViewBuilder
+    private func commentText(_ entry: EducationCommentEntry) -> some View {
+        let label = Text(entry.text)
+            .font(.body)
+            .foregroundStyle(YLTheme.fg(colorScheme))
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        if let url = entry.canvasURL {
+            Button {
+                CanvasLMS.open(url)
+            } label: {
+                label
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .ylHapticOnTap()
+            .accessibilityLabel("Open in Canvas")
+        } else {
+            label
+        }
     }
 }
 

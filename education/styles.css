@@ -778,11 +778,17 @@ html[data-resolved-theme="dark"] .edu-back-shadow feGaussianBlur {
 }
 
 .edu-comment-body {
+  display: block;
   margin: 0.35rem 0 0;
   white-space: pre-wrap;
   word-break: break-word;
   font-size: var(--text-body);
   line-height: var(--lh-body);
+  color: var(--fg);
+}
+
+a.edu-comment-body {
+  cursor: pointer;
 }
 
 .edu-comment-sep {
