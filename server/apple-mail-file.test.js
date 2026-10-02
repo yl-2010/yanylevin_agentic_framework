@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   MIN_CONFIDENCE,
+  FILE_BUCKET_TEXT,
   BODY_RETRY_FLOOR,
   buildFileState,
   classifyMailRow,
@@ -46,6 +47,13 @@ describe("decideFileAction", () => {
     );
     assert.equal(destMailboxForAction("colleges"), "Colleges");
     assert.equal(destMailboxForAction("security"), "Security");
+  });
+
+  it("asks Jev to file verification codes as security", () => {
+    assert.match(FILE_BUCKET_TEXT, /security:[\s\S]*verification code/);
+    assert.match(FILE_BUCKET_TEXT, /one-time passcode/);
+    assert.doesNotMatch(FILE_BUCKET_TEXT, /codes stay in the inbox/i);
+    assert.doesNotMatch(FILE_BUCKET_TEXT, /not a passcode/i);
   });
 
   it("leaves other and low-confidence mail in the inbox", () => {

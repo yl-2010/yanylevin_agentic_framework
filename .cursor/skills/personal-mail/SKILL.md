@@ -14,7 +14,7 @@ disable-model-invocation: true
 
 Yan’s personal mail is already in **Mail.app** on the Mac Studio. Accounts: **Exchange** `you@example.com` (personal Outlook), **Google** `you@example.com`, **iCloud** `you@icloud.com`. Read it with `osascript` talking to Mail. No Gmail API, no IMAP login, no browser.
 
-College-admissions spam and routine sign-in alerts are filed by `server/apple-mail-file.js` (Jev only) into iCloud mailboxes **Colleges** and **Security**, then marked read. Inbox/junk from every Mail.app account. Do not rebuild that with Grok or Composer. 2FA codes stay in the inbox.
+College-admissions spam, routine sign-in alerts, and verification codes (2FA, OTP, one-time passcodes) are filed by `server/apple-mail-file.js` (Jev only) into iCloud mailboxes **Colleges** and **Security**, then marked read. Inbox/junk from every Mail.app account. Do not rebuild that with Grok or Composer.
 
 EPS / school mail lives in Microsoft 365 `owner@school.example`. Read that with `.cursor/skills/personal-school-mail/SKILL.md` (`node server/school-mail.js`). Do not hunt school notices in Mail.app. Do not add the school account here.
 
