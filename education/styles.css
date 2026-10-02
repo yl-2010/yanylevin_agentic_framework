@@ -785,6 +785,25 @@ html[data-resolved-theme="dark"] .edu-back-shadow feGaussianBlur {
   line-height: var(--lh-body);
 }
 
+.edu-comment-sep {
+  height: 1px;
+  margin: 0.75rem 0;
+  background: var(--hairline);
+}
+
+.edu-comment-todo {
+  display: inline-block;
+  margin: 0 0 0.15rem;
+  font-size: var(--text-subhead);
+  font-weight: 600;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.edu-comment-todo:hover {
+  color: var(--accent);
+}
+
 .edu-todo-comments {
   display: flex;
   flex-direction: column;
@@ -981,7 +1000,8 @@ html[data-resolved-theme="dark"] .edu-file-folder-children {
 }
 
 .edu-dates-toggle,
-.edu-todos-toggle {
+.edu-todos-toggle,
+.edu-comments-toggle {
   display: inline;
   margin: 0;
   padding: 0;
@@ -999,7 +1019,8 @@ html[data-resolved-theme="dark"] .edu-file-folder-children {
 }
 
 .edu-dates-toggle:focus-visible,
-.edu-todos-toggle:focus-visible {
+.edu-todos-toggle:focus-visible,
+.edu-comments-toggle:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--accent) 65%, transparent);
   outline-offset: 3px;
   border-radius: 4px;
@@ -1705,7 +1726,8 @@ a.edu-score {
 
   /* Context files sit above Completed in the flattened single-column stack */
   .edu-grid--home .edu-files,
-  .edu-grid--home .edu-file-tile {
+  .edu-grid--home .edu-file-tile,
+  .edu-grid--home .edu-panel--class-comments {
     order: 98;
   }
 

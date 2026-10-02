@@ -982,6 +982,7 @@ struct ClassDetailView: View {
     @State private var todoTypeFilters: Set<String> = EducationTodoFilter.load()
     @State private var datesExpanded = false
     @State private var dateFilters: Set<String> = EducationDateFilter.load()
+    @State private var commentsExpanded = false
     @State private var archiveNow = Date()
 
     private static let collapsedTodoLimit = 6
@@ -1036,6 +1037,7 @@ struct ClassDetailView: View {
                         VStack(alignment: .leading, spacing: 14) {
                             datesPanel
                             classFilesPanel
+                            classCommentsPanel
                         }
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
@@ -1043,6 +1045,7 @@ struct ClassDetailView: View {
                     todosPanel
                     datesPanel
                     classFilesPanel
+                    classCommentsPanel
                     completedClassPanel
                 }
             }
@@ -1215,6 +1218,36 @@ struct ClassDetailView: View {
             onToggleFilter: toggleDateFilter,
             showFilters: store.workspace != "jype"
         )
+    }
+
+    @ViewBuilder
+    private var classCommentsPanel: some View {
+        let all = classCommentEntries
+        if !all.isEmpty {
+            EducationCommentsBox(
+                entries: commentsExpanded ? all : Array(all.prefix(3)),
+                expandable: true,
+                expanded: commentsExpanded,
+                onToggle: {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        commentsExpanded.toggle()
+                    }
+                },
+                use24Hour: use24Hour
+            )
+        }
+    }
+
+    private var classCommentEntries: [EducationCommentEntry] {
+        classTodos.flatMap { todo in
+            EducationCommentWhen.sorted(todo.canvasComments ?? []).map {
+                EducationCommentEntry(comment: $0, todo: todo)
+            }
+        }
+        .sorted { a, b in
+            if a.createdAt != b.createdAt { return a.createdAt > b.createdAt }
+            return a.id > b.id
+        }
     }
 
     @ViewBuilder
@@ -1807,75 +1840,35 @@ struct TodoDetailView: View {
     }
 
     @ViewBuilder
-    private func commentStack(_ comments: [EducationCanvasComment]) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            ForEach(Array(comments.enumerated()), id: \.element.id) { index, comment in
-                EducationCommentBox(
-                    title: index == 0 ? "Comment" : "Comment \(index + 1)",
-                    when: commentReleased(comment.createdAt),
-                    text: comment.comment
-                )
-            }
-        }
-    }
-
-    @ViewBuilder
     private var todoLower: some View {
         let files = liveTodo.files ?? []
-        let comments = (liveTodo.canvasComments ?? []).filter {
-            !$0.comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }
+        let comments = EducationCommentWhen.sorted(liveTodo.canvasComments ?? [])
         if comments.isEmpty {
             todoFiles(pairColumns: isWide)
         } else if isWide && !files.isEmpty {
             HStack(alignment: .top, spacing: 14) {
                 todoFiles(pairColumns: false)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                commentStack(comments)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                EducationCommentsBox(
+                    entries: comments.map {
+                        EducationCommentEntry(comment: $0, todo: nil)
+                    },
+                    use24Hour: use24Hour
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         } else {
-            commentStack(comments)
+            EducationCommentsBox(
+                entries: comments.map {
+                    EducationCommentEntry(comment: $0, todo: nil)
+                },
+                use24Hour: use24Hour
+            )
             if !files.isEmpty {
                 todoFiles(pairColumns: false)
             }
         }
     }
-
-    private func commentReleased(_ iso: String) -> String {
-        let trimmed = iso.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let date = Self.parseCommentDate(trimmed) else { return "" }
-        let calendar = Calendar.current
-        let dateStr = String(
-            format: "%04d-%02d-%02d",
-            calendar.component(.year, from: date),
-            calendar.component(.month, from: date),
-            calendar.component(.day, from: date)
-        )
-        let timeStr = String(
-            format: "%02d:%02d",
-            calendar.component(.hour, from: date),
-            calendar.component(.minute, from: date)
-        )
-        return NaturalWhen.formatDetail(date: dateStr, time: timeStr, use24Hour: use24Hour)
-    }
-
-    private static func parseCommentDate(_ iso: String) -> Date? {
-        if let date = commentDateFractional.date(from: iso) { return date }
-        return commentDatePlain.date(from: iso)
-    }
-
-    private static let commentDateFractional: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
-
-    private static let commentDatePlain: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
-        return f
-    }()
 
     private func toggleDone() {
         guard let token = auth.session?.token else { return }
@@ -2321,26 +2314,122 @@ private enum EducationFilterChrome {
     }
 }
 
-private struct EducationCommentBox: View {
-    let title: String
-    let when: String
+private struct EducationCommentEntry: Identifiable {
+    let id: Int
+    let createdAt: String
     let text: String
+    let todo: EducationTodo?
+
+    init(comment: EducationCanvasComment, todo: EducationTodo?) {
+        id = comment.id
+        createdAt = comment.createdAt
+        text = comment.comment
+        self.todo = todo
+    }
+}
+
+private enum EducationCommentWhen {
+    static func sorted(_ comments: [EducationCanvasComment]) -> [EducationCanvasComment] {
+        comments
+            .filter { !$0.comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .sorted { a, b in
+                if a.createdAt != b.createdAt { return a.createdAt > b.createdAt }
+                return a.id > b.id
+            }
+    }
+
+    static func format(_ iso: String, use24Hour: Bool) -> String {
+        let trimmed = iso.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let date = parse(trimmed) else { return "" }
+        let calendar = Calendar.current
+        let dateStr = String(
+            format: "%04d-%02d-%02d",
+            calendar.component(.year, from: date),
+            calendar.component(.month, from: date),
+            calendar.component(.day, from: date)
+        )
+        let timeStr = String(
+            format: "%02d:%02d",
+            calendar.component(.hour, from: date),
+            calendar.component(.minute, from: date)
+        )
+        return NaturalWhen.formatDetail(date: dateStr, time: timeStr, use24Hour: use24Hour)
+    }
+
+    private static func parse(_ iso: String) -> Date? {
+        if let date = fractional.date(from: iso) { return date }
+        return plain.date(from: iso)
+    }
+
+    private static let fractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    private static let plain: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+}
+
+private struct EducationCommentsBox: View {
+    let entries: [EducationCommentEntry]
+    var expandable: Bool = false
+    var expanded: Bool = false
+    var onToggle: (() -> Void)? = nil
+    var use24Hour: Bool = false
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.title3.weight(.bold))
-                .foregroundStyle(YLTheme.fg(colorScheme))
-            if !when.isEmpty {
-                Text(when)
-                    .font(.subheadline)
-                    .foregroundStyle(YLTheme.muted(colorScheme))
+        VStack(alignment: .leading, spacing: 12) {
+            if expandable, let onToggle {
+                Button {
+                    YLHaptics.tap()
+                    onToggle()
+                } label: {
+                    Text("Comments")
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(YLTheme.fg(colorScheme))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(expanded ? "Collapse comments" : "Expand comments")
+            } else {
+                Text("Comments")
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(YLTheme.fg(colorScheme))
             }
-            Text(text)
-                .font(.body)
-                .foregroundStyle(YLTheme.fg(colorScheme))
-                .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                    if index > 0 {
+                        EducationTodoDaySeparator()
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        if let todo = entry.todo {
+                            NavigationLink(value: EducationRoute.todoDetail(todo)) {
+                                EducationTodoTitle(todo: todo, font: .subheadline.weight(.semibold))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+                            .ylHapticNavigation()
+                        }
+                        let when = EducationCommentWhen.format(entry.createdAt, use24Hour: use24Hour)
+                        if !when.isEmpty {
+                            Text(when)
+                                .font(.subheadline)
+                                .foregroundStyle(YLTheme.muted(colorScheme))
+                        }
+                        Text(entry.text)
+                            .font(.body)
+                            .foregroundStyle(YLTheme.fg(colorScheme))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)

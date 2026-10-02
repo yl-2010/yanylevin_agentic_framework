@@ -283,6 +283,8 @@
   let dateFilter = loadDateFilters();
   /** Dates panel: collapsed shows upcoming 6; expanded shows all. */
   let datesExpanded = false;
+  /** Class comments panel: collapsed shows the 3 newest. */
+  let classCommentsExpanded = false;
   /** TODO panel: web starts fully expanded; collapsed shows 6 and hides type filters. */
   let todoExpanded = true;
   let route = parseRoute();
@@ -926,25 +928,84 @@
     return formatDetailWhen(dateStr, timeStr);
   }
 
-  function commentBoxesHtml(comments) {
-    const list = Array.isArray(comments) ? comments : [];
+  function commentSort(a, b) {
+    const byTime = String(b?.createdAt || "").localeCompare(String(a?.createdAt || ""));
+    if (byTime !== 0) return byTime;
+    return (Number(b?.id) || 0) - (Number(a?.id) || 0);
+  }
+
+  function commentEntryHtml(row, { todoName = "", href = "" } = {}) {
+    const text = String(row?.comment || "").trim();
+    if (!text) return "";
+    const when = formatCommentWhen(row?.createdAt);
+    const name = String(todoName || "").trim();
+    const nameHtml = name
+      ? `<a class="edu-comment-todo" href="${escapeHtml(href)}">${name}</a>`
+      : "";
+    return `<div class="edu-comment">
+      ${nameHtml}
+      ${when ? `<p class="edu-detail-meta">${escapeHtml(when)}</p>` : ""}
+      <p class="edu-comment-body">${escapeHtml(text)}</p>
+    </div>`;
+  }
+
+  function commentsPanelHtml(rows, { filterId, expandable = false, expanded = false } = {}) {
+    const list = (Array.isArray(rows) ? rows : []).filter((row) =>
+      String(row?.comment || "").trim()
+    );
     if (!list.length) return "";
-    return list
+    list.sort(commentSort);
+    const visible = expandable && !expanded ? list.slice(0, 3) : list;
+    const body = visible
       .map((row, i) => {
-        const text = String(row?.comment || "").trim();
-        if (!text) return "";
-        const title = i === 0 ? "Comment" : `Comment ${i + 1}`;
-        const when = formatCommentWhen(row?.createdAt);
-        const body = `
-        ${when ? `<p class="edu-detail-meta">${escapeHtml(when)}</p>` : ""}
-        <p class="edu-comment-body">${escapeHtml(text)}</p>`;
-        return panelHtml(title, body, {
-          extraClass: "edu-panel--comment",
-          filterId: `lg-edu-todo-comment-${i + 1}`,
+        const entry = commentEntryHtml(row, {
+          todoName: row.todoNameHtml || "",
+          href: row.href || "",
         });
+        if (!entry) return "";
+        const sep = i === 0 ? "" : `<div class="edu-comment-sep" aria-hidden="true"></div>`;
+        return `${sep}${entry}`;
       })
-      .filter(Boolean)
       .join("");
+    const titleHtml = expandable
+      ? `<button type="button" class="edu-comments-toggle" data-comments-expand aria-expanded="${
+          expanded ? "true" : "false"
+        }" aria-label="${expanded ? "Collapse comments" : "Expand comments"}">Comments</button>`
+      : "";
+    return panelHtml("Comments", body, {
+      extraClass: expandable
+        ? "edu-panel--comment edu-panel--class-comments"
+        : "edu-panel--comment",
+      filterId,
+      titleHtml,
+    });
+  }
+
+  function commentBoxesHtml(comments) {
+    return commentsPanelHtml(comments, { filterId: "lg-edu-todo-comments" });
+  }
+
+  function classCommentsHtml(cls) {
+    const rows = [];
+    flattenTodos(tree, { classId: cls.id }).forEach((t) => {
+      const comments = Array.isArray(t.canvasComments) ? t.canvasComments : [];
+      const tag = todoTagKey(t);
+      comments.forEach((row) => {
+        const text = String(row?.comment || "").trim();
+        if (!text) return;
+        rows.push({
+          ...row,
+          comment: text,
+          href: todoHref(t),
+          todoNameHtml: taggedNameHtml(tag, t.name || t.id),
+        });
+      });
+    });
+    return commentsPanelHtml(rows, {
+      filterId: "lg-edu-class-comments",
+      expandable: true,
+      expanded: classCommentsExpanded,
+    });
   }
 
   function weekdayLabel(weekday, y, m, d) {
@@ -2547,6 +2608,7 @@
           ${filesHtml(cls.files, { scope: "class", id: cls.id }, {
             filterPrefix: "lg-edu-class-file",
           })}
+          ${classCommentsHtml(cls)}
         </div>
       </div>
     `;
@@ -3555,6 +3617,14 @@
         return;
       }
 
+      const commentsToggle = t.closest?.("[data-comments-expand]");
+      if (commentsToggle) {
+        event.preventDefault();
+        classCommentsExpanded = !classCommentsExpanded;
+        render();
+        return;
+      }
+
       const todosToggle = t.closest?.("[data-todos-expand]");
       if (todosToggle) {
         event.preventDefault();
@@ -3669,7 +3739,7 @@
         return;
       }
 
-      const link = t.closest?.("a.edu-row-link, a.edu-back, a.edu-capsule-link");
+      const link = t.closest?.("a.edu-row-link, a.edu-back, a.edu-capsule-link, a.edu-comment-todo");
       if (link && link instanceof HTMLAnchorElement) {
         const href = link.getAttribute("href") || "";
         if (

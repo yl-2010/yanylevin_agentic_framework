@@ -254,7 +254,7 @@ function eachEducationTodo(tree, fn) {
 
 /**
  * Teacher submission comments for the todo page. Drops Yan's own notes.
- * Oldest first. Clears canvasComments when a Canvas todo has none left.
+ * Newest first. Clears canvasComments when a Canvas todo has none left.
  * Does not write files.
  * @param {object} tree
  * @param {object[]|null|undefined} comments
@@ -282,9 +282,9 @@ export function attachCanvasComments(tree, comments) {
   }
   for (const bucket of byAssignment.values()) {
     bucket.sort((a, b) => {
-      const byTime = a.createdAt.localeCompare(b.createdAt);
+      const byTime = b.createdAt.localeCompare(a.createdAt);
       if (byTime !== 0) return byTime;
-      return a.id - b.id;
+      return b.id - a.id;
     });
   }
 

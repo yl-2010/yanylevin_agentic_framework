@@ -211,7 +211,7 @@ describe("attachCanvasGrades", () => {
 });
 
 describe("attachCanvasComments", () => {
-  it("keeps teacher comments oldest first and drops Yan's own", () => {
+  it("keeps teacher comments newest first and drops Yan's own", () => {
     const tree = {
       classes: [
         {
@@ -270,8 +270,8 @@ describe("attachCanvasComments", () => {
       },
     ]);
     assert.deepEqual(tree.classes[0].todos[0].canvasComments, [
-      { id: 2, createdAt: "2026-09-28T20:30:05Z", comment: "earlier" },
       { id: 3, createdAt: "2026-09-29T20:30:05Z", comment: "later" },
+      { id: 2, createdAt: "2026-09-28T20:30:05Z", comment: "earlier" },
     ]);
     assert.equal(tree.classes[0].todos[1].canvasComments, undefined);
     assert.deepEqual(tree.todos[0].canvasComments, [
