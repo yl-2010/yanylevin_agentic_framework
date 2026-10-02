@@ -105,6 +105,7 @@ instead.
 | friend_of | person -> person | friendship |
 | classmate_of | person -> person | school peers |
 | teacher_of | person -> person | teacher -> student |
+| coaches | person -> person | coach -> athlete |
 | advisor_of | person -> person | advisor/mentor -> advisee |
 | works_with | person -> person | collaboration |
 | group_member | person -> group | membership |

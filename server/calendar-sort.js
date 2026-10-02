@@ -856,24 +856,11 @@ async function runCalendarSortEventKit(opts = {}) {
 const isCli =
   process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isCli) {
-  const cleanup = process.argv.includes("--cleanup");
-  const dryRun = process.argv.includes("--dry-run");
-  runCalendarSort({ mode: cleanup ? "cleanup" : "nightly", dryRun })
-    .then((result) => {
-      const summary = {
-        ok: result.ok,
-        mode: result.mode,
-        dryRun: Boolean(result.dryRun),
-        moveCount: result.moveCount,
-        applied: result.applied,
-        failed: result.failed,
-        deletedDaily: result.deletedDaily,
-      };
-      console.log(JSON.stringify(summary, null, 2));
-      if (!result.ok) process.exitCode = 1;
+  console.log(
+    JSON.stringify({
+      ok: true,
+      skipped: "disabled",
+      reason: "Moving an existing event between calendars resends invites.",
     })
-    .catch((err) => {
-      console.error("[calendar-sort]", err);
-      process.exitCode = 1;
-    });
+  );
 }

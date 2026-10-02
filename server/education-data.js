@@ -1220,6 +1220,7 @@ async function loadObjectFolder(
       item.createdAt = explicit || (await fileCreatedAtIso(jsonPath)) || null;
       if (typeof item.name === "string") item.name = stripTodoTagPrefix(item.name);
     }
+    if (kind === "date" && isHiddenFromUi(item)) continue;
     if (!includeFixtures && isFixture(item)) continue;
     const fileOpts = {
       ...contextFileListOpts(props),

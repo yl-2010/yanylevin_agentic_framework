@@ -8,6 +8,7 @@ import {
   AGENT_SENT_FOOTER,
   guestCallerLines,
   isBareAgentMention,
+  isJypeThread,
   messageMentionsAgent,
   stripAgentSentFooter,
 } from "./imessage-mention.js";
@@ -112,6 +113,31 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
     );
   }
   return lines.join("\n");
+}
+
+/** JYPE Teams group. Composer 2.5 answers @agent here. @agentg stays on Grok. */
+export const JYPE_TEAMS_CHAT_ID =
+  "19:5b03f2304dff426d95ebda79495d479a@thread.v2";
+
+/**
+ * Yan, 2026-10-01 JYPE Teams. Composer in this chat kept using Yan's bells
+ * for other members. Grok does not get this line.
+ * @param {{ id?: string }|null|undefined} model
+ * @param {object|null|undefined} origin
+ */
+export function jypeComposerScheduleLine(model, origin) {
+  if (String(model?.id || "") !== "composer-2.5") return "";
+  if (!origin || typeof origin !== "object") return "";
+  const chat = String(origin.chat || "");
+  const chatId = String(origin.chatId || origin.to || "");
+  if (!isJypeThread(chat) && chatId !== JYPE_TEAMS_CHAT_ID) return "";
+  return [
+    "When Composer 2.5 answers in this JYPE Teams chat, Live context bells are Yan's.",
+    "Before you name a class time, alarm, or tomorrow for anyone in the thread, open that person's roster and that date's rotation.",
+    "Files: people/<slug>/schedule.md and education/<email>/schedule.json.",
+    "Alex is alex-rivera / you@example.com. Example Friend is example-friend / xujeffery9@gmail.com. Example Neighbor is example-neighbor / everettedeng@gmail.com.",
+    "Spanish at 8:30 only when that person's D block is first that day.",
+  ].join(" ");
 }
 
 export { stripAgentSentFooter };

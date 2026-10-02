@@ -53,6 +53,7 @@ import {
 import { sendTeamsMessage } from "./school-teams.js";
 import {
   formatTeamsOriginBlock,
+  jypeComposerScheduleLine,
   normalizeTeamsOrigin,
 } from "./teams-mention.js";
 import {
@@ -2776,6 +2777,10 @@ export async function messageAgent(
   });
   if (teamsBlock) {
     promptParts.push("", teamsBlock);
+  }
+  const composerSchedule = jypeComposerScheduleLine(model, session.teamsOrigin);
+  if (composerSchedule) {
+    promptParts.push("", composerSchedule);
   }
   if (interrupting) {
     promptParts.push(

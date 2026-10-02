@@ -2,6 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   formatTeamsOriginBlock,
+  jypeComposerScheduleLine,
+  JYPE_TEAMS_CHAT_ID,
   normalizeTeamsOrigin,
   shouldTriggerTeamsAgent,
   teamsMessageKey,
@@ -113,6 +115,34 @@ describe("teams-mention trigger", () => {
     assert.match(grade, /Do not give out confidential information/);
     assert.match(grade, /yanylevin\.com/);
     assert.match(grade, /epschedule/);
+  });
+
+  it("adds a schedule check only for Composer in the JYPE Teams chat", () => {
+    const jype = {
+      chat: "JYPE",
+      chatId: JYPE_TEAMS_CHAT_ID,
+    };
+    const line = jypeComposerScheduleLine({ id: "composer-2.5" }, jype);
+    assert.match(line, /Live context bells are Yan's/);
+    assert.match(line, /alex-rivera/);
+    assert.match(line, /that person's D block is first/);
+    assert.equal(
+      jypeComposerScheduleLine({ id: "grok-4.7" }, jype),
+      ""
+    );
+    assert.equal(
+      jypeComposerScheduleLine(
+        { id: "composer-2.5" },
+        { chat: "Class of 2028", chatId: "19:class" }
+      ),
+      ""
+    );
+    assert.equal(jypeComposerScheduleLine({ id: "composer-2.5" }, null), "");
+    const byId = jypeComposerScheduleLine(
+      { id: "composer-2.5" },
+      { chat: "", chatId: JYPE_TEAMS_CHAT_ID }
+    );
+    assert.match(byId, /open that person's roster/);
   });
 
   it("tells the agent a bare @agent is not the task", () => {

@@ -69,7 +69,7 @@ Pass both flags. The calendars are named with the account so three Family calend
 
 Use the address on their people card. `--attendees` is a comma-separated list. Do not ask which calendar. Nightly actions uses the same rules and does not ask. College spam, the weekly EPS college-visit list, and dashboard todos stay off. Do not invent a day that nobody named.
 
-Do not move an existing event onto another account. A category fix stays on the account the event is already on. New events pick the account when they are created: iCloud, unless the event invites someone else, then Exchange.
+Do not move an existing event to another calendar. That resends invites, including a move on the same account. Pick Personal, School/Work, or Family when you create the event. New events go on iCloud unless you are inviting someone else, then Exchange.
 
 When adding a named person as a guest, use the address on their people card (or Contacts). Do not keep a second address table here.
 

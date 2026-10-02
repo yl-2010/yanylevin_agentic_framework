@@ -94,7 +94,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Gym / machines / weights | `.cursor/skills/fitness-os/SKILL.md` |
 | Apple Health / workouts / sleep / HR (Yan only) | `.cursor/skills/personal-health/SKILL.md`. Dump sleep after the 2026-09-26 10:49 AM PT ingest is inflated until Yan says otherwise. |
 | Apple Calendar on the Studio (read/write) | `.cursor/skills/personal-calendar/SKILL.md` |
-| Nightly calendar category sort (same account only) | `.cursor/skills/personal-calendar/SKILL.md` (`server/calendar-sort-agent.js`) |
+| Nightly calendar sort | Off. Do not run `calendar-sort-agent.js`. Moving an existing event between calendars resends invites. New events pick a calendar when they are created. |
 | Apple Home accessories / lights / sensors (Yan only) | `.cursor/skills/personal-home/SKILL.md` |
 | Home vacuum and away-lights (hourly) | `.cursor/skills/home-agent/SKILL.md` |
 | EPS Canvas (sync, submit file/text/URL, teacher files, comments/pages/modules) | `.cursor/skills/personal-canvas/SKILL.md` |
@@ -123,9 +123,9 @@ Live context on Express turns is authoritative for clock, class-now, the open sc
 
 ## Nightly jobs (Yan, manual)
 
-Times are in `education/you@example.com/daily-briefing/meta.json` (`nightlyAgentsLocalTime` 01:00, `calendarSortLocalTime` 01:15, `chatTitleRefreshLocalTime` 01:30, `lifeStateCleanupLocalTime` 01:30, `contextSynthesisLocalTime` 02:30, `brainProjectionLocalTime` 03:00, `compileLocalTime` 06:00). Canvas also runs an hourly Composer pass on mapped classes at :00 (skips the 01:00 hour). Fact-check starts as soon as both 03:00 agents finish, not on a 03:30 clock. Those overnight jobs read yesterday's 5-minute life-state log (`/tmp/yanylevin-context-life-state.json` or `node server/life-state.js day`) as a context source. They do not write samples. The 01:30 life-state cleanup job is the exception: it rewrites yesterday's JSONL.
+Times are in `education/you@example.com/daily-briefing/meta.json` (`nightlyAgentsLocalTime` 01:00, `chatTitleRefreshLocalTime` 01:30, `lifeStateCleanupLocalTime` 01:30, `contextSynthesisLocalTime` 02:30, `brainProjectionLocalTime` 03:00, `compileLocalTime` 06:00). The 01:15 calendar sort is off. Do not start it. Canvas also runs an hourly Composer pass on mapped classes at :00 (skips the 01:00 hour). Fact-check starts as soon as both 03:00 agents finish, not on a 03:30 clock. Those overnight jobs read yesterday's 5-minute life-state log (`/tmp/yanylevin-context-life-state.json` or `node server/life-state.js day`) as a context source. They do not write samples. The 01:30 life-state cleanup job is the exception: it rewrites yesterday's JSONL.
 
-When Yan says run location enrichment / enrich my places / run health takeaways / run context synthesis / run the nightly pipeline / update my memories / retitle chats / clean life-state logs / run life-state cleanup / sort my calendars / run calendar sort / run location brain / project my places / run health brain / run fact check / fact-check overnight context / fill a person from iMessage / fill school Outlook / fill school Teams / fill Apple Mail / run the home agent / check the vacuum, **do not** do the whole Grok/Composer pass in this chat turn. From the repo root:
+When Yan says run location enrichment / enrich my places / run health takeaways / run context synthesis / run the nightly pipeline / update my memories / retitle chats / clean life-state logs / run life-state cleanup / run location brain / project my places / run health brain / run fact check / fact-check overnight context / fill a person from iMessage / fill school Outlook / fill school Teams / fill Apple Mail / run the home agent / check the vacuum, **do not** do the whole Grok/Composer pass in this chat turn. From the repo root:
 
 ```bash
 node --env-file=server/.env server/location-enrichment-agent.js --force
@@ -133,7 +133,6 @@ node --env-file=server/.env server/health-takeaways-agent.js --force
 node --env-file=server/.env server/chat-title-refresh-agent.js --force
 node --env-file=server/.env server/chat-title-refresh-agent.js --backfill
 node --env-file=server/.env server/life-state-cleanup-agent.js --force
-node --env-file=server/.env server/calendar-sort-agent.js --force
 node --env-file=server/.env server/context-synthesis-agent.js --force   # 5-phase nightly pipeline
 node --env-file=server/.env server/context-synthesis-agent.js --resume-from=lint
 node --env-file=server/.env server/location-brain-agent.js --force
