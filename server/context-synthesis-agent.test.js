@@ -168,6 +168,8 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /SOUL\.md/);
     assert.match(prompt, /Person facts \(spelling, emails, nicknames, phones/);
     assert.match(prompt, /people\/example-friend/);
+    assert.match(prompt, /brain-glossary\.js/);
+    assert.match(prompt, /not a person alias/);
     assert.match(prompt, /phase 4/);
     assert.match(prompt, /Do not write notes claiming phase 4 calendar writes/);
     assert.match(prompt, /Did not write Apple Calendar/);
@@ -254,6 +256,8 @@ describe("nightly phase prompts", () => {
     });
     assert.match(prompt, /nightly-lint skill/);
     assert.match(prompt, /brain-graph\.js --check/);
+    assert.match(prompt, /brain-glossary\.js --check/);
+    assert.match(prompt, /--write-index/);
     assert.match(prompt, /brain-placement-lint\.js/);
     assert.match(prompt, /lastSynthesisDateKey is 2026-08-16/);
     assert.match(prompt, /wrote people\/index\.md/);

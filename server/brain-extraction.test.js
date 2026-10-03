@@ -13,5 +13,8 @@ describe("brain extraction prompt", () => {
     assert.match(prompt, /Person spelling, emails, nicknames, phones/);
     assert.match(prompt, /never go on identity\.md as prose/);
     assert.match(prompt, /You may still edit identity\.md for Yan facts/);
+    assert.match(prompt, /brain-glossary\.js/);
+    assert.match(prompt, /not a person nickname/);
+    assert.match(prompt, /Duplicate means do nothing/);
   });
 });

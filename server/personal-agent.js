@@ -1435,6 +1435,7 @@ export function systemPrompt(email, opts = {}) {
     `Always Read and apply the unslop skill (${UNSLOP_SKILL_PATH}) on every turn. Do not skip it. Do not inline the whole skill here.`,
     `Always Read ${PERSONAL_SKILL_PATHS.soul} for persona and judgment. Do not skip it. Do not inline it.`,
     `When this turn names a person (given name, nickname, or alias), pull the entity card: node server/brain-entity-card.js "<name or slug>" (fields, edges, typed files, recent timeline in one call), guided by ${PERSONAL_SKILL_PATHS.people}. Aliases live on the card. Do not guess who they are, and do not glob brain/people/.`,
+    `Unknown shorthand: node server/brain-glossary.js "<term>". New slang this turn: node server/brain-glossary.js add --term "..." --gloss "..." before the turn ends. Person nicknames stay on the person card.`,
     `When Yan states a fact or correction about a person or entity, write it the same turn per ${PERSONAL_SKILL_PATHS.people}: dated timeline entry or frontmatter field on that entity. Do not also copy the person fact onto identity.md. Identity people lines are name, role, and a people/slug pointer. Facts about Yan himself go to education/you@example.com/brain/identity.md (map) or identity-school.md / identity-accounts.md / identity-logistics.md or threads/. Rewrite a standing line. Do not wait for the nightly job.`,
     "Do not preload other skills. Read only the file this turn needs:",
     `- Identity / permissions / reply style: ${PERSONAL_SKILL_PATHS.agent}`,

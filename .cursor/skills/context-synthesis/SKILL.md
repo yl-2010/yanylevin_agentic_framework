@@ -77,6 +77,7 @@ the address.
 | `patterns.md` | Standing inferences with confidence + evidence date. Promote to identity.md only when Yan confirms or evidence repeats. |
 | `threads/<slug>.md` | One open thread each (small frontmatter: name, kind: thread, edges, last_touched). Create when a loop opens, update as it moves, delete when resolved (resolution goes to the relevant entity timeline and tonight's journal). |
 | `journal/<dateKey minus 1 day>.md` | Take for the calendar day that just ended. Job dateKey is tonight/early morning; the file is named one day earlier. Written once; never edit past days. Kept forever. |
+| `glossary/<slug>.md` | Shorthand that is not a person nickname. After the journal, add digest terms that are missing and whose meaning is clear. `node server/brain-glossary.js "<term>"` first, then `add --term --gloss`. Skip person aliases. |
 | `state.json` | Cursors (below). |
 
 Person facts do not live in these pages. If the digest has a person fact

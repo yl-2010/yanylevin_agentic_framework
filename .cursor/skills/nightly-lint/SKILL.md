@@ -26,6 +26,10 @@ duplicated, and the cursors moved. You fix structure, not content.
   the root cause is serializer or graph tooling, fix the `server/brain*.js`
   file. The runner commits `server/` with tonight's education tree. Do not
   leave that edit uncommitted.
+- Run `node server/brain-glossary.js --check`. If the index is stale, run
+  `node server/brain-glossary.js --write-index`. If a glossary file breaks
+  the schema (frontmatter, 400-character gloss, alias collision), fix that
+  file. Do not hand-edit `glossary/index.md`.
 - Dedup: same fact written by a chat-time write and tonight's phase 2 means
   removing the duplicate timeline entry ONLY if it is a true duplicate from
   tonight (same date, same fact). Older timeline entries are immutable.
@@ -68,6 +72,6 @@ duplicated, and the cursors moved. You fix structure, not content.
 
 ## Verify
 
-`node server/brain-graph.js --check` exits clean. No schema violations in
+`node server/brain-graph.js --check` and `node server/brain-glossary.js --check` exit clean. No schema violations in
 tonight's files. Cursors correct. Reply with what you fixed. The runner
 git-commits after you finish, including `server/` tooling.

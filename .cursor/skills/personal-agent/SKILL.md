@@ -67,6 +67,8 @@ Aliases live on the card and in `people/index.md`. Pull the card. Do not treat t
 
 When Yan states a fact or correction about a person/group/org/place, write it that turn per the personal-people skill (dated timeline entry or frontmatter field on that entity). Do not also copy the person fact onto identity.md. Identity people lines are name, role, and `people/slug` only. Facts about Yan himself go to `brain/identity.md` (map), `brain/identity-school.md`, `brain/identity-accounts.md`, `brain/identity-logistics.md`, or `brain/threads/`. Rewrite a standing line; do not append into a mega-bullet. Dated events go to the matching org or thread. A Composer extraction backstop runs after each Express turn and the nightly pipeline dedupes, but do not rely on them.
 
+Unknown shorthand: `node server/brain-glossary.js "<term>"`. A slang or abbreviation learned this turn is `node server/brain-glossary.js add --term "..." --gloss "..."`. Person nicknames stay on the person card. Do not read the whole glossary index.
+
 ## Read on demand (do not preload)
 
 Do **not** dump these into context unless the turn needs them. Read the matching file, then act.
@@ -103,6 +105,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Contacts lookup (sqlite, no Contacts.app) | `.cursor/skills/personal-contacts/SKILL.md` |
 | Their classes, free periods, recurring sports or clubs | that person's `people/<slug>/schedule.md` (Yan only; not `schedule.json`) |
 | Standing memories / brain (Yan only) | `education/you@example.com/brain/` — `identity.md` (map), `identity-school.md`, `identity-accounts.md`, `identity-logistics.md`, `patterns.md`, `health.md`, `threads/`, `journal/`, `places/`; contract in `brain/schema.md` (life facts; agent behavior is `SOUL.md` + the matching skill, not here) |
+| Unknown shorthand, slang, abbreviations (Yan only) | `node server/brain-glossary.js "<term>"`. New slang this turn: `add --term --gloss`. Do not read `brain/glossary/index.md` whole. |
 | Nightly context synthesis (manual run) | `.cursor/skills/context-synthesis/SKILL.md` |
 | Nightly fact-check (manual run) | `.cursor/skills/nightly-fact-check/SKILL.md` |
 | Location enrichment (manual run) | `.cursor/skills/location-enrichment/SKILL.md` |

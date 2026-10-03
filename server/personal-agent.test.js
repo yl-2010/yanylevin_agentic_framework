@@ -145,7 +145,7 @@ describe("Personal Agent models", () => {
 describe("Personal Agent system prompt", () => {
   it("stays slim and points at on-demand files instead of dumping recipes", () => {
     const prompt = systemPrompt(YAN);
-    assert.ok(prompt.length < 5600, `prompt length ${prompt.length}`);
+    assert.ok(prompt.length < 5900, `prompt length ${prompt.length}`);
     assert.match(prompt, /Personal Agent/);
     assert.match(prompt, /Do not preload other skills/);
     assert.ok(prompt.includes(UNSLOP_SKILL_PATH));
@@ -177,7 +177,7 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /native attachments/);
     assert.match(prompt, /Teams and school Outlook cannot attach a file/);
     assert.match(prompt, /Apple Mail/);
-    assert.ok(prompt.length < 5600, `prompt length ${prompt.length}`);
+    assert.ok(prompt.length < 5900, `prompt length ${prompt.length}`);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.chats));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.location));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.lifeState));
@@ -196,6 +196,8 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /brain-entity-card\.js/);
     assert.match(prompt, /write it the same turn/);
     assert.match(prompt, /Aliases live on the card/);
+    assert.match(prompt, /brain-glossary\.js/);
+    assert.match(prompt, /Person nicknames stay on the person card/);
     assert.match(prompt, /Do not also copy the person fact onto identity\.md/);
     assert.doesNotMatch(prompt, /Sunny = Adi Levin/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.news));
@@ -590,6 +592,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /Apple Home/);
     assert.match(agent, /named people/i);
     assert.match(agent, /brain-entity-card\.js/);
+    assert.match(agent, /brain-glossary\.js/);
     assert.match(agent, /Aliases live on the card/);
     assert.doesNotMatch(agent, /Sunny \/ Sunny Boy is Adi Levin/);
     assert.match(agent, /personal-screentime/);
@@ -635,6 +638,8 @@ describe("Personal Agent skill files", () => {
     assert.match(synthesis, /OneNote is not a nightly source/);
     assert.match(synthesis, /life-state/);
     assert.match(synthesis, /teamsSince/);
+    assert.match(synthesis, /brain-glossary\.js/);
+    assert.match(synthesis, /not a person nickname/);
     assert.doesNotMatch(synthesis, /memories\.md/);
 
     const triage = await readFile(
@@ -698,6 +703,7 @@ describe("Personal Agent skill files", () => {
       "utf8"
     );
     assert.match(lint, /brain-graph\.js --check/);
+    assert.match(lint, /brain-glossary\.js --check/);
     assert.match(lint, /brain-placement-lint\.js/);
     assert.match(lint, /state\.json/);
     assert.match(lint, /commits `server\/`/);
