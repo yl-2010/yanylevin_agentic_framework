@@ -1,14 +1,18 @@
 import { createRequire } from "node:module";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { isJypeAccessEmail, isStudyAccessEmail } from "./identity.js";
 import {
   STUDY_MODEL,
   formatNumber,
   normalizeExam,
+  modelPrompt,
   normalizeUploads,
   parseExamPayload,
+  seedNotesFile,
   renderExamHtml,
   wellLineCount,
 } from "./study.js";
@@ -70,6 +74,25 @@ describe("study uploads", () => {
     const parsed = normalizeUploads({ notes: "Chapter 3, ten questions.", files: [] });
     assert.equal(parsed.notes, "Chapter 3, ten questions.");
     assert.equal(parsed.files.length, 0);
+  });
+
+  it("tells the model a skill list is enough", () => {
+    const prompt = modelPrompt("Adding and subtracting positive and negative integers");
+    assert.match(prompt, /Notes alone are a complete request/);
+    assert.match(prompt, /list of skills is enough/);
+    assert.match(prompt, /no sample problems/);
+    assert.match(prompt, /Adding and subtracting positive and negative integers/);
+  });
+
+  it("writes notes into an empty sources folder and leaves a real upload alone", async () => {
+    const empty = await mkdtemp(join(tmpdir(), "study-notes-"));
+    assert.equal(await seedNotesFile(empty, "  Operations with integers  "), true);
+    assert.equal(await readFile(join(empty, "notes.txt"), "utf8"), "Operations with integers");
+
+    const filled = await mkdtemp(join(tmpdir(), "study-files-"));
+    await writeFile(join(filled, "packet.pdf"), "pdf");
+    assert.equal(await seedNotesFile(filled, "Operations with integers"), false);
+    await assert.rejects(readFile(join(filled, "notes.txt"), "utf8"));
   });
 });
 

@@ -1,8 +1,9 @@
 /**
- * /study jobs. Grok 4.7 high reads the uploaded class files and writes
- * exam.json. Chrome prints two PDFs that share the same question spacing:
- * one blank for work, one with the answers in that space.
- * This does not evict other Cursor agents.
+ * /study jobs. Grok 4.7 high reads the uploaded class files, or the notes
+ * alone, and writes exam.json. Chrome prints two PDFs that share the same
+ * question spacing: one blank for work, one with the answers in that space.
+ * Same local Cursor agent path as a Grok turn on the site. Jobs run next
+ * to other agents. There is no Mac-wide lock.
  */
 
 import { execFile } from "node:child_process";
@@ -13,9 +14,16 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { requireAuth } from "./auth.js";
 import {
+  AUTO_MODEL_SELECTION,
+  INTERACTIVE_FALLBACK_DELAYS_MS,
+  INTERACTIVE_MODEL_DELAYS_MS,
   createLocalCursorAgent,
   disposeCursorAgent,
-  scheduledCursorWorkCount,
+  onLocalCursorExecutorEvict,
+  recreateLocalCursorAgent,
+  reloadCursorApiKeyFromEnv,
+  requireCursorApiKey,
+  runWithModelFallback,
 } from "./cursor-sdk-auth.js";
 import { isStudyAccessEmail } from "./identity.js";
 
@@ -60,11 +68,13 @@ const CHROME_CANDIDATES = [
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
 ];
 
-const BUSY_ERROR =
-  "The Mac is busy with another agent. Try again in a minute.";
+/** Live study runs. An executor evict nulls the handle, same as a site chat. */
+/** @type {Set<{ agent: any }>} */
+const liveStudyRuns = new Set();
 
-/** @type {boolean} */
-let studyBusy = false;
+onLocalCursorExecutorEvict(() => {
+  for (const run of liveStudyRuns) run.agent = null;
+});
 
 /**
  * @param {string} value
@@ -479,14 +489,34 @@ async function extractSourceText(sources) {
 }
 
 /**
+ * Notes with no files are a real job. Put that text where the model reads files.
+ * @param {string} sources
  * @param {string} notes
  */
-function modelPrompt(notes) {
+export async function seedNotesFile(sources, notes) {
+  const text = String(notes || "").trim();
+  if (!text) return false;
+  const names = await readdir(sources);
+  if (names.length) return false;
+  await writeFile(join(sources, "notes.txt"), text);
+  return true;
+}
+
+/**
+ * @param {string} notes
+ */
+export function modelPrompt(notes) {
   return `You are writing one practice test. Read every file in sources/. The student's notes are below.
 
 Write exam.json in this folder and nothing else. Do not edit, delete, or create any other file.
 
-The test has to be answerable from those files and the notes. If they do not contain enough to write a real test, write exactly this and stop:
+Notes alone are a complete request. If sources/ only has notes.txt, or the notes are the only material, write the test from that text. A class name, a unit, or a list of skills is enough. Write original practice questions on those skills. Do not stop because the notes have no sample problems, examples, or rules.
+
+If the only material is a Canvas page or an assignment blurb, in the notes or in a text file, ignore the due date, the score, the accommodations link, and the teacher comment. Test the skills that page names.
+
+If the files or notes contain a passage, a data set, slides, or class notes, the questions have to come from that material. Do not invent quotes, page numbers, or facts that are not in it.
+
+Write exactly this and stop only when the notes and files do not say what subject or skills to test:
 {"error":"one sentence saying what is missing"}
 
 If two or more files are teacher-made tests and they share a header, numbering, and where the points sit, match that in font, numbering, and nameLine. font is "serif" or "sans". numbering is "1." or "1)" or "(1)". If they do not share a layout, use serif, "1.", and nameLine true. PNG files whose names end in .pdf.png are a picture of that PDF, for layout only.
@@ -512,11 +542,64 @@ exam.json shape:
 
 choices stays empty unless the question is multiple choice. workLines is how many ruled lines a student needs to show work, at least 3. The answer is the full worked answer that will be printed in that same space on the key. Plain text only, no HTML and no markdown.
 
-Do not invent facts, page numbers, or quotes that are not in the files. Match the length the notes ask for.
+If the notes name a length, match it. If they do not, write a short concept check that covers each named skill.
 
 Notes:
 ${notes || "(none)"}
 `;
+}
+
+/**
+ * @param {{ id: string, params?: { id: string, value: string }[] }} spec
+ */
+function modelSelection(spec) {
+  return {
+    id: String(spec.id),
+    params: (spec.params || []).map((p) => ({
+      id: String(p.id),
+      value: String(p.value),
+    })),
+  };
+}
+
+/**
+ * Match a catalog variant when Cursor lists one, same as a site Grok turn.
+ * @param {string} apiKey
+ * @param {{ id: string, params?: { id: string, value: string }[] }} spec
+ */
+async function resolveModelSelection(apiKey, spec) {
+  const fallback = modelSelection(spec);
+  try {
+    const { Cursor } = await import("@cursor/sdk");
+    const models = await Cursor.models.list({ apiKey });
+    const listed = models?.find((m) => m?.id === fallback.id);
+    if (!listed) return fallback;
+
+    const wanted = fallback.params;
+    const variant = (listed.variants || []).find((v) => {
+      const params = v?.params || [];
+      if (wanted.length === 0) return !params.length;
+      if (params.length !== wanted.length) {
+        return wanted.every((w) =>
+          params.some((p) => p.id === w.id && p.value === w.value)
+        );
+      }
+      return wanted.every((w) =>
+        params.some((p) => p.id === w.id && p.value === w.value)
+      );
+    });
+
+    if (variant?.params?.length) {
+      return modelSelection({ id: listed.id, params: variant.params });
+    }
+    return fallback;
+  } catch (err) {
+    console.warn(
+      "[study] model catalog lookup failed; using explicit ModelSelection",
+      err instanceof Error ? err.message : err
+    );
+    return fallback;
+  }
 }
 
 /**
@@ -534,10 +617,6 @@ async function textFromRun(run) {
       }
     }
   }
-  if (!chunks.length && run && typeof run.wait === "function") {
-    const result = await run.wait();
-    if (result && typeof result.result === "string") chunks.push(result.result);
-  }
   return chunks.join("");
 }
 
@@ -546,36 +625,86 @@ async function textFromRun(run) {
  * @param {string} notes
  */
 async function writeExamWithModel(dir, notes) {
-  if (scheduledCursorWorkCount() > 0) {
-    throw examError(BUSY_ERROR);
-  }
-  const agent = await createLocalCursorAgent({
-    model: STUDY_MODEL,
-    cwd: dir,
-  });
-  let timer;
+  await reloadCursorApiKeyFromEnv();
+  const model = await resolveModelSelection(requireCursorApiKey(), STUDY_MODEL);
+  const holder = { agent: null };
+  liveStudyRuns.add(holder);
+  const prompt = modelPrompt(notes);
   try {
-    const run = await Promise.race([
-      agent.send(modelPrompt(notes)),
-      new Promise((_, reject) => {
-        timer = setTimeout(() => reject(examError("The model took too long.")), MODEL_TIMEOUT_MS);
-      }),
-    ]);
-    clearTimeout(timer);
-    const spoken = await textFromRun(run);
-    let raw = null;
-    try {
-      raw = parseExamPayload(await readFile(join(dir, "exam.json"), "utf8"));
-    } catch {
-      raw = parseExamPayload(spoken);
-    }
-    if (!raw) throw examError("The model did not return a test.");
-    const exam = normalizeExam(raw);
-    await writeFile(join(dir, "exam.json"), JSON.stringify(exam, null, 2));
+    const outcome = await runWithModelFallback({
+      prefix: "study",
+      preferredModel: model,
+      delaysMs: INTERACTIVE_MODEL_DELAYS_MS,
+      fallbackModel: AUTO_MODEL_SELECTION,
+      fallbackDelaysMs: INTERACTIVE_FALLBACK_DELAYS_MS,
+      laterDelaysMs: [],
+      onBeforeAttempt: async ({ model: nextModel, recreate }) => {
+        if (recreate) {
+          const prev = holder.agent;
+          holder.agent = null;
+          if (prev) await disposeCursorAgent(prev);
+          await recreateLocalCursorAgent({
+            model: nextModel,
+            cwd: dir,
+            attach: (agent) => {
+              holder.agent = agent;
+            },
+          });
+        } else if (!holder.agent) {
+          holder.agent = await createLocalCursorAgent({
+            model: nextModel,
+            cwd: dir,
+          });
+        }
+      },
+      run: async (nextModel) => {
+        if (!holder.agent) {
+          holder.agent = await createLocalCursorAgent({
+            model: nextModel,
+            cwd: dir,
+          });
+        }
+        /** @type {ReturnType<typeof setTimeout>|undefined} */
+        let timer;
+        try {
+          const run = await Promise.race([
+            holder.agent.send(prompt, { model: nextModel }),
+            new Promise((_, reject) => {
+              timer = setTimeout(
+                () => reject(examError("The model took too long.")),
+                MODEL_TIMEOUT_MS
+              );
+            }),
+          ]);
+          clearTimeout(timer);
+          const spoken = await textFromRun(run);
+          const result = typeof run.wait === "function" ? await run.wait() : null;
+          const status = String(result?.status || "").toLowerCase();
+          if (status === "error") return result;
+          const text =
+            spoken ||
+            (result && typeof result.result === "string" ? result.result : "");
+          let raw = null;
+          try {
+            raw = parseExamPayload(await readFile(join(dir, "exam.json"), "utf8"));
+          } catch {
+            raw = parseExamPayload(text);
+          }
+          if (!raw) throw examError("The model did not return a test.");
+          const exam = normalizeExam(raw);
+          await writeFile(join(dir, "exam.json"), JSON.stringify(exam, null, 2));
+          return { status: "finished", result: text, exam };
+        } finally {
+          clearTimeout(timer);
+        }
+      },
+    });
+    const exam = outcome.result?.exam;
+    if (!exam) throw examError("The model did not return a test.");
     return exam;
   } finally {
-    clearTimeout(timer);
-    await disposeCursorAgent(agent);
+    liveStudyRuns.delete(holder);
+    await disposeCursorAgent(holder.agent);
   }
 }
 
@@ -618,16 +747,19 @@ async function printPdf(htmlPath, pdfPath, profile) {
 
 /**
  * @param {string} id
+ * @param {string} [root]
  */
-async function runJob(id) {
-  const dir = jobDir(id);
+export async function runJob(id, root = STUDY_ROOT) {
+  const dir = jobDir(id, root);
   const meta = await readMeta(dir);
   if (!meta) return;
   try {
     meta.status = "running";
     await writeMeta(dir, meta);
     const notes = await readFile(join(dir, "notes.txt"), "utf8").catch(() => "");
-    await extractSourceText(join(dir, "sources"));
+    const sources = join(dir, "sources");
+    await seedNotesFile(sources, notes);
+    await extractSourceText(sources);
     const exam = await writeExamWithModel(dir, notes);
     const workHtml = renderExamHtml(exam, "work");
     const keyHtml = renderExamHtml(exam, "key");
@@ -644,8 +776,6 @@ async function runJob(id) {
     meta.error = err instanceof Error && err.message ? err.message : "The test could not be made.";
     await writeMeta(dir, meta).catch(() => {});
     console.error("[study]", id, meta.error);
-  } finally {
-    studyBusy = false;
   }
 }
 
@@ -667,14 +797,8 @@ export function attachStudyRoutes(app) {
 
   app.post("/api/study/jobs", requireStudy, async (req, res) => {
     try {
-      if (studyBusy || scheduledCursorWorkCount() > 0) {
-        res.status(409).json({ ok: false, error: BUSY_ERROR });
-        return;
-      }
-      studyBusy = true;
       const parsed = normalizeUploads(req.body);
       if ("error" in parsed) {
-        studyBusy = false;
         res.status(400).json({ ok: false, error: parsed.error });
         return;
       }
@@ -696,7 +820,6 @@ export function attachStudyRoutes(app) {
       res.status(202).json({ ok: true, id, status: "queued" });
       void runJob(id);
     } catch (err) {
-      studyBusy = false;
       console.error("[study] create", err);
       res.status(500).json({ ok: false, error: "Could not start that test." });
     }

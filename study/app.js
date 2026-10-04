@@ -277,7 +277,7 @@
       session = null;
     }
     if (!session?.authenticated) {
-      showGate("Make a test from the class files.", true);
+      showGate("Make a test from class files or notes.", true);
       return;
     }
     if (!ALLOWED.has(session.access)) {
