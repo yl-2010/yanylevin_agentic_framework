@@ -77,8 +77,15 @@
     fileList.replaceChildren();
     for (const item of files) {
       const li = document.createElement("li");
+      const label = document.createElement("span");
+      label.className = "file-label";
       const name = document.createElement("span");
-      name.textContent = `${item.name} · ${formatSize(item.file.size)}`;
+      name.className = "file-name";
+      name.textContent = item.name;
+      const size = document.createElement("span");
+      size.className = "file-size";
+      size.textContent = formatSize(item.file.size);
+      label.append(name, size);
       const remove = document.createElement("button");
       remove.type = "button";
       remove.textContent = "Remove";
@@ -87,7 +94,7 @@
         files = files.filter((row) => row !== item);
         renderFiles();
       });
-      li.append(name, remove);
+      li.append(label, remove);
       fileList.append(li);
     }
   }

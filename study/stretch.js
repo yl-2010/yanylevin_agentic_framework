@@ -22,7 +22,7 @@
   function place(blob, el, pullX, pullY) {
     const deskBox = desk.getBoundingClientRect();
     const box = el.getBoundingClientRect();
-    const pad = 18;
+    const pad = 8;
     blob.style.left = `${box.left - deskBox.left - pad + pullX}px`;
     blob.style.top = `${box.top - deskBox.top - pad + pullY}px`;
     blob.style.width = `${box.width + pad * 2}px`;
