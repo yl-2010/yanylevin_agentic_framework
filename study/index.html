@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Study</title>
+    <link rel="icon" href="/study/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560&family=Schibsted+Grotesk:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/study/styles.css" />
+  </head>
+  <body>
+    <header class="top">
+      <h1>Study</h1>
+      <button type="button" class="text-btn" id="sign-out" hidden>Sign out</button>
+    </header>
+
+    <section class="gate" id="gate">
+      <p class="lede" id="gate-copy">Make a test from the class files.</p>
+      <a class="ink-btn" id="sign-in" href="/api/auth/google?next=/study/">Sign in with Google</a>
+    </section>
+
+    <main class="desk" id="desk" data-state="idle" hidden>
+      <p class="lede">Make a test from the class files. You get two copies, one to write on and one with the answers in that same space.</p>
+
+      <svg class="goo-defs" width="0" height="0" aria-hidden="true">
+        <filter id="goo">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
+          <feColorMatrix
+            in="blur"
+            mode="matrix"
+            values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -8"
+          />
+        </filter>
+      </svg>
+      <div class="goo" aria-hidden="true">
+        <div class="blob" id="blob-files"></div>
+        <div class="blob" id="blob-notes"></div>
+      </div>
+
+      <div class="materials">
+        <section class="material material-files" id="files-material">
+          <div class="material-head">
+            <h2>Files</h2>
+            <p>PDFs, notes, slides, a teacher test if you have one.</p>
+          </div>
+          <label class="drop" id="drop">
+            <input id="file-input" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.doc,.docx,application/pdf,text/plain" />
+            <span>Drop files, or choose them.</span>
+          </label>
+          <ul class="file-list" id="file-list"></ul>
+        </section>
+
+        <section class="material material-notes" id="notes-material">
+          <div class="material-head">
+            <h2>Notes</h2>
+            <p>Anything the files leave out.</p>
+          </div>
+          <textarea
+            id="notes"
+            rows="8"
+            placeholder="Class, how long, what kind of questions, what to emphasize."
+          ></textarea>
+        </section>
+      </div>
+
+      <div class="make-row">
+        <button type="button" class="make" id="make">Make the test</button>
+      </div>
+      <p class="status" id="status" aria-live="polite"></p>
+
+      <div class="papers" id="papers" hidden>
+        <button type="button" class="paper paper-work" id="download-work">
+          <span class="paper-kicker">Work copy</span>
+          <span class="paper-title" id="work-title">Practice test</span>
+        </button>
+        <button type="button" class="paper paper-key" id="download-key">
+          <span class="paper-kicker key-mark">Key</span>
+          <span class="paper-title">Same pages, with the answers.</span>
+        </button>
+      </div>
+    </main>
+
+    <script src="/study/stretch.js"></script>
+    <script src="/study/app.js"></script>
+  </body>
+</html>

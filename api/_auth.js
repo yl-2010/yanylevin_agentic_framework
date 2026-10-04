@@ -19,6 +19,8 @@ function loadOwnerAliases() {
   return Object.freeze(out);
 }
 const FULL_ACCESS_EMAILS = new Set([loadOwnerEmail()]);
+const JYPE_ACCESS_EMAILS = new Set();
+const STUDY_ONLY_EMAILS = new Set();
 const EMAIL_ALIASES = loadOwnerAliases();
 
 const SESSION_COOKIE = "yl_education_session";
@@ -43,6 +45,7 @@ const ALLOWED_RETURN_PATHS = new Set([
   "/dashboard/",
   "/jype/",
   "/debate/",
+  "/study/",
 ]);
 
 function getAuthSecret() {
@@ -68,6 +71,7 @@ function accessForEmail(email) {
   const normalized = canonicalizeEmail(email);
   if (FULL_ACCESS_EMAILS.has(normalized)) return "full";
   if (JYPE_ACCESS_EMAILS.has(normalized)) return "jype";
+  if (STUDY_ONLY_EMAILS.has(normalized)) return "study";
   return "denied";
 }
 
@@ -268,6 +272,7 @@ function readSession(req) {
 module.exports = {
   FULL_ACCESS_EMAILS,
   JYPE_ACCESS_EMAILS,
+  STUDY_ONLY_EMAILS,
   EMAIL_ALIASES,
   SESSION_COOKIE,
   STATE_COOKIE,

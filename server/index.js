@@ -94,6 +94,7 @@ import {
   listHeadlineAssignments,
   startHeadlinesWipeScheduler,
 } from "./headlines-activity.js";
+import { attachStudyRoutes } from "./study.js";
 
 const PORT = Number(process.env.PORT || 3004);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -1343,6 +1344,8 @@ app.get("/api/headlines/assignments", async (_req, res) => {
     });
   }
 });
+
+attachStudyRoutes(app);
 
 app.use((_req, res) => {
   res.status(404).json({ ok: false, error: "not found" });

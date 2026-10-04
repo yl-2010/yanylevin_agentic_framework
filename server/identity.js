@@ -43,3 +43,16 @@ export function isFullAccessEmail(email) {
 export function isOwner(email) {
   return isFullAccessEmail(email);
 }
+
+export const JYPE_ACCESS_EMAILS = new Set();
+export const STUDY_ONLY_EMAILS = new Set();
+
+/** Template has one operator, who can open the group and study apps. */
+export function isJypeAccessEmail(email) {
+  return isFullAccessEmail(email);
+}
+
+/** @param {string|null|undefined} email */
+export function isStudyAccessEmail(email) {
+  return isFullAccessEmail(email);
+}
