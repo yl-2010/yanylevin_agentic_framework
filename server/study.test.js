@@ -9,6 +9,7 @@ import {
   STUDY_MODEL,
   formatNumber,
   normalizeExam,
+  jobMaterial,
   modelPrompt,
   normalizeUploads,
   parseExamPayload,
@@ -76,12 +77,26 @@ describe("study uploads", () => {
     assert.equal(parsed.files.length, 0);
   });
 
-  it("tells the model a skill list is enough", () => {
+  it("is the task, the material, and the two PDFs", () => {
     const prompt = modelPrompt("Adding and subtracting positive and negative integers");
-    assert.match(prompt, /Notes alone are a complete request/);
-    assert.match(prompt, /list of skills is enough/);
-    assert.match(prompt, /no sample problems/);
+    assert.match(prompt, /Write one practice test/);
+    assert.match(prompt, /two PDFs/);
+    assert.match(prompt, /exam\.json/);
     assert.match(prompt, /Adding and subtracting positive and negative integers/);
+    assert.equal(/Canvas|sample problems|concept check|Do not invent/.test(prompt), false);
+  });
+
+  it("puts notes and file text in the material once", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "study-material-"));
+    await writeFile(join(dir, "notes.txt"), "ten questions");
+    await writeFile(join(dir, "packet.pdf.txt"), "Page one");
+    await writeFile(join(dir, "packet.pdf"), "pdf");
+    await writeFile(join(dir, "slide.png"), "png");
+    const material = await jobMaterial(dir, "ten questions");
+    assert.equal(material.split("ten questions").length - 1, 1);
+    assert.match(material, /packet\.pdf\.txt\nPage one/);
+    assert.match(material, /slide\.png/);
+    assert.equal(material.includes("packet.pdf\n"), false);
   });
 
   it("writes notes into an empty sources folder and leaves a real upload alone", async () => {

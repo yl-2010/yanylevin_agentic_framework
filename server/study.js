@@ -503,25 +503,42 @@ export async function seedNotesFile(sources, notes) {
 }
 
 /**
+ * Notes plus extracted file text. Non-text files are named so the model can open them.
+ * @param {string} sources
  * @param {string} notes
  */
-export function modelPrompt(notes) {
-  return `You are writing one practice test. Read every file in sources/. The student's notes are below.
+export async function jobMaterial(sources, notes) {
+  const names = (await readdir(sources)).sort();
+  /** @type {string[]} */
+  const parts = [];
+  const note = String(notes || "").trim();
+  let notesIncluded = false;
+  for (const name of names) {
+    if (!name.toLowerCase().endsWith(".txt")) continue;
+    const text = (await readFile(join(sources, name), "utf8").catch(() => "")).trim();
+    if (!text) continue;
+    if (note && text === note) notesIncluded = true;
+    parts.push(`${name}\n${text}`);
+  }
+  if (note && !notesIncluded) parts.unshift(`notes.txt\n${note}`);
+  const covered = new Set(
+    names.filter((name) => name.toLowerCase().endsWith(".txt")).map((name) => name.slice(0, -4))
+  );
+  for (const name of names) {
+    if (name.toLowerCase().endsWith(".txt") || covered.has(name)) continue;
+    parts.push(name);
+  }
+  return parts.join("\n\n");
+}
 
-Write exam.json in this folder and nothing else. Do not edit, delete, or create any other file.
+/**
+ * @param {string} material
+ */
+export function modelPrompt(material) {
+  return `Write one practice test from the material below. Files are in sources/.
 
-Notes alone are a complete request. If sources/ only has notes.txt, or the notes are the only material, write the test from that text. A class name, a unit, or a list of skills is enough. Write original practice questions on those skills. Do not stop because the notes have no sample problems, examples, or rules.
+The output is two PDFs with the same questions and the same space for work. One is blank. The other prints the answer in that space. Write that as exam.json in this folder and nothing else.
 
-If the only material is a Canvas page or an assignment blurb, in the notes or in a text file, ignore the due date, the score, the accommodations link, and the teacher comment. Test the skills that page names.
-
-If the files or notes contain a passage, a data set, slides, or class notes, the questions have to come from that material. Do not invent quotes, page numbers, or facts that are not in it.
-
-Write exactly this and stop only when the notes and files do not say what subject or skills to test:
-{"error":"one sentence saying what is missing"}
-
-If two or more files are teacher-made tests and they share a header, numbering, and where the points sit, match that in font, numbering, and nameLine. font is "serif" or "sans". numbering is "1." or "1)" or "(1)". If they do not share a layout, use serif, "1.", and nameLine true. PNG files whose names end in .pdf.png are a picture of that PDF, for layout only.
-
-exam.json shape:
 {
   "title": "",
   "course": "",
@@ -540,12 +557,10 @@ exam.json shape:
   ]
 }
 
-choices stays empty unless the question is multiple choice. workLines is how many ruled lines a student needs to show work, at least 3. The answer is the full worked answer that will be printed in that same space on the key. Plain text only, no HTML and no markdown.
+choices stays empty unless the question is multiple choice. workLines is at least 3. The answer is plain text and is printed in that space on the second PDF.
 
-If the notes name a length, match it. If they do not, write a short concept check that covers each named skill.
-
-Notes:
-${notes || "(none)"}
+Material:
+${material || "(none)"}
 `;
 }
 
@@ -622,14 +637,14 @@ async function textFromRun(run) {
 
 /**
  * @param {string} dir
- * @param {string} notes
+ * @param {string} material
  */
-async function writeExamWithModel(dir, notes) {
+async function writeExamWithModel(dir, material) {
   await reloadCursorApiKeyFromEnv();
   const model = await resolveModelSelection(requireCursorApiKey(), STUDY_MODEL);
   const holder = { agent: null };
   liveStudyRuns.add(holder);
-  const prompt = modelPrompt(notes);
+  const prompt = modelPrompt(material);
   try {
     const outcome = await runWithModelFallback({
       prefix: "study",
@@ -760,7 +775,7 @@ export async function runJob(id, root = STUDY_ROOT) {
     const sources = join(dir, "sources");
     await seedNotesFile(sources, notes);
     await extractSourceText(sources);
-    const exam = await writeExamWithModel(dir, notes);
+    const exam = await writeExamWithModel(dir, await jobMaterial(sources, notes));
     const workHtml = renderExamHtml(exam, "work");
     const keyHtml = renderExamHtml(exam, "key");
     await writeFile(join(dir, "work.html"), workHtml);
