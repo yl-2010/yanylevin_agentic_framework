@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, utimes, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile, utimes, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
@@ -20,6 +20,8 @@ import {
   activeMeetingAt,
   partitionClassTodos,
   siteFilesFromProps,
+  loadClassScopedObjects,
+  resolveLinkedTodoFile,
   stripTodoTagPrefix,
   uiPanelDateKeys,
   publicDebateCase,
@@ -391,6 +393,130 @@ describe("listContextFiles office open", () => {
     assert.equal(docx.webViewUrl, `${web}/notes.docx?web=1`);
     assert.equal(docx.officeUri, `ms-word:ofe|u|${web}/notes.docx`);
     await rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe("linkedFiles", () => {
+  /** @type {string} */
+  let classDir;
+  const maId = "MA Oct 7 Essay";
+  const cwId = "CW Oct 6 Prep";
+  const web =
+    "https://contoso-my.sharepoint.com/personal/yan_contoso_org/Documents";
+
+  it("setup class todos", async () => {
+    classDir = await mkdtemp(join(tmpdir(), "edu-linked-"));
+    const maDir = join(classDir, `.${maId}`);
+    const cwDir = join(classDir, cwId);
+    await mkdir(maDir);
+    await mkdir(cwDir);
+    await writeFile(join(maDir, "essay.docx"), "doc");
+    await writeFile(join(maDir, "prep.pdf"), "pdf-bytes");
+    await writeFile(join(maDir, "secret.docx"), "secret");
+    await writeFile(join(maDir, "local.docx"), "ma-local-longer");
+    await writeFile(
+      join(maDir, ".todo.json"),
+      JSON.stringify({
+        name: "Essay",
+        tag: "MA",
+        canvasId: "40000000",
+        hiddenFiles: ["secret.docx"],
+        sites: [
+          {
+            name: "essay notes",
+            url: "https://example.com/p1",
+            clientUrl: "onenote:https://example.com/p1",
+            oneNote: "personal",
+            pageId: "p1",
+          },
+          {
+            name: "Content Library: prep",
+            url: "https://example.com/p2",
+            clientUrl: "onenote:https://example.com/p2",
+            oneNote: "content-library",
+            pageId: "p2",
+          },
+        ],
+      })
+    );
+    await writeFile(join(cwDir, "worksheet.txt"), "own");
+    await writeFile(join(cwDir, "local.docx"), "cw");
+    await writeFile(
+      join(cwDir, ".todo.json"),
+      JSON.stringify({
+        name: "Prep",
+        tag: "CW",
+        canvasId: "40000001",
+        sites: [
+          {
+            name: "essay notes",
+            url: "https://example.com/p1",
+            clientUrl: "onenote:https://example.com/p1",
+            oneNote: "personal",
+            pageId: "p1",
+          },
+        ],
+        linkedFiles: [
+          { todo: "MA Oct 1 Old Title", canvasId: "40000000", name: "essay.docx" },
+          { todo: maId, canvasId: "40000000", name: "missing.docx" },
+          { todo: maId, canvasId: "40000000", name: "secret.docx" },
+          { todo: maId, canvasId: "40000000", name: "local.docx" },
+          { todo: maId, canvasId: "40000000", name: "prep.pdf" },
+          { todo: maId, canvasId: "40000000", pageId: "p1" },
+          { todo: maId, canvasId: "40000000", pageId: "p2" },
+          { todo: maId, canvasId: "40000000", pageId: "gone" },
+        ],
+      })
+    );
+  });
+
+  it("shows the sibling Word file and OneNote page on the CW", async () => {
+    const todos = await loadClassScopedObjects(
+      { id: "american-literature", objectDir: classDir, classFolder: classDir },
+      "todo",
+      {
+        includeFixtures: true,
+        classId: "american-literature",
+        officeOpen: { onedriveRoot: classDir, onedriveWebRoot: web },
+      }
+    );
+    const ma = todos.find((t) => t.id === maId);
+    const cw = todos.find((t) => t.id === cwId);
+    const maEssay = ma.files.find((f) => f.name === "essay.docx");
+    const cwEssay = cw.files.find((f) => f.name === "essay.docx");
+    const names = cw.files.map((f) => f.name);
+    assert.equal(cw._objectDir, undefined);
+    assert.ok(names.indexOf("worksheet.txt") < names.indexOf("essay.docx"));
+    assert.equal(names.filter((n) => n === "local.docx").length, 1);
+    assert.equal(cw.files.find((f) => f.name === "local.docx").size, 2);
+    assert.equal(names.includes("missing.docx"), false);
+    assert.equal(names.filter((n) => n === "essay notes").length, 1);
+    assert.equal(cwEssay.officeUri, maEssay.officeUri);
+    assert.equal(cwEssay.officeUri, `ms-word:ofe|u|${maEssay.webUrl}`);
+    const secret = cw.files.find((f) => f.name === "secret.docx");
+    assert.equal(secret.officeUri, `ms-word:ofe|u|${secret.webUrl}`);
+    assert.match(secret.officeUri, /^ms-word:ofe\|u\|/);
+    const prepPage = cw.files.find((f) => f.name === "Content Library: prep");
+    assert.equal(prepPage.kind, "url");
+    assert.equal(prepPage.officeUri, "onenote:https://example.com/p2");
+    assert.equal(cw.files.some((f) => f.name === "gone"), false);
+    const pdf = cw.files.find((f) => f.name === "prep.pdf");
+    assert.equal(pdf.kind, "file");
+    assert.equal(pdf.officeUri, undefined);
+  });
+
+  it("downloads the CW link from the MA folder", async () => {
+    const pdf = await resolveLinkedTodoFile(classDir, cwId, "prep.pdf");
+    assert.equal(pdf.name, "prep.pdf");
+    assert.equal(pdf.path, join(classDir, `.${maId}`, "prep.pdf"));
+    const own = await resolveLinkedTodoFile(classDir, cwId, "local.docx");
+    assert.equal(own, null);
+    const missing = await resolveLinkedTodoFile(classDir, cwId, "missing.docx");
+    assert.equal(missing, null);
+  });
+
+  it("cleanup", async () => {
+    await rm(classDir, { recursive: true, force: true });
   });
 });
 

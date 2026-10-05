@@ -1488,6 +1488,7 @@ export function buildCanvasSyncPrompt({
     "Leave canvasFiles on .todo.json alone. Express downloads teacher attachments into the OneDrive todo folder after you finish. Spanish 4 pasted decoration images (image-<uuid>, image.png) are not downloaded.",
     "Do not recreate a todo or date that looks like a manually deleted.md row. Judgement, not exact due clocks. canvasId is a strong hint.",
     "After the Canvas writes, link OneNote pages yourself, including todos imported on earlier nights. Go todo by todo. For each todo, look through that class notebook for pages that belong to it. Do not start from a page and hunt for a todo. Use node server/school-onenote.js (status, sections, pages). Read _Content Library and the Yan Levin group for that todo. Do not run link-todos. A page in Yan's notebook is a site named with the assignment name, oneNote personal. A Content Library page is a site named Content Library: plus the page title, oneNote content-library. Copy url (https webUrl), clientUrl (onenote:), and pageId. The same teacher page may go on more than one todo when you reach each of those todos. Keep sites that are not OneNote. If OneNote is signed out or a notebook fails, leave existing OneNote sites in place. Do not put OneNote URLs in description.",
+    "After that todo's own OneNote sites, look at the other todos in the same class. If Yan would use a file in another todo's folder, or a OneNote page already on that todo, add linkedFiles on this todo. name is the filename. pageId is the other todo's OneNote page. Include canvasId so a renamed folder still resolves, and todo as the Finder folder id. Do not copy the file. Do not replace this todo's own two OneNote sites. Drop a pointer that no longer fits. Files Express downloads after you finish can be linked the next night.",
     rebuild,
     hourly,
     deleted,
@@ -1512,7 +1513,7 @@ export function buildCanvasHourlyPrompt({ dateKey, hourKey, timezone, deletedBlo
     "If the snapshot matches existing todos, do nothing.",
     "NEVER write done or completedAt from Canvas. Do not POST to Canvas. Do not delete todos because Canvas dropped a row. Do not recreate deleted.md rows. Preserve finderHidden when it is already set.",
     "Leave canvasFiles on .todo.json alone. Express downloads teacher attachments into the OneDrive todo folder after you finish. Spanish 4 pasted decoration images (image-<uuid>, image.png) are not downloaded.",
-    "Do not run link-todos. Do not link OneNote pages on the hourly pass. That is the nightly Grok pass.",
+    "Do not run link-todos. Do not link OneNote pages on the hourly pass. That is the nightly Grok pass. Do not edit linkedFiles. Cross-todo file links are the nightly pass.",
     deleted,
   ]
     .filter(Boolean)

@@ -508,6 +508,8 @@ describe("buildCanvasSyncPrompt", () => {
     assert.match(prompt, /Do not start from a page and hunt for a todo/);
     assert.match(prompt, /Do not run link-todos/);
     assert.match(prompt, /oneNote content-library/);
+    assert.match(prompt, /add linkedFiles on this todo/);
+    assert.match(prompt, /Do not copy the file/);
   });
 });
 
@@ -525,6 +527,7 @@ describe("buildCanvasHourlyPrompt", () => {
     assert.match(prompt, /NEVER write done/);
     assert.match(prompt, /Do not fold Canvas comments/);
     assert.match(prompt, /Do not run link-todos/);
+    assert.match(prompt, /Do not edit linkedFiles/);
   });
 });
 

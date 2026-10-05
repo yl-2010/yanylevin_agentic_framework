@@ -204,6 +204,25 @@ A todo gets at most two OneNote sites. The same teacher page may sit on more tha
 
 Copy `url` from the page `webUrl` (https) and `clientUrl` from the page (`onenote:`). Store `pageId` from the page `id`. Keep every site whose `oneNote` is not `personal` or `content-library`. Replace an old OneNote site when you have a better page. If `status` is signed out, or a notebook fails to load, leave the OneNote sites that are already there and finish the Canvas sync. Do not put these URLs in `description`. Hourly Composer does not do this.
 
+## Files from another todo
+
+After that todo's own OneNote sites, look at the other todos in the same class. Read the files in each sibling folder and the OneNote pages on that sibling's `sites`. If Yan would open that same doc while doing this todo, add a pointer on this todo's `linkedFiles`. The file stays in the folder it already lives in.
+
+The usual case is a CW or HW that is prep for a later assignment. The essay stays in the MA folder. The CW stores a pointer, so the website and the iPhone show the same Word or OneNote button.
+
+```json
+"linkedFiles": [
+  { "todo": "MA Oct 7 American Dream Epigraphic In-class Essay", "canvasId": "40000000", "name": "American Dream Essay.docx" },
+  { "todo": "MA Oct 7 American Dream Epigraphic In-class Essay", "canvasId": "40000000", "pageId": "1-abc" }
+]
+```
+
+`name` is one file in the other todo's folder. `pageId` is a OneNote site already on that other todo. `canvasId` is how a later night finds the folder after a rename. `todo` is the Finder folder id without a leading dot, used when there is no Canvas id.
+
+Write the pointer on the todo that needs the doc. A shared draft, outline, or problem set counts. An unrelated worksheet does not. Drop a pointer when the file is gone or this todo no longer uses that doc. Do not move or copy the file. Do not edit `canvasFiles`. A linked OneNote page does not replace this todo's own personal page or Content Library page.
+
+Teacher files Express downloads after you finish are not on disk yet. Link those on the next night. Hourly Composer does not write `linkedFiles`.
+
 ## Nightly review of hourly Composer
 
 Read `last-hourly-sync.json`. Walk mapped class todos against the **full** snapshot. Fix wrong tags, `HW:` prefixes left on names, Adv Calc HW dues pulled back to Canvas time, yoga CW `hiddenFromHome`, missing `canvasId`/`canvasLink`, duplicates, and course-map drift. Then do the usual full map (new junior-year courses may have appeared). Then fold `comments-new.md` into class/todo `CONTEXT.md` as above.

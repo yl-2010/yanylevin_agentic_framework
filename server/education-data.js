@@ -575,6 +575,9 @@ export async function resolveContextFile(email, opts) {
 
   /** @type {string|null} */
   let folder = null;
+  /** Class folder used to follow linkedFiles when this todo does not have the file. */
+  /** @type {string|null} */
+  let classFolderForLinks = null;
   if (scope === "user") {
     folder = root;
   } else if (scope === "class") {
@@ -603,12 +606,14 @@ export async function resolveContextFile(email, opts) {
     } else if (classId) {
       const entry = await classEntryForRoot(root, classId);
       if (entry) {
+        classFolderForLinks = entry.classFolder || entry.objectDir || null;
         folder = await firstExistingDir([
-          ...objectFolderPaths(entry.classFolder || entry.objectDir, id),
+          ...objectFolderPaths(classFolderForLinks, id),
           ...objectFolderPaths(join(entry.objectDir, "todos"), id),
         ]);
       } else {
-        folder = join(root, "classes", classId, "todos", id);
+        classFolderForLinks = join(root, "classes", classId);
+        folder = join(classFolderForLinks, "todos", id);
       }
     } else {
       folder = join(root, "todos", id);
@@ -663,11 +668,18 @@ export async function resolveContextFile(email, opts) {
     throw err;
   }
 
+  const linkedTodoFile = async () => {
+    if (scope !== "todo" || !classFolderForLinks || !id) return null;
+    return resolveLinkedTodoFile(classFolderForLinks, id, fileName);
+  };
+
   let st;
   try {
     st = await stat(absFile);
   } catch (err) {
     if (err?.code === "ENOENT") {
+      const linked = await linkedTodoFile();
+      if (linked) return linked;
       if (scope === "class" && id) {
         try {
           return await resolveOnedriveContextFile(root, {
@@ -687,6 +699,8 @@ export async function resolveContextFile(email, opts) {
     throw err;
   }
   if (!st.isFile()) {
+    const linked = await linkedTodoFile();
+    if (linked) return linked;
     if (scope === "class" && id) {
       try {
         return await resolveOnedriveContextFile(root, {
@@ -1181,6 +1195,299 @@ export function stripTodoTagPrefix(name) {
   return stripped || raw;
 }
 
+/**
+ * @param {string} parent
+ * @param {string} child
+ */
+function pathInside(parent, child) {
+  const base = resolve(parent);
+  const target = resolve(child);
+  return target === base || target.startsWith(base + sep);
+}
+
+/**
+ * Pointers on `.todo.json` `linkedFiles`. Same class only.
+ * `name` is one file in the other todo's folder. `pageId` is a OneNote site
+ * already stored on that todo. `canvasId` wins over the Finder folder id.
+ * @param {unknown} raw
+ * @returns {{ name: string, pageId: string, todo: string, canvasId: string }[]}
+ */
+export function parseLinkedFiles(raw) {
+  if (!Array.isArray(raw)) return [];
+  /** @type {{ name: string, pageId: string, todo: string, canvasId: string }[]} */
+  const out = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const todo =
+      objectDirId(entry.todo) ||
+      objectDirId(String(entry.todo || "").replace(/^\./, "")) ||
+      "";
+    let canvasId = String(entry.canvasId ?? "").trim();
+    if (canvasId.length > 80 || /[\\/\0]/.test(canvasId)) canvasId = "";
+    if (!todo && !canvasId) continue;
+    const pageId = String(entry.pageId || "").trim();
+    const pageOk =
+      pageId &&
+      pageId.length <= 512 &&
+      !pageId.includes("/") &&
+      !pageId.includes("\\") &&
+      !pageId.includes("\0");
+    const name = isSafeContextFileName(entry.name);
+    if (pageOk) out.push({ name: "", pageId, todo, canvasId });
+    if (name) out.push({ name, pageId: "", todo, canvasId });
+  }
+  return out;
+}
+
+/**
+ * @param {string} classFolder
+ * @param {string} todoId
+ * @returns {Promise<string|null>}
+ */
+async function existingTodoDir(classFolder, todoId) {
+  const paths = [
+    ...objectFolderPaths(classFolder, todoId),
+    ...objectFolderPaths(join(classFolder, "todos"), todoId),
+  ];
+  for (const p of paths) {
+    if (!p) continue;
+    try {
+      const st = await stat(p);
+      if (st.isDirectory()) return p;
+    } catch {
+      /* try next */
+    }
+  }
+  return null;
+}
+
+/**
+ * Finder folder for a Canvas assignment id. A leading-dot hide still counts.
+ * A visible folder wins when both exist.
+ * @param {string} classFolder
+ * @param {string} canvasId
+ * @returns {Promise<string|null>}
+ */
+async function findTodoDirByCanvasId(classFolder, canvasId) {
+  const want = String(canvasId || "").trim();
+  if (!want) return null;
+  /** @type {string|null} */
+  let hidden = null;
+  for (const parent of [classFolder, join(classFolder, "todos")]) {
+    for (const dirName of await listDirs(parent)) {
+      if (!objectDirId(dirName)) continue;
+      const objectDir = join(parent, dirName);
+      const jsonPath = await resolveBookkeepingFile(objectDir, "todo.json");
+      if (!jsonPath) continue;
+      const props = await readJsonFile(jsonPath);
+      if (String(props?.canvasId ?? "").trim() !== want) continue;
+      if (!String(dirName).startsWith(".")) return objectDir;
+      if (!hidden) hidden = objectDir;
+    }
+  }
+  return hidden;
+}
+
+/**
+ * @param {string} classFolder
+ * @param {{ todo: string, canvasId: string }} link
+ * @param {string} currentDir
+ * @returns {Promise<string|null>}
+ */
+async function findSiblingTodoDir(classFolder, link, currentDir) {
+  const current = resolve(currentDir);
+  if (link.canvasId) {
+    const hit = await findTodoDirByCanvasId(classFolder, link.canvasId);
+    if (hit && resolve(hit) !== current) return hit;
+  }
+  if (link.todo) {
+    const hit = await existingTodoDir(classFolder, link.todo);
+    if (hit && resolve(hit) !== current) return hit;
+  }
+  return null;
+}
+
+/**
+ * File named on this todo's `linkedFiles` that lives in a sibling todo folder.
+ * Returns null when this todo already has that filename. The caller streams
+ * the sibling file. Bytes stay where they are.
+ * @param {string} classFolder
+ * @param {string} todoId
+ * @param {string} fileName
+ * @returns {Promise<{ path: string, name: string, size: number, mtime: string }|null>}
+ */
+export async function resolveLinkedTodoFile(classFolder, todoId, fileName) {
+  const name = isSafeContextFileName(fileName);
+  const id = objectDirId(todoId);
+  if (!classFolder || !name || !id) return null;
+  const current = await existingTodoDir(classFolder, id);
+  if (!current || !pathInside(classFolder, current)) return null;
+  const local = resolve(join(current, name));
+  if (pathInside(current, local)) {
+    try {
+      const own = await stat(local);
+      if (own.isFile()) return null;
+    } catch {
+      /* not in this folder */
+    }
+  }
+  const jsonPath = await resolveBookkeepingFile(current, "todo.json");
+  if (!jsonPath) return null;
+  const props = await readJsonFile(jsonPath);
+  const links = parseLinkedFiles(props?.linkedFiles).filter(
+    (link) => link.name && link.name.toLowerCase() === name.toLowerCase()
+  );
+  for (const link of links) {
+    const sibling = await findSiblingTodoDir(classFolder, link, current);
+    if (!sibling || !pathInside(classFolder, sibling)) continue;
+    const absFile = resolve(join(sibling, name));
+    if (!pathInside(sibling, absFile) || !pathInside(classFolder, absFile)) continue;
+    try {
+      const st = await stat(absFile);
+      if (!st.isFile()) continue;
+      return {
+        path: absFile,
+        name,
+        size: st.size,
+        mtime: new Date(st.mtimeMs).toISOString(),
+      };
+    } catch {
+      /* try the next pointer */
+    }
+  }
+  return null;
+}
+
+/**
+ * @param {object} todo
+ * @param {{ canvasId: string, todo: string }} link
+ * @param {Map<string, object>} byId
+ * @param {Map<string, object>} byCanvas
+ */
+function siblingTodo(todo, link, byId, byCanvas) {
+  if (link.canvasId) {
+    const hit = byCanvas.get(link.canvasId);
+    if (hit && hit !== todo) return hit;
+  }
+  if (link.todo) {
+    const hit = byId.get(link.todo);
+    if (hit && hit !== todo) return hit;
+  }
+  return null;
+}
+
+/**
+ * Append file and OneNote tiles from `linkedFiles`. Own files stay first.
+ * A missing file or page is omitted. `_objectDir` is removed before return.
+ * @param {object[]} todos
+ * @param {{ onedriveRoot?: string, onedriveWebRoot?: string }} [officeOpen]
+ */
+export async function applyTodoFileLinks(todos, officeOpen = {}) {
+  const list = Array.isArray(todos) ? todos : [];
+  try {
+    /** @type {Map<string, object>} */
+    const byId = new Map();
+    /** @type {Map<string, object>} */
+    const byCanvas = new Map();
+    for (const todo of list) {
+      if (!todo || typeof todo !== "object") continue;
+      if (todo.id && !byId.has(todo.id)) byId.set(todo.id, todo);
+      const canvasId = String(todo.canvasId ?? "").trim();
+      if (canvasId && !byCanvas.has(canvasId)) byCanvas.set(canvasId, todo);
+    }
+    for (const todo of list) {
+      if (!todo || typeof todo !== "object") continue;
+      const links = parseLinkedFiles(todo.linkedFiles);
+      if (!links.length) continue;
+      /** @type {Set<string>} */
+      const ownNames = new Set();
+      /** @type {Set<string>} */
+      const ownPageIds = new Set();
+      /** @type {Set<string>} */
+      const ownUrls = new Set();
+      for (const site of Array.isArray(todo.sites) ? todo.sites : []) {
+        const pageId = String(site?.pageId || "").trim();
+        if (pageId) ownPageIds.add(pageId);
+        const url = String(site?.url || site?.href || "").trim().toLowerCase();
+        if (url) ownUrls.add(url);
+      }
+      for (const file of Array.isArray(todo.files) ? todo.files : []) {
+        const kind = String(file?.kind || "file");
+        if (kind === "file") ownNames.add(String(file?.name || "").toLowerCase());
+        const url = String(file?.url || "").trim().toLowerCase();
+        if (url) ownUrls.add(url);
+      }
+      /** @type {object[]} */
+      const linked = [];
+      const seenNames = new Set();
+      const seenPages = new Set();
+      for (const link of links) {
+        const sibling = siblingTodo(todo, link, byId, byCanvas);
+        if (!sibling) continue;
+        if (link.pageId) {
+          if (ownPageIds.has(link.pageId) || seenPages.has(link.pageId)) continue;
+          const site = (Array.isArray(sibling.sites) ? sibling.sites : []).find(
+            (row) => String(row?.pageId || "").trim() === link.pageId
+          );
+          if (!site) continue;
+          const tile = urlTileFromObject(site);
+          if (!tile) continue;
+          const urlKey = tile.url.toLowerCase();
+          if (ownUrls.has(urlKey)) continue;
+          linked.push({ ...tile, source: "site" });
+          seenPages.add(link.pageId);
+          ownUrls.add(urlKey);
+          continue;
+        }
+        const key = link.name.toLowerCase();
+        if (!key || ownNames.has(key) || seenNames.has(key)) continue;
+        const fromSibling = (Array.isArray(sibling.files) ? sibling.files : []).find(
+          (file) =>
+            String(file?.kind || "file") === "file" &&
+            String(file?.name || "").toLowerCase() === key
+        );
+        if (fromSibling) {
+          linked.push({ ...fromSibling });
+          seenNames.add(key);
+          ownNames.add(key);
+          continue;
+        }
+        const dir = sibling._objectDir;
+        if (!dir) continue;
+        const abs = join(dir, link.name);
+        if (!pathInside(dir, abs)) continue;
+        try {
+          const st = await stat(abs);
+          if (!st.isFile()) continue;
+          linked.push(
+            attachOfficeOpenFields(
+              {
+                name: link.name,
+                size: st.size,
+                mtime: new Date(st.mtimeMs).toISOString(),
+                kind: "file",
+                source: "education",
+              },
+              abs,
+              officeOpen
+            )
+          );
+          seenNames.add(key);
+          ownNames.add(key);
+        } catch {
+          /* pointer whose file is gone */
+        }
+      }
+      if (linked.length) todo.files = [...(todo.files || []), ...linked];
+    }
+  } finally {
+    for (const todo of list) {
+      if (todo && typeof todo === "object") delete todo._objectDir;
+    }
+  }
+  return list;
+}
+
 async function loadObjectFolder(
   parentDir,
   kind,
@@ -1189,6 +1496,7 @@ async function loadObjectFolder(
     classId = null,
     projectId = null,
     officeOpen = {},
+    keepObjectDir = false,
   } = {}
 ) {
   const ids = await listDirs(parentDir);
@@ -1237,6 +1545,7 @@ async function loadObjectFolder(
       fileOpts.topNames,
       fileOpts.bottomNames
     );
+    if (keepObjectDir) item._objectDir = objectDir;
     out.push(item);
   }
   return out;
@@ -1417,7 +1726,7 @@ async function loadProjectCases(
   return { cases, todos };
 }
 
-async function loadClassScopedObjects(entry, kind, opts) {
+export async function loadClassScopedObjects(entry, kind, opts) {
   const nestedName = kind === "todo" ? "todos" : "dates";
   /** @type {Map<string, object>} */
   const byId = new Map();
@@ -1428,12 +1737,16 @@ async function loadClassScopedObjects(entry, kind, opts) {
     const nested = join(entry.objectDir, nestedName);
     if (nested !== classFolder) parents.push(nested);
   }
+  const loadOpts =
+    kind === "todo" ? { ...opts, keepObjectDir: true } : opts;
   for (const parent of parents) {
-    for (const item of await loadObjectFolder(parent, kind, opts)) {
+    for (const item of await loadObjectFolder(parent, kind, loadOpts)) {
       if (!byId.has(item.id)) byId.set(item.id, item);
     }
   }
-  return [...byId.values()];
+  const items = [...byId.values()];
+  if (kind === "todo") await applyTodoFileLinks(items, opts?.officeOpen || {});
+  return items;
 }
 
 /**
