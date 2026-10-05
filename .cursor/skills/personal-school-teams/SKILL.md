@@ -172,5 +172,7 @@ app bubble (bold, italic, lists, links, headings, code). No HTML tags, no
 markdown to Teams HTML so desktop and mobile keep newlines and formatting,
 and adds the footer on Teams only.
 
-Later turns typed in the app are Yan. They do not auto-post unless you
-send via this skill.
+Later turns on the website or in the app stay there. Do not post them to
+Teams. Post to that Teams chat only when this message asks you to tell that
+chat, reply there, or send something those people should see. A follow-up on
+the same topic, typed here, stays here. The group already got the first reply.

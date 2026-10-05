@@ -83,8 +83,15 @@ describe("teams-mention trigger", () => {
     assert.doesNotMatch(block, /never sent to Teams/);
     assert.doesNotMatch(block, /send confirmation/);
     const later = formatTeamsOriginBlock(origin, { deliverFinal: false });
-    assert.match(later, /Later app turns do not auto-post/);
+    assert.match(later, /reply stays in this chat/);
+    assert.match(later, /Do not post it to Teams/);
+    assert.match(later, /Do not run school-teams\.js send/);
+    assert.match(later, /A follow-up on the same topic, typed here, stays here/);
+    assert.match(later, /Teams chat id if they ask you to post there/);
     assert.doesNotMatch(later, /posted to this Teams chat immediately/);
+    assert.doesNotMatch(later, /send replies to chat id/);
+    assert.doesNotMatch(later, /text that should land in that Teams chat/);
+    assert.doesNotMatch(later, /when a reply belongs there/);
     assert.match(later, /stays in the app and website only/);
     const guest = formatTeamsOriginBlock(origin, {
       deliverFinal: true,

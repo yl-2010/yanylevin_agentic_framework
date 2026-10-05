@@ -262,6 +262,7 @@ export function formatIMessageOriginBlock(origin, opts = {}) {
   const bare = isBareAgentMention(origin.text);
   const threadLimit = bare ? 80 : 40;
   const guestLines = guestCallerLines(opts.guestCaller, "iMessage");
+  const deliver = opts.deliverFinal !== false;
   const lines = [
     guestLines.length
       ? guestLines[0]
@@ -269,35 +270,44 @@ export function formatIMessageOriginBlock(origin, opts = {}) {
     ...guestLines.slice(1),
     `- iMessage chat: ${chat || "?"}`,
   ];
-  if (chatId && chatId !== chat && !chatId.startsWith("+") && !chatId.includes("@")) {
+  const opaqueThreadId =
+    chatId && chatId !== chat && !chatId.startsWith("+") && !chatId.includes("@");
+  if (opaqueThreadId) {
     lines.push(`- thread id for reads only, never pass as chatGuid: ${chatId}`);
+  }
+  if (deliver && opaqueThreadId) {
     lines.push(
       "Send with to set to the name on send replies to. Leave chatGuid off. That thread id is not a Messages guid. Passing it opens a new chat with the group name."
     );
   }
   if (handle) lines.push(`- handle: ${handle}`);
-  if (to) lines.push(`- send replies to: ${to}`);
-  if (bare) {
+  const threadCmd = `curl -sS --unix-socket /tmp/personal-agent-local.sock "http://localhost/imessage/thread?person=${threadQ}&limit=${threadLimit}"`;
+  if (deliver) {
+    if (to) lines.push(`- send replies to: ${to}`);
+    if (bare) {
+      lines.push(
+        "The user message is only @agent. That is not the task. Read the surrounding iMessage thread first, then infer why they called you and what to do from the recent messages (a question someone asked, a plan, a thing they want handled). Do not reply asking what they want unless the thread is empty or you truly cannot tell."
+      );
+    }
     lines.push(
-      "The user message is only @agent. That is not the task. Read the surrounding iMessage thread first, then infer why they called you and what to do from the recent messages (a question someone asked, a plan, a thing they want handled). Do not reply asking what they want unless the thread is empty or you truly cannot tell."
-    );
-  }
-  lines.push(
-    `Read the surrounding thread before answering: curl -sS --unix-socket /tmp/personal-agent-local.sock "http://localhost/imessage/thread?person=${threadQ}&limit=${threadLimit}" (iMessage skill).`,
-    "The app and website thread is a normal Personal Agent chat.",
-    "Write the final bubble as the text that should land in that iMessage. Newlines work. When there is more than one point, put each on its own line with • or a dash. Do not leave those as one paragraph. iMessage does not render markdown (no bold or italic). No HTML tags, no @agent. The app and website keep that final bubble as the end of the turn (the answer or what you did). Do not write Sent on iMessage. Do not add // Sent by Yan's Personal Agent. The server appends that footer on the iMessage only, never in the app or website thread.",
-    "Keep the reply that lands in this chat short. A few sentences, or a short list. Answer and stop. Write at length only when they asked for a lot of text, such as an essay, a full explanation, or a drafted message. A study guide or plan still goes on a page. This chat gets the URL and one line."
-  );
-  if (opts.deliverFinal !== false) {
-    lines.push(
+      `Read the surrounding thread before answering: ${threadCmd} (iMessage skill).`,
+      "The app and website thread is a normal Personal Agent chat.",
+      "Write the final bubble as the text that should land in that iMessage. Newlines work. When there is more than one point, put each on its own line with • or a dash. Do not leave those as one paragraph. iMessage does not render markdown (no bold or italic). No HTML tags, no @agent. The app and website keep that final bubble as the end of the turn (the answer or what you did). Do not write Sent on iMessage. Do not add // Sent by Yan's Personal Agent. The server appends that footer on the iMessage only, never in the app or website thread.",
+      "Keep the reply that lands in this chat short. A few sentences, or a short list. Answer and stop. Write at length only when they asked for a lot of text, such as an essay, a full explanation, or a drafted message. A study guide or plan still goes on a page. This chat gets the URL and one line.",
       "On a long job, call send_chat_message with one short plain line of what you are about to do before you start the work. A new page, a study guide, or a big write counts. @agent and @agentg both do this. That message is posted to this iMessage chat immediately. Then do the work. Send another the same way only when this chat should hear something new. Do not send still working with no news. Quick answers stay one message, so skip send_chat_message. The server still sends your final bubble when you are done. Do not also send_chat_message that same final text.",
       "The server delivers your final bubble to that same iMessage chat. Do not also sendIMessage that same final text.",
       "This is a full Personal Agent turn. You can send native iMessage files (photos, PDFs, anything on disk). Never a yanylevin.com stand-in. Files are never in the same message as text. If this reply includes files, decide the text first, then POST /imessage/send with files and attachToReply true (no text) to this same chat as the last action, then write that text as the final bubble. The server sends each file as its own message, then the text, immediately. Extra sends to someone else still use files + text in one /imessage/send (files first, then text)."
     );
   } else {
+    if (to) lines.push(`- iMessage target if they ask you to text there: ${to}`);
     lines.push(
-      "This chat started from that iMessage thread. Later app turns do not auto-text it. send_chat_message stays in the app and website only. Send via the iMessage skill when a reply belongs there."
+      "This turn is on the website or app. The reply stays in this chat. Do not text it. Do not sendIMessage or POST /imessage/send for this reply. send_chat_message stays in the app and website only.",
+      "Text that iMessage chat only when this message asks you to tell that chat, reply there, or send something those people should see. A follow-up on the same topic, typed here, stays here. The chat already got the first reply.",
+      opaqueThreadId
+        ? "If they do ask you to text that chat, set to to the chat name and leave chatGuid off. That thread id is not a Messages guid. Passing it opens a new chat with the group name."
+        : "",
+      `If this message is about what was said in that iMessage, read it first: ${threadCmd} (iMessage skill).`
     );
   }
-  return lines.join("\n");
+  return lines.filter(Boolean).join("\n");
 }

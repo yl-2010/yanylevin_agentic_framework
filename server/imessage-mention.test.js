@@ -199,6 +199,13 @@ describe("imessage-mention", () => {
     const later = formatIMessageOriginBlock(origin, { deliverFinal: false });
     assert.doesNotMatch(later, /server delivers your final bubble/);
     assert.doesNotMatch(later, /posted to this iMessage chat immediately/);
+    assert.doesNotMatch(later, /send replies to:/);
+    assert.doesNotMatch(later, /text that should land in that iMessage/);
+    assert.doesNotMatch(later, /when a reply belongs there/);
+    assert.match(later, /reply stays in this chat/);
+    assert.match(later, /Do not text it/);
+    assert.match(later, /A follow-up on the same topic, typed here, stays here/);
+    assert.match(later, /iMessage target if they ask you to text there/);
     assert.match(later, /stays in the app and website only/);
   });
 
