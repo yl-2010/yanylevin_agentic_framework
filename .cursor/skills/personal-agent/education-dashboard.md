@@ -197,7 +197,7 @@ Home **Classes** layout, bells, and `schedule.json` keys: Read `.cursor/skills/c
 
 ## Live page context
 
-Express Personal Agent turns include a **Live context** clock and in-class-now / today's classes. Trust that for “what class am I in?” Open the weekly PDF / `schedule.json` (class-schedule skill) when editing schedule data.
+Express Personal Agent turns include a Live context clock and the current class. Trust that for what class you are in. The rest of the day and the week are not preloaded. Open the weekly PDF / `schedule.json` (class-schedule skill) when you need another period, or when editing schedule data.
 
 **Web + iOS:** the client also sends the exact education screen open (home, expanded class/project, todo detail, date detail, news capsule). Prefer that object as the default edit target unless the user names something else. On iOS this is the Education tab's navigation (still applied when the user switches to Chat). When a news capsule is open, Live context includes the full story body and citations. Answer follow-ups from that. iOS may also attach the capsule as a markdown file. News source rules: `.cursor/skills/daily-news/SKILL.md`.
 

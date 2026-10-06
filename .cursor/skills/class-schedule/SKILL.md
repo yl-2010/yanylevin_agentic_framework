@@ -25,7 +25,7 @@ Example: `education/you@example.com/schedule.json`
 
 That JSON is Yan's (or Alex's) live bell schedule. A classmate's recurring classes live on their brain card as `people/<slug>/schedule.md`, not here. Do not dump Four11 PDFs or schedule screenshots into `education/<email>/`.
 
-Express may inject a **Live context** clock plus in-class-now / next / previous / today's classes. Trust that for “what class am I in?” Do not guess from the clock alone. Classes are in person: say “in a class”, never “class meeting”. Open the PDF / `schedule.json` when editing, verifying, or when Live context does not answer.
+Express injects a Live context clock plus the current class (in class, heading there, or a free period), and next or previous when you are between classes. Trust that for what class is now. Do not guess from the clock alone. Classes are in person: say "in a class", never "class meeting". The rest of the day and the week are not in the prompt. Open this skill, the PDF, or `schedule.json` when you need another period, or when editing the schedule.
 
 ## `schedule.json`
 

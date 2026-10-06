@@ -275,13 +275,21 @@ describe("Personal Agent live context", () => {
     assert.doesNotMatch(block, /Not currently in a class/);
   });
 
-  it("lists today's classes, not meetings", () => {
+  it("does not dump today's classes into the prompt", () => {
     const block = formatLiveContextBlock(
       {
         dateKey: "2026-08-17",
         localTime: "09:00",
         timezone: "America/Los_Angeles",
         isSchoolDay: true,
+        inClass: true,
+        currentClass: {
+          classId: "math",
+          name: "Math",
+          period: "A",
+          start: "08:30",
+          end: "09:20",
+        },
         todayClasses: [
           {
             period: "A",
@@ -289,12 +297,21 @@ describe("Personal Agent live context", () => {
             start: "08:30",
             end: "09:20",
           },
+          {
+            period: "B",
+            name: "English",
+            start: "09:45",
+            end: "10:35",
+          },
         ],
       },
       null
     );
-    assert.match(block, /Today's classes:/);
+    assert.match(block, /IN CLASS NOW: Math/);
+    assert.doesNotMatch(block, /Today's classes:/);
     assert.doesNotMatch(block, /Today's meetings:/);
+    assert.doesNotMatch(block, /English/);
+    assert.match(block, /class-schedule\/SKILL\.md/);
   });
 
   it("appends a Yan calendar/canvas appendix when provided", () => {

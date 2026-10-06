@@ -83,7 +83,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Debate case building (`/debate`, Aff/Neg, research a case) | `.cursor/skills/debate-cases/SKILL.md` |
 | Static HTML on a todo / date / project / class | `.cursor/skills/object-html/SKILL.md` |
 | Public yanylevin.com page (study guide, plan, blueprint, liquid-glass report) | `.cursor/skills/yanylevin-webpage-create/SKILL.md` |
-| Weekly PDF, `schedule.json`, bells, what class is now | `.cursor/skills/class-schedule/SKILL.md` |
+| Weekly PDF, `schedule.json`, bells, another class, the week | `.cursor/skills/class-schedule/SKILL.md` |
 | EPS student IDs, four11 course lists, school / yearbook photos | `~/.cursor/skills/eps-four11/SKILL.md` |
 | Past Personal Agent transcripts | `.cursor/skills/past-chats/SKILL.md` |
 | Yan iPhone location (live + stays/trips) | `.cursor/skills/phone-location/SKILL.md` |
@@ -124,7 +124,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Chat title refresh (manual / backfill) | `.cursor/skills/chat-title-refresh/SKILL.md` (Personal Agent) and `.cursor/skills/jype-chat-title-refresh/SKILL.md` (JYPE) |
 | Life-state cleanup (manual) | `.cursor/skills/life-state-cleanup/SKILL.md` |
 
-Live context on Express turns is authoritative for clock, class-now, the open screen, and (Yan) today’s Apple Calendar plus a Canvas due-soon count. Trust it. Mail, iMessage, Screen Time, Contacts, OneNote, Teams, and Apple Home stay on-demand files (Teams is also a nightly dump). OneNote is not a nightly default source. Open it when a school question is about an agenda, HW instructions, maps, or day packets (class `CONTEXT.md` has the section map), or when a job already names a notebook or page. Named-people lookup above still opens `brain/people/`. Other `education/<email>/` files only when the question needs that data.
+Live context on Express turns is authoritative for clock, the current class, the open screen, and (Yan) today's Apple Calendar plus a Canvas due-soon count. Trust it. The rest of the class schedule is not preloaded. Read the class-schedule skill when you need another period or the week. Mail, iMessage, Screen Time, Contacts, OneNote, Teams, and Apple Home stay on-demand files (Teams is also a nightly dump). OneNote is not a nightly default source. Open it when a school question is about an agenda, HW instructions, maps, or day packets (class `CONTEXT.md` has the section map), or when a job already names a notebook or page. Named-people lookup above still opens `brain/people/`. Other `education/<email>/` files only when the question needs that data.
 
 ## Nightly jobs (Yan, manual)
 

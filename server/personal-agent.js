@@ -1563,17 +1563,9 @@ export function formatLiveContextBlock(nowContext, uiContext, appendix = "") {
         );
       }
     }
-    if (Array.isArray(nowContext.todayClasses) && nowContext.todayClasses.length) {
-      lines.push(
-        "Today's classes: " +
-          nowContext.todayClasses
-            .map(
-              (c) =>
-                `${c.period} ${c.name} ${c.start}–${c.end}${c.freePeriod ? " (free)" : ""}`
-            )
-            .join("; ")
-      );
-    }
+    lines.push(
+      `The rest of today and the weekly schedule are not in this prompt. Read ${PERSONAL_SKILL_PATHS.schedule} when you need another class or the week.`
+    );
   } else {
     lines.push(
       `Schedule clock unavailable — Read ${PERSONAL_SKILL_PATHS.schedule} if you need bells or today's classes.`
