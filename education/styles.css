@@ -1353,17 +1353,16 @@ a.edu-score {
   box-sizing: border-box;
   max-width: 100%;
   min-width: 0;
-  margin: 0.7rem 0;
-  padding: 0.72rem 0.85rem;
+  margin: 0.85rem 0;
+  padding: 0.1rem 0;
   overflow-x: auto;
   overflow-y: hidden;
   text-align: center;
   white-space: nowrap;
   font-style: normal;
-  border-radius: 12px;
-  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
-  background: color-mix(in srgb, currentColor 8%, transparent);
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent, currentColor) 65%, transparent);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -1944,26 +1943,17 @@ html[data-resolved-theme="dark"] .yan-chat-pill.corner.lg-refraction::after {
 }
 .yan-chat-close svg { width: 48%; height: 48%; display: block; }
 .yan-chat-close:focus-visible { outline: 2px solid var(--chat-orange); outline-offset: 2px; }
-.yan-chat-close--pill { top: 0.38rem; left: 0.38rem; }
 .yan-chat-close--panel {
   top: calc(var(--chat-panel-radius) - var(--chat-x-size) / 2);
   left: calc(var(--chat-panel-radius) - var(--chat-x-size) / 2);
 }
-.yan-chat.is-open:not(.has-panel) .yan-chat-close--pill,
-.yan-chat.is-open .yan-chat-minimize {
-  opacity: 1; pointer-events: auto; transition-delay: 0.18s;
-}
 .yan-chat.has-panel .yan-chat-close--panel {
   opacity: 1; pointer-events: auto;
-}
-/* Minus stays on the pill even when the message panel is open */
-.yan-chat.has-panel .yan-chat-close--pill {
-  opacity: 1; pointer-events: auto; transition-delay: 0.18s;
 }
 
 .yan-chat-form {
   position: absolute; inset: 0; z-index: 4; display: flex; align-items: center; gap: 0.45rem;
-  padding: 0 0.7rem 0 2.45rem; opacity: 0; pointer-events: none;
+  padding: 0 0.7rem 0 1.15rem; opacity: 0; pointer-events: none;
   transition: opacity 0.28s var(--ease);
 }
 .yan-chat.is-open .yan-chat-form { opacity: 1; pointer-events: auto; transition-delay: 0.2s; }
@@ -1990,7 +1980,7 @@ html[data-resolved-theme="dark"] .yan-chat-pill.corner.lg-refraction::after {
 }
 .yan-chat-attach-chips {
   position: absolute;
-  left: 2.45rem;
+  left: 1.15rem;
   right: 3.2rem;
   bottom: calc(100% + 0.35rem);
   display: flex;

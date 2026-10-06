@@ -1,9 +1,9 @@
 /**
  * /education chatbot — same orb→pill→panel visuals as main site.
  * Agent calls go to Mac via YanMacApi (api.yanylevin.com), never /api/chat.
- * Runs continue on the Mac after tab close or a new chat; resume via
- * /agent/active, /agent/state, or past-chats. New chat does not stop the
- * previous thread (queued turns still drain in the background).
+ * The circle always opens the history panel. A thread opens only when a row
+ * is picked or a message is sent. Runs continue on the Mac after the panel
+ * closes. New chat does not stop the previous thread.
  * Drag-and-drop files onto the composer or an open thread (paste images too).
  * Attachments work on later turns, not only the first.
  */
@@ -52,8 +52,8 @@
   const messagesEl = threadCol.querySelector(".yan-chat-messages");
   const historyEl = historyCol.querySelector(".yan-chat-history");
   const launcher = historyCol.querySelector(".yan-chat-launcher");
-  const clearBtns = root.querySelectorAll("[data-edu-chat-clear]");
-  const minimizeBtns = root.querySelectorAll("[data-edu-chat-minimize]");
+  const closeAllBtns = root.querySelectorAll("[data-edu-chat-close-all]");
+  const closeThreadBtns = root.querySelectorAll("[data-edu-chat-close-thread]");
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /** @type {string|null} */
@@ -66,6 +66,8 @@
   let pollTimer = null;
   let preferPanel = false;
   let showingHistory = false;
+  /** Thread column is visible only after a row click or a send. */
+  let showThread = false;
   /** Bumped when the visible thread changes so in-flight polls/resumes cannot paint an older chat. */
   let viewGen = 0;
   let historyFetchGen = 0;
@@ -653,6 +655,7 @@
   }
 
   async function showHistory(opts = {}) {
+    showThread = false;
     showingHistory = true;
     if (historyEl && !historyEl.childElementCount) {
       historyEl.innerHTML = "";
@@ -670,9 +673,13 @@
 
   function toggleHistory() {
     if (root.classList.contains("is-dual")) return;
-    if (showingHistory) {
-      if (!threadOpen()) return;
-      hideHistory({ markVisibleRead: true });
+    if (showThread && !wideEnough()) {
+      closeThreadPanel();
+      return;
+    }
+    if (!showThread && threadOpen()) {
+      showThread = true;
+      if (!wideEnough()) showingHistory = false;
       setState("panel", { focusComposer: threadComposer });
       return;
     }
@@ -822,14 +829,13 @@
   async function openHistoryChat(sid) {
     const id = String(sid || "").trim();
     if (!id) return;
+    showThread = true;
     if (wideEnough()) showingHistory = true;
     else hideHistory();
     markChatRead(id);
     resetComposer(threadComposer);
-    if (id === sessionId) {
-      setState("panel", { focusComposer: threadComposer });
-      return;
-    }
+    setState("panel", { focusComposer: threadComposer });
+    if (id === sessionId) return;
     if (!window.YanMacApi) return;
     const gen = ++viewGen;
     stopPolling();
@@ -931,22 +937,21 @@
 
   function syncLayout() {
     const open = state() !== "closed";
-    const hasThread = threadOpen();
-    const dual = open && state() === "panel" && hasThread && wideEnough();
+    const panelOn = state() === "panel";
+    const dual = open && panelOn && showThread && wideEnough();
     const wasDual = layoutDual;
     if (dual) showingHistory = true;
-    else if (wasDual && hasThread && open) showingHistory = false;
+    else if (wasDual && showThread && open) showingHistory = false;
     layoutDual = dual;
     root.classList.toggle("is-dual", dual);
     if (dual && !wasDual) renderHistory().catch(() => {});
     syncHistoryFrost();
 
-    const showThreadCol = open && state() === "panel" && (dual || !showingHistory);
+    const showThreadCol = open && panelOn && showThread;
     const showHistoryCol = !showThreadCol || dual;
     historyCol.hidden = !showHistoryCol;
     threadCol.hidden = !showThreadCol;
 
-    const panelOn = state() === "panel";
     for (const composer of composers) {
       const showCol = composer.role === "history" ? showHistoryCol : showThreadCol;
       const showPanel = panelOn && showCol;
@@ -961,8 +966,10 @@
       if (!showPanel && composer.panel) releaseChatMagnetic(composer.panel);
       if (composer.input) composer.input.tabIndex = open && showCol ? 0 : -1;
     }
-    if (!panelOn) clearBtns.forEach(releaseChatMagnetic);
-    if (!open) minimizeBtns.forEach(releaseChatMagnetic);
+    if (!panelOn) {
+      closeAllBtns.forEach(releaseChatMagnetic);
+      closeThreadBtns.forEach(releaseChatMagnetic);
+    }
     markCurrentHistoryRow();
   }
 
@@ -1042,6 +1049,7 @@
   }
 
   function setState(next, opts = {}) {
+    if (next === "open") next = "panel";
     root.dataset.state = next;
     const open = next !== "closed";
     root.classList.toggle("is-open", open);
@@ -1433,6 +1441,7 @@
       sessionId = null;
       messages = [];
       preferPanel = false;
+      showThread = false;
       setBusy(false);
       clearMessagesDom();
       clearLocal();
@@ -1513,6 +1522,7 @@
       root.classList.remove("is-busy");
       clearMessagesDom();
     }
+    showThread = true;
     if (fresh) {
       resetComposer(threadComposer);
       if (!wideEnough()) showingHistory = false;
@@ -1644,47 +1654,20 @@
     }
   }
 
-  /** Soft hide — keep session + transcript; discard drafts. */
-  function minimizeChat() {
+  /** Hide every chat view. The thread stays in history and keeps running. */
+  function closeAllChats() {
+    viewGen += 1;
     composers.forEach(resetComposer);
-    preferPanel = messages.length > 0 || preferPanel;
-    persistLocal();
+    showThread = false;
     showingHistory = false;
+    persistLocal();
     setState("closed");
   }
 
-  /** New chat — leave the previous thread running in the background. */
-  async function clearChat(opts = {}) {
+  /** Hide the open chat. History stays up and goes full width. */
+  function closeThreadPanel() {
     viewGen += 1;
-    stopPolling();
-    const hadThread = messages.length > 0 || sending;
-    sessionId = null;
-    messages = [];
-    preferPanel = false;
-    sending = false;
-    root.classList.remove("is-busy");
-    composers.forEach(resetComposer);
-    updateComposerEnabled();
-    clearMessagesDom();
-    clearLocal();
-    showingHistory = false;
-    setState(opts.open ? "open" : "closed");
-    if (hadThread && window.YanMacApi) {
-      try {
-        const res = await window.YanMacApi.macFetch(`${API}/agent/start`, {
-          method: "POST",
-          json: {},
-          timeoutMs: 120_000,
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data.sessionId) {
-          sessionId = data.sessionId;
-          persistLocal();
-        }
-      } catch {
-        /* ignore */
-      }
-    }
+    showHistory({ focus: true });
   }
 
   launcher?.addEventListener(
@@ -1721,31 +1704,19 @@
     event.stopPropagation();
   });
 
-  clearBtns.forEach((btn) => {
+  closeAllBtns.forEach((btn) => {
     btn.addEventListener("click", (event) => {
-      if (event.shiftKey) return;
       event.preventDefault();
       event.stopPropagation();
-      clearChat();
+      closeAllChats();
     });
-
-    btn.addEventListener(
-      "click",
-      (event) => {
-        if (!event.shiftKey) return;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        clearChat({ open: true });
-      },
-      true
-    );
   });
 
-  minimizeBtns.forEach((btn) => {
+  closeThreadBtns.forEach((btn) => {
     btn.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      minimizeChat();
+      closeThreadPanel();
     });
   });
 
@@ -1997,7 +1968,7 @@
 
   window.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || state() === "closed") return;
-    minimizeChat();
+    closeAllChats();
   });
 
   window.addEventListener(

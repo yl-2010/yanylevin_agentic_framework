@@ -720,8 +720,8 @@ final class EducationStore: ObservableObject {
     /// Bumped when the visible thread changes so in-flight polls/resumes cannot
     /// paint an older chat.
     private var agentViewGen = 0
-    /// True while `startNewChat` is replacing the visible thread. Resume from
-    /// `/agent/active` must not paint the previous session over the blank one.
+    /// True while `startNewChat` is replacing the visible thread. A resume
+    /// must not paint the previous session over the blank one.
     private var startingNewChat = false
 
     var isStartingNewChat: Bool { startingNewChat }
@@ -783,48 +783,12 @@ final class EducationStore: ObservableObject {
         UserDefaults.standard.removeObject(forKey: chatDefaultsKey(email: email))
     }
 
-    private static func decodeWidgets(_ raw: Any?) -> [ChatWidget] {
-        guard let raw else { return [] }
-        guard JSONSerialization.isValidJSONObject(raw),
-              let data = try? JSONSerialization.data(withJSONObject: raw),
-              let widgets = try? APIClient.decoder.decode([ChatWidget].self, from: data)
-        else { return [] }
-        return widgets
-    }
-
-    /// Drop clock fields so SSE reloads of `/data` do not republish `tree`
-    /// once a second while the agent is writing files.
     private static func stableEducationPayload(_ data: Data) -> Data {
         guard var obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
             return data
         }
         obj.removeValue(forKey: "nowContext")
         return (try? JSONSerialization.data(withJSONObject: obj)) ?? data
-    }
-
-    private func loadPersistedAgentChat(email: String) {
-        persistEmail = email.lowercased()
-        guard let raw = UserDefaults.standard.dictionary(forKey: chatDefaultsKey(email: email)) else {
-            return
-        }
-        if let sid = raw["sessionId"] as? String, !sid.isEmpty {
-            agentSessionId = sid
-        }
-        if let list = raw["messages"] as? [[String: Any]] {
-            agentMessages = list.compactMap { row in
-                guard let role = row["role"] as? String,
-                      let content = row["content"] as? String
-                else { return nil }
-                let queued = row["queued"] as? Bool ?? false
-                let widgets = Self.decodeWidgets(row["widgets"])
-                return ChatMessage(role: role, content: content, queued: queued, widgets: widgets)
-            }
-        } else if let list = raw["messages"] as? [[String: String]] {
-            agentMessages = list.compactMap { row in
-                guard let role = row["role"], let content = row["content"] else { return nil }
-                return ChatMessage(role: role, content: content)
-            }
-        }
     }
 
     private func applyWireMessages(_ list: [AgentChatWireMessage]?) {
@@ -960,8 +924,6 @@ final class EducationStore: ObservableObject {
             // Same SSE bump refreshes education agent chat (reply may land without a file write).
             if let sid = self.agentSessionId {
                 await self.refreshAgentState(token: token, sessionId: sid)
-            } else if self.agentBusy {
-                await self.resumeAgentChat(email: self.persistEmail, token: token)
             }
             if !self.chatHistory.isEmpty {
                 await self.loadChatList(token: token)
@@ -1268,49 +1230,14 @@ final class EducationStore: ObservableObject {
         return dest
     }
 
-    /// Restore local cache then sync from Mac `/agent/active` (or saved session state).
+    /// Refresh the chat already open in this process. Does not adopt the
+    /// Mac's focused session, so a chat started on the website stays there.
     func resumeAgentChat(email: String?, token: String) async {
         if startingNewChat { return }
-        let gen = agentViewGen
         if let email, !email.isEmpty {
-            loadPersistedAgentChat(email: email)
+            persistEmail = email.lowercased()
         }
-        guard gen == agentViewGen, !startingNewChat else { return }
-        do {
-            let active: AgentStateResponse = try await APIClient.shared.request(
-                api("agent/active"),
-                bearer: token
-            )
-            guard gen == agentViewGen, !startingNewChat else { return }
-            if let sid = active.sessionId, !sid.isEmpty {
-                if agentSessionId != sid {
-                    agentSessionId = sid
-                }
-                applyWireMessages(active.messages)
-                applyAgentRunState(status: active.status, workingLabel: active.workingLabel)
-                if agentBusy {
-                    startAgentPolling(token: token)
-                } else {
-                    stopAgentPolling()
-                }
-                persistAgentChatNow()
-                return
-            }
-            // Backend has no active session (cleared on another device) — wipe local too.
-            clearLocalAgentChat()
-            return
-        } catch {
-            // Fall through to saved sessionId poll.
-        }
-
-        guard gen == agentViewGen, !startingNewChat else { return }
-        guard let sid = agentSessionId else {
-            // No server active and no local id — treat as cleared.
-            if !agentMessages.isEmpty {
-                clearLocalAgentChat()
-            }
-            return
-        }
+        guard let sid = agentSessionId, !sid.isEmpty else { return }
         await refreshAgentState(token: token, sessionId: sid)
     }
 
@@ -1494,8 +1421,21 @@ final class EducationStore: ObservableObject {
         )
     }
 
-    /// Blank the visible thread immediately so a later `/agent/active` resume
-    /// cannot flash the previous chat. Call before `startNewChat` from lock-screen.
+    /// Blank the visible thread without starting a server session.
+    /// An empty `/agent/start` would replace the website's focused chat.
+    func presentBlankChat() {
+        agentViewGen += 1
+        startingNewChat = false
+        stopAgentPolling()
+        agentBusy = false
+        agentWorkingLabel = "Working"
+        agentMessages = []
+        agentSessionId = nil
+        persistAgentChatNow()
+    }
+
+    /// Blank the visible thread immediately so a later resume cannot
+    /// flash the previous chat. Call before `startNewChat` from lock-screen.
     func prepareNewChat() {
         agentViewGen += 1
         startingNewChat = true

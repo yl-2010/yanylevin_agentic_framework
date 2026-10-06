@@ -48,7 +48,7 @@
     <title>Education</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" media="(prefers-color-scheme: light)" />
     <link rel="icon" href="/favicon-dark.svg" type="image/svg+xml" media="(prefers-color-scheme: dark)" />
-    <link rel="stylesheet" href="/education/styles.css?v=math-block-1" />
+    <link rel="stylesheet" href="/education/styles.css?v=math-plain-1" />
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css"
@@ -129,8 +129,8 @@
               class="yan-chat-close yan-chat-close--panel circle"
               data-liquid-glass="circle"
               data-filter-id="lg-edu-chat-x-panel"
-              data-edu-chat-clear
-              aria-label="New chat"
+              data-edu-chat-close-all
+              aria-label="Close chat"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true" style="transform: rotate(45deg)"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
             </button>
@@ -142,18 +142,6 @@
             data-liquid-glass="circle"
             data-filter-id="lg-edu-chat-pill"
           >
-            <button
-              type="button"
-              class="yan-chat-minimize yan-chat-close yan-chat-close--pill circle"
-              data-liquid-glass="circle"
-              data-filter-id="lg-edu-chat-minimize"
-              data-edu-chat-minimize
-              aria-label="Hide chat"
-              tabindex="-1"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
-            </button>
-
             <button
               type="button"
               class="yan-chat-launcher"
@@ -213,8 +201,8 @@
               class="yan-chat-close yan-chat-close--panel circle"
               data-liquid-glass="circle"
               data-filter-id="lg-edu-chat-x-panel-thread"
-              data-edu-chat-clear
-              aria-label="New chat"
+              data-edu-chat-close-thread
+              aria-label="Close this chat"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true" style="transform: rotate(45deg)"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
             </button>
@@ -226,18 +214,6 @@
             data-liquid-glass="circle"
             data-filter-id="lg-edu-chat-pill-thread"
           >
-            <button
-              type="button"
-              class="yan-chat-minimize yan-chat-close yan-chat-close--pill circle"
-              data-liquid-glass="circle"
-              data-filter-id="lg-edu-chat-minimize-thread"
-              data-edu-chat-minimize
-              aria-label="Hide chat"
-              tabindex="-1"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
-            </button>
-
             <form class="yan-chat-form" action="#" autocomplete="off">
               <label class="visually-hidden" for="edu-chat-thread-input">Continue this chat</label>
               <textarea
@@ -296,6 +272,6 @@
     <script src="/education/file-query.js?v=1"></script>
     <script src="/education/app.js?v=frost-1"></script>
     <script src="/js/chat-send-flight.js?v=1"></script>
-    <script src="/education/chatbot.js?v=dual-pane-2"></script>
+    <script src="/education/chatbot.js?v=chat-open-1"></script>
   </body>
 </html>

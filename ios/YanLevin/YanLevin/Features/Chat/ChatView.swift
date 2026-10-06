@@ -397,7 +397,7 @@ struct ChatView: View {
         }
         .onChange(of: educationFocus.workspace) { _, ws in
             educationStore.workspace = ws
-            educationStore.prepareNewChat()
+            educationStore.presentBlankChat()
             liveSessionID += 1
         }
         .onChange(of: scenePhase) { _, phase in
@@ -798,18 +798,12 @@ struct ChatView: View {
     }
 
     /// Entering the Personal Agent (public → personal toggle, cold launch,
-    /// sign-in) always lands on a fresh, empty thread. Runs BEFORE the backend
-    /// flips so the restarted live task sees `isStartingNewChat` and cannot
-    /// resume the previous thread. The lock-screen / URL handoff path does its
-    /// own force-new in `consumeChatHandoff`, so skip when one is pending.
+    /// sign-in) lands on an empty composer. The website's open chat is not
+    /// pulled in. A server session starts on the first send.
     private func startFreshPersonalChat() {
         guard !nav.chatHandoffStartNew else { return }
-        guard let token = auth.session?.token else { return }
         closeChatHistory(animated: false, markVisibleRead: false)
-        // Blank immediately so an in-flight `/agent/active` resume cannot
-        // paint the previous thread back over the new one.
-        educationStore.prepareNewChat()
-        Task { await educationStore.startNewChat(token: token) }
+        educationStore.presentBlankChat()
     }
 
     private func composer(focus: FocusState<Bool>.Binding) -> some View {
@@ -1162,18 +1156,12 @@ struct ChatView: View {
             closeChatHistory(animated: false, markVisibleRead: false)
             draft = ""
             pendingAttachments = []
-            let token = auth.session?.token ?? AppGroupStore.token
             let fullAccess = auth.hasFullAccess || AppGroupStore.hasFullAccess
             if fullAccess {
-                // Session restore is async (Keychain + /session). Keep the
-                // handoff until a token exists so we don't fall through to
-                // visitor chat and drop the new-chat request.
-                guard let token, !token.isEmpty else { return }
-                educationStore.prepareNewChat()
+                educationStore.presentBlankChat()
                 nav.chatHandoffAttachments = []
                 nav.chatHandoffPreferPersonalAgent = false
                 nav.chatHandoffStartNew = false
-                Task { await educationStore.startNewChat(token: token, force: true) }
                 return
             }
             if auth.session == nil, AppGroupStore.token != nil {

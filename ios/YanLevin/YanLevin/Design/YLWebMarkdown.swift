@@ -220,17 +220,16 @@ private struct YLWebMarkdownView: UIViewRepresentable {
                 box-sizing: border-box;
                 max-width: 100%;
                 min-width: 0;
-                margin: 0.7rem 0;
-                padding: 0.72rem 0.85rem;
+                margin: 0.85rem 0;
+                padding: 0.1rem 0;
                 overflow-x: auto;
                 overflow-y: hidden;
                 text-align: center;
                 white-space: nowrap;
                 font-style: normal;
-                border-radius: 12px;
-                border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
-                background: color-mix(in srgb, currentColor 8%, transparent);
-                box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 65%, transparent);
+                background: transparent;
+                border: 0;
+                box-shadow: none;
                 -webkit-overflow-scrolling: touch;
               }
               .md-math-block .katex, .md-math--display .katex { white-space: nowrap; font-style: normal; }
