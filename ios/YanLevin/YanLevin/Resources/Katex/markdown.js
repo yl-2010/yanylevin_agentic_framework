@@ -35,21 +35,67 @@
     return null;
   }
 
-  function renderMath(tex, display) {
-    const src = String(tex || "").trim();
+  /**
+   * One equation per line becomes a stacked display. aligned/gather environments
+   * are left as written. A trailing \\ on a line is stripped before joining so
+   * it is not doubled.
+   */
+  function stackDisplayTex(tex) {
+    const raw = String(tex || "").trim();
+    if (!raw) return "";
+    if (/\\begin\{/.test(raw)) return raw;
+    const lines = raw
+      .split("\n")
+      .map((line) => line.trim().replace(/\\\\\s*$/, "").trim())
+      .filter(Boolean);
+    if (lines.length > 1) {
+      return "\\begin{gathered}\n" + lines.join(" \\\\\n") + "\n\\end{gathered}";
+    }
+    const one = lines[0] || "";
+    if (/\\\\/.test(one)) return "\\begin{gathered}" + one + "\\end{gathered}";
+    return one;
+  }
+
+  function renderMath(tex, display, asBlock) {
+    const src = display ? stackDisplayTex(tex) : String(tex || "").trim();
+    if (!src) return "";
     const api = katexApi();
-    const cls = display ? "md-math md-math--display" : "md-math";
+    const cls = asBlock ? "md-math-block" : display ? "md-math md-math--display" : "md-math";
+    const tag = asBlock ? "div" : "span";
     if (api) {
       try {
-        return `<span class="${cls}">${api.renderToString(src, {
+        return `<${tag} class="${cls}">${api.renderToString(src, {
           throwOnError: false,
           displayMode: Boolean(display),
-        })}</span>`;
+        })}</${tag}>`;
       } catch {
         /* fall through */
       }
     }
-    return `<span class="${cls}">${escapeHtml(src)}</span>`;
+    return `<${tag} class="${cls}">${escapeHtml(src)}</${tag}>`;
+  }
+
+  /** A line that is only a display-math fence or a one-line $$...$$ / \[...\]. */
+  function ownLineDisplay(line) {
+    const t = String(line).trim();
+    if (t === "$$") return { fence: "$$", close: "$$" };
+    if (t === "\\[") return { fence: "\\[", close: "\\]" };
+    let m = t.match(/^\$\$([\s\S]+)\$\$$/);
+    if (m && m[1].trim() && !m[1].includes("$$")) return { tex: m[1] };
+    m = t.match(/^\\\[([\s\S]+)\\\]$/);
+    if (m && m[1].trim()) return { tex: m[1] };
+    return null;
+  }
+
+  function readDisplayFence(lines, i, close) {
+    const body = [];
+    let j = i + 1;
+    while (j < lines.length && lines[j].trim() !== close) {
+      body.push(lines[j]);
+      j += 1;
+    }
+    const closed = j < lines.length;
+    return { tex: body.join("\n"), i: closed ? j + 1 : i, closed };
   }
 
   /**
@@ -71,6 +117,12 @@
     );
 
     s = s.replace(/\$\$([\s\S]+?)\$\$/g, (_, tex) => hold(renderMath(tex, true)));
+    s = s.replace(/\\\[([\s\S]+?)\\\]/g, (_, tex) => hold(renderMath(tex, true)));
+    s = s.replace(/\\\(([\s\S]+?)\\\)/g, (_, tex) => {
+      const inner = String(tex);
+      if (!inner.trim()) return `\\(${inner}\\)`;
+      return hold(renderMath(inner, false));
+    });
     s = s.replace(/(^|[^$0-9])\$([^$\n]+?)\$(?![$0-9])/g, (m, pre, tex) => {
       const inner = String(tex);
       if (!inner.trim() || /^\s|\s$/.test(inner)) return m;
@@ -271,9 +323,33 @@
           i += 1;
         }
         if (i < lines.length) i += 1;
-        const cls = lang ? ` class="language-${escapeHtml(lang.split(/\s+/)[0])}"` : "";
+        const langName = lang.split(/\s+/)[0] || "";
+        if (/^(math|latex|tex|katex)$/i.test(langName)) {
+          const html = renderMath(body.join("\n"), true, true);
+          if (html) out.push(html);
+          continue;
+        }
+        const cls = langName ? ` class="language-${escapeHtml(langName)}"` : "";
         out.push(`<pre><code${cls}>${escapeHtml(body.join("\n"))}</code></pre>`);
         continue;
+      }
+
+      const display = ownLineDisplay(line);
+      if (display) {
+        if (display.fence) {
+          const read = readDisplayFence(lines, i, display.close);
+          if (read.closed) {
+            const html = renderMath(read.tex, true, true);
+            if (html) out.push(html);
+            i = read.i;
+            continue;
+          }
+        } else if (display.tex) {
+          const html = renderMath(display.tex, true, true);
+          if (html) out.push(html);
+          i += 1;
+          continue;
+        }
       }
 
       if (isHr(line)) {
@@ -350,6 +426,7 @@
         const next = lines[i];
         if (!next.trim()) break;
         if (isFenceOpen(next) || isHr(next) || headingMatch(next)) break;
+        if (ownLineDisplay(next)) break;
         if (listMatch(next) || /^\s*>/.test(next)) break;
         if (next.includes("|") && i + 1 < lines.length && isTableSep(lines[i + 1])) {
           break;

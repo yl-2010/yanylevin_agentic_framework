@@ -15,13 +15,43 @@
     ""
   ) || "/api/education";
 
-  const pill = root.querySelector(".yan-chat-pill");
-  const panel = root.querySelector(".yan-chat-panel");
-  const messagesEl = root.querySelector(".yan-chat-messages");
-  const historyEl = root.querySelector(".yan-chat-history");
-  const form = root.querySelector(".yan-chat-form");
-  const input = root.querySelector(".yan-chat-input");
-  const launcher = root.querySelector(".yan-chat-launcher");
+  const historyCol = root.querySelector(".yan-chat-column--history");
+  const threadCol = root.querySelector(".yan-chat-column--thread");
+  if (!historyCol || !threadCol) return;
+
+  /**
+   * @param {Element} column
+   * @param {"history"|"thread"} role
+   */
+  function bindComposer(column, role) {
+    const pill = column.querySelector(".yan-chat-pill");
+    const panel = column.querySelector(".yan-chat-panel");
+    const form = column.querySelector(".yan-chat-form");
+    const input = column.querySelector(".yan-chat-input");
+    return {
+      role,
+      column,
+      pill,
+      panel,
+      form,
+      input,
+      sendBtn: form?.querySelector(".yan-chat-send") || null,
+      /** @type {{ id: string, file: File }[]} */
+      pendingFiles: [],
+      /** @type {HTMLElement|null} */
+      chipsEl: null,
+      /** @type {string[]} */
+      chipObjectUrls: [],
+      lastPillH: 0,
+    };
+  }
+
+  const historyComposer = bindComposer(historyCol, "history");
+  const threadComposer = bindComposer(threadCol, "thread");
+  const composers = [historyComposer, threadComposer];
+  const messagesEl = threadCol.querySelector(".yan-chat-messages");
+  const historyEl = historyCol.querySelector(".yan-chat-history");
+  const launcher = historyCol.querySelector(".yan-chat-launcher");
   const clearBtns = root.querySelectorAll("[data-edu-chat-clear]");
   const minimizeBtns = root.querySelectorAll("[data-edu-chat-minimize]");
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -43,8 +73,6 @@
   /** @type {string|null} */
   let historyPointerSid = null;
 
-  /** @type {{ id: string, file: File }[]} */
-  let pendingFiles = [];
   const MAX_FILES = 16;
   /** Match server MAX_ATTACHMENT_BYTES / MAX_TOTAL_ATTACHMENT_BYTES. */
   const MAX_FILE_BYTES = 64 * 1024 * 1024;
@@ -52,10 +80,6 @@
   const MAX_QUEUED = 8;
   const POLL_MS = 2000;
 
-  /** @type {HTMLElement|null} */
-  let chipsEl = null;
-  /** @type {string[]} */
-  let chipObjectUrls = [];
   /** @type {HTMLElement|null} */
   let workingEl = null;
   let busyLabel = "Working…";
@@ -104,37 +128,36 @@
     }
   }
 
-  function ensureChipsEl() {
-    if (chipsEl) return chipsEl;
-    chipsEl = document.createElement("div");
+  function ensureChipsEl(composer) {
+    if (composer.chipsEl) return composer.chipsEl;
+    const chipsEl = document.createElement("div");
     chipsEl.className = "yan-chat-attach-chips";
     chipsEl.hidden = true;
-    if (form) {
-      form.insertBefore(chipsEl, form.firstChild);
-    }
+    if (composer.form) composer.form.insertBefore(chipsEl, composer.form.firstChild);
+    composer.chipsEl = chipsEl;
     return chipsEl;
   }
 
-  function clearChipObjectUrls() {
-    for (const url of chipObjectUrls) URL.revokeObjectURL(url);
-    chipObjectUrls = [];
+  function clearChipObjectUrls(composer) {
+    for (const url of composer.chipObjectUrls) URL.revokeObjectURL(url);
+    composer.chipObjectUrls = [];
   }
 
-  function renderChips() {
-    const el = ensureChipsEl();
+  function renderChips(composer) {
+    const el = ensureChipsEl(composer);
     el.innerHTML = "";
-    clearChipObjectUrls();
-    const had = root.classList.contains("has-attachments");
-    if (!pendingFiles.length) {
+    clearChipObjectUrls(composer);
+    const had = composer.column.classList.contains("has-attachments");
+    if (!composer.pendingFiles.length) {
       el.hidden = true;
-      root.classList.remove("has-attachments");
+      composer.column.classList.remove("has-attachments");
       if (had) scheduleGlassRefresh();
       return;
     }
     el.hidden = false;
-    root.classList.add("has-attachments");
+    composer.column.classList.add("has-attachments");
     if (!had) scheduleGlassRefresh();
-    for (const item of pendingFiles) {
+    for (const item of composer.pendingFiles) {
       const chip = document.createElement("span");
       chip.className = "yan-chat-attach-chip";
       chip.title = item.file.name;
@@ -143,7 +166,7 @@
         thumb.className = "yan-chat-attach-chip-thumb";
         thumb.alt = "";
         const url = URL.createObjectURL(item.file);
-        chipObjectUrls.push(url);
+        composer.chipObjectUrls.push(url);
         thumb.src = url;
         chip.appendChild(thumb);
       }
@@ -158,8 +181,8 @@
       remove.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        pendingFiles = pendingFiles.filter((f) => f.id !== item.id);
-        renderChips();
+        composer.pendingFiles = composer.pendingFiles.filter((f) => f.id !== item.id);
+        renderChips(composer);
       });
       chip.appendChild(label);
       chip.appendChild(remove);
@@ -167,45 +190,57 @@
     }
   }
 
+  function resetComposer(composer) {
+    composer.pendingFiles = [];
+    if (composer.input) {
+      composer.input.value = "";
+      composer.input.disabled = false;
+    }
+    renderChips(composer);
+    syncComposerSize(composer);
+  }
+
   /**
+   * @param {ReturnType<typeof bindComposer>} composer
    * @param {FileList|File[]} list
    */
-  function addFiles(list) {
+  function addFiles(composer, list) {
     const files = Array.from(list || []);
-    let pendingTotal = pendingFiles.reduce((n, p) => n + p.file.size, 0);
+    let pendingTotal = composer.pendingFiles.reduce((n, p) => n + p.file.size, 0);
     for (const file of files) {
       if (!file || !(file instanceof File)) continue;
-      if (pendingFiles.length >= MAX_FILES) break;
+      if (composer.pendingFiles.length >= MAX_FILES) break;
       if (file.size > MAX_FILE_BYTES) {
-        appendBubble(
-          "assistant",
-          `“${file.name}” is too large (max 64MB per file).`
-        );
-        setState("panel");
+        if (composer.role === "thread") {
+          appendBubble(
+            "assistant",
+            `“${file.name}” is too large (max 64MB per file).`
+          );
+          setState("panel");
+        }
         continue;
       }
       if (pendingTotal + file.size > MAX_TOTAL_BYTES) {
-        appendBubble(
-          "assistant",
-          `“${file.name}” would exceed 64MB total per message.`
-        );
-        setState("panel");
+        if (composer.role === "thread") {
+          appendBubble(
+            "assistant",
+            `“${file.name}” would exceed 64MB total per message.`
+          );
+          setState("panel");
+        }
         continue;
       }
-      const dup = pendingFiles.some(
+      const dup = composer.pendingFiles.some(
         (p) => p.file.name === file.name && p.file.size === file.size
       );
       if (dup) continue;
-      pendingFiles.push({
+      composer.pendingFiles.push({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         file,
       });
       pendingTotal += file.size;
     }
-    if (pendingFiles.length && showingHistory) {
-      hideHistory({ markVisibleRead: true });
-    }
-    renderChips();
+    renderChips(composer);
   }
 
   /**
@@ -582,43 +617,66 @@
     root.classList.toggle("is-history", showingHistory);
   }
 
+  function threadOpen() {
+    return messages.length > 0 || sending;
+  }
+
+  function lengthPx(value) {
+    const raw = String(value || "").trim();
+    const n = parseFloat(raw);
+    if (raw.endsWith("px") && Number.isFinite(n)) return n;
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:absolute;visibility:hidden;width:" + (raw || "0px");
+    root.appendChild(probe);
+    const w = probe.getBoundingClientRect().width;
+    probe.remove();
+    return w;
+  }
+
+  function wideEnough() {
+    const circle = circlePx();
+    const styles = getComputedStyle(root);
+    const gap = parseFloat(styles.getPropertyValue("--chat-gap")) || 12;
+    const pad = lengthPx(styles.getPropertyValue("--chat-pad"));
+    const threadW = circle * 6;
+    return window.innerWidth >= threadW * 1.5 + gap + pad * 2 - 1;
+  }
+
   function hideHistory(opts = {}) {
     const wasShowing = showingHistory;
     showingHistory = false;
-    syncHistoryFrost();
-    historyStructureKey = "";
     historyPointerSid = null;
-    if (messagesEl) messagesEl.hidden = false;
-    if (historyEl) {
-      historyEl.hidden = true;
-      historyEl.setAttribute("aria-hidden", "true");
-      historyEl.innerHTML = "";
-    }
     if (opts.markVisibleRead && wasShowing && sessionId && !sending) {
       markChatRead(sessionId);
     }
+    syncLayout();
   }
 
-  async function showHistory() {
+  async function showHistory(opts = {}) {
     showingHistory = true;
-    syncHistoryFrost();
-    setState("panel", { skipFocus: true });
-    if (messagesEl) messagesEl.hidden = true;
-    if (historyEl) {
-      historyEl.hidden = false;
-      historyEl.setAttribute("aria-hidden", "false");
+    if (historyEl && !historyEl.childElementCount) {
       historyEl.innerHTML = "";
       const loading = document.createElement("p");
       loading.className = "yan-chat-history-empty";
       loading.textContent = "Loading…";
       historyEl.appendChild(loading);
     }
+    setState("panel", {
+      skipFocus: !opts.focus,
+      focusComposer: opts.focus ? historyComposer : null,
+    });
     await renderHistory();
   }
 
   function toggleHistory() {
-    if (showingHistory) hideHistory({ markVisibleRead: true });
-    else showHistory();
+    if (root.classList.contains("is-dual")) return;
+    if (showingHistory) {
+      if (!threadOpen()) return;
+      hideHistory({ markVisibleRead: true });
+      setState("panel", { focusComposer: threadComposer });
+      return;
+    }
+    showHistory();
   }
 
   /**
@@ -692,6 +750,7 @@
       const nextKey = historyRowsKey(chats);
       if (nextKey === historyStructureKey && historyEl.childElementCount) {
         patchHistoryRows(chats);
+        markCurrentHistoryRow();
         return;
       }
       historyStructureKey = nextKey;
@@ -727,6 +786,10 @@
             btn.appendChild(age);
           }
           applyHistoryDot(btn, chat);
+          if (sessionId && String(chat.sessionId || "") === sessionId) {
+            btn.classList.add("is-current");
+            btn.setAttribute("aria-current", "true");
+          }
           wrap.appendChild(btn);
         }
         historyEl.appendChild(wrap);
@@ -759,10 +822,12 @@
   async function openHistoryChat(sid) {
     const id = String(sid || "").trim();
     if (!id) return;
-    hideHistory();
+    if (wideEnough()) showingHistory = true;
+    else hideHistory();
     markChatRead(id);
+    resetComposer(threadComposer);
     if (id === sessionId) {
-      setState("panel");
+      setState("panel", { focusComposer: threadComposer });
       return;
     }
     if (!window.YanMacApi) return;
@@ -783,7 +848,7 @@
       if (Array.isArray(data.messages)) applyServerMessages(data.messages);
       preferPanel = true;
       persistLocal();
-      setState("panel");
+      setState("panel", { focusComposer: threadComposer });
       if (data.status === "running") {
         setBusy(true);
         setBusyLabel(data.workingLabel || "Working…");
@@ -803,8 +868,8 @@
   }
 
   const COMPOSER_MAX_LINES = 8;
-  let lastPillH = 0;
   let composerGlassTimer = 0;
+  let layoutDual = false;
 
   function cssPx(el, name) {
     const raw = String(getComputedStyle(el).getPropertyValue(name) || "").trim();
@@ -823,11 +888,11 @@
   }
 
   /** Count wrapped + hard-break lines without reading textarea.scrollHeight (flex min-height lies). */
-  function composerLineCount() {
-    const text = String(input.value || "");
+  function composerLineCount(input) {
+    const text = String(input?.value || "");
     const parts = text.split("\n");
-    const width = Math.max(0, input.clientWidth || input.offsetWidth || 0);
-    if (width < 8) return Math.max(1, parts.length);
+    const width = Math.max(0, input?.clientWidth || input?.offsetWidth || 0);
+    if (!input || width < 8) return Math.max(1, parts.length);
     const cs = getComputedStyle(input);
     const canvas =
       composerLineCount._c || (composerLineCount._c = document.createElement("canvas"));
@@ -845,11 +910,6 @@
     return Math.max(1, lines);
   }
 
-  function syncComposerFrost() {
-    const filled = state() !== "closed" && Boolean(input && String(input.value).length);
-    root.classList.toggle("has-input-text", filled);
-  }
-
   function bumpComposerGlass() {
     window.clearTimeout(composerGlassTimer);
     composerGlassTimer = window.setTimeout(() => {
@@ -859,21 +919,72 @@
     }, 90);
   }
 
+  function markCurrentHistoryRow() {
+    if (!historyEl) return;
+    historyEl.querySelectorAll(".yan-chat-history-row").forEach((row) => {
+      const on = Boolean(sessionId) && row.dataset.sessionId === sessionId;
+      row.classList.toggle("is-current", on);
+      if (on) row.setAttribute("aria-current", "true");
+      else row.removeAttribute("aria-current");
+    });
+  }
+
+  function syncLayout() {
+    const open = state() !== "closed";
+    const hasThread = threadOpen();
+    const dual = open && state() === "panel" && hasThread && wideEnough();
+    const wasDual = layoutDual;
+    if (dual) showingHistory = true;
+    else if (wasDual && hasThread && open) showingHistory = false;
+    layoutDual = dual;
+    root.classList.toggle("is-dual", dual);
+    if (dual && !wasDual) renderHistory().catch(() => {});
+    syncHistoryFrost();
+
+    const showThreadCol = open && state() === "panel" && (dual || !showingHistory);
+    const showHistoryCol = !showThreadCol || dual;
+    historyCol.hidden = !showHistoryCol;
+    threadCol.hidden = !showThreadCol;
+
+    const panelOn = state() === "panel";
+    for (const composer of composers) {
+      const showCol = composer.role === "history" ? showHistoryCol : showThreadCol;
+      const showPanel = panelOn && showCol;
+      if (composer.panel) {
+        composer.panel.hidden = !showPanel;
+        composer.panel.setAttribute("aria-hidden", showPanel ? "false" : "true");
+      }
+      if (composer.pill) {
+        composer.pill._lgMagClamp = open && showCol;
+        if (!open || !showCol) releaseChatMagnetic(composer.pill);
+      }
+      if (!showPanel && composer.panel) releaseChatMagnetic(composer.panel);
+      if (composer.input) composer.input.tabIndex = open && showCol ? 0 : -1;
+    }
+    if (!panelOn) clearBtns.forEach(releaseChatMagnetic);
+    if (!open) minimizeBtns.forEach(releaseChatMagnetic);
+    markCurrentHistoryRow();
+  }
+
   /** Grow the liquid-glass pill with wrapped / multiline text. Same corner radius. */
-  function syncComposerSize() {
-    if (!input || !root) return;
-    syncComposerFrost();
+  function syncOneComposer(composer) {
+    const input = composer.input;
+    const column = composer.column;
+    if (!input || !column) return;
+    const filled =
+      state() !== "closed" && !column.hidden && Boolean(String(input.value || "").length);
+    column.classList.toggle("has-input-text", filled);
     const circle = circlePx();
     const radius = Math.round(circle / 2);
-    if (pill) pill.setAttribute("data-lg-radius", String(radius));
+    if (composer.pill) composer.pill.setAttribute("data-lg-radius", String(radius));
 
-    if (state() === "closed") {
+    if (state() === "closed" || column.hidden) {
       input.style.height = "";
       input.style.overflowY = "hidden";
-      root.classList.remove("is-composer-tall");
-      if (lastPillH !== 0) {
-        lastPillH = 0;
-        root.style.setProperty("--pill-h", `${Math.round(circle)}px`);
+      column.classList.remove("is-composer-tall");
+      if (composer.lastPillH !== 0) {
+        composer.lastPillH = 0;
+        column.style.setProperty("--pill-h", `${Math.round(circle)}px`);
       }
       return;
     }
@@ -883,17 +994,16 @@
     if (!Number.isFinite(lineH) || lineH < 8) {
       lineH = (parseFloat(cs.fontSize) || 16) * 1.35;
     }
-    const lines = composerLineCount();
-    const fromClosed = lastPillH === 0;
+    const lines = composerLineCount(input);
+    const fromClosed = composer.lastPillH === 0;
 
-    // One visual line: original circle-height pill, text centered in the form.
     if (lines <= 1) {
       input.style.height = "";
       input.style.overflowY = "hidden";
-      root.classList.remove("is-composer-tall");
-      const changed = lastPillH !== circle;
-      lastPillH = circle;
-      root.style.setProperty("--pill-h", `${Math.round(circle)}px`);
+      column.classList.remove("is-composer-tall");
+      const changed = composer.lastPillH !== circle;
+      composer.lastPillH = circle;
+      column.style.setProperty("--pill-h", `${Math.round(circle)}px`);
       if (changed && !fromClosed) bumpComposerGlass();
       return;
     }
@@ -902,17 +1012,22 @@
     input.style.height = `${nextH}px`;
     input.style.overflowY = lines > COMPOSER_MAX_LINES ? "auto" : "hidden";
 
-    const formCs = form ? getComputedStyle(form) : null;
+    const formCs = composer.form ? getComputedStyle(composer.form) : null;
     const formPad = formCs
       ? (parseFloat(formCs.paddingTop) || 0) + (parseFloat(formCs.paddingBottom) || 0)
       : 0;
     const pillH = Math.max(circle, Math.ceil(nextH + formPad));
-    root.classList.toggle("is-composer-tall", pillH > circle + 4);
-    if (Math.abs(pillH - lastPillH) > 0.5) {
-      lastPillH = pillH;
-      root.style.setProperty("--pill-h", `${pillH}px`);
+    column.classList.toggle("is-composer-tall", pillH > circle + 4);
+    if (Math.abs(pillH - composer.lastPillH) > 0.5) {
+      composer.lastPillH = pillH;
+      column.style.setProperty("--pill-h", `${pillH}px`);
       if (!fromClosed) bumpComposerGlass();
     }
+  }
+
+  function syncComposerSize(only) {
+    const list = only ? [only] : composers;
+    for (const composer of list) syncOneComposer(composer);
   }
 
   function releaseChatMagnetic(el) {
@@ -932,34 +1047,20 @@
     root.classList.toggle("is-open", open);
     root.classList.toggle("has-panel", next === "panel");
     if (next === "panel") preferPanel = true;
-    if (panel) {
-      panel.hidden = next !== "panel";
-      panel.setAttribute("aria-hidden", next === "panel" ? "false" : "true");
-    }
-    if (pill) {
-      pill._lgMagClamp = open;
-      if (!open) releaseChatMagnetic(pill);
-    }
-    if (next !== "panel") {
-      releaseChatMagnetic(panel);
-      clearBtns.forEach(releaseChatMagnetic);
-    }
-    if (!open) minimizeBtns.forEach(releaseChatMagnetic);
+    syncLayout();
     if (launcher) {
       launcher.setAttribute("aria-expanded", open ? "true" : "false");
       launcher.tabIndex = open ? -1 : 0;
     }
-    if (input) {
-      input.tabIndex = open ? 0 : -1;
-      if (open && !opts.skipFocus) {
-        window.setTimeout(
-          () => input.focus({ preventScroll: true }),
-          reduceMotion ? 0 : 420
-        );
-      }
-    }
     syncComposerSize();
     scheduleGlassRefresh();
+    const focusEl = opts.focusComposer?.input;
+    if (open && !opts.skipFocus && focusEl) {
+      window.setTimeout(
+        () => focusEl.focus({ preventScroll: true }),
+        reduceMotion ? 0 : 420
+      );
+    }
   }
 
   // Pill left/width spring is 0.7s with overshoot. Rebuilding glass mid-tween
@@ -968,14 +1069,19 @@
   let glassTimer = 0;
   let glassTransitionHandler = null;
 
+  function pillEls() {
+    return composers.map((c) => c.pill).filter(Boolean);
+  }
+
   function scheduleGlassRefresh() {
     window.clearTimeout(glassTimer);
-    if (glassTransitionHandler && pill) {
-      pill.removeEventListener("transitionend", glassTransitionHandler);
+    const pills = pillEls();
+    if (glassTransitionHandler) {
+      pills.forEach((pill) => pill.removeEventListener("transitionend", glassTransitionHandler));
       glassTransitionHandler = null;
     }
 
-    if (reduceMotion || !pill) {
+    if (reduceMotion || !pills.length) {
       refreshGlass();
       return;
     }
@@ -985,15 +1091,15 @@
       if (done) return;
       done = true;
       window.clearTimeout(glassTimer);
-      if (glassTransitionHandler && pill) {
-        pill.removeEventListener("transitionend", glassTransitionHandler);
+      if (glassTransitionHandler) {
+        pills.forEach((pill) => pill.removeEventListener("transitionend", glassTransitionHandler));
         glassTransitionHandler = null;
       }
       refreshGlass();
     };
 
     glassTransitionHandler = (event) => {
-      if (event.target !== pill) return;
+      if (!pills.includes(event.target)) return;
       if (
         event.propertyName !== "width" &&
         event.propertyName !== "left" &&
@@ -1003,7 +1109,7 @@
       }
       finish();
     };
-    pill.addEventListener("transitionend", glassTransitionHandler);
+    pills.forEach((pill) => pill.addEventListener("transitionend", glassTransitionHandler));
     glassTimer = window.setTimeout(finish, PILL_SPRING_MS);
   }
 
@@ -1017,8 +1123,10 @@
 
   function updateComposerEnabled() {
     const full = queueFull();
-    if (input) input.disabled = false;
-    const submit = form?.querySelector('button[type="submit"]');
+    for (const composer of composers) {
+      if (composer.input) composer.input.disabled = false;
+    }
+    const submit = threadComposer.sendBtn;
     if (submit) {
       // Keep enabled while busy so hold-to-interrupt still works at queue cap.
       submit.disabled = full && !sending;
@@ -1027,6 +1135,10 @@
         : sending
           ? "Hold send or Enter 2 seconds to interrupt instead of queueing"
           : "";
+    }
+    if (historyComposer.sendBtn) {
+      historyComposer.sendBtn.disabled = false;
+      historyComposer.sendBtn.title = "";
     }
   }
 
@@ -1262,7 +1374,7 @@
     }
     if (sending) startPolling();
     else stopPolling();
-    if (wasSending && !next && !showingHistory && sessionId) {
+    if (wasSending && !next && sessionId && !threadCol.hidden) {
       markChatRead(sessionId);
     }
   }
@@ -1324,7 +1436,11 @@
       setBusy(false);
       clearMessagesDom();
       clearLocal();
-      hideHistory();
+      if (state() !== "closed") showHistory();
+      else {
+        showingHistory = false;
+        syncLayout();
+      }
       return;
     }
     if (!res.ok) return;
@@ -1380,17 +1496,30 @@
    * @param {{ interrupt?: boolean }} [opts]
    */
   async function sendMessage(raw, opts = {}) {
-    const interrupt = Boolean(opts.interrupt);
+    const composer = opts.composer || threadComposer;
+    const fresh = composer.role === "history";
+    const interrupt = Boolean(opts.interrupt) && !fresh;
     const text = String(raw || "").trim();
-    const files = pendingFiles.slice();
+    const files = composer.pendingFiles.slice();
     if (!text && !files.length) return;
-    if (!interrupt && queueFull()) return;
+    if (!fresh && !interrupt && queueFull()) return;
 
-    const originRect = pill ? pill.getBoundingClientRect() : null;
-    if (state() !== "panel") {
-      root.classList.add("is-send-flight");
-      setState("panel");
+    if (fresh && (messages.length || sending)) {
+      viewGen += 1;
+      stopPolling();
+      sessionId = null;
+      messages = [];
+      sending = false;
+      root.classList.remove("is-busy");
+      clearMessagesDom();
     }
+    if (fresh) {
+      resetComposer(threadComposer);
+      if (!wideEnough()) showingHistory = false;
+    }
+
+    const originRect = composer.pill ? composer.pill.getBoundingClientRect() : null;
+    if (state() !== "panel") root.classList.add("is-send-flight");
 
     const label =
       text +
@@ -1399,12 +1528,10 @@
             .map((f) => f.file.name)
             .join(", ")}]`
         : "");
-    const willQueue = sending && !interrupt;
+    const willQueue = !fresh && sending && !interrupt;
     appendBubble("user", label || "(attachment)", { queued: willQueue });
-    if (input) input.value = "";
-    syncComposerSize();
-    pendingFiles = [];
-    renderChips();
+    resetComposer(composer);
+    setState("panel", { skipFocus: true });
     flyUserBubble(originRect);
     if (!sending) setBusy(true);
     else {
@@ -1479,7 +1606,8 @@
         applyServerMessages(data.messages);
       }
       setBusy(true);
-      setState("panel");
+      setState("panel", { skipFocus: true });
+      if (showingHistory) renderHistory().catch(() => {});
       // Keep busy + poll until assistant reply lands (and queue drains).
       startPolling();
       await pollState();
@@ -1499,35 +1627,29 @@
         "assistant",
         "Could not reach the personal agent. Is the Mac API running?"
       );
-      setState("panel");
+      setState("panel", { skipFocus: true });
     } finally {
-      if (input && state() !== "closed") {
-        input.focus({ preventScroll: true });
+      const focus = !threadCol.hidden ? threadComposer : historyComposer;
+      if (focus.input && state() !== "closed") {
+        focus.input.focus({ preventScroll: true });
       }
     }
   }
 
   function openChat() {
     if (state() !== "closed") return;
-    if (messages.length || preferPanel) {
-      setState("panel");
-    } else {
-      setState("open");
-    }
+    showHistory({ focus: true });
     if (sending || (sessionId && messages.length)) {
       pollState().catch(() => {});
     }
   }
 
-  /** Soft hide — keep session + transcript; discard draft. */
+  /** Soft hide — keep session + transcript; discard drafts. */
   function minimizeChat() {
-    if (input) input.value = "";
-    syncComposerSize();
-    pendingFiles = [];
-    renderChips();
+    composers.forEach(resetComposer);
     preferPanel = messages.length > 0 || preferPanel;
     persistLocal();
-    hideHistory();
+    showingHistory = false;
     setState("closed");
   }
 
@@ -1541,21 +1663,11 @@
     preferPanel = false;
     sending = false;
     root.classList.remove("is-busy");
-    if (input) {
-      input.value = "";
-      input.disabled = false;
-      syncComposerSize();
-    }
-    const submit = form?.querySelector('button[type="submit"]');
-    if (submit) {
-      submit.disabled = false;
-      submit.title = "";
-    }
-    pendingFiles = [];
-    renderChips();
+    composers.forEach(resetComposer);
+    updateComposerEnabled();
     clearMessagesDom();
     clearLocal();
-    hideHistory();
+    showingHistory = false;
     setState(opts.open ? "open" : "closed");
     if (hadThread && window.YanMacApi) {
       try {
@@ -1642,18 +1754,8 @@
   let sendHoldArmed = false;
   let sendHoldConsumed = false;
   let enterHoldActive = false;
-
-  form?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    if (event.shiftKey) return;
-    if (sendHoldConsumed) {
-      sendHoldConsumed = false;
-      return;
-    }
-    sendMessage(input?.value);
-  });
-
-  const sendBtn = form?.querySelector(".yan-chat-send");
+  /** @type {ReturnType<typeof bindComposer>|null} */
+  let enterComposer = null;
 
   function clearSendHold() {
     if (sendHoldTimer) {
@@ -1661,7 +1763,7 @@
       sendHoldTimer = null;
     }
     sendHoldArmed = false;
-    sendBtn?.classList.remove("is-interrupt-armed");
+    threadComposer.sendBtn?.classList.remove("is-interrupt-armed");
   }
 
   function startSendHold() {
@@ -1671,7 +1773,7 @@
       sendHoldTimer = null;
       if (!sending) return;
       sendHoldArmed = true;
-      sendBtn?.classList.add("is-interrupt-armed");
+      threadComposer.sendBtn?.classList.add("is-interrupt-armed");
     }, HOLD_MS);
   }
 
@@ -1685,30 +1787,113 @@
     if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
       navigator.vibrate([40, 35, 90]);
     }
-    sendMessage(input?.value, { interrupt: true });
+    sendMessage(threadComposer.input?.value, {
+      interrupt: true,
+      composer: threadComposer,
+    });
     return true;
   }
 
-  sendBtn?.addEventListener("pointerdown", (event) => {
-    if (event.button && event.button !== 0) return;
-    if (event.shiftKey) return;
-    startSendHold();
-  });
-
-  sendBtn?.addEventListener("pointerup", (event) => {
-    finishInterruptHold(event);
-  });
-
-  sendBtn?.addEventListener("pointercancel", () => {
-    sendHoldConsumed = false;
-    clearSendHold();
-  });
-
-  sendBtn?.addEventListener("contextmenu", (event) => {
+  function onEnterKeyup(event) {
+    if (event.key !== "Enter" || !enterHoldActive) return;
+    const composer = enterComposer || threadComposer;
+    enterHoldActive = false;
+    enterComposer = null;
     event.preventDefault();
-  });
+    if (composer.role === "thread" && finishInterruptHold(event)) return;
+    sendMessage(composer.input?.value, { composer });
+  }
 
-  sendBtn?.addEventListener(
+  for (const composer of composers) {
+    const { form, input, sendBtn } = composer;
+    form?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (event.shiftKey) return;
+      if (composer.role === "thread" && sendHoldConsumed) {
+        sendHoldConsumed = false;
+        return;
+      }
+      sendMessage(input?.value, { composer });
+    });
+
+    form?.addEventListener("pointerdown", (event) => {
+      if (event.target === form) input?.focus({ preventScroll: true });
+    });
+
+    input?.addEventListener("input", () => syncComposerSize(composer));
+
+    input?.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.shiftKey || event.isComposing || event.keyCode === 229) {
+        return;
+      }
+      if (!desktopEnterSends()) return;
+      event.preventDefault();
+      if (event.repeat) return;
+      enterHoldActive = true;
+      enterComposer = composer;
+      if (composer.role === "thread") startSendHold();
+    });
+
+    input?.addEventListener("keyup", onEnterKeyup);
+
+    input?.addEventListener("blur", () => {
+      if (!enterHoldActive || enterComposer !== composer) return;
+      enterHoldActive = false;
+      enterComposer = null;
+      sendHoldConsumed = false;
+      clearSendHold();
+    });
+
+    input?.addEventListener("paste", (event) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+      /** @type {File[]} */
+      const files = [];
+      for (const item of items) {
+        if (item.kind === "file") {
+          const f = item.getAsFile();
+          if (f) files.push(f);
+        }
+      }
+      if (!files.length) return;
+      event.preventDefault();
+      addFiles(composer, files);
+    });
+
+    if (composer.role !== "thread") continue;
+
+    sendBtn?.addEventListener("pointerdown", (event) => {
+      if (event.button && event.button !== 0) return;
+      if (event.shiftKey) return;
+      startSendHold();
+    });
+
+    sendBtn?.addEventListener("pointerup", (event) => {
+      finishInterruptHold(event);
+    });
+
+    sendBtn?.addEventListener("pointercancel", () => {
+      sendHoldConsumed = false;
+      clearSendHold();
+    });
+
+    sendBtn?.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+    });
+
+    sendBtn?.addEventListener(
+      "click",
+      (event) => {
+        if (!event.shiftKey) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        toggleHistory();
+      },
+      true
+    );
+  }
+
+  historyComposer.sendBtn?.addEventListener(
     "click",
     (event) => {
       if (!event.shiftKey) return;
@@ -1734,68 +1919,22 @@
     if (sid) openHistoryChat(sid);
   });
 
-  input?.addEventListener("focus", () => {
-    if (showingHistory) hideHistory({ markVisibleRead: true });
-  });
-
-  form?.addEventListener("pointerdown", (event) => {
-    if (event.target === form) {
-      input?.focus({ preventScroll: true });
-    }
-  });
-
-  input?.addEventListener("input", syncComposerSize);
-
-  // Desktop: Enter sends on keyup, Shift+Enter inserts a newline.
-  // Hold Enter 2s while working to interrupt instead of queueing.
-  // Touch / iOS: Return inserts a newline; send is the UI button.
-  input?.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" || event.shiftKey || event.isComposing || event.keyCode === 229) {
-      return;
-    }
-    if (!desktopEnterSends()) return;
-    event.preventDefault();
-    if (event.repeat) return;
-    enterHoldActive = true;
-    startSendHold();
-  });
-
-  function onEnterKeyup(event) {
-    if (event.key !== "Enter" || !enterHoldActive) return;
-    enterHoldActive = false;
-    event.preventDefault();
-    if (finishInterruptHold(event)) return;
-    sendMessage(input?.value);
-  }
-
-  input?.addEventListener("keyup", onEnterKeyup);
   window.addEventListener("keyup", onEnterKeyup);
 
-  input?.addEventListener("blur", () => {
-    if (!enterHoldActive) return;
-    enterHoldActive = false;
-    sendHoldConsumed = false;
-    clearSendHold();
-  });
-
-  // Drag-and-drop onto the composer or the open transcript (later turns too).
+  // Drag-and-drop onto either composer or its panel.
   function isFileDrag(event) {
     const types = event.dataTransfer?.types;
     if (!types) return false;
     return [...types].includes("Files");
   }
 
-  function nodeInChatDrop(node) {
-    if (!(node instanceof Node)) return false;
-    if (pill && (node === pill || pill.contains(node))) return true;
-    if (
-      panel &&
-      !panel.hidden &&
-      (node === panel || panel.contains(node))
-    ) {
-      return true;
+  function composerFromNode(node) {
+    if (!(node instanceof Node)) return null;
+    for (const composer of composers) {
+      if (composer.column.hidden) continue;
+      if (composer.column.contains(node)) return composer;
     }
-    return false;
+    return null;
   }
 
   function filesFromDrop(event) {
@@ -1812,68 +1951,52 @@
   }
 
   function onDragEnter(event) {
-    if (!isFileDrag(event) || !nodeInChatDrop(event.target)) return;
+    const composer = composerFromNode(event.target);
+    if (!isFileDrag(event) || !composer) return;
     event.preventDefault();
-    root.classList.add("is-dragover");
+    composer.column.classList.add("is-dragover");
     if (state() === "closed") openChat();
   }
 
   function onDragOver(event) {
-    if (!isFileDrag(event) || !nodeInChatDrop(event.target)) return;
+    const composer = composerFromNode(event.target);
+    if (!isFileDrag(event) || !composer) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
-    root.classList.add("is-dragover");
+    composer.column.classList.add("is-dragover");
   }
 
   function onDragLeave(event) {
     if (!isFileDrag(event)) return;
     const next = event.relatedTarget;
-    if (next instanceof Node && nodeInChatDrop(next)) return;
-    root.classList.remove("is-dragover");
+    if (next instanceof Node && composerFromNode(next)) return;
+    composers.forEach((composer) => composer.column.classList.remove("is-dragover"));
   }
 
   function onDrop(event) {
-    if (!nodeInChatDrop(event.target)) return;
+    const composer = composerFromNode(event.target);
+    if (!composer) return;
     const files = filesFromDrop(event);
     if (!files.length) return;
     event.preventDefault();
     event.stopPropagation();
-    root.classList.remove("is-dragover");
+    composers.forEach((item) => item.column.classList.remove("is-dragover"));
     if (state() === "closed") openChat();
-    addFiles(files);
-    input?.focus({ preventScroll: true });
+    addFiles(composer, files);
+    composer.input?.focus({ preventScroll: true });
   }
 
-  [pill, panel].filter(Boolean).forEach((el) => {
-    el.addEventListener("dragenter", onDragEnter);
-    el.addEventListener("dragover", onDragOver, true);
-    el.addEventListener("dragleave", onDragLeave);
-    el.addEventListener("drop", onDrop, true);
-  });
-
-  // Paste images into the input.
-  input?.addEventListener("paste", (event) => {
-    const items = event.clipboardData?.items;
-    if (!items) return;
-    /** @type {File[]} */
-    const files = [];
-    for (const item of items) {
-      if (item.kind === "file") {
-        const f = item.getAsFile();
-        if (f) files.push(f);
-      }
-    }
-    if (!files.length) return;
-    event.preventDefault();
-    addFiles(files);
-  });
+  for (const composer of composers) {
+    [composer.pill, composer.panel].filter(Boolean).forEach((el) => {
+      el.addEventListener("dragenter", onDragEnter);
+      el.addEventListener("dragover", onDragOver, true);
+      el.addEventListener("dragleave", onDragLeave);
+      el.addEventListener("drop", onDrop, true);
+    });
+  }
 
   window.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || state() === "closed") return;
-    if (showingHistory) {
-      hideHistory({ markVisibleRead: true });
-      return;
-    }
     minimizeChat();
   });
 
@@ -1882,6 +2005,7 @@
     (() => {
       let t;
       return () => {
+        if (state() !== "closed") syncLayout();
         syncComposerSize();
         if (state() === "closed") return;
         clearTimeout(t);
@@ -1949,12 +2073,12 @@
   }
 
   window.__eduChatAttachFiles = (files) => {
-    addFiles(files);
-    const next = messages.length || preferPanel ? "panel" : "open";
-    setState(next);
+    const composer = !threadCol.hidden ? threadComposer : historyComposer;
+    addFiles(composer, files);
+    if (state() === "closed") showHistory({ focus: true });
   };
 
-  ensureChipsEl();
+  composers.forEach((composer) => ensureChipsEl(composer));
   setState("closed");
 
   // Instant updates via the same education SSE / 45s poll path as the dashboard.

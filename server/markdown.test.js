@@ -82,6 +82,58 @@ describe("YLMarkdown.render", () => {
     assert.doesNotMatch(html, /md-math/);
   });
 
+  it("renders a $$ block as its own display plate, not inside the paragraph", () => {
+    const html = render(
+      ["The integral is", "", "$$", "\\frac{1}{a}\\int\\frac{1}{\\sin^3 b}\\,db", "$$", "", "The power is too high."].join(
+        "\n"
+      )
+    );
+    assert.match(html, /<p>The integral is<\/p>/);
+    assert.match(html, /<div class="md-math-block">\\frac\{1\}\{a\}\\int\\frac\{1\}\{\\sin\^3 b\}/);
+    assert.match(html, /<p>The power is too high\.<\/p>/);
+    assert.doesNotMatch(html, /<br>/);
+  });
+
+  it("stacks one equation per line inside a display block", () => {
+    const html = render(["$$", "x = a\\tan b", "dx = a\\sec^2 b\\, db", "$$"].join("\n"));
+    assert.match(html, /<div class="md-math-block">\\begin\{gathered\}/);
+    assert.match(html, /x = a\\tan b \\\\/);
+    assert.match(html, /dx = a\\sec\^2 b/);
+    assert.match(html, /\\end\{gathered\}/);
+  });
+
+  it("leaves an aligned environment alone", () => {
+    const html = render(["$$", "\\begin{aligned}", "x &= 1 \\\\", "\\end{aligned}", "$$"].join("\n"));
+    assert.match(html, /\\begin\{aligned\}/);
+    assert.doesNotMatch(html, /gathered/);
+  });
+
+  it("renders \\(...\\) inline and \\[...\\] as a display block", () => {
+    const inline = render("With \\(x = a\\tan b\\), it becomes that.");
+    assert.match(inline, /<span class="md-math">x = a\\tan b<\/span>/);
+    assert.doesNotMatch(inline, /md-math-block/);
+    const block = render(["\\[", "\\int_0^1 x\\,dx", "\\]"].join("\n"));
+    assert.match(block, /<div class="md-math-block">\\int_0\^1 x/);
+  });
+
+  it("does not treat backticked latex as math", () => {
+    const html = render("`\\\\(x\\\\)` and `\\frac{1}{a}`");
+    assert.doesNotMatch(html, /md-math/);
+    assert.match(html, /<code>/);
+  });
+
+  it("renders a math fence as a display block", () => {
+    const html = render("```math\n\\frac{1}{a}\n```");
+    assert.match(html, /<div class="md-math-block">\\frac\{1\}\{a\}<\/div>/);
+    assert.doesNotMatch(html, /<pre>/);
+  });
+
+  it("does not swallow the rest of the message when $$ is unclosed", () => {
+    const html = render("$$\nhello");
+    assert.match(html, /hello/);
+    assert.doesNotMatch(html, /md-math/);
+  });
+
   it("renders headings, lists, fences, and tables", () => {
     const html = render(
       [

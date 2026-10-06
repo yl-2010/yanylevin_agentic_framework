@@ -1326,25 +1326,58 @@ a.edu-score {
 .md-math {
   font-style: italic;
   color: inherit;
+  white-space: nowrap;
 }
 
 .md-math .katex,
-.md-math .katex * {
+.md-math .katex *,
+.md-math-block .katex,
+.md-math-block .katex * {
   color: inherit;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
-.md-math .katex {
+.md-math:not(.md-math--display) .katex {
   font-size: 1.05em;
+  white-space: nowrap;
 }
 
+.md-math:has(.katex) {
+  font-style: normal;
+}
+
+.md-math-block,
 .md-math--display {
   display: block;
-  margin: 0.55rem 0;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0.7rem 0;
+  padding: 0.72rem 0.85rem;
   overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+  white-space: nowrap;
+  font-style: normal;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent, currentColor) 65%, transparent);
+  -webkit-overflow-scrolling: touch;
 }
 
+.md-math-block .katex,
+.md-math--display .katex {
+  white-space: nowrap;
+  font-style: normal;
+}
+
+.md-math-block .katex-display,
 .md-math--display .katex-display {
-  margin: 0;
+  margin: 0.15em 0;
+  overflow: visible;
+  text-align: center;
 }
 
 .edu-class-row.is-current {
@@ -1796,6 +1829,7 @@ a.edu-score {
   --chat-top-gap: 0.75rem;
   --chat-panel-top: calc(var(--chat-pad) + var(--chat-top-orb) + var(--chat-top-gap));
   --pill-h: var(--chat-circle);
+  --chat-gap: 12px;
   --chat-panel-bottom: calc(var(--pill-h) + var(--chat-pad) + 0.75rem);
   --chat-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --chat-orange: #fd5802;
@@ -1819,10 +1853,24 @@ html[data-resolved-theme="light"] .yan-chat {
   --pill-w: min(calc(var(--chat-circle) * 6), calc(100vw - (var(--chat-pad) * 2)));
   --pill-left: calc(50vw - (var(--pill-w) / 2));
 }
-.yan-chat.has-input-text {
+.yan-chat-column {
+  --col-left: var(--pill-left);
+  --col-w: var(--pill-w);
+  --pill-h: var(--chat-circle);
+  --chat-panel-bottom: calc(var(--pill-h) + var(--chat-pad) + 0.75rem);
+}
+.yan-chat.is-dual .yan-chat-column--history {
+  --col-w: calc(var(--pill-w) / 2);
+  --col-left: calc(50vw - (var(--pill-w) * 0.75) - (var(--chat-gap) / 2));
+}
+.yan-chat.is-dual .yan-chat-column--thread {
+  --col-w: var(--pill-w);
+  --col-left: calc(50vw - (var(--pill-w) * 0.25) + (var(--chat-gap) / 2));
+}
+.yan-chat-column.has-input-text {
   --lg-read-blur: 20px;
 }
-.yan-chat.is-history {
+.yan-chat.is-history .yan-chat-column--history {
   --lg-panel-blur: 20px;
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -1834,8 +1882,8 @@ html[data-resolved-theme="light"] .yan-chat {
 .yan-chat-pill.corner,
 .yan-chat-pill.corner.circle {
   top: auto; bottom: var(--chat-pad);
-  left: var(--pill-left); right: auto;
-  width: var(--pill-w); height: var(--pill-h);
+  left: var(--col-left, var(--pill-left)); right: auto;
+  width: var(--col-w, var(--pill-w)); height: var(--pill-h);
   /* Beat .corner.circle { border-radius: 50% } so a tall composer stays a rounded rect. */
   border-radius: calc(var(--chat-circle) / 2);
   /* Above the transcript so attach chips are not covered in an open thread. */
@@ -1868,7 +1916,7 @@ html[data-resolved-theme="dark"] .yan-chat-pill.corner.lg-refraction::after {
   -webkit-backdrop-filter: blur(10px) saturate(1.5);
   transition: backdrop-filter 0.4s var(--ease), -webkit-backdrop-filter 0.4s var(--ease);
 }
-.yan-chat.has-input-text .yan-chat-pill.lg-fallback {
+.yan-chat-column.has-input-text .yan-chat-pill.lg-fallback {
   backdrop-filter: blur(20px) saturate(1.5);
   -webkit-backdrop-filter: blur(20px) saturate(1.5);
 }
@@ -1919,7 +1967,7 @@ html[data-resolved-theme="dark"] .yan-chat-pill.corner.lg-refraction::after {
   transition: opacity 0.28s var(--ease);
 }
 .yan-chat.is-open .yan-chat-form { opacity: 1; pointer-events: auto; transition-delay: 0.2s; }
-.yan-chat.is-composer-tall .yan-chat-form {
+.yan-chat-column.is-composer-tall .yan-chat-form {
   align-items: flex-end;
   padding-top: 0.55rem;
   padding-bottom: 0.55rem;
@@ -1932,12 +1980,12 @@ html[data-resolved-theme="dark"] .yan-chat-pill.corner.lg-refraction::after {
   white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;
   appearance: none; -webkit-appearance: none; field-sizing: fixed; align-self: center;
 }
-.yan-chat.is-composer-tall .yan-chat-input { align-self: stretch; height: auto; }
+.yan-chat-column.is-composer-tall .yan-chat-input { align-self: stretch; height: auto; }
 .yan-chat-input::placeholder { color: var(--muted); opacity: 0.8; }
-.yan-chat.is-dragover .yan-chat-pill.corner {
+.yan-chat-column.is-dragover .yan-chat-pill.corner {
   box-shadow: 0 0 0 2px var(--chat-orange), 0 4px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
 }
-.yan-chat.is-dragover.has-panel .yan-chat-panel {
+.yan-chat-column.is-dragover .yan-chat-panel {
   box-shadow: 0 0 0 2px var(--chat-orange), 0 10px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
 }
 .yan-chat-attach-chips {
@@ -1953,7 +2001,8 @@ html[data-resolved-theme="dark"] .yan-chat-pill.corner.lg-refraction::after {
   pointer-events: auto;
   z-index: 5;
 }
-.yan-chat.has-panel.has-attachments .yan-chat-messages::after {
+.yan-chat-column.has-attachments .yan-chat-messages::after,
+.yan-chat-column.has-attachments .yan-chat-history::after {
   height: calc(var(--chat-panel-radius) + 3.2rem);
 }
 .yan-chat-attach-chips[hidden] { display: none !important; }
@@ -2077,11 +2126,11 @@ html[data-resolved-theme="dark"] .yan-chat-send { --lg-tint-opacity: 0.4; }
   --chat-panel-radius: clamp(1.5rem, 4vw, 2.4rem);
   --chat-x-size: 1.7rem;
   position: fixed; z-index: 89;
-  left: var(--pill-left); right: auto;
+  left: var(--col-left, var(--pill-left)); right: auto;
   /* Always clear top-left / top-right glass with a visible gap */
   top: var(--chat-panel-top);
   bottom: var(--chat-panel-bottom);
-  width: var(--pill-w); height: auto;
+  width: var(--col-w, var(--pill-w)); height: auto;
   border-radius: var(--chat-panel-radius);
   --lg-filter: none; isolation: isolate;
   box-shadow: 0 10px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
@@ -2109,7 +2158,7 @@ html[data-resolved-theme="dark"] .yan-chat-send { --lg-tint-opacity: 0.4; }
   backdrop-filter: blur(14px) saturate(1.5); -webkit-backdrop-filter: blur(14px) saturate(1.5);
   transition: backdrop-filter 0.4s var(--ease), -webkit-backdrop-filter 0.4s var(--ease);
 }
-.yan-chat.is-history .yan-chat-panel.lg-fallback {
+.yan-chat.is-history .yan-chat-column--history .yan-chat-panel.lg-fallback {
   backdrop-filter: blur(20px) saturate(1.5);
   -webkit-backdrop-filter: blur(20px) saturate(1.5);
 }
@@ -2145,17 +2194,44 @@ html.lg-chrome .yan-chat-close:hover {
   }
 }
 .yan-chat-messages {
-  position: relative; z-index: 3; flex: 1 1 auto; min-height: 0; overflow: auto;
+  position: relative; z-index: 3; flex: 1 1 auto; min-height: 0;
+  overflow-x: hidden; overflow-y: auto;
   padding: calc(var(--chat-panel-radius) + var(--chat-x-size) / 2 + 0.55rem) 1.2rem 0;
   display: flex; flex-direction: column; gap: 0.55rem;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--fg) 42%, transparent) transparent;
 }
 .yan-chat-history {
   --chat-history-inset: 1.2rem;
-  position: relative; z-index: 3; flex: 1 1 auto; min-height: 0; overflow: auto;
+  position: relative; z-index: 3; flex: 1 1 auto; min-height: 0;
+  overflow-x: hidden; overflow-y: auto;
   padding: calc(var(--chat-panel-radius) + var(--chat-x-size) / 2 + 0.55rem) 0 0;
   display: flex; flex-direction: column; gap: 1.05rem;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--fg) 42%, transparent) transparent;
+}
+.yan-chat-messages::-webkit-scrollbar,
+.yan-chat-history::-webkit-scrollbar {
+  width: 8px;
+  height: 0;
+  background: transparent;
+}
+.yan-chat-messages::-webkit-scrollbar-track,
+.yan-chat-history::-webkit-scrollbar-track,
+.yan-chat-messages::-webkit-scrollbar-track-piece,
+.yan-chat-history::-webkit-scrollbar-track-piece,
+.yan-chat-messages::-webkit-scrollbar-corner,
+.yan-chat-history::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.yan-chat-messages::-webkit-scrollbar-thumb,
+.yan-chat-history::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--fg) 42%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 /* Flex + overflow:auto drops padding-bottom from the scroll range. A real
    flex item stays reachable, and the height clears the panel's corner clip. */
@@ -2231,7 +2307,8 @@ html[data-resolved-theme="light"] .yan-chat-history-row::before {
   background-color: rgba(var(--lg-tint-rgb), 0.12);
 }
 .yan-chat-history-row:hover::before,
-.yan-chat-history-row:focus-visible::before {
+.yan-chat-history-row:focus-visible::before,
+.yan-chat-history-row.is-current::before {
   opacity: 0.72;
   transition: opacity 0s;
 }
@@ -2386,6 +2463,17 @@ html[data-resolved-theme="light"] .yan-chat-bubble--user {
 }
 .yan-chat-turn .yan-chat-bubble {
   max-width: 100%;
+}
+.yan-chat-turn:has(.md-math-block),
+.yan-chat-turn:has(.md-math--display) {
+  width: 100%;
+  min-width: 0;
+}
+.yan-chat-turn:has(.md-math-block) .yan-chat-bubble,
+.yan-chat-turn:has(.md-math--display) .yan-chat-bubble {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 .yan-chat-turn--queued {
   opacity: 0.42;

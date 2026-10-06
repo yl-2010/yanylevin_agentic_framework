@@ -64,9 +64,15 @@ enum YLMarkdown {
         return cache
     }()
 
-    /// Same `$...$` / `$$...$$` rules as `education/markdown.js`. Code stays literal.
+    /// Same `$...$` / `$$...$$` / `\(...\)` / `\[...\]` rules as `education/markdown.js`. Code stays literal.
     static func containsMath(_ source: String) -> Bool {
         var s = source.replacingOccurrences(of: "\r\n", with: "\n")
+        if s.range(
+            of: #"```(?:math|latex|tex|katex)\b"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil {
+            return true
+        }
         if let fence = try? NSRegularExpression(pattern: "```[\\s\\S]*?```") {
             s = fence.stringByReplacingMatches(
                 in: s,
@@ -82,6 +88,12 @@ enum YLMarkdown {
             )
         }
         if s.range(of: #"\$\$[\s\S]+?\$\$"#, options: .regularExpression) != nil {
+            return true
+        }
+        if s.range(of: #"\\\[[\s\S]+?\\\]"#, options: .regularExpression) != nil {
+            return true
+        }
+        if s.range(of: #"\\\([\s\S]+?\\\)"#, options: .regularExpression) != nil {
             return true
         }
         guard let inline = try? NSRegularExpression(

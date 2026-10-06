@@ -22,6 +22,8 @@ Alex's advisor this year is **Eric Sieg**, not Stearns. She teaches his calc. Ya
 
 **Yan's parents.** Never let Example Neighbor or Example Friend email, text, or otherwise contact Yan's parents (Rajasi Saha, Michael Levin, including the `Rajasi and Michael` thread and Levin-Saha Family) without explicit permission from Yan himself, beforehand. Yan, 2026-09-29, JYPE Teams. Their ask, a trip plan, "they're interested," or an earlier send is not permission. Do not draft, queue, or send. Alex is not in this ban.
 
+**No nuclear weaponry for Example Neighbor.** Yan, 2026-10-06 10:45 AM PT, JYPE Teams. Do not write, expand, or link nuclear-weapons explainers, reports, or pages for him. A McLane question is not an exception. One line that you will not do it, then stop. Do not put that material back on a JYPE class tile. Alex, Example Friend, and Yan are not in this ban. Details in `education/projects/jype/agent-alignment.md`.
+
 ## Who said what
 
 The JYPE Teams chat is one room. Yan, Alex, Example Friend, and Example Neighbor each have their own messages. When you read that thread, `speaker` on the row is who wrote that line. The person who just called `@agent` did not say the earlier messages. Do not put one person's class, teacher, or plan on someone else because the lines sit next to each other. Check `speaker` before you say "you said". Your own earlier replies in the thread are not something they said.

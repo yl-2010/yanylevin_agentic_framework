@@ -13,6 +13,9 @@ import {
   formatAgentgDailyLimitMessage,
   jypeMentionModelSpec,
   HOURLY_LIMIT,
+  NIKHIL_IMESSAGE_BOOST_FROM_MS,
+  NIKHIL_IMESSAGE_BOOST_UNTIL_MS,
+  exampleImessageBoostActive,
   contactHasHandle,
   dayKey,
   displayGivenName,
@@ -541,6 +544,107 @@ describe("evaluateGuestMention", () => {
       blocked.text,
       "Your hourly rate limit has been reached. Try again at 6:00 PM."
     );
+  });
+
+  it("gives Example Classmate uncapped Grok on iMessage until the boost ends", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "guest-example-"));
+    const statePath = join(dir, "limits.json");
+    const example = {
+      id: "people/example-classmate",
+      kind: "person",
+      name: "Example Classmate",
+      fields: {
+        aliases: ["Example Classmate"],
+        emails: [],
+        phones: ["+15555550444"],
+      },
+    };
+    const during = new Date(NIKHIL_IMESSAGE_BOOST_FROM_MS + 60_000);
+    const after = new Date(NIKHIL_IMESSAGE_BOOST_UNTIL_MS);
+    assert.equal(exampleImessageBoostActive("example-classmate", "imessage", during), true);
+    assert.equal(exampleImessageBoostActive("example-classmate", "teams", during), false);
+    assert.equal(exampleImessageBoostActive("example-classmate", "imessage", after), false);
+    assert.equal(
+      exampleImessageBoostActive("example-classmate", "imessage", new Date(NIKHIL_IMESSAGE_BOOST_FROM_MS - 1)),
+      false
+    );
+
+    const base = {
+      platform: "imessage",
+      message: {
+        fromMe: false,
+        handle: "+15555550444",
+        chatId: "+15555550444",
+        text: "@agent hi",
+        chat: "Example Classmate",
+      },
+      contacts: [contact("Example Classmate", "+15555550444")],
+      people: [...PEOPLE, example],
+      now: during,
+      statePath,
+    };
+    for (let i = 0; i < HOURLY_LIMIT + 3; i += 1) {
+      const decision = await evaluateGuestMention(base);
+      assert.equal(decision.action, "start");
+      assert.equal(decision.caller.slug, "example-classmate");
+      assert.equal(decision.caller.model.id, "grok-4.7");
+      assert.equal(
+        decision.caller.model.params.find((p) => p.id === "reasoning_effort")?.value,
+        "high"
+      );
+      assert.equal(
+        decision.caller.model.params.find((p) => p.id === "fast")?.value,
+        "false"
+      );
+      assert.equal(decision.caller.forceGrok, true);
+    }
+
+    for (let i = 0; i < AGENTG_DAILY_LIMIT + 2; i += 1) {
+      const decision = await evaluateGuestMention({
+        ...base,
+        message: { ...base.message, text: "@agentg hi" },
+      });
+      assert.equal(decision.action, "start");
+      assert.equal(decision.caller.model.id, "grok-4.7");
+    }
+
+    const teams = await evaluateGuestMention({
+      platform: "teams",
+      message: {
+        fromMe: false,
+        from: "Example Classmate",
+        fromEmail: "guest@school.example",
+        chatType: "oneOnOne",
+        text: "@agent hi",
+      },
+      people: [
+        ...PEOPLE,
+        {
+          ...example,
+          fields: {
+            ...example.fields,
+            emails: ["guest@school.example"],
+          },
+        },
+      ],
+      now: during,
+      statePath,
+    });
+    assert.equal(teams.action, "start");
+    assert.equal(teams.caller.model.id, "composer-2.5");
+
+    const expired = await evaluateGuestMention({ ...base, now: after });
+    assert.equal(expired.action, "start");
+    assert.equal(expired.caller.model.id, "composer-2.5");
+    assert.equal(expired.caller.forceGrok, undefined);
+    for (let i = 1; i < HOURLY_LIMIT; i += 1) {
+      assert.equal(
+        (await evaluateGuestMention({ ...base, now: after })).action,
+        "start"
+      );
+    }
+    const blocked = await evaluateGuestMention({ ...base, now: after });
+    assert.equal(blocked.action, "rate-limit");
   });
 
   it("allows any Teams 1:1 and other Teams groups; Class of 2028 is allowlisted", async () => {

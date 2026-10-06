@@ -53,6 +53,28 @@ export function hourlyLimitForSlug(slug) {
   return n > 0 ? n : HOURLY_LIMIT;
 }
 
+/**
+ * Example Classmate, iMessage only. No hourly cap, no @agentg daily cap,
+ * every turn on Grok 4.7 high. Teams stays on the normal contact path.
+ * Exclusive end, so 10:33 PM PT 2026-10-06 is already the old limits.
+ */
+export const NIKHIL_IMESSAGE_BOOST_SLUG = "example-classmate";
+export const NIKHIL_IMESSAGE_BOOST_FROM_MS = Date.parse(
+  "2026-10-05T22:29:00-07:00"
+);
+export const NIKHIL_IMESSAGE_BOOST_UNTIL_MS = Date.parse(
+  "2026-10-06T22:33:00-07:00"
+);
+
+export function exampleImessageBoostActive(slug, platform, now = new Date()) {
+  if (platform !== "imessage") return false;
+  if (String(slug || "") !== NIKHIL_IMESSAGE_BOOST_SLUG) return false;
+  const t = now instanceof Date ? now.getTime() : Number(now);
+  return (
+    t >= NIKHIL_IMESSAGE_BOOST_FROM_MS && t < NIKHIL_IMESSAGE_BOOST_UNTIL_MS
+  );
+}
+
 /** Teams Class of 2028 only. Yan is fromMe and never hits this. */
 export const TEAMS_CLASS_OF_2028_ALLOW_SLUGS = new Set([
   "alex-rivera",
@@ -425,7 +447,8 @@ export async function takeGuestSlot(opts) {
     row.dayKey = day;
     row.grokCount = 0;
   }
-  const hourCap = hourlyLimitForSlug(slug);
+  const boosted = exampleImessageBoostActive(slug, platform, now);
+  const hourCap = boosted ? Infinity : hourlyLimitForSlug(slug);
   if (row.hourCount >= hourCap) {
     bag[personKey] = row;
     await saveLimitState(state, path);
@@ -443,7 +466,7 @@ export async function takeGuestSlot(opts) {
     agentgRow.dayKey = day;
     agentgRow.count = 0;
   }
-  if (countAgentg && agentgRow.count >= AGENTG_DAILY_LIMIT) {
+  if (!boosted && countAgentg && agentgRow.count >= AGENTG_DAILY_LIMIT) {
     agentgBag[personKey] = agentgRow;
     bag[personKey] = row;
     await saveLimitState(state, path);
@@ -456,10 +479,10 @@ export async function takeGuestSlot(opts) {
     };
   }
 
-  row.hourCount += 1;
+  if (!boosted) row.hourCount += 1;
   const grokCap = Number(GROK_HOURLY[slug]) || 0;
-  let useGrok = false;
-  if (grokCap > 0 && row.grokCount < grokCap) {
+  let useGrok = boosted;
+  if (!boosted && grokCap > 0 && row.grokCount < grokCap) {
     row.grokCount += 1;
     useGrok = true;
   }
@@ -808,6 +831,7 @@ export async function evaluateGuestMention(opts) {
     };
   }
 
+  const imessageBoost = exampleImessageBoostActive(slug, platform, now);
   return {
     action: "start",
     platform,
@@ -818,7 +842,10 @@ export async function evaluateGuestMention(opts) {
       handle,
       inContacts,
       audience: describeGuestAudience(platform, message),
-      model: guestModelSpec(Boolean(slot.useGrok), slug, displayName),
+      model: imessageBoost
+        ? copyModelSpec(GUEST_GROK_SPEC)
+        : guestModelSpec(Boolean(slot.useGrok), slug, displayName),
+      ...(imessageBoost ? { forceGrok: true } : {}),
     },
   };
 }

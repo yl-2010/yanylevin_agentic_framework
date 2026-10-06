@@ -48,7 +48,7 @@
     <title>Education</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" media="(prefers-color-scheme: light)" />
     <link rel="icon" href="/favicon-dark.svg" type="image/svg+xml" media="(prefers-color-scheme: dark)" />
-    <link rel="stylesheet" href="/education/styles.css?v=attach-frost-1" />
+    <link rel="stylesheet" href="/education/styles.css?v=math-block-1" />
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css"
@@ -114,87 +114,162 @@
       <main id="edu-app" class="edu-app" aria-live="polite"></main>
 
       <div id="edu-chat" class="yan-chat" data-state="closed">
-        <div
-          class="yan-chat-panel"
-          data-liquid-glass="rounded"
-          data-filter-id="lg-edu-chat-panel"
-          hidden
-          aria-hidden="true"
-          role="region"
-          aria-label="Personal assistant"
-        >
-          <button
-            type="button"
-            class="yan-chat-close yan-chat-close--panel circle"
-            data-liquid-glass="circle"
-            data-filter-id="lg-edu-chat-x-panel"
-            data-edu-chat-clear
-            aria-label="New chat"
+        <div class="yan-chat-column yan-chat-column--history">
+          <div
+            class="yan-chat-panel"
+            data-liquid-glass="rounded"
+            data-filter-id="lg-edu-chat-panel"
+            hidden
+            aria-hidden="true"
+            role="region"
+            aria-label="Chat history"
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true" style="transform: rotate(45deg)"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
-          </button>
-          <div class="yan-chat-messages" aria-live="polite"></div>
-          <div class="yan-chat-history" hidden aria-hidden="true"></div>
+            <button
+              type="button"
+              class="yan-chat-close yan-chat-close--panel circle"
+              data-liquid-glass="circle"
+              data-filter-id="lg-edu-chat-x-panel"
+              data-edu-chat-clear
+              aria-label="New chat"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" style="transform: rotate(45deg)"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
+            </button>
+            <div class="yan-chat-history"></div>
+          </div>
+
+          <div
+            class="yan-chat-pill corner circle c-br"
+            data-liquid-glass="circle"
+            data-filter-id="lg-edu-chat-pill"
+          >
+            <button
+              type="button"
+              class="yan-chat-minimize yan-chat-close yan-chat-close--pill circle"
+              data-liquid-glass="circle"
+              data-filter-id="lg-edu-chat-minimize"
+              data-edu-chat-minimize
+              aria-label="Hide chat"
+              tabindex="-1"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
+            </button>
+
+            <button
+              type="button"
+              class="yan-chat-launcher"
+              aria-label="Personal assistant"
+              aria-expanded="false"
+              aria-controls="edu-chat-input"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
+            </button>
+
+            <form class="yan-chat-form" action="#" autocomplete="off">
+              <label class="visually-hidden" for="edu-chat-input">Ask your personal agent</label>
+              <textarea
+                id="edu-chat-input"
+                class="yan-chat-input"
+                name="q"
+                rows="1"
+                inputmode="text"
+                enterkeyhint="enter"
+                placeholder="Ask your personal agent…"
+                maxlength="4000"
+                tabindex="-1"
+                autocomplete="off"
+                wrap="soft"
+                aria-multiline="true"
+              ></textarea>
+              <button
+                type="submit"
+                class="yan-chat-send circle"
+                data-liquid-glass="circle"
+                data-filter-id="lg-edu-chat-send"
+                aria-label="Send"
+              >
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <g stroke="currentColor" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 18.2V6.4"/>
+                    <path d="M6.9 11.3L12 6.2L17.1 11.3"/>
+                  </g>
+                </svg>
+              </button>
+            </form>
+          </div>
         </div>
 
-        <div
-          class="yan-chat-pill corner circle c-br"
-          data-liquid-glass="circle"
-          data-filter-id="lg-edu-chat-pill"
-        >
-          <button
-            type="button"
-            class="yan-chat-minimize yan-chat-close yan-chat-close--pill circle"
-            data-liquid-glass="circle"
-            data-filter-id="lg-edu-chat-minimize"
-            data-edu-chat-minimize
-            aria-label="Hide chat"
-            tabindex="-1"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
-          </button>
-
-          <button
-            type="button"
-            class="yan-chat-launcher"
+        <div class="yan-chat-column yan-chat-column--thread" hidden>
+          <div
+            class="yan-chat-panel"
+            data-liquid-glass="rounded"
+            data-filter-id="lg-edu-chat-panel-thread"
+            hidden
+            aria-hidden="true"
+            role="region"
             aria-label="Personal assistant"
-            aria-expanded="false"
-            aria-controls="edu-chat-input"
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
-          </button>
-
-          <form class="yan-chat-form" action="#" autocomplete="off">
-            <label class="visually-hidden" for="edu-chat-input">Ask your personal agent</label>
-            <textarea
-              id="edu-chat-input"
-              class="yan-chat-input"
-              name="q"
-              rows="1"
-              inputmode="text"
-              enterkeyhint="enter"
-              placeholder="Ask your personal agent…"
-              maxlength="4000"
-              tabindex="-1"
-              autocomplete="off"
-              wrap="soft"
-              aria-multiline="true"
-            ></textarea>
             <button
-              type="submit"
-              class="yan-chat-send circle"
+              type="button"
+              class="yan-chat-close yan-chat-close--panel circle"
               data-liquid-glass="circle"
-              data-filter-id="lg-edu-chat-send"
-              aria-label="Send. Hold send or Enter two seconds while working to interrupt."
+              data-filter-id="lg-edu-chat-x-panel-thread"
+              data-edu-chat-clear
+              aria-label="New chat"
             >
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <g stroke="currentColor" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 18.2V6.4"/>
-                  <path d="M6.9 11.3L12 6.2L17.1 11.3"/>
-                </g>
-              </svg>
+              <svg viewBox="0 0 24 24" aria-hidden="true" style="transform: rotate(45deg)"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
             </button>
-          </form>
+            <div class="yan-chat-messages" aria-live="polite"></div>
+          </div>
+
+          <div
+            class="yan-chat-pill corner circle c-br"
+            data-liquid-glass="circle"
+            data-filter-id="lg-edu-chat-pill-thread"
+          >
+            <button
+              type="button"
+              class="yan-chat-minimize yan-chat-close yan-chat-close--pill circle"
+              data-liquid-glass="circle"
+              data-filter-id="lg-edu-chat-minimize-thread"
+              data-edu-chat-minimize
+              aria-label="Hide chat"
+              tabindex="-1"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
+            </button>
+
+            <form class="yan-chat-form" action="#" autocomplete="off">
+              <label class="visually-hidden" for="edu-chat-thread-input">Continue this chat</label>
+              <textarea
+                id="edu-chat-thread-input"
+                class="yan-chat-input"
+                name="q"
+                rows="1"
+                inputmode="text"
+                enterkeyhint="enter"
+                placeholder="Ask your personal agent…"
+                maxlength="4000"
+                tabindex="-1"
+                autocomplete="off"
+                wrap="soft"
+                aria-multiline="true"
+              ></textarea>
+              <button
+                type="submit"
+                class="yan-chat-send circle"
+                data-liquid-glass="circle"
+                data-filter-id="lg-edu-chat-send-thread"
+                aria-label="Send. Hold send or Enter two seconds while working to interrupt."
+              >
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <g stroke="currentColor" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 18.2V6.4"/>
+                    <path d="M6.9 11.3L12 6.2L17.1 11.3"/>
+                  </g>
+                </svg>
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>
@@ -217,10 +292,10 @@
     <script src="/yl-home-link.js?v=4"></script>
     <script src="/js/mac-api.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" crossorigin="anonymous"></script>
-    <script src="/education/markdown.js?v=katex-1"></script>
+    <script src="/education/markdown.js?v=katex-2"></script>
     <script src="/education/file-query.js?v=1"></script>
     <script src="/education/app.js?v=frost-1"></script>
     <script src="/js/chat-send-flight.js?v=1"></script>
-    <script src="/education/chatbot.js?v=attach-64mb-1"></script>
+    <script src="/education/chatbot.js?v=dual-pane-2"></script>
   </body>
 </html>

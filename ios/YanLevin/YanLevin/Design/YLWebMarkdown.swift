@@ -155,6 +155,7 @@ private struct YLWebMarkdownView: UIViewRepresentable {
                 -webkit-text-size-adjust: 100%;
                 word-wrap: break-word;
                 overflow-wrap: anywhere;
+                overflow-x: hidden;
               }
               .md-body { word-break: break-word; }
               .md-body > :first-child { margin-top: 0; }
@@ -205,9 +206,39 @@ private struct YLWebMarkdownView: UIViewRepresentable {
                 vertical-align: top;
               }
               .md-body img { max-width: 100%; height: auto; }
-              .md-math { font-style: italic; color: inherit; }
-              .md-math .katex, .md-math .katex * { color: inherit; }
-              .md-math--display { display: block; margin: 0.55rem 0; overflow-x: auto; }
+              .md-math { font-style: italic; color: inherit; white-space: nowrap; }
+              .md-math .katex, .md-math .katex *,
+              .md-math-block .katex, .md-math-block .katex * {
+                color: inherit;
+                word-break: normal;
+                overflow-wrap: normal;
+              }
+              .md-math:not(.md-math--display) .katex { font-size: 1.05em; white-space: nowrap; }
+              .md-math:has(.katex), .md-math-block { font-style: normal; }
+              .md-math-block, .md-math--display {
+                display: block;
+                box-sizing: border-box;
+                max-width: 100%;
+                min-width: 0;
+                margin: 0.7rem 0;
+                padding: 0.72rem 0.85rem;
+                overflow-x: auto;
+                overflow-y: hidden;
+                text-align: center;
+                white-space: nowrap;
+                font-style: normal;
+                border-radius: 12px;
+                border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+                background: color-mix(in srgb, currentColor 8%, transparent);
+                box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 65%, transparent);
+                -webkit-overflow-scrolling: touch;
+              }
+              .md-math-block .katex, .md-math--display .katex { white-space: nowrap; font-style: normal; }
+              .md-math-block .katex-display, .md-math--display .katex-display {
+                margin: 0.15em 0;
+                overflow: visible;
+                text-align: center;
+              }
             </style>
             </head>
             <body>
