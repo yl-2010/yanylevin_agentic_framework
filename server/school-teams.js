@@ -86,6 +86,8 @@ export function parseArgs(argv) {
     since: "",
     out: "",
     full: false,
+    reaction: "",
+    from: "",
   };
   while (args.length) {
     const a = args.shift();
@@ -112,6 +114,12 @@ export function parseArgs(argv) {
       out.text = rest.join(" ").trim();
     } else if (a === "--since") out.since = String(args.shift() || "").trim();
     else if (a === "--out") out.out = String(args.shift() || "").trim();
+    else if (a === "--id") out.id = String(args.shift() || "").trim();
+    else if (a === "--from") {
+      const rest = [];
+      while (args.length && !String(args[0]).startsWith("--")) rest.push(args.shift());
+      out.from = rest.join(" ").trim();
+    } else if (a === "--reaction") out.reaction = String(args.shift() || "").trim();
     else if (a === "--limit") {
       const n = Number(args.shift());
       out.limit = Number.isFinite(n) ? Math.min(50, Math.max(1, Math.trunc(n))) : 20;
@@ -147,6 +155,50 @@ export function hasChannelRead(token) {
   return teamsScopes(token).some((s) =>
     /^(ChannelMessage\.(Read|ReadWrite)|Team\.ReadBasic)/i.test(s)
   );
+}
+
+/** Graph bearer usable for chatMessage setReaction (delegated Teams messaging). */
+export function hasGraphMessaging(token) {
+  if (!isGraphAudience(token)) return false;
+  const claims = jwtClaims(token);
+  const blob = [claims.scp, claims.roles]
+    .flatMap((v) => (Array.isArray(v) ? v : String(v || "").split(/\s+/)))
+    .filter(Boolean)
+    .join(" ");
+  return /chat|channelmessage|chatmessage/i.test(blob);
+}
+
+export function normalizeReactionType(raw) {
+  const s = String(raw || "").trim().toLowerCase();
+  if (!s || s === "like" || s === "thumbsup" || s === "thumb" || s === "+1") return "👍";
+  return String(raw || "").trim() || "👍";
+}
+
+export function buildSetReactionUrl(chatId, messageId) {
+  const chat = encodeURIComponent(String(chatId || "").trim());
+  const msg = encodeURIComponent(String(messageId || "").trim());
+  return `${GRAPH_BASE}/chats/${chat}/messages/${msg}/setReaction`;
+}
+
+/** chatsvc emotion key. Teams web sends this, not Graph setReaction. */
+export function emotionKeyFor(reactionType) {
+  const s = String(reactionType || "").trim().toLowerCase();
+  if (!s || s === "👍" || s === "like" || s === "thumbsup" || s === "thumb" || s === "+1") {
+    return "like";
+  }
+  if (s === "❤️" || s === "heart") return "heart";
+  if (s === "😆" || s === "laugh") return "laugh";
+  if (s === "😮" || s === "surprised") return "surprised";
+  if (s === "😢" || s === "sad") return "sad";
+  if (s === "😠" || s === "angry") return "angry";
+  return s;
+}
+
+export function buildEmotionUrl(chatId, messageId, { region = "amer" } = {}) {
+  const chat = encodeURIComponent(String(chatId || "").trim());
+  const msg = encodeURIComponent(String(messageId || "").trim());
+  const r = encodeURIComponent(String(region || "amer").trim() || "amer");
+  return `${TEAMS_CLOUD}/api/chatsvc/${r}/v1/users/ME/conversations/${chat}/messages/${msg}/properties?name=emotions`;
 }
 
 export function isGraphAudience(token) {
@@ -775,12 +827,12 @@ function waitForTeamsTokens(context, timeoutMs) {
 
     function maybeDone() {
       if (!found.ic3 || !found.csa || done) return;
-      if (found.mt) {
+      if (found.mt && found.graph) {
         finish();
         return;
       }
       if (!grace) {
-        grace = setTimeout(finish, MT_GRACE_MS);
+        grace = setTimeout(finish, Math.max(MT_GRACE_MS, 10_000));
       }
     }
 
@@ -795,7 +847,7 @@ function waitForTeamsTokens(context, timeoutMs) {
       if (isIc3Token(token)) found.ic3 = token;
       if (isCsaToken(token)) found.csa = token;
       if (String(url || "").includes("/api/mt/") && token) found.mt = token;
-      if (isGraphAudience(token) && (hasChannelRead(token) || hasChatRead(token))) {
+      if (hasGraphMessaging(token)) {
         found.graph = token;
       }
       maybeDone();
@@ -849,6 +901,14 @@ async function captureToken(opts) {
     await clickIfVisible(page, "Chats");
     try {
       await page.goto("https://teams.microsoft.com/v2/#/chats", {
+        waitUntil: "domcontentloaded",
+        timeout: 30_000,
+      });
+    } catch {
+      // still listening
+    }
+    try {
+      await page.goto("https://teams.microsoft.com/v2/#/teams", {
         waitUntil: "domcontentloaded",
         timeout: 30_000,
       });
@@ -1608,6 +1668,81 @@ async function resolveTeamChannel(session, teamNeedle, channelNeedle) {
   return { team: team.match, channel: channel.match };
 }
 
+export async function reactTeamsMessage(opts = {}) {
+  const session = opts.session || (await resolveSession(opts));
+  const chatNeedle = String(opts.chat || "").trim();
+  const messageId = String(opts.id || "").trim();
+  const fromNeedle = String(opts.from || "").trim().toLowerCase();
+  const reactionType = normalizeReactionType(opts.reaction || "like");
+  const graphToken = String(session.graphToken || "").trim();
+  if (!chatNeedle) return { ok: false, error: "react needs --chat", account: SCHOOL_EMAIL };
+  const resolved = await resolveChat(session, chatNeedle);
+  if (!resolved.match) {
+    return {
+      ok: false,
+      error: resolved.ambiguous.length ? "ambiguous chat name" : "chat not found",
+      chats: (resolved.ambiguous.length ? resolved.ambiguous : resolved.chats)
+        .slice(0, 12)
+        .map((c) => c.name),
+      account: SCHOOL_EMAIL,
+    };
+  }
+  let targetId = messageId;
+  if (!targetId && fromNeedle) {
+    const rows = await listChatMessages(session, resolved.match.id, { limit: 50 });
+    const hit = rows.find((row) => {
+      if (row.fromMe) return false;
+      const from = String(row.from || "").toLowerCase();
+      const speaker = givenName(row.from).toLowerCase();
+      return from.includes(fromNeedle) || speaker.includes(fromNeedle) || fromNeedle.includes(speaker);
+    });
+    if (!hit) {
+      return {
+        ok: false,
+        error: `no recent message from ${opts.from}`,
+        account: SCHOOL_EMAIL,
+        chat: resolved.match.name,
+      };
+    }
+    targetId = hit.id;
+  }
+  if (!targetId) {
+    return {
+      ok: false,
+      error: "react needs --id or --from <speaker>",
+      account: SCHOOL_EMAIL,
+    };
+  }
+  const emotion = emotionKeyFor(reactionType);
+  try {
+    await apiRequest(
+      buildEmotionUrl(resolved.match.id, targetId, { region: session.region }),
+      session,
+      {
+        method: "PUT",
+        body: { emotions: JSON.stringify({ key: emotion, value: Date.now() }) },
+        extra: { "x-ms-client-caller": "updateMessageReactionAdd" },
+      }
+    );
+  } catch (err) {
+    if (!graphToken) throw err;
+    await apiRequest(
+      buildSetReactionUrl(resolved.match.id, targetId),
+      session,
+      { method: "POST", body: { reactionType }, token: graphToken }
+    );
+  }
+  return {
+    ok: true,
+    account: SCHOOL_EMAIL,
+    chat: resolved.match.name,
+    chatId: resolved.match.id,
+    messageId: targetId,
+    reactionType,
+    emotion,
+  };
+}
+
 export async function sendTeamsMessage(opts = {}) {
   const session = opts.session || (await resolveSession(opts));
   const text = String(opts.text || "").trim();
@@ -1701,7 +1836,7 @@ export async function runSchoolTeams(argv, opts = {}) {
     return {
       ok: true,
       usage:
-        "node server/school-teams.js login|status|chats|teams|channels --team <name>|thread --chat <id|name>|thread --team T --channel C|search <q>|send --chat <name> --text <body>|send --team T --channel C --text <body>|dump [--since ISO]|dump --full [--since ISO] [--out dir]",
+        "node server/school-teams.js login|status|chats|teams|channels --team <name>|thread --chat <id|name>|thread --team T --channel C|search <q>|send --chat <name> --text <body>|send --team T --channel C --text <body>|react --chat <name> --from <speaker>|react --chat <name> --id <messageId> [--reaction like]|dump [--since ISO]|dump --full [--since ISO] [--out dir]",
       account: SCHOOL_EMAIL,
     };
   }
@@ -1867,6 +2002,19 @@ export async function runSchoolTeams(argv, opts = {}) {
         team: parsed.team,
         channel: parsed.channel,
         text: parsed.text,
+        root,
+      });
+    });
+  }
+
+  if (cmd === "react") {
+    return withSession(parsed, root, async (session) => {
+      return reactTeamsMessage({
+        session,
+        chat: parsed.chat,
+        id: parsed.id,
+        from: parsed.from,
+        reaction: parsed.reaction || "like",
         root,
       });
     });
