@@ -7,11 +7,21 @@ private struct YLKeyboardReservedBottomKey: EnvironmentKey {
     static let defaultValue: CGFloat = 0
 }
 
+private struct YLKeyboardLiftKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
 extension EnvironmentValues {
     /// Height reserved for `ylKeyboardAccessory` (composer bar + keyboard lift).
     var ylKeyboardReservedBottom: CGFloat {
         get { self[YLKeyboardReservedBottomKey.self] }
         set { self[YLKeyboardReservedBottomKey.self] = newValue }
+    }
+
+    /// How far the keyboard rises above its resting home-indicator inset. 0 when the keys are down.
+    var ylKeyboardLift: CGFloat {
+        get { self[YLKeyboardLiftKey.self] }
+        set { self[YLKeyboardLiftKey.self] = newValue }
     }
 }
 
@@ -118,6 +128,7 @@ private struct YLKeyboardAccessoryModifier: ViewModifier {
     /// configuration is behaviorally identical to the original modifier.
     private let aboveBuilder: (() -> AnyView)?
     @State private var reservedBottom: CGFloat = 0
+    @State private var keyboardLift: CGFloat = 0
 
     init<Accessory: View, Above: View>(
         @ViewBuilder accessory: @escaping () -> Accessory,
@@ -139,9 +150,12 @@ private struct YLKeyboardAccessoryModifier: ViewModifier {
             YLKeyboardAccessoryRepresentable(
                 accessory: accessoryBuilder,
                 above: aboveBuilder,
-                onReservedBottomChange: { next in
+                onReservedBottomChange: { next, lift in
                     if abs(next - reservedBottom) > 1 {
                         reservedBottom = next
+                    }
+                    if abs(lift - keyboardLift) > 1 {
+                        keyboardLift = lift
                     }
                 }
             )
@@ -150,6 +164,7 @@ private struct YLKeyboardAccessoryModifier: ViewModifier {
             .zIndex(1_000)
         }
         .environment(\.ylKeyboardReservedBottom, reservedBottom)
+        .environment(\.ylKeyboardLift, keyboardLift)
     }
 }
 
@@ -186,7 +201,7 @@ struct SizeReportingAccessory: View {
 private struct YLKeyboardAccessoryRepresentable: UIViewRepresentable {
     var accessory: () -> AnyView
     var above: (() -> AnyView)?
-    var onReservedBottomChange: (CGFloat) -> Void
+    var onReservedBottomChange: (CGFloat, CGFloat) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onReservedBottomChange: onReservedBottomChange)
@@ -226,16 +241,16 @@ private struct YLKeyboardAccessoryRepresentable: UIViewRepresentable {
             chrome.installAbove(host: aboveHost)
         }
 
-        chrome.onReservedBottomChange = { [weak coordinator = context.coordinator] value in
-            coordinator?.onReservedBottomChange(value)
+        chrome.onReservedBottomChange = { [weak coordinator = context.coordinator] reserved, lift in
+            coordinator?.onReservedBottomChange(reserved, lift)
         }
         return chrome
     }
 
     func updateUIView(_ uiView: YLKeyboardAccessoryChrome, context: Context) {
         context.coordinator.onReservedBottomChange = onReservedBottomChange
-        uiView.onReservedBottomChange = { [weak coordinator = context.coordinator] value in
-            coordinator?.onReservedBottomChange(value)
+        uiView.onReservedBottomChange = { [weak coordinator = context.coordinator] reserved, lift in
+            coordinator?.onReservedBottomChange(reserved, lift)
         }
         context.coordinator.host?.rootView = sizedRoot(chrome: uiView)
         // UIHostingController can re-enable clipping when the root view updates.
@@ -278,11 +293,11 @@ private struct YLKeyboardAccessoryRepresentable: UIViewRepresentable {
     }
 
     final class Coordinator {
-        var onReservedBottomChange: (CGFloat) -> Void
+        var onReservedBottomChange: (CGFloat, CGFloat) -> Void
         var host: UIHostingController<SizeReportingAccessory>?
         var aboveHost: UIHostingController<AnyView>?
 
-        init(onReservedBottomChange: @escaping (CGFloat) -> Void) {
+        init(onReservedBottomChange: @escaping (CGFloat, CGFloat) -> Void) {
             self.onReservedBottomChange = onReservedBottomChange
         }
     }
@@ -293,7 +308,7 @@ private struct YLKeyboardAccessoryRepresentable: UIViewRepresentable {
 /// Pins the hosted accessory bottom to `keyboardLayoutGuide.top` — this is what
 /// makes interactive dismiss track the finger. SwiftUI never owns vertical motion.
 final class YLKeyboardAccessoryChrome: UIView {
-    var onReservedBottomChange: ((CGFloat) -> Void)?
+    var onReservedBottomChange: ((CGFloat, CGFloat) -> Void)?
 
     private var host: UIHostingController<SizeReportingAccessory>?
     private var aboveHost: UIHostingController<AnyView>?
@@ -1006,9 +1021,10 @@ final class YLKeyboardAccessoryChrome: UIView {
         // toggles). Publishing SwiftUI state synchronously from there is an
         // AttributeGraph crash. Always defer to the next runloop turn; the bar
         // position is Auto Layout-owned, this only pads scroll content.
+        let lift = isScrubbing ? scrubLift * (1 - scrubProgress) : keyboardLift()
         let apply = { [weak self] in
             guard let self else { return }
-            self.onReservedBottomChange?(next)
+            self.onReservedBottomChange?(next, lift)
         }
         DispatchQueue.main.async {
             if animated {

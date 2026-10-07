@@ -51,6 +51,7 @@ struct ChatView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.ylKeyboardReservedBottom) private var keyboardReservedBottom
+    @Environment(\.ylKeyboardLift) private var keyboardLift
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var visitorStore = VisitorChatStore()
     @StateObject private var educationStore = EducationStore()
@@ -444,6 +445,7 @@ struct ChatView: View {
         .overlay(alignment: .topLeading) {
             if usesEducation, padLandscape {
                 landscapeHistoryColumn
+                    .ignoresSafeArea(edges: .bottom)
             }
         }
         .background {
@@ -696,16 +698,30 @@ struct ChatView: View {
         .allowsHitTesting(padLandscape ? historyContentShift > 0.5 : historyOverlayHits)
     }
 
-    /// iPad landscape column. Only the panel's own rect is in the tree, offset
-    /// to sit under the nav bar, so the thread and composer stay tappable.
+    /// iPad landscape column. Keyboard down: the bottom inset matches the left
+    /// inset, measured from the screen corner. Keyboard up: the old clearance
+    /// above the keys.
     private var landscapeHistoryColumn: some View {
         let width = historyPanelWidth(max(historyContainerWidth, 1))
         let strip = width + Self.historyLeadingInset
         let hideTravel = width + Self.historyHideExtra
         let x = (historyReveal - 1) * hideTravel
         let topPad = max(6, historyChromeTop - historyOverlayTop)
-        let bottomPad = max(keyboardReservedBottom, IMessageComposer.height + 24) + 10
-        let panelHeight = max(0, historyContainerHeight - topPad)
+        let keyboardUp = keyboardLift > 20
+        let safeBottom = Self.windowSafeAreaBottom()
+        let bottomPad: CGFloat
+        let dropBelowSafeArea: CGFloat
+        if keyboardUp {
+            bottomPad = max(keyboardReservedBottom, IMessageComposer.height + 24) + 10
+            dropBelowSafeArea = 0
+        } else if safeBottom > Self.historyLeadingInset {
+            bottomPad = 0
+            dropBelowSafeArea = safeBottom - Self.historyLeadingInset
+        } else {
+            bottomPad = Self.historyLeadingInset - safeBottom
+            dropBelowSafeArea = 0
+        }
+        let panelHeight = max(0, historyContainerHeight - topPad + dropBelowSafeArea)
         let showPanel = historyDragging || historyPanelMounted
         let mountPanel = showPanel || historyPanelWarming
         let panelHits = showPanel && (historyDragging || historyReveal > 0.02)
@@ -985,6 +1001,12 @@ struct ChatView: View {
 
     private static func initialWindowWidth() -> CGFloat {
         initialWindowBounds().width
+    }
+
+    private static func windowSafeAreaBottom() -> CGFloat {
+        guard let scene = foregroundWindowScene() else { return 0 }
+        let window = scene.windows.first(where: \.isKeyWindow) ?? scene.windows.first
+        return window?.safeAreaInsets.bottom ?? 0
     }
 
     /// Landscape iPad only. Phone landscape is still a phone.
