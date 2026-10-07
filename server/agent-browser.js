@@ -14,7 +14,7 @@ import { jypeEmailForSlug, isJypeMember, normalizeJypeWorkspace } from "./jype.j
 
 export const LOGIN_WAIT_MS = 10 * 60_000;
 export const IDLE_MS = 2 * 60_000;
-export const SNAPSHOT_MAX = 100;
+export const SNAPSHOT_MAX = 300;
 const VIEWPORT = { width: 1280, height: 900 };
 
 const SENSITIVE_HOST_RE =
@@ -227,6 +227,9 @@ async function collectSnapshot(active) {
   const url = active.url();
   const title = await active.title().catch(() => "");
   const rows = await active.evaluate((max) => {
+    document.querySelectorAll("[data-agent-ref]").forEach((el) => {
+      el.removeAttribute("data-agent-ref");
+    });
     const sel =
       'a, button, input, textarea, select, [role="button"], [role="link"], [role="textbox"], [role="checkbox"], [role="menuitem"], [contenteditable="true"]';
     const seen = new Set();
@@ -322,6 +325,7 @@ export async function click(ref, opts = {}) {
   return withLock(async () => {
     const active = await ensureBrowser(opts);
     const handle = await loc(active, ref);
+    await handle.scrollIntoViewIfNeeded().catch(() => {});
     await handle.click({ timeout: 15_000 });
     bumpIdle();
     await active.waitForTimeout(400).catch(() => {});
@@ -361,6 +365,24 @@ export async function press(key, opts = {}) {
     bumpIdle();
     await active.waitForTimeout(400).catch(() => {});
     return collectSnapshot(active);
+  });
+}
+
+export async function pageText(opts = {}) {
+  return withLock(async () => {
+    const active = await ensureBrowser(opts);
+    const text = await active.evaluate(() => document.body?.innerText || "");
+    bumpIdle();
+    return { ok: true, text: String(text).slice(0, 80_000) };
+  });
+}
+
+export async function pageEval(fn, opts = {}) {
+  return withLock(async () => {
+    const active = await ensureBrowser(opts);
+    const result = await active.evaluate(fn);
+    bumpIdle();
+    return { ok: true, result };
   });
 }
 
@@ -588,6 +610,9 @@ export async function runAgentBrowser(argv) {
   if (cmd === "press") return press(parsed.key, { headed: parsed.headed });
   if (cmd === "screenshot" || cmd === "shot") {
     return screenshot({ headed: parsed.headed, path: parsed.path });
+  }
+  if (cmd === "text") {
+    return pageText({ headed: parsed.headed });
   }
   if (cmd === "login") {
     return loginHeaded(parsed.url, {
