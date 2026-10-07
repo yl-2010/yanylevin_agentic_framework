@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ChatHistorySection: Identifiable, Equatable {
     let id: String
@@ -188,12 +189,90 @@ struct ChatHistoryPanel: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 12)
+            .background {
+                HistoryScrollClipLock()
+            }
         }
+        .scrollClipDisabled(false)
         .frame(width: width)
         .frame(maxHeight: .infinity, alignment: .top)
         .ylGlassRounded(cornerRadius: 22, interactive: true, clear: true)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Past chats")
+    }
+}
+
+/// SwiftUI turns the history list's clip off when the finger lifts, so row
+/// chips draw into the gap under the panel. Keep `clipsToBounds` on.
+private struct HistoryScrollClipLock: UIViewRepresentable {
+    func makeUIView(context: Context) -> HistoryScrollClipLockView {
+        let view = HistoryScrollClipLockView()
+        view.isUserInteractionEnabled = false
+        view.backgroundColor = .clear
+        return view
+    }
+
+    func updateUIView(_ uiView: HistoryScrollClipLockView, context: Context) {
+        uiView.lock()
+    }
+}
+
+private final class HistoryScrollClipLockView: UIView {
+    private weak var scroll: UIScrollView?
+    private var trackingObservation: NSKeyValueObservation?
+    private var draggingObservation: NSKeyValueObservation?
+    private var deceleratingObservation: NSKeyValueObservation?
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        attachIfNeeded()
+        lock()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        attachIfNeeded()
+        lock()
+    }
+
+    func lock() {
+        attachIfNeeded()
+        apply()
+        DispatchQueue.main.async { [weak self] in
+            self?.apply()
+        }
+    }
+
+    private func attachIfNeeded() {
+        guard scroll == nil else { return }
+        var view: UIView? = self
+        while let current = view {
+            if let found = current as? UIScrollView {
+                scroll = found
+                trackingObservation = found.observe(\.isTracking, options: [.new]) { [weak self] _, _ in
+                    self?.lock()
+                }
+                draggingObservation = found.observe(\.isDragging, options: [.new]) { [weak self] _, _ in
+                    self?.lock()
+                }
+                deceleratingObservation = found.observe(\.isDecelerating, options: [.new]) { [weak self] _, _ in
+                    self?.lock()
+                }
+                return
+            }
+            view = current.superview
+        }
+    }
+
+    private func apply() {
+        guard let scroll else { return }
+        if !scroll.clipsToBounds {
+            scroll.clipsToBounds = true
+        }
+        if !scroll.layer.masksToBounds {
+            scroll.layer.masksToBounds = true
+        }
     }
 }
 

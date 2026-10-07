@@ -735,7 +735,12 @@ struct ChatView: View {
                     onSelect: selectHistoryChat
                 )
                 .padding(.leading, Self.historyLeadingInset)
-                .padding(.bottom, bottomPad)
+                .frame(
+                    width: strip,
+                    height: max(0, panelHeight - bottomPad),
+                    alignment: .topLeading
+                )
+                .clipped()
                 .frame(width: strip, height: panelHeight, alignment: .topLeading)
                 .offset(x: x, y: topPad)
                 .accessibilityHidden(!showPanel)
