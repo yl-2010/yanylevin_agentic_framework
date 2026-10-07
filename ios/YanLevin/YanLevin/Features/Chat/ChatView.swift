@@ -75,18 +75,27 @@ struct ChatView: View {
     /// Long-press Copy pill target — message stays put (no context-menu lift).
     @State private var copyMenuMessageID: UUID?
     /// 0 = closed, 1 = open. Tracks the finger while dragging.
-    @State private var historyReveal: CGFloat = 0
+    /// iPad landscape starts open so the column is there on the first frame.
+    @State private var historyReveal: CGFloat = ChatView.initialPadLandscape() ? 1 : 0
     @State private var historyDragging = false
     /// True from latch through the settle spring when this open swipe also hides the keyboard.
     @State private var historyScrubbingKeyboard = false
     @State private var historyDragOrigin: CGFloat = 0
     @State private var historyMeasuredWidth: CGFloat = 280
+    @State private var historyContainerWidth: CGFloat = ChatView.initialWindowWidth()
+    @State private var historyContainerHeight: CGFloat = ChatView.initialWindowBounds().height
     @State private var historyChromeTop: CGFloat = 0
+    /// Top of this chat view in window space, so the column starts under the nav bar.
+    @State private var historyOverlayTop: CGFloat = 0
+    /// iPad window is wider than it is tall. Portrait and iPhone stay on the overlay drawer.
+    @State private var padLandscape = ChatView.initialPadLandscape()
+    /// Kept through the portrait-close spring so the column eases back to center.
+    @State private var historyColumnShift = ChatView.initialPadLandscape()
     @State private var historyHapticGate = YLHalfwayHapticGate()
     @State private var historySwipeBlocks = ChatHistorySwipeBlocks()
     /// Stays true until the close slide finishes so SwiftUI does not fade the
     /// panel out (default `if` removal) while it is still on screen.
-    @State private var historyPanelMounted = false
+    @State private var historyPanelMounted = ChatView.initialPadLandscape()
     /// One-shot off-screen mount at idle so the first swipe does not pay the
     /// panel's first-time view construction / Liquid Glass setup mid-gesture.
     @State private var historyPanelWarming = false
@@ -99,6 +108,8 @@ struct ChatView: View {
     private static let historySwipeVelocityCommit: CGFloat = 520
     private static let historySwipeSpring = Animation.spring(response: 0.42, dampingFraction: 0.86)
     private static let historyHideExtra: CGFloat = 64
+    /// Matches the history panel's leading inset.
+    private static let historyLeadingInset: CGFloat = 8
     /// Past the last bubble + composer clearance so `scrollTo` can hit true bottom.
     private static let chatScrollEndID = "chat-scroll-end"
 
@@ -249,6 +260,8 @@ struct ChatView: View {
                         .animation(.spring(response: 0.38, dampingFraction: 0.86), value: isBusy)
                         .animation(.spring(response: 0.38, dampingFraction: 0.86), value: educationStore.agentWorkingLabel)
                         .animation(.spring(response: 0.38, dampingFraction: 0.86), value: queuedAnimationSignature)
+                        .offset(x: historyContentShift)
+                        .animation(historyDragging ? nil : Self.historySwipeSpring, value: historyContentShift)
 
                         Color.clear
                             .frame(height: 1)
@@ -289,7 +302,7 @@ struct ChatView: View {
                 .onChange(of: isBusy) { wasBusy, busy in
                     scrollChatToEnd(proxy: proxy)
                     guard usesEducation, wasBusy, !busy else { return }
-                    guard historyReveal < 0.5 else { return }
+                    guard padLandscape || historyReveal < 0.5 else { return }
                     guard let sid = educationStore.agentSessionId,
                           let token = auth.session?.token else { return }
                     Task { await educationStore.markChatRead(sessionId: sid, token: token) }
@@ -346,6 +359,9 @@ struct ChatView: View {
                 if !edu {
                     pendingAttachments = []
                     closeChatHistory(animated: false)
+                } else if padLandscape {
+                    historyColumnShift = true
+                    settleHistory(open: true, animated: false)
                 }
             }
             .onChange(of: educationStore.agentNavigate) { _, _ in
@@ -355,7 +371,7 @@ struct ChatView: View {
                 applyPendingAgentEducationNavigate()
             }
             .onChange(of: composerFocused) { _, focused in
-                if focused { closeChatHistory() }
+                if focused, !padLandscape { closeChatHistory() }
             }
             .fileImporter(
                 isPresented: $showFileImporter,
@@ -420,10 +436,34 @@ struct ChatView: View {
                 if let flight = sendFlight {
                     ChatSendFlightOverlay(flight: flight, colorScheme: colorScheme)
                 }
-                if usesEducation {
+                if usesEducation, !padLandscape {
                     chatHistoryOverlay
                 }
             }
+        }
+        .overlay(alignment: .topLeading) {
+            if usesEducation, padLandscape {
+                landscapeHistoryColumn
+            }
+        }
+        .background {
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear {
+                        syncPadLandscape(geo.size, animated: false)
+                    }
+                    .onChange(of: geo.size) { _, size in
+                        syncPadLandscape(size, animated: true)
+                    }
+                    .onGeometryChange(for: CGFloat.self) { proxy in
+                        proxy.frame(in: .global).minY
+                    } action: { y in
+                        if abs(y - historyOverlayTop) > 0.5 {
+                            historyOverlayTop = y
+                        }
+                    }
+            }
+            .allowsHitTesting(false)
         }
         .environment(\.ylPalette, palette)
     }
@@ -464,7 +504,7 @@ struct ChatView: View {
 
     private func handleChatTabReselect(proxy: ScrollViewProxy) {
         guard nav.selectedTab == .chat else { return }
-        if usesEducation && (historyReveal > 0.5 || historyPanelMounted) {
+        if usesEducation && !padLandscape && (historyReveal > 0.5 || historyPanelMounted) {
             closeChatHistory()
             return
         }
@@ -574,45 +614,77 @@ struct ChatView: View {
             // Warm-up renders the panel at its resting off-screen offset
             // (fully outside the clipped overlay) — never visible.
             let mountPanel = showPanel || historyPanelWarming
+            // Landscape column: only the panel itself takes hits, so the thread
+            // stays tappable. Portrait and iPhone keep the full-screen catcher.
+            let panelHits = showPanel && (historyDragging || historyReveal > 0.02)
 
-            VStack(spacing: 0) {
-                Color.clear
-                    .frame(height: topPad)
-                    .allowsHitTesting(false)
-
-                ZStack(alignment: .topLeading) {
+            ZStack(alignment: .topLeading) {
+                if !padLandscape {
                     Color.clear
                         .contentShape(Rectangle())
                         .onTapGesture { closeChatHistory() }
                         .accessibilityLabel("Dismiss past chats")
                         .accessibilityAddTraits(.isButton)
+                        .allowsHitTesting(historyOverlayHits)
+                        .simultaneousGesture(historyCloseDragGesture)
+                }
 
-                    if mountPanel {
+                if mountPanel {
+                    VStack(spacing: 0) {
+                        Color.clear
+                            .frame(height: topPad)
+                            .allowsHitTesting(false)
+
                         ChatHistoryPanel(
                             sections: ChatHistoryGrouping.sections(from: educationStore.chatHistory),
                             isLoading: educationStore.chatHistoryLoading,
                             width: width,
                             onSelect: selectHistoryChat
                         )
-                        .padding(.leading, 8)
+                        .padding(.leading, Self.historyLeadingInset)
                         .padding(.bottom, bottomPad)
-                        .offset(x: x)
-                        .accessibilityHidden(!showPanel)
-                        .transition(.identity)
+                        .frame(maxHeight: .infinity, alignment: .top)
                     }
+                    .frame(width: width + Self.historyLeadingInset, alignment: .leading)
+                    .offset(x: x)
+                    .accessibilityHidden(!showPanel)
+                    .allowsHitTesting(panelHits)
+                    .simultaneousGesture(historyCloseDragGesture)
+                    .transition(.identity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .modifier(
+                HistoryColumnHitShape(
+                    enabled: padLandscape,
+                    width: max(0, Self.historyLeadingInset + width + x),
+                    height: geo.size.height
+                )
+            )
             .onAppear {
                 historyMeasuredWidth = width
+                if abs(geo.size.width - historyContainerWidth) > 0.5 {
+                    historyContainerWidth = geo.size.width
+                }
                 warmUpHistoryPanelIfNeeded()
             }
             .onChange(of: width) { _, newWidth in
                 historyMeasuredWidth = newWidth
             }
+            .onChange(of: geo.size.width) { _, newWidth in
+                if abs(newWidth - historyContainerWidth) > 0.5 {
+                    historyContainerWidth = newWidth
+                }
+            }
         }
         .clipped()
+        .modifier(
+            HistoryColumnHitShape(
+                enabled: padLandscape,
+                width: historyContentShift * 2,
+                height: 10000
+            )
+        )
         .modifier(
             YLProgressMonitor(progress: historyReveal) { progress in
                 historyHapticGate.handle(progress)
@@ -621,8 +693,55 @@ struct ChatView: View {
                 }
             }
         )
-        .simultaneousGesture(historyCloseDragGesture)
-        .allowsHitTesting(historyOverlayHits)
+        .allowsHitTesting(padLandscape ? historyContentShift > 0.5 : historyOverlayHits)
+    }
+
+    /// iPad landscape column. Only the panel's own rect is in the tree, offset
+    /// to sit under the nav bar, so the thread and composer stay tappable.
+    private var landscapeHistoryColumn: some View {
+        let width = historyPanelWidth(max(historyContainerWidth, 1))
+        let strip = width + Self.historyLeadingInset
+        let hideTravel = width + Self.historyHideExtra
+        let x = (historyReveal - 1) * hideTravel
+        let topPad = max(6, historyChromeTop - historyOverlayTop)
+        let bottomPad = max(keyboardReservedBottom, IMessageComposer.height + 24) + 10
+        let panelHeight = max(0, historyContainerHeight - topPad)
+        let showPanel = historyDragging || historyPanelMounted
+        let mountPanel = showPanel || historyPanelWarming
+        let panelHits = showPanel && (historyDragging || historyReveal > 0.02)
+
+        return Group {
+            if mountPanel {
+                ChatHistoryPanel(
+                    sections: ChatHistoryGrouping.sections(from: educationStore.chatHistory),
+                    isLoading: educationStore.chatHistoryLoading,
+                    width: width,
+                    onSelect: selectHistoryChat
+                )
+                .padding(.leading, Self.historyLeadingInset)
+                .padding(.bottom, bottomPad)
+                .frame(width: strip, height: panelHeight, alignment: .topLeading)
+                .offset(x: x, y: topPad)
+                .accessibilityHidden(!showPanel)
+                .allowsHitTesting(panelHits)
+                .simultaneousGesture(historyCloseDragGesture)
+            }
+        }
+        .onAppear {
+            historyMeasuredWidth = width
+            warmUpHistoryPanelIfNeeded()
+        }
+        .onChange(of: width) { _, newWidth in
+            historyMeasuredWidth = newWidth
+        }
+        .modifier(
+            YLProgressMonitor(progress: historyReveal) { progress in
+                historyHapticGate.handle(progress)
+                if historyScrubbingKeyboard {
+                    YLKeyboardScrub.setProgress(min(max(progress, 0), 1))
+                }
+            }
+        )
     }
 
     /// Opening stays on the chat scroll gesture so the overlay cannot steal the
@@ -741,6 +860,9 @@ struct ChatView: View {
             } completion: {
                 if !open, !historyDragging, historyReveal < 0.01 {
                     historyPanelMounted = false
+                    if !padLandscape {
+                        historyColumnShift = false
+                    }
                 }
                 historyHapticGate.reset()
                 finishHistoryKeyboardScrub()
@@ -750,6 +872,9 @@ struct ChatView: View {
             transaction.disablesAnimations = true
             withTransaction(transaction, apply)
             historyPanelMounted = open
+            if !open, !padLandscape {
+                historyColumnShift = false
+            }
             historyHapticGate.reset()
             finishHistoryKeyboardScrub()
         }
@@ -788,7 +913,13 @@ struct ChatView: View {
     private func selectHistoryChat(_ chat: AgentChatListItem) {
         YLHaptics.tap()
         let sameThread = chat.sessionId == educationStore.agentSessionId
-        closeChatHistory(markVisibleRead: sameThread)
+        if padLandscape {
+            if sameThread {
+                markVisibleChatReadIfIdle()
+            }
+        } else {
+            closeChatHistory(markVisibleRead: sameThread)
+        }
         guard let token = auth.session?.token else { return }
         Task { await educationStore.markChatRead(sessionId: chat.sessionId, token: token) }
         if sameThread {
@@ -802,8 +933,67 @@ struct ChatView: View {
     /// pulled in. A server session starts on the first send.
     private func startFreshPersonalChat() {
         guard !nav.chatHandoffStartNew else { return }
-        closeChatHistory(animated: false, markVisibleRead: false)
+        if !padLandscape {
+            closeChatHistory(animated: false, markVisibleRead: false)
+        }
         educationStore.presentBlankChat()
+    }
+
+    /// Horizontal offset that recenters the 760pt column in the space beside
+    /// the landscape history panel. Zero when that column mode is off, and
+    /// zero again once the panel has slid fully away.
+    private var historyContentShift: CGFloat {
+        guard historyColumnShift, usesEducation else { return 0 }
+        let width = historyPanelWidth(max(historyContainerWidth, 1))
+        let hideTravel = width + Self.historyHideExtra
+        let x = (historyReveal - 1) * hideTravel
+        let occupied = max(0, Self.historyLeadingInset + width + x)
+        return occupied / 2
+    }
+
+    private func syncPadLandscape(_ size: CGSize, animated: Bool) {
+        guard size.width > 1, size.height > 1 else { return }
+        if abs(size.width - historyContainerWidth) > 0.5 {
+            historyContainerWidth = size.width
+        }
+        if abs(size.height - historyContainerHeight) > 0.5 {
+            historyContainerHeight = size.height
+        }
+        let next = AdaptiveLayout.isPad && size.width > size.height
+        guard next != padLandscape else { return }
+        padLandscape = next
+        if next {
+            historyColumnShift = true
+            guard usesEducation else { return }
+            settleHistory(open: true, animated: animated)
+        } else if usesEducation && (historyReveal > 0.001 || historyPanelMounted || historyDragging) {
+            settleHistory(open: false, animated: animated)
+        } else {
+            historyColumnShift = false
+        }
+    }
+
+    private static func foregroundWindowScene() -> UIWindowScene? {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        return scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
+    }
+
+    private static func initialWindowBounds() -> CGRect {
+        guard let scene = foregroundWindowScene() else { return .zero }
+        return scene.windows.first(where: \.isKeyWindow)?.bounds ?? scene.screen.bounds
+    }
+
+    private static func initialWindowWidth() -> CGFloat {
+        initialWindowBounds().width
+    }
+
+    /// Landscape iPad only. Phone landscape is still a phone.
+    private static func initialPadLandscape() -> Bool {
+        guard AdaptiveLayout.isPad, let scene = foregroundWindowScene() else { return false }
+        if scene.interfaceOrientation.isLandscape { return true }
+        if scene.interfaceOrientation.isPortrait { return false }
+        let bounds = initialWindowBounds()
+        return bounds.width > bounds.height
     }
 
     private func composer(focus: FocusState<Bool>.Binding) -> some View {
@@ -860,6 +1050,9 @@ struct ChatView: View {
             .frame(maxWidth: .infinity)
             .zIndex(10)
         }
+        .offset(x: historyContentShift)
+        .animation(historyDragging ? nil : Self.historySwipeSpring, value: historyContentShift)
+        .modifier(LandscapeHistoryDragModifier(enabled: padLandscape, gesture: historyOpenDragGesture))
     }
 
     /// UIKit `UIButton` + `UIMenu`, not SwiftUI `Menu`. On iOS 26+/27 the
@@ -1031,7 +1224,7 @@ struct ChatView: View {
         }
         guard !reduceMotion,
               !trimmed.isEmpty,
-              historyReveal < 0.5,
+              padLandscape || historyReveal < 0.5,
               composerFieldGlobalFrame.width > 1,
               composerFieldGlobalFrame.height > 1
         else { return }
@@ -1135,7 +1328,9 @@ struct ChatView: View {
         let fullAccess = auth.hasFullAccess || AppGroupStore.hasFullAccess
         if let resumeSid, !resumeSid.isEmpty {
             guard fullAccess, let token, !token.isEmpty else { return }
-            closeChatHistory(animated: false, markVisibleRead: false)
+            if !padLandscape {
+                closeChatHistory(animated: false, markVisibleRead: false)
+            }
             nav.chatHandoffAttachments = []
             nav.chatHandoffPreferPersonalAgent = false
             nav.chatHandoffStartNew = false
@@ -1153,7 +1348,9 @@ struct ChatView: View {
             return
         }
         if startNew {
-            closeChatHistory(animated: false, markVisibleRead: false)
+            if !padLandscape {
+                closeChatHistory(animated: false, markVisibleRead: false)
+            }
             draft = ""
             pendingAttachments = []
             let fullAccess = auth.hasFullAccess || AppGroupStore.hasFullAccess
@@ -1367,6 +1564,37 @@ private final class ChatRowsMemo {
         }
         cached = rows
         return rows
+    }
+}
+
+/// Limits hit testing to the visible history strip on iPad landscape.
+/// Portrait and iPhone leave the view's own shape alone.
+private struct HistoryColumnHitShape: ViewModifier {
+    var enabled: Bool
+    var width: CGFloat
+    var height: CGFloat
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.contentShape(Path(CGRect(x: 0, y: 0, width: max(0, width), height: height)))
+        } else {
+            content
+        }
+    }
+}
+
+/// Composer lives outside the scroll view, so landscape needs the same
+/// sideways drag on the field. Phone and portrait keep the overlay catcher.
+private struct LandscapeHistoryDragModifier<G: Gesture>: ViewModifier {
+    var enabled: Bool
+    var gesture: G
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.simultaneousGesture(gesture)
+        } else {
+            content
+        }
     }
 }
 
