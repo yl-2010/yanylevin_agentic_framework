@@ -237,7 +237,7 @@ describe("Personal Agent system prompt", () => {
   it("runs @agentp as Alex's agent and keeps Yan's Mac closed to guests", () => {
     const yan = systemPrompt(YAN, { agentp: true });
     assert.match(yan, /You are Alex's agent/);
-    assert.match(yan, /Sent by Alex's agent/);
+    assert.match(yan, /Sent by Alex's Personal Agent/);
     assert.match(yan, /Do not refuse repo-wide or Mac-wide work/);
     const guest = systemPrompt(YAN, {
       agentp: true,

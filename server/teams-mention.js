@@ -87,7 +87,7 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
   const guestLines = guestCallerLines(opts.guestCaller, "Teams", agentp);
   const deliver = opts.deliverFinal !== false;
   const footerPhrase = agentp
-    ? "// Sent by Alex's agent"
+    ? "// Sent by Alex's Personal Agent"
     : "// Sent by Yan's Personal Agent";
   const lines = [
     guestLines.length

@@ -79,11 +79,11 @@ describe("markdownToTeamsHtml", () => {
 
   it("italicizes the Alex agent footer the same way", () => {
     const html = markdownToTeamsHtml(
-      "On it\n\n// Sent by Alex's agent"
+      "On it\n\n// Sent by Alex's Personal Agent"
     );
     assert.equal(
       html,
-      "<p>On it</p><p>&nbsp;</p><p><em>// Sent by Alex's agent</em></p>"
+      "<p>On it</p><p>&nbsp;</p><p><em>// Sent by Alex's Personal Agent</em></p>"
     );
   });
 });

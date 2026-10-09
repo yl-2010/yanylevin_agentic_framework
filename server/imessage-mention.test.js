@@ -227,7 +227,7 @@ describe("imessage-mention", () => {
       agentp: true,
     });
     assert.match(agentpBlock, /Alex's agent/);
-    assert.match(agentpBlock, /Do not add \/\/ Sent by Alex's agent/);
+    assert.match(agentpBlock, /Do not add \/\/ Sent by Alex's Personal Agent/);
     assert.doesNotMatch(agentpBlock, /still Yan's Personal Agent/);
     assert.match(block, /Newlines work/);
     assert.match(block, /does not render markdown/);

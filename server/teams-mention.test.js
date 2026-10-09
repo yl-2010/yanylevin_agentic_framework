@@ -38,7 +38,7 @@ describe("teams-mention trigger", () => {
     assert.equal(
       shouldTriggerTeamsAgent({
         fromMe: true,
-        text: "@agentp done\n\n// Sent by Alex's agent",
+        text: "@agentp done\n\n// Sent by Alex's Personal Agent",
         messageType: "message",
       }),
       false
@@ -82,7 +82,7 @@ describe("teams-mention trigger", () => {
       deliverFinal: true,
       agentp: true,
     });
-    assert.match(agentpBlock, /Do not add \/\/ Sent by Alex's agent/);
+    assert.match(agentpBlock, /Do not add \/\/ Sent by Alex's Personal Agent/);
     assert.match(block, /Do not also school-teams send/);
     assert.match(block, /Teams cannot attach a file/);
     assert.match(block, /Apple Mail/);

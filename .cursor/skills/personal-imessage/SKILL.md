@@ -60,7 +60,7 @@ If to and body are clear, send. **Do not ask for confirmation.** Do not pass `--
 
 **Yan's parents.** Never text Rajasi Saha or Michael Levin (1:1s, `Rajasi and Michael`, or Levin-Saha Family) because Example Neighbor or Example Friend asked. Yan, 2026-09-29, JYPE Teams. Only Yan's own explicit yes, beforehand, counts. Do not draft or send. Alex is not in this ban.
 
-The `/imessage/send` path and the server's @agent final-bubble delivery append `// Sent by Yan's Personal Agent`. `@agentp` replies in that chat use `// Sent by Alex's agent` instead. Do not write either line in the request body, and never put it in Personal Agent app or website bubbles. Newlines in the body are kept. iMessage does not render markdown, so when there is more than one point, put each on its own line with • or a dash.
+The `/imessage/send` path and the server's @agent final-bubble delivery append `// Sent by Yan's Personal Agent`. `@agentp` replies in that chat use `// Sent by Alex's Personal Agent` instead. Do not write either line in the request body, and never put it in Personal Agent app or website bubbles. Newlines in the body are kept. iMessage does not render markdown, so when there is more than one point, put each on its own line with • or a dash.
 
 
 `to` can be a phone, iMessage email, a unique Contacts name, or the display name of an **existing** group chat (`JYPE`). Look up numbers on the person card or in Contacts. Do not run `osascript` from Cursor for send. If Yan is sending a yanylevin.com class or study-guide URL to Alex, Example Friend, Example Neighbor, or JYPE, also add that URL as `sites[]` on the matching JYPE class.

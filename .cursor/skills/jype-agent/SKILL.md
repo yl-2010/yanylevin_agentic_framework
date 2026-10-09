@@ -30,7 +30,7 @@ Alex's advisor this year is **Eric Sieg**, not Stearns. She teaches his calc. Ya
 
 `@agentp` is Alex's agent. Same run as `@agentg` (Grok 4.7 high, Fast off, same chats, same caps), plus `server/agentp-appendix.md` at the end of the system prompt. That appendix is how he tells it to behave, talk, and act, including voice. It does not let the run take over Yan's Mac, install software, or delete files. Yan still owns the machine, and his standing rules win.
 
-Replies in that chat are signed `Sent by Alex's agent`. The server adds it. Do not write it.
+Replies in that chat are signed `Sent by Alex's Personal Agent`. The server adds it. Do not write it.
 
 Alex changes the appendix in chat. `@agentp set:` replaces it. `@agentp append:` adds to it. `@agentp clear` wipes it. `@agentp show` prints it. Yan changes it by editing `server/agentp-appendix.md`. Example Friend, Example Neighbor, and everyone else cannot. Those commands from them get a refusal and do not start a run. Do not write that file yourself.
 

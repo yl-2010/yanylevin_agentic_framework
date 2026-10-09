@@ -98,7 +98,7 @@ email the whole channel. This fallback is Yan only.
 `--text` is markdown (or plain text). The CLI converts it to Teams HTML
 (`RichText/Html`) so desktop keeps newlines and bold/lists/links. Do not
 pass HTML. The CLI appends `// Sent by Yan's Personal Agent`. An `@agentp`
-reply in that chat uses `// Sent by Alex's agent` instead. Do not write
+reply in that chat uses `// Sent by Alex's Personal Agent` instead. Do not write
 either line in `--text`, and never put them in Personal Agent app or website
 bubbles. Same parent skip as iMessage (Rajasi / Michael / `Rajasi and
 Michael`). iMessage uses the same `// Sent by Yan's Personal Agent` line.

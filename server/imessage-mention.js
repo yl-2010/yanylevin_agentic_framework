@@ -5,7 +5,7 @@
  */
 
 export const AGENT_SENT_FOOTER = "Sent by Yan's Personal Agent";
-export const AGENTP_SENT_FOOTER = "Sent by Alex's agent";
+export const AGENTP_SENT_FOOTER = "Sent by Alex's Personal Agent";
 export const TEAMS_AGENT_SENT_FOOTER = `// ${AGENT_SENT_FOOTER}`;
 export const TEAMS_AGENTP_SENT_FOOTER = `// ${AGENTP_SENT_FOOTER}`;
 const FOOTER_PHRASE = [AGENT_SENT_FOOTER, AGENTP_SENT_FOOTER]
