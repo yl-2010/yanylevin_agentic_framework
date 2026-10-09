@@ -60,8 +60,13 @@
   let sessionId = null;
   let starting = false;
   let sending = false;
-  /** @type {{ role: string, content: string, queued?: boolean }[]} */
+  /** @type {{ role: string, content: string, queued?: boolean, queueId?: string, widgets?: object[] }[]} */
   let messages = [];
+  /** @type {{ pointerId: number, index: number, content: string, queueId: string, startX: number, startY: number, armed: boolean, timer: ReturnType<typeof setTimeout>|null }|null} */
+  let queueHold = null;
+  /** @type {{ index: number, content: string }|null} */
+  let pendingQueueInterrupt = null;
+  let promotingQueueId = "";
   /** @type {ReturnType<typeof setInterval>|null} */
   let pollTimer = null;
   let preferPanel = false;
@@ -880,9 +885,10 @@
   function cssPx(el, name) {
     const raw = String(getComputedStyle(el).getPropertyValue(name) || "").trim();
     const n = parseFloat(raw);
-    if (Number.isFinite(n)) return n;
+    if (Number.isFinite(n) && !/rem|em/.test(raw)) return n;
     const nested = raw.match(/^var\(\s*(--[\w-]+)/);
-    return nested ? cssPx(el, nested[1]) : 0;
+    if (nested) return cssPx(el, nested[1]);
+    return lengthPx(raw);
   }
 
   function circlePx() {
@@ -1019,10 +1025,10 @@
     input.style.height = `${nextH}px`;
     input.style.overflowY = lines > COMPOSER_MAX_LINES ? "auto" : "hidden";
 
-    const formCs = composer.form ? getComputedStyle(composer.form) : null;
-    const formPad = formCs
-      ? (parseFloat(formCs.paddingTop) || 0) + (parseFloat(formCs.paddingBottom) || 0)
-      : 0;
+    /* Count the tall inset before the class is on, so the pill grows
+       before the text meets the corner instead of after. */
+    const padY = cssPx(root, "--composer-pad-y") || lengthPx("1.25rem");
+    const formPad = padY * 2;
     const pillH = Math.max(circle, Math.ceil(nextH + formPad));
     column.classList.toggle("is-composer-tall", pillH > circle + 4);
     if (Math.abs(pillH - composer.lastPillH) > 0.5) {
@@ -1170,6 +1176,7 @@
         role: m.role,
         content: String(m.content || ""),
         queued: Boolean(m.queued),
+        queueId: m.queued && m.queueId ? String(m.queueId) : "",
         widgets: m.widgets || null,
       }))
     );
@@ -1220,11 +1227,25 @@
     if (created) refreshGlass();
   }
 
+  function syncQueuedTurn(turn, msg) {
+    const queued = Boolean(msg && msg.queued);
+    turn.classList.toggle("yan-chat-turn--queued", queued);
+    if (!queued) {
+      turn.removeAttribute("title");
+      delete turn.dataset.queueId;
+      turn.classList.remove("is-interrupt-armed");
+      return;
+    }
+    turn.title = "Hold 2 seconds, then release, to interrupt with this message";
+    if (msg.queueId) turn.dataset.queueId = String(msg.queueId);
+    else delete turn.dataset.queueId;
+  }
+
   function buildTurn(msg, msgIndex) {
     const turn = document.createElement("div");
     turn.className = `yan-chat-turn yan-chat-turn--${msg.role}`;
     turn.dataset.reuseKey = messageReuseKey(msg);
-    if (msg.queued) turn.classList.add("yan-chat-turn--queued");
+    syncQueuedTurn(turn, msg);
     const text = String(msg.content || "");
     if (text.trim()) {
       const el = document.createElement("div");
@@ -1290,7 +1311,7 @@
       let turn = pool.get(key);
       if (turn) {
         pool.delete(key);
-        turn.classList.toggle("yan-chat-turn--queued", Boolean(msg.queued));
+        syncQueuedTurn(turn, msg);
       } else {
         turn = buildTurn(msg, i);
         if (turn.querySelector("[data-liquid-glass]")) addedGlass = true;
@@ -1327,6 +1348,7 @@
       messagesEl.scrollTop = prevScroll;
     }
     updateComposerEnabled();
+    applyQueueHoldChrome();
     if (addedGlass) refreshGlass();
   }
 
@@ -1409,19 +1431,24 @@
     const next = list
       .filter((m) => m && (m.role === "user" || m.role === "assistant"))
       .map((m) => {
-        /** @type {{ role: string, content: string, queued?: boolean, widgets?: object[] }} */
+        /** @type {{ role: string, content: string, queued?: boolean, queueId?: string, widgets?: object[] }} */
         const out = {
           role: String(m.role),
           content: String(m.content || ""),
         };
         if (m.queued) out.queued = true;
+        if (m.queued && m.queueId) out.queueId = String(m.queueId);
         if (Array.isArray(m.widgets) && m.widgets.length) out.widgets = m.widgets;
         return out;
       });
-    if (messagesFingerprint(next) === messagesFingerprint(messages)) return;
+    if (messagesFingerprint(next) === messagesFingerprint(messages)) {
+      maybeFlushPendingQueueInterrupt();
+      return;
+    }
     messages = next;
     renderMessagesDom();
     persistLocal();
+    maybeFlushPendingQueueInterrupt();
   }
 
   async function pollState() {
@@ -1864,6 +1891,181 @@
     );
   }
 
+  const QUEUE_HOLD_MOVE_PX = 12;
+
+  function applyQueueHoldChrome() {
+    if (!messagesEl) return;
+    for (const el of messagesEl.querySelectorAll(":scope > .yan-chat-turn.is-interrupt-armed")) {
+      el.classList.remove("is-interrupt-armed");
+    }
+    const turn = heldQueuedTurn();
+    if (queueHold?.armed && turn) turn.classList.add("is-interrupt-armed");
+  }
+
+  function heldQueuedTurn() {
+    if (!messagesEl || !queueHold) return null;
+    const queued = [...messagesEl.querySelectorAll(":scope > .yan-chat-turn--queued")];
+    if (queueHold.queueId) {
+      return queued.find((el) => el.dataset.queueId === queueHold.queueId) || null;
+    }
+    const turn = queued[queueHold.index] || null;
+    if (!turn) return null;
+    const text = turn.querySelector(".yan-chat-bubble-in")?.textContent || "";
+    if (text !== queueHold.content) return null;
+    return turn;
+  }
+
+  function endQueueHold() {
+    if (queueHold?.timer) window.clearTimeout(queueHold.timer);
+    queueHold = null;
+    applyQueueHoldChrome();
+  }
+
+  function resolveHeldQueueId(hold) {
+    const queued = messages.filter((m) => m && m.queued);
+    if (hold.queueId) {
+      return queued.some((m) => m.queueId === hold.queueId) ? hold.queueId : "";
+    }
+    const msg = queued[hold.index];
+    if (!msg || String(msg.content || "") !== hold.content) return "";
+    return msg.queueId ? String(msg.queueId) : "";
+  }
+
+  function maybeFlushPendingQueueInterrupt() {
+    if (!pendingQueueInterrupt || promotingQueueId) return;
+    const queued = messages.filter((m) => m && m.queued);
+    const msg = queued[pendingQueueInterrupt.index];
+    if (!msg || String(msg.content || "") !== pendingQueueInterrupt.content) {
+      pendingQueueInterrupt = null;
+      return;
+    }
+    if (!msg.queueId) return;
+    const queueId = String(msg.queueId);
+    pendingQueueInterrupt = null;
+    promoteQueued(queueId);
+  }
+
+  function promoteQueuedLocally(queueId) {
+    const index = messages.findIndex((m) => m && m.queued && m.queueId === queueId);
+    if (index < 0) return false;
+    const [msg] = messages.splice(index, 1);
+    delete msg.queued;
+    delete msg.queueId;
+    const firstQueued = messages.findIndex((m) => m && m.queued);
+    if (firstQueued < 0) messages.push(msg);
+    else messages.splice(firstQueued, 0, msg);
+    renderMessagesDom();
+    persistLocal();
+    return true;
+  }
+
+  async function promoteQueued(queueId) {
+    const id = String(queueId || "").trim();
+    if (!id || promotingQueueId || !sessionId || !window.YanMacApi) return;
+    const previous = messages.map((m) => ({ ...m }));
+    if (!promoteQueuedLocally(id)) return;
+    promotingQueueId = id;
+    try {
+      const res = await window.YanMacApi.macFetch(`${API}/agent/interrupt-queued`, {
+        method: "POST",
+        json: { sessionId, queueId: id },
+        timeoutMs: 120_000,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 404) {
+        await pollState().catch(() => {});
+        return;
+      }
+      if (!res.ok) {
+        messages = previous;
+        renderMessagesDom();
+        persistLocal();
+        appendBubble("assistant", data.error || "Could not interrupt with that message.");
+        return;
+      }
+      if (Array.isArray(data.messages)) applyServerMessages(data.messages);
+      setBusy(true);
+      startPolling();
+      await pollState();
+    } catch (err) {
+      console.error("[edu-chat] interrupt queued", err);
+      messages = previous;
+      renderMessagesDom();
+      persistLocal();
+      appendBubble(
+        "assistant",
+        "Could not reach the personal agent. Is the Mac API running?"
+      );
+    } finally {
+      promotingQueueId = "";
+    }
+  }
+
+  function onQueuePointerDown(event) {
+    if (event.button && event.button !== 0) return;
+    const turn = event.target?.closest?.(".yan-chat-turn--queued");
+    if (!turn || !messagesEl?.contains(turn)) return;
+    const queuedTurns = [...messagesEl.querySelectorAll(":scope > .yan-chat-turn--queued")];
+    const index = queuedTurns.indexOf(turn);
+    if (index < 0) return;
+    const msg = messages.filter((m) => m && m.queued)[index];
+    if (!msg) return;
+    endQueueHold();
+    const pointerId = event.pointerId;
+    queueHold = {
+      pointerId,
+      index,
+      content: String(msg.content || ""),
+      queueId: msg.queueId ? String(msg.queueId) : "",
+      startX: event.clientX,
+      startY: event.clientY,
+      armed: false,
+      timer: window.setTimeout(() => {
+        if (!queueHold || queueHold.pointerId !== pointerId) return;
+        queueHold.armed = true;
+        queueHold.timer = null;
+        applyQueueHoldChrome();
+        if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+          navigator.vibrate(18);
+        }
+      }, HOLD_MS),
+    };
+  }
+
+  function onQueuePointerMove(event) {
+    if (!queueHold || event.pointerId !== queueHold.pointerId) return;
+    const dx = event.clientX - queueHold.startX;
+    const dy = event.clientY - queueHold.startY;
+    if (dx * dx + dy * dy > QUEUE_HOLD_MOVE_PX * QUEUE_HOLD_MOVE_PX) endQueueHold();
+  }
+
+  function onQueuePointerUp(event) {
+    if (!queueHold || event.pointerId !== queueHold.pointerId) return;
+    const hold = queueHold;
+    const armed = hold.armed;
+    endQueueHold();
+    if (!armed) return;
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      navigator.vibrate([40, 35, 90]);
+    }
+    const queueId = resolveHeldQueueId(hold);
+    if (queueId) promoteQueued(queueId);
+    else pendingQueueInterrupt = { index: hold.index, content: hold.content };
+  }
+
+  messagesEl?.addEventListener("pointerdown", onQueuePointerDown);
+  window.addEventListener("pointermove", onQueuePointerMove);
+  window.addEventListener("pointerup", onQueuePointerUp);
+  window.addEventListener("pointercancel", (event) => {
+    if (!queueHold || event.pointerId !== queueHold.pointerId) return;
+    endQueueHold();
+  });
+  messagesEl?.addEventListener("contextmenu", (event) => {
+    const turn = event.target?.closest?.(".yan-chat-turn--queued");
+    if (!turn || !messagesEl.contains(turn)) return;
+    event.preventDefault();
+  });
+
   historyComposer.sendBtn?.addEventListener(
     "click",
     (event) => {
@@ -2023,12 +2225,13 @@
       messages = local.messages
         .filter((m) => m && (m.role === "user" || m.role === "assistant"))
         .map((m) => {
-          /** @type {{ role: string, content: string, queued?: boolean }} */
+          /** @type {{ role: string, content: string, queued?: boolean, queueId?: string }} */
           const out = {
             role: String(m.role),
             content: String(m.content || ""),
           };
           if (m.queued) out.queued = true;
+          if (m.queued && m.queueId) out.queueId = String(m.queueId);
           return out;
         });
       preferPanel = Boolean(local.preferPanel) || messages.length > 0;

@@ -493,7 +493,13 @@ struct AgentChatWireMessage: Decodable {
     let role: String?
     let content: String?
     let queued: Bool?
+    let queueId: String?
     let widgets: [ChatWidget]?
+}
+
+struct AgentInterruptQueuedBody: Encodable {
+    let sessionId: String
+    let queueId: String
 }
 
 struct AgentEducationNavigate: Decodable, Equatable {
@@ -723,6 +729,8 @@ final class EducationStore: ObservableObject {
     /// True while `startNewChat` is replacing the visible thread. A resume
     /// must not paint the previous session over the blank one.
     private var startingNewChat = false
+    /// Queued bubble held before the server assigned a queueId.
+    private var pendingQueueInterruptID: UUID?
 
     var isStartingNewChat: Bool { startingNewChat }
 
@@ -761,6 +769,9 @@ final class EducationStore: ObservableObject {
             "messages": messages.map { msg -> [String: Any] in
                 var row: [String: Any] = ["role": msg.role, "content": msg.content]
                 if msg.queued { row["queued"] = true }
+                if let queueId = msg.queueId, !queueId.isEmpty {
+                    row["queueId"] = queueId
+                }
                 if !msg.widgets.isEmpty,
                    let data = try? APIClient.encoder.encode(msg.widgets),
                    let obj = try? JSONSerialization.jsonObject(with: data)
@@ -797,10 +808,12 @@ final class EducationStore: ObservableObject {
             guard let role = row.role, role == "user" || role == "assistant" else {
                 return nil
             }
+            let queueId = row.queueId?.trimmingCharacters(in: .whitespacesAndNewlines)
             return ChatMessage(
                 role: role,
                 content: row.content ?? "",
                 queued: row.queued == true,
+                queueId: (queueId?.isEmpty == false) ? queueId : nil,
                 widgets: row.widgets ?? []
             )
         }
@@ -812,9 +825,82 @@ final class EducationStore: ObservableObject {
             next.id = agentMessages[index].id
             return next
         }
-        guard merged != agentMessages else { return }
+        guard merged != agentMessages else {
+            flushPendingQueueInterrupt()
+            return
+        }
         agentMessages = merged
         persistAgentChat()
+        flushPendingQueueInterrupt()
+    }
+
+    /// Hold-to-release on a queued bubble. If the server has not assigned an id
+    /// yet, remember the bubble and promote when the next snapshot arrives.
+    func interruptQueued(messageID: UUID, token: String) async {
+        guard let msg = agentMessages.first(where: { $0.id == messageID }) else { return }
+        guard msg.role == "user", msg.queued else { return }
+        if let queueId = msg.queueId, !queueId.isEmpty {
+            pendingQueueInterruptID = nil
+            await promoteQueuedTurn(queueId: queueId, token: token)
+            return
+        }
+        pendingQueueInterruptID = messageID
+    }
+
+    private func flushPendingQueueInterrupt() {
+        guard let pending = pendingQueueInterruptID else { return }
+        guard let msg = agentMessages.first(where: { $0.id == pending }) else {
+            pendingQueueInterruptID = nil
+            return
+        }
+        guard msg.queued, let queueId = msg.queueId, !queueId.isEmpty else { return }
+        pendingQueueInterruptID = nil
+        guard let token = liveToken else { return }
+        Task { await promoteQueuedTurn(queueId: queueId, token: token) }
+    }
+
+    private func promoteQueuedLocally(queueId: String) {
+        guard let index = agentMessages.firstIndex(where: {
+            $0.queued && $0.queueId == queueId
+        }) else { return }
+        var msg = agentMessages.remove(at: index)
+        msg.queued = false
+        msg.queueId = nil
+        if let firstQueued = agentMessages.firstIndex(where: \.queued) {
+            agentMessages.insert(msg, at: firstQueued)
+        } else {
+            agentMessages.append(msg)
+        }
+    }
+
+    private func promoteQueuedTurn(queueId: String, token: String) async {
+        guard let sid = agentSessionId, !sid.isEmpty else { return }
+        let previous = agentMessages
+        promoteQueuedLocally(queueId: queueId)
+        do {
+            let res: AgentMessageResponse = try await APIClient.shared.request(
+                api("agent/interrupt-queued"),
+                method: "POST",
+                body: AgentInterruptQueuedBody(sessionId: sid, queueId: queueId),
+                bearer: token
+            )
+            applyWireMessages(res.messages)
+            applyAgentRunState(status: res.status ?? "running", workingLabel: res.workingLabel)
+            startAgentPolling(token: token)
+        } catch {
+            if case let APIError.http(code, _) = error, code == 404 {
+                await refreshAgentState(token: token, sessionId: sid)
+                return
+            }
+            agentMessages = previous
+            agentMessages.append(
+                ChatMessage(
+                    role: "assistant",
+                    content: "Could not interrupt with that message."
+                )
+            )
+            persistAgentChatNow()
+        }
     }
 
     private static func displayWorkingLabel(_ raw: String?) -> String {

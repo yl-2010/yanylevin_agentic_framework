@@ -6,16 +6,25 @@ struct ChatMessage: Identifiable, Equatable, Codable {
     var content: String
     /// Waiting behind an in-flight education agent turn (server-backed queue).
     var queued: Bool = false
+    /// Server id for a waiting turn. Hold the bubble to interrupt with it.
+    var queueId: String? = nil
     var widgets: [ChatWidget] = []
 
     enum CodingKeys: String, CodingKey {
-        case role, content, queued, widgets
+        case role, content, queued, queueId, widgets
     }
 
-    init(role: String, content: String, queued: Bool = false, widgets: [ChatWidget] = []) {
+    init(
+        role: String,
+        content: String,
+        queued: Bool = false,
+        queueId: String? = nil,
+        widgets: [ChatWidget] = []
+    ) {
         self.role = role
         self.content = content
         self.queued = queued
+        self.queueId = queueId
         self.widgets = widgets
     }
 
@@ -24,6 +33,8 @@ struct ChatMessage: Identifiable, Equatable, Codable {
         role = try c.decode(String.self, forKey: .role)
         content = try c.decode(String.self, forKey: .content)
         queued = try c.decodeIfPresent(Bool.self, forKey: .queued) ?? false
+        let rawQueueId = try c.decodeIfPresent(String.self, forKey: .queueId)
+        queueId = (rawQueueId?.isEmpty == false) ? rawQueueId : nil
         widgets = try c.decodeIfPresent([ChatWidget].self, forKey: .widgets) ?? []
     }
 
@@ -32,6 +43,9 @@ struct ChatMessage: Identifiable, Equatable, Codable {
         try c.encode(role, forKey: .role)
         try c.encode(content, forKey: .content)
         if queued { try c.encode(true, forKey: .queued) }
+        if let queueId, !queueId.isEmpty {
+            try c.encode(queueId, forKey: .queueId)
+        }
         if !widgets.isEmpty { try c.encode(widgets, forKey: .widgets) }
     }
 }

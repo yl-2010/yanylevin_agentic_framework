@@ -59,6 +59,7 @@ import { attachEducationEvents } from "./education-events.js";
 import {
   startAgent,
   messageAgent,
+  promoteQueuedTurn,
   stopAgent,
   getAgentState,
   getActiveAgent,
@@ -800,6 +801,28 @@ app.post(
   }
 );
 
+app.post(
+  "/api/education/agent/interrupt-queued",
+  requireEducationUser,
+  async (req, res) => {
+    try {
+      const result = await promoteQueuedTurn(
+        req.body?.sessionId,
+        req.user.email,
+        req.body?.queueId
+      );
+      res.setHeader("Cache-Control", "no-store");
+      res.status(202).json(result);
+    } catch (err) {
+      console.error("[/api/education/agent/interrupt-queued]", err);
+      res.status(err.status || 500).json({
+        ok: false,
+        error: err.message || "agent interrupt failed",
+      });
+    }
+  }
+);
+
 app.get("/api/education/agent/state", requireEducationUser, (req, res) => {
   try {
     const result = getAgentState(req.query?.sessionId, req.user.email);
@@ -1079,6 +1102,24 @@ app.post("/api/jype/agent/message", requireJypeUser, async (req, res) => {
     res.status(err.status || 500).json({
       ok: false,
       error: err.message || "agent message failed",
+    });
+  }
+});
+
+app.post("/api/jype/agent/interrupt-queued", requireJypeUser, async (req, res) => {
+  try {
+    const result = await promoteQueuedTurn(
+      req.body?.sessionId,
+      req.user.email,
+      req.body?.queueId
+    );
+    res.setHeader("Cache-Control", "no-store");
+    res.status(202).json(result);
+  } catch (err) {
+    console.error("[/api/jype/agent/interrupt-queued]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "agent interrupt failed",
     });
   }
 });

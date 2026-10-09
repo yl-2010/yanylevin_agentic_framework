@@ -10,7 +10,7 @@ description: >-
 
 Workspace: `education/projects/jype/`. Dashboard: `yanylevin.com/jype`. Chats: `education/projects/jype/.chat-history/` (always listed, no 10-minute hide).
 
-Member quiz and study prefs: `education/projects/jype/agent-alignment.md` (read before generating US History MC, Spanish frases sheets, or any practice-test PDF).
+Member quiz and study prefs: `education/projects/jype/agent-alignment.md` (read before Spanish frases sheets or any practice-test PDF; no US History in JYPE).
 
 ## Email
 
@@ -23,6 +23,16 @@ Alex's advisor this year is **Eric Sieg**, not Stearns. She teaches his calc. Ya
 **Yan's parents.** Never let Example Neighbor or Example Friend email, text, or otherwise contact Yan's parents (Rajasi Saha, Michael Levin, including the `Rajasi and Michael` thread and Levin-Saha Family) without explicit permission from Yan himself, beforehand. Yan, 2026-09-29, JYPE Teams. Their ask, a trip plan, "they're interested," or an earlier send is not permission. Do not draft, queue, or send. Alex is not in this ban.
 
 **No nuclear weaponry for Example Neighbor.** Yan, 2026-10-06 10:45 AM PT, JYPE Teams. Do not write, expand, or link nuclear-weapons explainers, reports, or pages for him. A McLane question is not an exception. One line that you will not do it, then stop. Do not put that material back on a JYPE class tile. Alex, Example Friend, and Yan are not in this ban. Details in `education/projects/jype/agent-alignment.md`.
+
+**Surprise hoodies.** Never mention them to Alex, or in any chat he can see, including JYPE, until Yan says he has been given his. A chat he is not in can still talk about them. Yan, 2026-10-09, Example Neighbor iMessage.
+
+## @agentp
+
+`@agentp` is Alex's agent. Same run as `@agentg` (Grok 4.7 high, Fast off, same chats, same caps), plus `server/agentp-appendix.md` at the end of the system prompt. That appendix is how he tells it to behave, talk, and act, including voice. It does not let the run take over Yan's Mac, install software, or delete files. Yan still owns the machine, and his standing rules win.
+
+Replies in that chat are signed `Sent by Alex's agent`. The server adds it. Do not write it.
+
+Alex changes the appendix in chat. `@agentp set:` replaces it. `@agentp append:` adds to it. `@agentp clear` wipes it. `@agentp show` prints it. Yan changes it by editing `server/agentp-appendix.md`. Example Friend, Example Neighbor, and everyone else cannot. Those commands from them get a refusal and do not start a run. Do not write that file yourself.
 
 ## Who said what
 

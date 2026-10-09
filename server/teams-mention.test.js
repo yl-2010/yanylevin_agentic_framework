@@ -38,6 +38,14 @@ describe("teams-mention trigger", () => {
     assert.equal(
       shouldTriggerTeamsAgent({
         fromMe: true,
+        text: "@agentp done\n\n// Sent by Alex's agent",
+        messageType: "message",
+      }),
+      false
+    );
+    assert.equal(
+      shouldTriggerTeamsAgent({
+        fromMe: true,
         text: "@agent ping",
         messageType: "systemEventMessage",
       }),
@@ -70,6 +78,11 @@ describe("teams-mention trigger", () => {
     assert.match(block, /Markdown is fine/);
     assert.match(block, /Teams HTML/);
     assert.match(block, /Do not add \/\/ Sent by Yan's Personal Agent/);
+    const agentpBlock = formatTeamsOriginBlock(origin, {
+      deliverFinal: true,
+      agentp: true,
+    });
+    assert.match(agentpBlock, /Do not add \/\/ Sent by Alex's agent/);
     assert.match(block, /Do not also school-teams send/);
     assert.match(block, /Teams cannot attach a file/);
     assert.match(block, /Apple Mail/);
@@ -77,7 +90,7 @@ describe("teams-mention trigger", () => {
     assert.match(block, /keep that final bubble/);
     assert.match(block, /before you start the work/);
     assert.match(block, /posted to this Teams chat immediately/);
-    assert.match(block, /@agent and @agentg both do this/);
+    assert.match(block, /@agent, @agentg, and @agentp all do this/);
     assert.match(block, /Keep the reply that lands in this chat short/);
     assert.match(block, /bold on the key fact/);
     assert.doesNotMatch(block, /never sent to Teams/);

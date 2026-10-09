@@ -489,6 +489,11 @@ struct ChatView: View {
                 }
             },
             onDismissCopyMenu: dismissCopyMenu,
+            onInterruptQueued: {
+                let id = msg.id
+                guard let token = auth.session?.token else { return }
+                Task { await educationStore.interruptQueued(messageID: id, token: token) }
+            },
             onBubbleFrame: { frame in
                 updateSendFlightDest(frame)
             }
@@ -1723,6 +1728,23 @@ private struct ChatWorkingBubble: View, Equatable {
     }
 }
 
+/// VoiceOver action only on a queued user bubble.
+private struct QueueInterruptAccessibility: ViewModifier {
+    var enabled: Bool
+    var action: () -> Void
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.accessibilityAction(named: "Interrupt with this message") {
+                YLHaptics.interrupt()
+                action()
+            }
+        } else {
+            content
+        }
+    }
+}
+
 private struct ChatBubbleView: View, Equatable {
     let msg: ChatMessage
     let usesEducation: Bool
@@ -1735,7 +1757,40 @@ private struct ChatBubbleView: View, Equatable {
     var reportsBubbleFrame: Bool = false
     var onShowCopyMenu: () -> Void
     var onDismissCopyMenu: () -> Void
+    var onInterruptQueued: () -> Void = {}
     var onBubbleFrame: ((CGRect) -> Void)?
+    @State private var interruptArmed = false
+
+    private var canQueueInterrupt: Bool {
+        usesEducation && msg.role == "user" && msg.queued
+    }
+
+    /// Arms at 2 seconds (scale, haptic). Does not send until release.
+    private var queueArmGesture: some Gesture {
+        LongPressGesture(minimumDuration: 2, maximumDistance: 12)
+            .onEnded { _ in
+                guard canQueueInterrupt else { return }
+                interruptArmed = true
+                YLHaptics.medium()
+                onDismissCopyMenu()
+            }
+    }
+
+    /// The drag starts only after the 2 second press, so scrolling still wins
+    /// before that. Releasing then promotes the queued turn.
+    private var queueReleaseGesture: some Gesture {
+        LongPressGesture(minimumDuration: 2, maximumDistance: 12)
+            .sequenced(before: DragGesture(minimumDistance: 0))
+            .onEnded { value in
+                guard case .second(true, _) = value, canQueueInterrupt else {
+                    interruptArmed = false
+                    return
+                }
+                interruptArmed = false
+                YLHaptics.interrupt()
+                onInterruptQueued()
+            }
+    }
 
     static func == (lhs: ChatBubbleView, rhs: ChatBubbleView) -> Bool {
         lhs.msg == rhs.msg
@@ -1786,7 +1841,9 @@ private struct ChatBubbleView: View, Equatable {
                                 }
                         }
                     }
-                    .opacity(msg.queued ? 0.42 : 1)
+                    .opacity(msg.queued && !interruptArmed ? 0.42 : 1)
+                    .scaleEffect(interruptArmed ? 1.04 : 1)
+                    .animation(.spring(response: 0.28, dampingFraction: 0.72), value: interruptArmed)
                     .overlay {
                         if showCopyMenu {
                             Color.clear
@@ -1815,9 +1872,20 @@ private struct ChatBubbleView: View, Equatable {
                     .simultaneousGesture(
                         LongPressGesture(minimumDuration: 0.35)
                             .onEnded { _ in
-                                guard copyable else { return }
+                                guard copyable, !interruptArmed else { return }
                                 onShowCopyMenu()
                             }
+                    )
+                    .simultaneousGesture(queueArmGesture)
+                    .simultaneousGesture(queueReleaseGesture)
+                    .onChange(of: msg.queued) { _, queued in
+                        if !queued { interruptArmed = false }
+                    }
+                    .modifier(
+                        QueueInterruptAccessibility(
+                            enabled: canQueueInterrupt,
+                            action: onInterruptQueued
+                        )
                     )
                     .simultaneousGesture(
                         TapGesture().onEnded {

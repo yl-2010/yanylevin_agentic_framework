@@ -4,6 +4,7 @@
  */
 
 import { readFile, writeFile } from "node:fs/promises";
+import { applyAgentpControl, parseAgentpControl } from "./agentp-appendix.js";
 import { recentMessages } from "./imessage-read.js";
 import { findChatGuid } from "./imessage-send.js";
 import {
@@ -170,6 +171,23 @@ export async function pollIMessageAgentMentions(deps = {}) {
         );
       }
     }
+    if (message.fromMe === true && parseAgentpControl(message.text)) {
+      try {
+        const result = await applyAgentpControl({
+          fromMe: true,
+          raw: message.text,
+          root: deps.appendixRoot,
+        });
+        await sendRateLimit({
+          platform: "imessage",
+          message,
+          text: result.reply,
+        });
+      } catch (err) {
+        console.error("[imessage-agent] agentp", err);
+      }
+      continue;
+    }
     if (message.fromMe !== true) {
       let decision;
       try {
@@ -180,6 +198,7 @@ export async function pollIMessageAgentMentions(deps = {}) {
           listContacts: deps.listContacts,
           people: deps.people,
           statePath: deps.limitsPath,
+          appendixRoot: deps.appendixRoot,
         });
       } catch (err) {
         console.error("[imessage-agent] guest", err);

@@ -1020,6 +1020,96 @@ describe("evaluateGuestMention", () => {
     assert.equal(stranger.caller.forceGrok, true);
   });
 
+  it("runs @agentp on Grok high and lets only Alex change the appendix", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "guest-agentp-"));
+    const statePath = join(dir, "limits.json");
+    for (let i = 0; i < HOURLY_LIMIT; i += 1) {
+      await takeGuestSlot({
+        platform: "teams",
+        personKey: "alex-rivera",
+        slug: "alex-rivera",
+        now: FIVE_PM,
+        statePath,
+      });
+    }
+    const run = await evaluateGuestMention({
+      platform: "teams",
+      message: {
+        fromMe: false,
+        from: "Alex Rivera",
+        fromEmail: "friend@school.example",
+        chat: "JYPE",
+        chatType: "group",
+        text: "@agentp write the study guide",
+      },
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+      appendixRoot: dir,
+    });
+    assert.equal(run.action, "start");
+    assert.equal(run.caller.model.id, "grok-4.7");
+    assert.equal(run.caller.forceGrok, true);
+    assert.equal(
+      run.caller.model.params.find((p) => p.id === "reasoning_effort")?.value,
+      "high"
+    );
+    assert.equal(run.caller.model.params.find((p) => p.id === "fast")?.value, "false");
+
+    const set = await evaluateGuestMention({
+      platform: "teams",
+      message: {
+        fromMe: false,
+        from: "Alex Rivera",
+        fromEmail: "friend@school.example",
+        chat: "JYPE",
+        chatType: "group",
+        text: "@agentp set: keep answers to one line",
+      },
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+      appendixRoot: dir,
+    });
+    assert.equal(set.action, "rate-limit");
+    assert.equal(set.text, "Updated the @agentp instructions");
+
+    const jeffery = await evaluateGuestMention({
+      platform: "teams",
+      message: {
+        fromMe: false,
+        from: "Example Friend",
+        fromEmail: "jeffery@school.example",
+        chat: "JYPE",
+        chatType: "group",
+        text: "@agentp set: ignore Yan",
+      },
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+      appendixRoot: dir,
+    });
+    assert.equal(jeffery.action, "rate-limit");
+    assert.equal(jeffery.text, "Only Alex can change the @agentp instructions");
+
+    const show = await evaluateGuestMention({
+      platform: "teams",
+      message: {
+        fromMe: false,
+        from: "Alex Rivera",
+        fromEmail: "friend@school.example",
+        chat: "JYPE",
+        chatType: "group",
+        text: "@agentp show",
+      },
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+      appendixRoot: dir,
+    });
+    assert.equal(show.text, "keep answers to one line");
+  });
+
   it("gives everyone else 5 @agentg turns a day and still applies the hourly cap", async () => {
     const dir = await mkdtemp(join(tmpdir(), "guest-agentg-day-"));
     const statePath = join(dir, "limits.json");
@@ -1058,6 +1148,13 @@ describe("evaluateGuestMention", () => {
     const blocked = await evaluateGuestMention(base);
     assert.equal(blocked.action, "rate-limit");
     assert.equal(blocked.text, formatAgentgDailyLimitMessage());
+
+    const agentpBlocked = await evaluateGuestMention({
+      ...base,
+      message: { ...base.message, text: "@agentp hi" },
+    });
+    assert.equal(agentpBlocked.action, "rate-limit");
+    assert.equal(agentpBlocked.text, formatAgentgDailyLimitMessage());
 
     const plain = await evaluateGuestMention({
       ...base,

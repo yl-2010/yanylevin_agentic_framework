@@ -347,6 +347,25 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    if (route === "agent/interrupt-queued") {
+      if (method !== "POST") {
+        res.setHeader("Allow", "POST");
+        res.status(405).json({ ok: false, error: "method not allowed" });
+        return;
+      }
+      const body = await readJsonBody(req);
+      await forwardEducation(req, res, {
+        method: "POST",
+        path: "/api/education/agent/interrupt-queued",
+        body: {
+          sessionId: body?.sessionId,
+          queueId: body?.queueId,
+        },
+        timeoutMs: 120_000,
+      });
+      return;
+    }
+
     if (route === "agent/state") {
       if (method !== "GET") {
         res.setHeader("Allow", "GET");

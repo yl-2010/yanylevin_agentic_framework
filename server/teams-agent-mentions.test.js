@@ -299,4 +299,46 @@ describe("teams-agent-mentions poller", () => {
     assert.equal(started.length, 0);
     assert.equal(limited.length, 0);
   });
+
+  it("lets Yan set the @agentp appendix without starting a run", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "teams-agentp-"));
+    const statePath = join(dir, "state.json");
+    const appendixRoot = join(dir, "repo");
+    await saveMentionState(
+      { lastAt: "2026-09-09T17:30:00.000Z", seenIds: [] },
+      statePath
+    );
+    /** @type {object[]} */
+    const started = [];
+    /** @type {object[]} */
+    const sent = [];
+    const result = await pollTeamsAgentMentions({
+      statePath,
+      appendixRoot,
+      now: () => new Date("2026-09-09T17:36:12.000Z"),
+      fetchRecent: async () => [
+        {
+          id: "set1",
+          fromMe: true,
+          text: "@agentp set: one line answers",
+          at: "2026-09-09T17:36:10Z",
+          chat: "JYPE",
+          chatId: "19:jype",
+          chatType: "group",
+          messageType: "message",
+        },
+      ],
+      startFromMessage: async (message) => {
+        started.push(message);
+      },
+      deliverGuestRateLimit: async (opts) => {
+        sent.push(opts);
+      },
+    });
+    assert.equal(result.started, 0);
+    assert.equal(started.length, 0);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].text, "Updated the @agentp instructions");
+    assert.equal(sent[0].platform, "teams");
+  });
 });

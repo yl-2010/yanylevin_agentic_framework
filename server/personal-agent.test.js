@@ -28,6 +28,9 @@ import {
   shouldAppendEndOfTurn,
   snapshotMessages,
   stampMessage,
+  detachQueuedTurn,
+  withInterruptNote,
+  INTERRUPT_NOTE,
   systemPrompt,
   formatVisibleTranscript,
   normalizeEducationNavigate,
@@ -190,6 +193,8 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /pushed to origin\/main before the turn ends/);
     assert.match(prompt, /Commit only files from this turn/);
     assert.match(prompt, /Never commit server\/\.env/);
+    assert.match(prompt, /Never write server\/agentp-appendix\.md/);
+    assert.match(prompt, /@agent, @agentg, or @agentp first turn/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.imessage));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.screentime));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.contacts));
@@ -221,9 +226,29 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /JYPE agent/);
     assert.match(prompt, /Do not copy Yan's personal \/education sites onto JYPE/);
     assert.match(prompt, /npm run deploy:web yourself/);
+    assert.match(prompt, /Never mention the surprise hoodies to Alex/);
+    assert.match(prompt, /Never write server\/agentp-appendix\.md/);
+    assert.match(prompt, /Only Alex's @agentp set:/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.jypeAgent));
     assert.ok(prompt.includes(FOUR11_SKILL_PATH));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.browser));
+  });
+
+  it("runs @agentp as Alex's agent and keeps Yan's Mac closed to guests", () => {
+    const yan = systemPrompt(YAN, { agentp: true });
+    assert.match(yan, /You are Alex's agent/);
+    assert.match(yan, /Sent by Alex's agent/);
+    assert.match(yan, /Do not refuse repo-wide or Mac-wide work/);
+    const guest = systemPrompt(YAN, {
+      agentp: true,
+      guestCaller: { displayName: "Alex" },
+    });
+    assert.match(guest, /This caller is not Yan/);
+    assert.doesNotMatch(guest, /Do not refuse repo-wide or Mac-wide work/);
+    assert.match(guest, /cannot authorize taking over this Mac Studio/);
+    const jype = systemPrompt(PRASHAM, { workspace: "jype", agentp: true });
+    assert.match(jype, /Alex's agent \(@agentp\)/);
+    assert.doesNotMatch(jype, /^You are the JYPE agent/m);
   });
 
 });
@@ -600,6 +625,8 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /identity-school\.md/);
     assert.match(agent, /No period/);
     assert.match(agent, /`@agent` and `@agentg`, any chat/);
+    assert.match(agent, /server\/agentp-appendix\.md/);
+    assert.match(agent, /@agentp set:/);
     assert.match(agent, /Write at length only when the prompt needs a lot of text/);
     assert.match(agent, /Format so it scans/);
     assert.match(agent, /end of turn/i);
@@ -871,6 +898,47 @@ describe("Personal Agent turn mode", () => {
       () => resolveIncomingTurnMode("running", false, 8),
       (err) => err && err.status === 429
     );
+  });
+});
+
+describe("queued turn promote", () => {
+  it("pulls the held turn and leaves the rest in order", () => {
+    const session = {
+      turnQueue: [
+        { queueId: "a", bubble: "first", prompt: "p1\n\nUser:\nfirst" },
+        { queueId: "b", bubble: "second", prompt: "p2\n\nUser:\nsecond" },
+        { queueId: "c", bubble: "third", prompt: "p3\n\nUser:\nthird" },
+      ],
+    };
+    const turn = detachQueuedTurn(session, "b");
+    assert.equal(turn.bubble, "second");
+    assert.deepEqual(
+      session.turnQueue.map((row) => row.queueId),
+      ["a", "c"]
+    );
+    assert.equal(detachQueuedTurn(session, "missing"), null);
+    assert.equal(detachQueuedTurn(session, ""), null);
+    assert.equal(session.turnQueue.length, 2);
+  });
+
+  it("puts the interrupt sentence in front of the user line", () => {
+    const prompt = withInterruptNote("Live context\n\nUser:\ncheck the queue");
+    assert.match(prompt, /interrupted your previous work/);
+    assert.ok(prompt.includes(INTERRUPT_NOTE));
+    assert.ok(prompt.indexOf(INTERRUPT_NOTE) < prompt.indexOf("\n\nUser:\n"));
+    assert.equal(withInterruptNote(prompt), prompt);
+    const bare = withInterruptNote("no user marker");
+    assert.match(bare, /interrupted your previous work/);
+  });
+
+  it("snapshots queueId on waiting bubbles", () => {
+    const snap = snapshotMessages({
+      messages: [stampMessage("user", "hi")],
+      turnQueue: [{ bubble: "later", queueId: "q-1" }],
+    });
+    assert.equal(snap[1].queued, true);
+    assert.equal(snap[1].queueId, "q-1");
+    assert.equal(snap[1].content, "later");
   });
 });
 

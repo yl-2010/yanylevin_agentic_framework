@@ -1751,7 +1751,11 @@ export async function sendTeamsMessage(opts = {}) {
   const teamNeedle = String(opts.team || "").trim();
   const channelNeedle = String(opts.channel || "").trim();
   const originChat = chatNeedle || teamNeedle;
-  const body = applyAgentSentFooter(text, { chat: originChat, platform: "teams" });
+  const body = applyAgentSentFooter(text, {
+    chat: originChat,
+    platform: "teams",
+    agentp: opts.agentp === true,
+  });
   if (!body) return { ok: false, error: "empty body" };
 
   if (teamNeedle && channelNeedle) {

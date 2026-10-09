@@ -1835,6 +1835,8 @@ a.edu-score {
   --chat-orange-rgb: 253, 88, 2;
   --pill-w: var(--chat-circle);
   --pill-left: calc(100vw - var(--chat-pad) - var(--chat-circle));
+  /* Clears the pill's corner curve (radius is half the short pill) with a little air. */
+  --composer-pad-y: 1.25rem;
   position: fixed; inset: 0; z-index: 90; pointer-events: none;
 }
 @media (prefers-color-scheme: dark) {
@@ -1959,8 +1961,12 @@ html[data-resolved-theme="dark"] .yan-chat-pill.corner.lg-refraction::after {
 .yan-chat.is-open .yan-chat-form { opacity: 1; pointer-events: auto; transition-delay: 0.2s; }
 .yan-chat-column.is-composer-tall .yan-chat-form {
   align-items: flex-end;
-  padding-top: 0.55rem;
-  padding-bottom: 0.55rem;
+  padding-top: var(--composer-pad-y);
+  padding-bottom: var(--composer-pad-y);
+}
+.yan-chat-column.is-composer-tall .yan-chat-send {
+  /* Same bottom gap as the short pill, where the button is vertically centered. */
+  margin-bottom: max(0px, calc((var(--chat-circle) - 2.45rem) / 2 - var(--composer-pad-y)));
 }
 .yan-chat-input {
   flex: 1; min-width: 0; min-height: 0; height: 1.35em; margin: 0; padding: 0 0.25rem; border: 0;
@@ -2081,7 +2087,7 @@ html[data-resolved-theme="light"] .yan-chat-attach-chip {
   border-radius: 50%; display: grid; place-items: center; background: transparent;
   color: var(--fg); isolation: isolate; cursor: pointer;
   box-shadow: 0 4px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
-  transition: opacity 0.2s, box-shadow 0.3s var(--ease), filter 0.25s var(--ease), transform 0.25s var(--ease);
+  transition: opacity 0.2s, box-shadow 0.3s var(--ease), filter 0.25s var(--ease), transform 0.25s var(--ease), margin-bottom 0.22s var(--ease);
   touch-action: manipulation;
   -webkit-touch-callout: none;
   user-select: none;
@@ -2467,6 +2473,13 @@ html[data-resolved-theme="light"] .yan-chat-bubble--user {
 }
 .yan-chat-turn--queued {
   opacity: 0.42;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.yan-chat-turn--queued.is-interrupt-armed {
+  opacity: 1;
+  transform: scale(1.04);
 }
 .yan-chat-widget-stack {
   display: flex;
