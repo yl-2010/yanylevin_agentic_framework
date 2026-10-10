@@ -7,13 +7,11 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { listEntities } from "./brain-lib.js";
 import { contactMatchesQuery } from "./contacts-read.js";
-import { applyAgentpControl, parseAgentpControl } from "./agentp-appendix.js";
 import {
   applyAgentSentFooter,
   isClassOf2028Thread,
   isGradeWideThread,
   isJypeThread,
-  messageForcesAgentp,
   messageForcesGrok,
   normalizeIMessageOrigin,
   replyTargetForMessage,
@@ -220,7 +218,7 @@ export function formatRateLimitMessage(retryAt) {
 }
 
 export function formatAgentgDailyLimitMessage() {
-  return "Your daily @agentg / @agentp limit has been reached. Try again tomorrow.";
+  return "Your daily @agentg limit has been reached. Try again tomorrow.";
 }
 
 /**
@@ -740,21 +738,6 @@ export async function evaluateGuestMention(opts) {
   const jypeCaller = isJypeGuestCaller(slug, email, fromName);
   if (messageIsJypeThread(message) && !jypeCaller) return { action: "ignore" };
 
-  if (parseAgentpControl(message.text)) {
-    const result = await applyAgentpControl({
-      fromMe: false,
-      slug,
-      email,
-      raw: message.text,
-      root: opts.appendixRoot,
-    });
-    return {
-      action: "rate-limit",
-      platform,
-      text: result.reply,
-    };
-  }
-
   const forceGrok = messageForcesGrok(message.text);
 
   if (messageIsJypeThread(message)) {
@@ -882,13 +865,12 @@ export async function deliverGuestRateLimit(opts) {
   const text = String(opts.text || "").trim();
   if (!text) return { ok: false, skipped: "empty" };
   const message = opts.message || {};
-  const agentp = messageForcesAgentp(message.text);
   if (opts.platform === "teams") {
     const origin = normalizeTeamsOrigin(message);
     const chat = String(origin?.chatId || origin?.to || origin?.chat || "").trim();
     if (!chat) return { ok: false, skipped: "no-target" };
     const send = opts.sendTeamsMessage || sendTeamsMessage;
-    return send({ chat, text, agentp });
+    return send({ chat, text });
   }
   const origin = normalizeIMessageOrigin(message);
   const to =
@@ -900,7 +882,7 @@ export async function deliverGuestRateLimit(opts) {
   const send = opts.sendIMessage || sendIMessage;
   return send({
     to: to || chatGuid,
-    text: applyAgentSentFooter(text, { ...origin, agentp }),
+    text: applyAgentSentFooter(text, origin),
     chatGuid: chatGuid || undefined,
   });
 }

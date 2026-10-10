@@ -4,7 +4,6 @@
  */
 
 import { readFile, writeFile } from "node:fs/promises";
-import { applyAgentpControl, parseAgentpControl } from "./agentp-appendix.js";
 import { fetchRecentChatMessages, isTeamsAuthError, isTeamsSelfChat } from "./school-teams.js";
 import {
   deliverGuestRateLimit,
@@ -155,23 +154,6 @@ export async function pollTeamsAgentMentions(deps = {}) {
     seen.add(key);
     /** @type {object} */
     const message = { ...hit };
-    if (message.fromMe === true && parseAgentpControl(message.text)) {
-      try {
-        const result = await applyAgentpControl({
-          fromMe: true,
-          raw: message.text,
-          root: deps.appendixRoot,
-        });
-        await sendRateLimit({
-          platform: "teams",
-          message,
-          text: result.reply,
-        });
-      } catch (err) {
-        console.error("[teams-agent] agentp", err);
-      }
-      continue;
-    }
     if (message.fromMe !== true) {
       let decision;
       try {
@@ -181,7 +163,6 @@ export async function pollTeamsAgentMentions(deps = {}) {
           now: nowFn(),
           people: deps.people,
           statePath: deps.limitsPath,
-          appendixRoot: deps.appendixRoot,
         });
       } catch (err) {
         console.error("[teams-agent] guest", err);

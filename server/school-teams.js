@@ -1754,7 +1754,6 @@ export async function sendTeamsMessage(opts = {}) {
   const body = applyAgentSentFooter(text, {
     chat: originChat,
     platform: "teams",
-    agentp: opts.agentp === true,
   });
   if (!body) return { ok: false, error: "empty body" };
 

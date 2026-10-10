@@ -2,9 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   AGENT_SENT_FOOTER,
-  AGENTP_SENT_FOOTER,
   TEAMS_AGENT_SENT_FOOTER,
-  TEAMS_AGENTP_SENT_FOOTER,
   agentSentFooterFor,
   applyAgentSentFooter,
   formatIMessageOriginBlock,
@@ -39,13 +37,13 @@ describe("imessage-mention", () => {
     assert.equal(messageMentionsAgent("@agent_grok do this"), false);
     assert.equal(messageForcesGrok("@agentgood"), false);
     assert.equal(AGENT_MENTION_RE.test("@agentg do this"), false);
-    assert.equal(messageMentionsAgent("@agentp do this"), true);
-    assert.equal(messageForcesGrok("@agentp do this"), true);
-    assert.equal(messageForcesGrok("@AgentP"), true);
+    assert.equal(messageMentionsAgent("@agentp do this"), false);
+    assert.equal(messageForcesGrok("@agentp do this"), false);
+    assert.equal(messageForcesGrok("@AgentP"), false);
     assert.equal(messageForcesGrok("@agentpuppy"), false);
     assert.equal(messageMentionsAgent("@agentpuppy"), false);
     assert.equal(AGENT_MENTION_RE.test("@agentp do this"), false);
-    assert.equal(isBareAgentMention("@agentp"), true);
+    assert.equal(isBareAgentMention("@agentp"), false);
     assert.equal(isBareAgentMention("@agentp ping"), false);
     assert.equal(isBareAgentMention("@agentg"), true);
     assert.equal(isBareAgentMention("@agentg ping"), false);
@@ -66,14 +64,6 @@ describe("imessage-mention", () => {
     assert.equal(agentSentFooterFor({ platform: "teams" }), TEAMS_AGENT_SENT_FOOTER);
     assert.equal(agentSentFooterFor({ chat: "JYPE" }), TEAMS_AGENT_SENT_FOOTER);
     assert.equal(agentSentFooterFor({ platform: "email" }), AGENT_SENT_FOOTER);
-    assert.equal(
-      agentSentFooterFor({ platform: "teams", agentp: true }),
-      TEAMS_AGENTP_SENT_FOOTER
-    );
-    assert.equal(
-      agentSentFooterFor({ platform: "email", agentp: true }),
-      AGENTP_SENT_FOOTER
-    );
   });
 
   it("triggers on Yan fromMe or guest texts with the token", () => {
@@ -98,18 +88,25 @@ describe("imessage-mention", () => {
     assert.equal(
       shouldTriggerIMessageAgent({
         ...base,
-        text: `ok\n\n${AGENT_SENT_FOOTER}`,
+        text: "ok\n\nSent by Yan's Personal Agent",
+      }),
+      false
+    );
+    assert.equal(shouldTriggerIMessageAgent({ ...base, text: "hello" }), false);
+    assert.equal(
+      shouldTriggerIMessageAgent({
+        ...base,
+        text: "@agentp get rid of yourself",
       }),
       false
     );
     assert.equal(
       shouldTriggerIMessageAgent({
         ...base,
-        text: `@agentp ok\n\n${AGENTP_SENT_FOOTER}`,
+        text: "@agentp @agentg still works",
       }),
-      false
+      true
     );
-    assert.equal(shouldTriggerIMessageAgent({ ...base, text: "hello" }), false);
   });
 
   it("picks named groups then handles then chat ids", () => {
@@ -168,22 +165,6 @@ describe("imessage-mention", () => {
       applyAgentSentFooter("On it", { chat: "Class of 2028", platform: "teams" }),
       `On it\n\n${TEAMS_AGENT_SENT_FOOTER}`
     );
-    assert.equal(
-      applyAgentSentFooter("On it", { chat: "JYPE", agentp: true }),
-      `On it\n\n${TEAMS_AGENTP_SENT_FOOTER}`
-    );
-    assert.equal(
-      stripAgentSentFooter(`On it\n\n${TEAMS_AGENTP_SENT_FOOTER}`),
-      "On it"
-    );
-    assert.equal(stripAgentSentFooter(AGENTP_SENT_FOOTER), "");
-    assert.equal(
-      applyAgentSentFooter(`On it\n\n${AGENT_SENT_FOOTER}`, {
-        chat: "JYPE",
-        agentp: true,
-      }),
-      `On it\n\n${TEAMS_AGENTP_SENT_FOOTER}`
-    );
   });
 
   it("formats origin context with a thread lookup", () => {
@@ -222,13 +203,6 @@ describe("imessage-mention", () => {
     assert.match(bare, /infer why they called you/);
     assert.match(bare, /limit=80/);
     assert.match(block, /Do not add \/\/ Sent by Yan's Personal Agent/);
-    const agentpBlock = formatIMessageOriginBlock(origin, {
-      deliverFinal: true,
-      agentp: true,
-    });
-    assert.match(agentpBlock, /Alex's agent/);
-    assert.match(agentpBlock, /Do not add \/\/ Sent by Alex's Personal Agent/);
-    assert.doesNotMatch(agentpBlock, /still Yan's Personal Agent/);
     assert.match(block, /Newlines work/);
     assert.match(block, /does not render markdown/);
     assert.match(block, /server appends that footer on the iMessage only/);
@@ -239,7 +213,7 @@ describe("imessage-mention", () => {
     assert.match(block, /native iMessage files/);
     assert.match(block, /before you start the work/);
     assert.match(block, /posted to this iMessage chat immediately/);
-    assert.match(block, /@agent, @agentg, and @agentp all do this/);
+    assert.match(block, /@agent and @agentg both do this/);
     assert.match(block, /Keep the reply that lands in this chat short/);
     assert.match(block, /put each on its own line/);
     assert.doesNotMatch(block, /never sent to iMessage/);

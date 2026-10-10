@@ -6,11 +6,9 @@
  * small markdown subset (bold, italic, lists, links, headings, code).
  */
 
-import { AGENT_SENT_FOOTER, AGENTP_SENT_FOOTER } from "./imessage-mention.js";
+import { AGENT_SENT_FOOTER } from "./imessage-mention.js";
 
-const FOOTER_PHRASE = [AGENT_SENT_FOOTER, AGENTP_SENT_FOOTER]
-  .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-  .join("|");
+const FOOTER_PHRASE = AGENT_SENT_FOOTER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const FOOTER_RE = new RegExp(
   `^(?://[ \\t]*)?(?:${FOOTER_PHRASE})[ \\t]*$`,
   "i"
