@@ -42,7 +42,7 @@ List the day with `node server/calendar-cli.js events`.
 
 ## Action log
 
-On `create`, `update`, and `delete`, add `--via calendar-on-demand`. List and get stay without it. The dashboard Actions rail uses that flag to tell a Jev job from a chat.
+On `create`, `update`, and `delete`, add `--via calendar-on-demand`. List and get stay without it. The flag tells the CLI this is a Jev job, so a title that names Jev is refused. These writes do not get a card on the dashboard Actions rail. Yan already sees the change on the calendar.
 
 ## Fields
 

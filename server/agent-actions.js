@@ -1,7 +1,8 @@
 /**
  * Append-only log of side effects Yan would not already see.
- * Calendar, mail, education dates, lights, and the vacuum belong here.
+ * Nightly calendar writes, mail, education dates, lights, and the vacuum belong here.
  * Teams and iMessage sends do not. Those already show in the chat.
+ * Calendar-on-demand writes do not. Those already show on the calendar.
  * File stays on the Mac. data/agent-actions.jsonl is gitignored.
  */
 
@@ -19,14 +20,18 @@ const AGENT_LABELS = {
   "nightly-actions": "Nightly actions",
 };
 
-/** Already visible in Teams or Messages. The Actions rail skips these. */
+/** Already visible in Teams, Messages, or on the calendar. The Actions rail skips these. */
 const CHAT_KINDS = new Set(["teams", "imessage"]);
+const HIDDEN_AGENTS = new Set(["calendar-on-demand"]);
 
 /**
  * @param {string} kind
+ * @param {string} [agent]
  */
-export function isDashboardAction(kind) {
-  return !CHAT_KINDS.has(String(kind || "").trim());
+export function isDashboardAction(kind, agent = "") {
+  if (CHAT_KINDS.has(String(kind || "").trim())) return false;
+  if (HIDDEN_AGENTS.has(String(agent || "").trim())) return false;
+  return true;
 }
 
 /**
@@ -86,7 +91,7 @@ export async function appendAgentAction(entry, opts = {}) {
     .trim();
   const at = entry?.at ? String(entry.at) : new Date().toISOString();
   if (!agent || !kind || !summary) return null;
-  if (!isDashboardAction(kind)) return null;
+  if (!isDashboardAction(kind, agent)) return null;
   if (Number.isNaN(Date.parse(at))) return null;
   const id = String(entry?.id || "").trim();
   if (id && (await actionIdExists(path, id))) return null;
@@ -231,7 +236,7 @@ export async function readAgentActions(opts = {}) {
     try {
       const row = JSON.parse(trimmed);
       if (!row?.summary || !row?.at) continue;
-      if (!isDashboardAction(row.kind)) continue;
+      if (!isDashboardAction(row.kind, row.agent)) continue;
       entries.push(publicEntry(row));
     } catch {
       /* skip a torn line */

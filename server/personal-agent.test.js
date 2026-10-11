@@ -154,6 +154,7 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.includes(UNSLOP_SKILL_PATH));
     assert.ok(prompt.includes(FOUR11_SKILL_PATH));
     assert.match(prompt, /Always Read and apply the unslop skill/);
+    assert.match(prompt, /Never mention the surprise hoodies to Alex/);
     assert.match(prompt, /EPS student IDs \/ school photos/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.soul));
     assert.match(prompt, /Always Read SOUL\.md/);

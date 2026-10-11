@@ -92,6 +92,8 @@ describe("agent action log", () => {
       assert.equal(isDashboardAction("teams"), false);
       assert.equal(isDashboardAction("imessage"), false);
       assert.equal(isDashboardAction("calendar"), true);
+      assert.equal(isDashboardAction("calendar", "nightly-actions"), true);
+      assert.equal(isDashboardAction("calendar", "calendar-on-demand"), false);
       const dropped = await appendAgentAction(
         {
           agent: "jype",
@@ -120,6 +122,26 @@ describe("agent action log", () => {
         },
         { path }
       );
+      await appendFile(
+        path,
+        `${JSON.stringify({
+          at: "2026-10-01T20:00:00.000Z",
+          agent: "calendar-on-demand",
+          kind: "calendar",
+          summary: "Added Dinner Friday on Home",
+        })}\n`,
+        "utf8"
+      );
+      const hidden = await appendAgentAction(
+        {
+          at: "2026-10-02T20:00:00.000Z",
+          agent: "calendar-on-demand",
+          kind: "calendar",
+          summary: "Added Lunch Saturday on Home",
+        },
+        { path }
+      );
+      assert.equal(hidden, null);
       const { entries } = await readAgentActions({ path, seed: false });
       assert.equal(entries.length, 1);
       assert.equal(entries[0].kind, "vacuum");

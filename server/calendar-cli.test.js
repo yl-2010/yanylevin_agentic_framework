@@ -260,8 +260,15 @@ describe("calendar --via action log", () => {
     const dir = await mkdtemp(join(tmpdir(), "calendar-via-"));
     const path = join(dir, "actions.jsonl");
     try {
-      const row = await logCalendarCommand({
+      const dropped = await logCalendarCommand({
         via: "calendar-on-demand",
+        cmd: "create",
+        event: { title: "Dinner Friday", calendar: "Home", id: "ev-1" },
+        path,
+      });
+      assert.equal(dropped, null);
+      const row = await logCalendarCommand({
+        via: "nightly-actions",
         cmd: "create",
         event: { title: "Dinner Friday", calendar: "Home", id: "ev-1" },
         path,
