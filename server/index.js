@@ -67,7 +67,12 @@ import {
   listAgentChats,
   resumeAgent,
   markAgentChatRead,
+  startFutureAgentScheduler,
 } from "./personal-agent.js";
+import {
+  listUpcomingFutureAgents,
+  publicFutureAgentEntry,
+} from "./future-agents.js";
 import {
   isFitnessUser,
   readFitnessTree,
@@ -387,6 +392,24 @@ app.post("/api/account-delete", requireAuth, async (req, res) => {
 /**
  * Login audit log for the gated /dashboard (operator only).
  */
+app.get("/api/future-agents", requireAuth, async (req, res) => {
+  try {
+    if (!isChatLogViewer(req.user?.email)) {
+      res.status(403).json({ ok: false, error: "forbidden" });
+      return;
+    }
+    const entries = (await listUpcomingFutureAgents()).map(publicFutureAgentEntry);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, count: entries.length, entries });
+  } catch (err) {
+    console.error("[/api/future-agents]", err);
+    res.status(500).json({
+      ok: false,
+      error: err.message || "future-agents read failed",
+    });
+  }
+});
+
 app.get("/api/agent-actions", requireAuth, async (req, res) => {
   try {
     if (!isChatLogViewer(req.user?.email)) {
@@ -1408,6 +1431,7 @@ app.use((_req, res) => {
   startLocalIpc();
   startIMessageAgentMentionScheduler();
   startTeamsAgentMentionScheduler();
+  startFutureAgentScheduler();
   startAppleMailFileScheduler();
   startCalendarReconcileScheduler();
   startSchoolMailCalendarScheduler();

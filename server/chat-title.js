@@ -19,6 +19,8 @@ import {
   patchChatHistoryTitle,
   resolveChatStarter,
   sanitizeChatTitle,
+  scheduledTaskFromUserMessage,
+  withScheduledTitlePrefix,
 } from "./education-chat-history.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -38,7 +40,9 @@ No quotes. No trailing punctuation. No em dashes. No explanation.`;
 export const TITLE_PROMPT = `Reply with only a short chat list title for this first user message.
 ${CHAT_TITLE_STYLE}
 Do not prefix the title with a person's name or Name:. The server adds that when needed.
+Do not prefix the title with Scheduled:. The server adds that on a future agent thread.
 If this is a Teams or iMessage @agent ping, title the request, not the From Name on Teams/iMessage wrapper or the @agent mention.
+If the message starts with "Agent scheduled for", title the task under that line, not the date.
 
 Message:
 `;
@@ -53,6 +57,8 @@ const AGENT_MENTION_LEAD_RE = /^@agent\b[:,]?\s*/i;
  * @returns {string}
  */
 export function titleSeedFromUserMessage(raw) {
+  const task = scheduledTaskFromUserMessage(raw);
+  if (task) return task;
   let s = String(raw || "").trim();
   const wrap = s.match(CHAT_GUEST_WRAP_RE);
   let who = "";
@@ -75,8 +81,24 @@ export function titleSeedFromUserMessage(raw) {
  * @param {unknown} title
  * @param {unknown} firstUserMessage
  */
+function isScheduledThread(loaded, firstUserMessage) {
+  return Boolean(loaded?.scheduled) || Boolean(scheduledTaskFromUserMessage(firstUserMessage));
+}
+
+function storeChatTitle(title, loaded, firstUserMessage, starterOpts) {
+  if (isScheduledThread(loaded, firstUserMessage)) {
+    return withScheduledTitlePrefix(title);
+  }
+  return applyChatTitleStarter(title, starterOpts) || sanitizeChatTitle(title);
+}
+
 export function isStubChatTitle(title, firstUserMessage) {
   const t = sanitizeChatTitle(title);
+  const task = scheduledTaskFromUserMessage(firstUserMessage);
+  if (task) {
+    if (!t) return true;
+    if (t === withScheduledTitlePrefix(fallbackChatTitle(task))) return true;
+  }
   if (!t) return true;
   if (CHAT_GUEST_WRAP_RE.test(t)) return true;
   const collapsed = String(firstUserMessage || "").replace(/\s+/g, " ").trim();
@@ -167,19 +189,15 @@ export async function generateAndStoreChatTitle(opts) {
     loaded.messages.find((m) => m.role === "user")?.content ||
     loaded.preview ||
     "";
-  const starter = resolveChatStarter({
+  const starterOpts = {
     email: opts.email,
     workspace: opts.workspace || loaded.workspace,
     starter: opts.starter || loaded.starter,
     firstUserMessage: firstUser,
-  });
+  };
+  const starter = resolveChatStarter(starterOpts);
   if (loaded.title && !isStubChatTitle(loaded.title, firstUser)) {
-    const kept = applyChatTitleStarter(loaded.title, {
-      email: opts.email,
-      workspace: opts.workspace || loaded.workspace,
-      starter,
-      firstUserMessage: firstUser,
-    });
+    const kept = storeChatTitle(loaded.title, loaded, firstUser, starterOpts);
     if (kept === loaded.title && starter === (loaded.starter || "")) {
       return loaded.title;
     }
@@ -228,12 +246,7 @@ export async function generateAndStoreChatTitle(opts) {
   if (isStubChatTitle(title, firstUser) && loaded.title) {
     title = loaded.title;
   }
-  const named = applyChatTitleStarter(title, {
-    email: opts.email,
-    workspace: opts.workspace || loaded.workspace,
-    starter,
-    firstUserMessage: firstUser,
-  });
+  const named = storeChatTitle(title, loaded, firstUser, starterOpts);
   return patchChatHistoryTitle({
     email: opts.email,
     sessionId: opts.sessionId,

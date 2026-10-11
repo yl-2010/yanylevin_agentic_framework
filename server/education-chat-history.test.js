@@ -963,6 +963,22 @@ describe("titles", () => {
     assert.equal(sanitizeChatVisibility("nope"), "showing");
   });
 
+  it("keeps Scheduled: outside the 40 character cap and skips the name prefix", () => {
+    const long = "spanish mastery assessment link for the group chat";
+    const titled = sanitizeChatTitle(`Scheduled: ${long} extra words that should fall off the end`);
+    assert.ok(titled.startsWith("Scheduled: "));
+    assert.ok(titled.length > 40);
+    assert.ok(titled.slice("Scheduled: ".length).length <= 40);
+    assert.equal(
+      applyChatTitleStarter(titled, {
+        email: EMAIL,
+        workspace: "jype",
+        starter: "Alex",
+      }),
+      titled
+    );
+  });
+
   it("treats only explicit true as ephemeral", () => {
     assert.equal(sanitizeChatEphemeral(""), false);
     assert.equal(sanitizeChatEphemeral("true"), true);

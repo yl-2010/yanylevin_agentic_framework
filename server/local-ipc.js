@@ -268,6 +268,25 @@ export function createLocalIpcHandler(deps = {}) {
         });
         return sendJson(res, 202, { ok: true, started: true });
       }
+      if (method === "GET" && path === "/future-agents/list") {
+        const { listUpcomingFutureAgents, publicFutureAgentEntry } = await import(
+          "./future-agents.js"
+        );
+        const entries = (await listUpcomingFutureAgents()).map(publicFutureAgentEntry);
+        return sendJson(res, 200, { ok: true, count: entries.length, entries });
+      }
+      if (method === "POST" && path === "/future-agents/schedule") {
+        const payload = await readJsonBody(req);
+        const { scheduleFutureAgentLive } = await import("./personal-agent.js");
+        const result = await scheduleFutureAgentLive(payload);
+        return sendJson(res, 200, result);
+      }
+      if (method === "POST" && path === "/future-agents/cancel") {
+        const payload = await readJsonBody(req);
+        const { cancelFutureAgentLive } = await import("./personal-agent.js");
+        const result = await cancelFutureAgentLive(payload?.sessionId);
+        return sendJson(res, 200, result);
+      }
       if (method === "POST" && path === "/jobs/bootstrap-people") {
         runSynth({ force: true, bootstrapPeople: true }).catch((err) => {
           console.error(

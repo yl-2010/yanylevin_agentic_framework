@@ -11,6 +11,9 @@
   const listEl = document.getElementById("dash-list");
   const loginListEl = document.getElementById("login-list");
   const actionsEl = document.getElementById("action-list");
+  const futureEl = document.getElementById("future-agent-list");
+  let futureKey = "";
+  let futurePoll = null;
   const agentsEl = document.getElementById("dash-agents");
 
   const AGENT_BANDS = [
@@ -443,6 +446,58 @@
     queueMicrotask(() => window.reinitLiquidGlass?.());
   }
 
+  function renderFutureAgent(entry, index) {
+    const id = `lg-future-${index}`;
+    const when =
+      entry.status === "running" ? "Running" : entry.when || "";
+    const href = String(entry.href || "");
+    return `<li
+      class="dash-entry dash-action"
+      data-liquid-glass="rounded"
+      data-lg-radius="18"
+      data-filter-id="${escapeHtml(id)}"
+      data-key="${escapeHtml(entry.sessionId || String(index))}"
+    >
+      <a class="dash-future-link" href="${escapeHtml(href)}">
+        <div class="dash-entry-in">
+          <p class="dash-when">${escapeHtml(when)}</p>
+          <p class="dash-action-agent">${escapeHtml(entry.workspaceLabel || "")}</p>
+          <p class="dash-action-line">${escapeHtml(entry.prompt || entry.title || "")}</p>
+        </div>
+      </a>
+    </li>`;
+  }
+
+  function renderEmptyFuture() {
+    return `<li
+      class="dash-entry dash-action is-empty"
+      data-liquid-glass="rounded"
+      data-lg-radius="18"
+      data-filter-id="lg-future-empty"
+    >
+      <div class="dash-entry-in">
+        <p class="dash-action-line">No scheduled agents</p>
+      </div>
+    </li>`;
+  }
+
+  function renderFutureAgents(entries, resetScroll) {
+    if (!futureEl) return;
+    const key = entries
+      .map((entry) => `${entry.sessionId || ""}:${entry.status || ""}:${entry.runAt || ""}`)
+      .join("|");
+    if (key === futureKey && futureEl.childElementCount) return;
+    futureKey = key;
+    const rows = entries.length
+      ? entries.map(renderFutureAgent)
+      : [renderEmptyFuture()];
+    const scroll = futureEl.scrollLeft;
+    futureEl.innerHTML = rows.join("");
+    if (resetScroll) futureEl.scrollLeft = 0;
+    else futureEl.scrollLeft = scroll;
+    queueMicrotask(() => window.reinitLiquidGlass?.());
+  }
+
   function renderActions(entries) {
     if (!actionsEl) return;
     const rows = entries.length
@@ -495,6 +550,22 @@
     return data;
   }
 
+  async function fetchFutureAgents() {
+    const { res, data } = await fetchJson("/api/dashboard/future-agents");
+    if (res.status === 401) {
+      show("login");
+      return null;
+    }
+    if (res.status === 403) {
+      show("denied");
+      return null;
+    }
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || `future-agents failed (${res.status})`);
+    }
+    return data;
+  }
+
   async function fetchLoginLog() {
     const { res, data } = await fetchJson("/api/dashboard/login-log");
     if (res.status === 401) {
@@ -534,15 +605,17 @@
 
   async function loadOnce() {
     try {
-      const [chat, logins, actions] = await Promise.all([
+      const [chat, logins, actions, future] = await Promise.all([
         fetchChatLog(),
         fetchLoginLog(),
         fetchAgentActions(),
+        fetchFutureAgents(),
       ]);
-      if (!chat || !logins || !actions) return;
+      if (!chat || !logins || !actions || !future) return;
       renderChats(Array.isArray(chat.entries) ? chat.entries : []);
       renderLogins(Array.isArray(logins.entries) ? logins.entries : []);
       renderActions(Array.isArray(actions.entries) ? actions.entries : []);
+      renderFutureAgents(Array.isArray(future.entries) ? future.entries : [], true);
     } catch (err) {
       console.error("[dashboard]", err);
     }
@@ -565,6 +638,18 @@
         renderAgents();
         await ensureLoginRecorded();
         await loadOnce();
+        if (futurePoll) clearInterval(futurePoll);
+        futurePoll = setInterval(() => {
+          fetchFutureAgents()
+            .then((data) => {
+              if (!data) return;
+              renderFutureAgents(
+                Array.isArray(data.entries) ? data.entries : [],
+                false
+              );
+            })
+            .catch((err) => console.error("[dashboard] future agents", err));
+        }, 30_000);
         return;
       }
       show("denied");

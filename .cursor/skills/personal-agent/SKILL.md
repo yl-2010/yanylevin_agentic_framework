@@ -51,6 +51,12 @@ If you edit any other file in this repo, commit only those files and `git push o
 
 On the Mac Studio, if Vercel serves a file you changed, run `npm run deploy:web` in that same turn.
 
+## Always: future agents
+
+If someone wants a reminder, a message after something finishes, or anything that has to wait, schedule a future agent in this turn. A hint is enough. Do the part you can do now. Schedule the part that waits. Do not say you will remember.
+
+Read `.cursor/skills/future-agents/SKILL.md` and call `schedule_future_agent`. On Cursor Desktop, run `node server/future-agents.js schedule` from that skill.
+
 ## Always: named people (Yan only)
 
 Skip this section if the user is Alex.
@@ -84,6 +90,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Static HTML on a todo / date / project / class | `.cursor/skills/object-html/SKILL.md` |
 | Public yanylevin.com page (study guide, plan, blueprint, liquid-glass report) | `.cursor/skills/yanylevin-webpage-create/SKILL.md` |
 | Weekly PDF, `schedule.json`, bells, another class, the week | `.cursor/skills/class-schedule/SKILL.md` |
+| Reminder, "later", end of a period, send something after an event | `.cursor/skills/future-agents/SKILL.md` |
 | EPS student IDs, four11 course lists, school / yearbook photos | `~/.cursor/skills/eps-four11/SKILL.md` |
 | Past Personal Agent transcripts | `.cursor/skills/past-chats/SKILL.md` |
 | Yan iPhone location (live + stays/trips) | `.cursor/skills/phone-location/SKILL.md` |

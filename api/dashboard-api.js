@@ -10,7 +10,7 @@ const ISSUER = "yanylevin-next";
 const AUDIENCE = "yanylevin-mac-api";
 const DEFAULT_MAC_API = "https://api.yanylevin.com";
 
-const ALLOWED = new Set(["chat-log", "login-log", "agent-actions"]);
+const ALLOWED = new Set(["chat-log", "login-log", "agent-actions", "future-agents"]);
 
 function macApiBase() {
   const raw =
@@ -67,7 +67,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    if (path === "chat-log" || path === "agent-actions") {
+    if (path === "chat-log" || path === "agent-actions" || path === "future-agents") {
       if (req.method !== "GET") {
         res.setHeader("Allow", "GET");
         res.status(405).json({ ok: false, error: "method not allowed" });

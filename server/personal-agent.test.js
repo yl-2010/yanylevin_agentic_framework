@@ -150,6 +150,8 @@ describe("Personal Agent system prompt", () => {
     const prompt = systemPrompt(YAN);
     assert.ok(prompt.length < 6600, `prompt length ${prompt.length}`);
     assert.match(prompt, /Personal Agent/);
+    assert.match(prompt, /schedule_future_agent/);
+    assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.futureAgents));
     assert.match(prompt, /Do not preload other skills/);
     assert.ok(prompt.includes(UNSLOP_SKILL_PATH));
     assert.ok(prompt.includes(FOUR11_SKILL_PATH));
@@ -230,6 +232,8 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.jypeAgent));
     assert.ok(prompt.includes(FOUR11_SKILL_PATH));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.browser));
+    assert.match(prompt, /schedule_future_agent/);
+    assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.futureAgents));
   });
 
 });

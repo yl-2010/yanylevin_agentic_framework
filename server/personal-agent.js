@@ -40,6 +40,16 @@ import {
 } from "./education-chat-history.js";
 import { enqueueChatTitle, isStubChatTitle } from "./chat-title.js";
 import {
+  armFutureAgentTimer,
+  armStoredFutureAgents,
+  cancelFutureAgent,
+  clearFutureAgentTimer,
+  formatScheduledSystemBlock,
+  markFutureAgentStatus,
+  readFutureAgent,
+  scheduleFutureAgent,
+} from "./future-agents.js";
+import {
   formatWidgetsAsFences,
   parseAgentReply,
 } from "./chat-widgets.js";
@@ -771,6 +781,164 @@ function openEducationPageTool(sid, session) {
   };
 }
 
+function originFromSession(session) {
+  const teams = session?.teamsOrigin;
+  if (teams && typeof teams === "object") {
+    const chatId = String(teams.chatId || teams.to || "").trim();
+    if (chatId) {
+      return {
+        kind: "teams",
+        chatId,
+        chat: String(teams.chat || "").trim(),
+        to: String(teams.to || chatId).trim(),
+        text: String(teams.text || "").slice(0, 500),
+      };
+    }
+  }
+  const im = session?.imessageOrigin;
+  if (im && typeof im === "object") {
+    const to = String(im.to || im.handle || "").trim();
+    const chatGuid = String(im.chatGuid || "").trim();
+    if (to || chatGuid) {
+      return {
+        kind: "imessage",
+        to,
+        chatGuid,
+        chat: String(im.chat || "").trim(),
+        text: String(im.text || "").slice(0, 500),
+      };
+    }
+  }
+  return { kind: "" };
+}
+
+function canManageFutureAgent(record, session) {
+  if (!record || !session) return false;
+  if (sessionWorkspace(session) === "jype") return record.workspace === "jype";
+  return record.workspace !== "jype" && record.email === session.email;
+}
+
+/**
+ * @param {Session} session
+ * @param {object|null|undefined} record
+ */
+function attachScheduledToSession(session, record) {
+  if (!session || !record) return;
+  session.scheduled = true;
+  session.scheduledRunAt = record.runAt;
+  session.scheduledStatus = record.status || "pending";
+  session.futureAgentRecord = record;
+  session.forceGrok = true;
+  session.ephemeralPinned = true;
+  const origin = record.origin || {};
+  if (origin.kind === "teams" && origin.chatId) {
+    session.teamsOrigin = {
+      chatId: origin.chatId,
+      to: origin.to || origin.chatId,
+      chat: origin.chat || "",
+      text: origin.text || "",
+    };
+  } else if (origin.kind === "imessage" && (origin.to || origin.chatGuid)) {
+    session.imessageOrigin = {
+      to: origin.to || "",
+      chatGuid: origin.chatGuid || "",
+      chat: origin.chat || "",
+      handle: origin.to || "",
+      text: origin.text || "",
+    };
+  }
+}
+
+function notifyScheduledThread(email, workspace, sessionId, status) {
+  notifyEducationClients(email, "change", {
+    source: "agent",
+    sessionId,
+    status: status || "idle",
+    ...(workspace === "jype" ? { workspace: "jype" } : {}),
+  });
+}
+
+/**
+ * @param {string} sid
+ * @param {Session} session
+ */
+function futureAgentTools(sid, session) {
+  return {
+    schedule_future_agent: {
+      description:
+        "Schedule a one-time future agent in this same chat history. Use it whenever the user wants a reminder, a message after something finishes, or anything that has to wait (end of a period, once we're done, send it later). A hint is enough. Pass an ISO time with a timezone offset, the task the future agent should do, and context it cannot re-derive (URLs, who asked, what you already did). The tool copies this session's Teams or iMessage chat. The thread shows up immediately. Do the work that can happen now yourself. Schedule only the part that has to wait.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          runAt: {
+            type: "string",
+            description:
+              "ISO time with an offset, America/Los_Angeles. Example 2026-10-13T09:35:00-07:00. For a result ready at a bell, use the period end minus 5 minutes.",
+          },
+          prompt: {
+            type: "string",
+            description:
+              "The task, in plain words. This becomes the first user message under the scheduled time.",
+          },
+          context: {
+            type: "string",
+            description:
+              "Facts the future agent needs: live URL, who asked, which chat this came from, what you already finished.",
+          },
+        },
+        required: ["runAt", "prompt"],
+      },
+      async execute({ runAt, prompt, context }) {
+        if (!sessions.has(sid) || sessions.get(sid) !== session) {
+          return "session gone";
+        }
+        try {
+          const result = await scheduleFutureAgentLive({
+            runAt,
+            prompt,
+            context,
+            workspace: sessionWorkspace(session),
+            email: session.email,
+            origin: originFromSession(session),
+          });
+          return JSON.stringify({
+            ok: true,
+            sessionId: result.sessionId,
+            runAtLocal: result.runAtLocal,
+            history: result.history,
+            title: result.title,
+            pending: result.pending,
+          });
+        } catch (err) {
+          return err instanceof Error ? err.message : String(err);
+        }
+      },
+    },
+    cancel_future_agent: {
+      description:
+        "Cancel a pending future agent you can see in this workspace. Pass the sessionId from schedule_future_agent or from the pending list. Does nothing once it has started.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          sessionId: { type: "string" },
+        },
+        required: ["sessionId"],
+      },
+      async execute({ sessionId }) {
+        if (!sessions.has(sid) || sessions.get(sid) !== session) {
+          return "session gone";
+        }
+        try {
+          const result = await cancelFutureAgentLive(sessionId, session);
+          return JSON.stringify(result);
+        } catch (err) {
+          return err instanceof Error ? err.message : String(err);
+        }
+      },
+    },
+  };
+}
+
 /**
  * @param {string} sid
  * @param {Session} session
@@ -778,6 +946,7 @@ function openEducationPageTool(sid, session) {
 function sessionCustomTools(sid, session) {
   return {
     ...sendChatMessageTool(sid, session),
+    ...futureAgentTools(sid, session),
     ...openEducationPageTool(sid, session),
     ...(sessionMayUseBrowser(session) ? browserCustomTools(session) : {}),
   };
@@ -868,6 +1037,11 @@ function persistSessionHistory(sid, session) {
     starter: session.starter || "",
   };
   if (ephemeral != null) opts.ephemeral = ephemeral;
+  if (session.scheduled) {
+    opts.scheduled = true;
+    opts.scheduledRunAt = session.scheduledRunAt || "";
+    opts.scheduledStatus = session.scheduledStatus || "pending";
+  }
   return persistChatHistory(opts)
     .then(() => {
       // Wait for the first assistant bubble so the title agent is not
@@ -1421,7 +1595,11 @@ export const PERSONAL_SKILL_PATHS = {
   healthBrain: ".cursor/skills/health-brain/SKILL.md",
   factCheck: ".cursor/skills/nightly-fact-check/SKILL.md",
   jypeAgent: ".cursor/skills/jype-agent/SKILL.md",
+  futureAgents: ".cursor/skills/future-agents/SKILL.md",
 };
+
+const FUTURE_AGENT_HINT =
+  "If the reply has to wait (remind me, once we're done, end of the period, send it later), call schedule_future_agent this turn. Read the future-agents skill. Do what you can now. Do not say you will remember.";
 
 const EDUCATION_VIEWS = new Set([
   "home",
@@ -1451,6 +1629,7 @@ export function systemPrompt(email, opts = {}) {
       "On Yan's Mac Studio: after push, run npm run deploy:web yourself when the live site must change. Do not ask Yan or JYPE members to deploy. Read the jype-agent skill.",
       "Never mention the surprise hoodies to Alex, or in any chat he can see, including this one, until Yan says he has been given his. Yan, 2026-10-09.",
       "Never spawn a Cursor cloud agent.",
+      FUTURE_AGENT_HINT,
       "",
       `Always Read and apply the unslop skill (${UNSLOP_SKILL_PATH}) on every turn.`,
       `Always Read ${PERSONAL_SKILL_PATHS.soul} for persona and judgment.`,
@@ -1460,6 +1639,7 @@ export function systemPrompt(email, opts = {}) {
       `- Public yanylevin.com page: ${PERSONAL_SKILL_PATHS.webpage || ".cursor/skills/yanylevin-webpage-create/SKILL.md"}`,
       `- EPS student IDs / school photos: ${FOUR11_SKILL_PATH}`,
       `- Click-through / login pages (skip static fetch): ${PERSONAL_SKILL_PATHS.browser}`,
+      `- Future agents (schedule a later run): ${PERSONAL_SKILL_PATHS.futureAgents}`,
       "File uploads can be stored in the matching JYPE class or project folder.",
       "Math on the website and in the iOS app is a display block, with a blank line before and after. Put $$ on its own line, then LaTeX, then $$ on its own line. Stack equations one per line in that block. Use \\(x\\) or $x^2$ only for a symbol inside a sentence. Never backticks for math. iMessage and Teams cannot render KaTeX, so those replies stay plain words.",
     ].join("\n");
@@ -1471,6 +1651,7 @@ export function systemPrompt(email, opts = {}) {
     "Yan: full write in this repo and on this Mac. Do not refuse repo-wide or Mac-wide work. Class files go on OneDrive (education-dashboard skill), never under education/you@example.com/ except .chat-uploads staging.",
     "Code outside education-sync must be committed and pushed to origin/main before the turn ends. Commit only files from this turn. Sync covers education/<email>/, education/projects/jype/, fitness/<email>/, data/chat-log.md, and data/login-log.md. Never commit server/.env.",
     "Never spawn a Cursor cloud agent. Never edit main-site chatbot.js / /api/chat / LM Studio unless Yan explicitly asks.",
+    FUTURE_AGENT_HINT,
     "Never mention the surprise hoodies to Alex, or in any chat he can see, including this one, until Yan says he has been given his. Yan, 2026-10-09.",
     "",
     `Always Read and apply the unslop skill (${UNSLOP_SKILL_PATH}) on every turn. Do not skip it. Do not inline the whole skill here.`,
@@ -1503,6 +1684,7 @@ export function systemPrompt(email, opts = {}) {
     `- Contacts: ${PERSONAL_SKILL_PATHS.contacts}`,
     `- Daily Briefing compile / news sources / thumbs: ${PERSONAL_SKILL_PATHS.news}`,
     `- Fitness / gym: ${PERSONAL_SKILL_PATHS.fitness}`,
+    `- Future agents (schedule a later run): ${PERSONAL_SKILL_PATHS.futureAgents}`,
     `- Memories / brain: education/you@example.com/brain/ (identity.md map, identity-school.md, identity-accounts.md, identity-logistics.md, patterns.md, health.md, threads/, journal/, places/; contract in ${PERSONAL_SKILL_PATHS.brain})`,
     "",
     "Live context below is authoritative for clock, class-now, and the open screen. Trust it. Named-people lookup still opens brain/people/. Other education/<email>/ files only when the question needs that data.",
@@ -2382,6 +2564,18 @@ export async function resumeAgent(sessionId, email, opts = {}) {
     guestCaller: null,
     ephemeralPinned: workspace === "jype" ? true : !loaded.ephemeral,
   });
+  if (loaded.scheduled) {
+    const record = await readFutureAgent(sid);
+    const resumed = sessions.get(sid);
+    if (record && resumed) attachScheduledToSession(resumed, record);
+    else if (resumed) {
+      resumed.scheduled = true;
+      resumed.scheduledRunAt = loaded.scheduledRunAt || "";
+      resumed.scheduledStatus = loaded.scheduledStatus || "pending";
+      resumed.forceGrok = true;
+      resumed.ephemeralPinned = true;
+    }
+  }
   activeByEmail.set(focusKey(normalized, workspace), sid);
   await markChatHistoryRead({ email: normalized, sessionId: sid, workspace });
   const firstUser =
@@ -2545,6 +2739,20 @@ async function executeAgentTurn(sid, session, opts) {
       );
     }
 
+    if (opts.scheduledKickoff) {
+      session.scheduledStatus = result?.status === "error" ? "failed" : "done";
+      session.scheduledKickoff = false;
+      if (session.futureAgentRecord) {
+        session.futureAgentRecord = {
+          ...session.futureAgentRecord,
+          status: session.scheduledStatus,
+        };
+      }
+      await markFutureAgentStatus(sid, session.scheduledStatus).catch((err) => {
+        console.error("[future-agents] status", err);
+      });
+    }
+
     let content =
       result && typeof result.result === "string" ? result.result.trim() : "";
     if (!content) {
@@ -2651,6 +2859,19 @@ async function executeAgentTurn(sid, session, opts) {
     }
     console.error("[personal-agent] run", err);
     if (!sessions.has(sid) || sessions.get(sid) !== session) return;
+    if (opts.scheduledKickoff) {
+      session.scheduledStatus = "failed";
+      session.scheduledKickoff = false;
+      if (session.futureAgentRecord) {
+        session.futureAgentRecord = {
+          ...session.futureAgentRecord,
+          status: "failed",
+        };
+      }
+      await markFutureAgentStatus(sid, "failed").catch((statusErr) => {
+        console.error("[future-agents] status", statusErr);
+      });
+    }
     const fallback = PA_ERROR_REPLY;
     session.messages.push(
       stampMessage("assistant", fallback, undefined, { endOfTurn: true })
@@ -2823,6 +3044,12 @@ export async function messageAgent(
   const composerSchedule = jypeComposerScheduleLine(model, session.teamsOrigin);
   if (composerSchedule) {
     promptParts.push("", composerSchedule);
+  }
+  if (session.futureAgentRecord) {
+    promptParts.push(
+      "",
+      formatScheduledSystemBlock(session.futureAgentRecord, { kickoff: false })
+    );
   }
   if (interrupting) {
     promptParts.push("", INTERRUPT_NOTE);
@@ -3212,4 +3439,224 @@ export async function stopAgent(sessionId, email, opts = {}) {
     ...(sessionWorkspace(session) ? { workspace: sessionWorkspace(session) } : {}),
   });
   return { ok: true, stopped: true };
+}
+
+/** @type {Set<string>} */
+const scheduledInflight = new Set();
+
+/**
+ * Schedule from a live session or the local socket. Arms the timer and
+ * tells open history drawers the thread exists.
+ * @param {object} input
+ */
+export async function scheduleFutureAgentLive(input) {
+  const result = await scheduleFutureAgent(input);
+  armFutureAgentTimer(result.record, (record) => runScheduledAgent(record));
+  notifyScheduledThread(
+    result.record.email,
+    result.record.workspace,
+    result.sessionId,
+    "idle"
+  );
+  return result;
+}
+
+/**
+ * @param {string} sessionId
+ * @param {Session|null} [session]
+ */
+export async function cancelFutureAgentLive(sessionId, session = null) {
+  const sid = String(sessionId || "").trim();
+  const record = await readFutureAgent(sid);
+  if (!record) {
+    const err = new Error("scheduled agent not found");
+    err.status = 404;
+    throw err;
+  }
+  if (session && !canManageFutureAgent(record, session)) {
+    const err = new Error("forbidden");
+    err.status = 403;
+    throw err;
+  }
+  const result = await cancelFutureAgent(sid);
+  clearFutureAgentTimer(sid);
+  notifyScheduledThread(record.email, record.workspace, sid, "idle");
+  return result;
+}
+
+/**
+ * @param {Session} session
+ * @param {object} record
+ * @param {boolean} kickoff
+ */
+async function scheduledTurnPrompt(session, record, kickoff) {
+  const email = record?.email || session.email;
+  const workspace = record?.workspace || sessionWorkspace(session);
+  let nowContext = null;
+  try {
+    nowContext = await resolveNowScheduleContext(email);
+  } catch (err) {
+    console.error("[future-agents] nowContext", err);
+  }
+  const model = copyModelSpec(DEFAULT_MODEL_SPEC);
+  /** @type {string[]} */
+  const parts = [
+    systemPrompt(email, { workspace }),
+    "",
+    formatLiveContextBlock(
+      nowContext,
+      {},
+      await buildYanLiveAppendix(email, nowContext?.timezone)
+    ),
+  ];
+  if (kickoff && record.origin?.kind === "teams") {
+    session.teamsDeliverFinal = true;
+  }
+  if (kickoff && record.origin?.kind === "imessage") {
+    session.imessageDeliverFinal = true;
+  }
+  const imessageBlock = formatIMessageOriginBlock(session.imessageOrigin, {
+    deliverFinal: Boolean(session.imessageDeliverFinal),
+  });
+  if (imessageBlock) parts.push("", imessageBlock);
+  const teamsBlock = formatTeamsOriginBlock(session.teamsOrigin, {
+    deliverFinal: Boolean(session.teamsDeliverFinal),
+  });
+  if (teamsBlock) parts.push("", teamsBlock);
+  parts.push("", formatScheduledSystemBlock(record, { kickoff }));
+  if (kickoff) {
+    parts.push(
+      "",
+      "It is now the scheduled time. Do the task. The first user message is already in the thread."
+    );
+  }
+  return { prompt: parts.join("\n"), nowContext, model };
+}
+
+/**
+ * Start the scheduled run on the existing thread. Does not take UI focus.
+ * @param {object} record
+ */
+export async function runScheduledAgent(record) {
+  const sid = String(record?.sessionId || "").trim();
+  if (!sid) return;
+  if (scheduledInflight.has(sid)) return;
+  const fresh = await readFutureAgent(sid);
+  if (!fresh) return;
+  if (fresh.status === "done" || fresh.status === "canceled" || fresh.status === "failed") {
+    return;
+  }
+  const live = sessions.get(sid);
+  if (live?.status === "running" && live.runPromise) {
+    live.runPromise.finally(() => {
+      runScheduledAgent(fresh).catch((err) => {
+        console.error("[future-agents] retry", err);
+      });
+    });
+    return;
+  }
+
+  scheduledInflight.add(sid);
+  try {
+    const email = fresh.email;
+    const workspace = fresh.workspace;
+    let session = sessions.get(sid);
+    if (!session) {
+      const loaded = await loadChatHistory({
+        email,
+        sessionId: sid,
+        workspace,
+      });
+      if (!loaded) {
+        await markFutureAgentStatus(sid, "failed");
+        scheduledInflight.delete(sid);
+        return;
+      }
+      const messages = (loaded.messages || []).map((m) => {
+        /** @type {ChatMessage} */
+        const row = { role: m.role, content: m.content, at: m.at };
+        if (Array.isArray(m.widgets) && m.widgets.length) row.widgets = m.widgets;
+        return row;
+      });
+      const uploadRoot =
+        workspace === "jype"
+          ? `education/projects/jype/.chat-uploads/${sid}`
+          : `education/${email}/.chat-uploads/${sid}`;
+      session = {
+        agent: null,
+        email,
+        workspace,
+        starter: loaded.starter || "",
+        createdAt: Date.parse(loaded.started) || Date.now(),
+        lastUsedAt: Date.now(),
+        uploads: [],
+        uploadDirRel: uploadRoot,
+        messages,
+        status: "idle",
+        workingLabel: null,
+        runPromise: null,
+        turnQueue: [],
+        replayUiTranscript: true,
+        imessageOrigin: null,
+        imessageDeliverFinal: false,
+        teamsOrigin: null,
+        teamsDeliverFinal: false,
+        guestCaller: null,
+        ephemeralPinned: true,
+      };
+      sessions.set(sid, session);
+    }
+    attachScheduledToSession(session, fresh);
+    session.scheduledStatus = "running";
+    session.futureAgentRecord = { ...fresh, status: "running" };
+    session.scheduledKickoff = true;
+    session.replayUiTranscript = true;
+    await markFutureAgentStatus(sid, "running");
+    const built = await scheduledTurnPrompt(session, session.futureAgentRecord, true);
+    const apiKey = requireKey();
+    const model = await resolveModelSelection(apiKey, built.model);
+    /** @type {TurnOpts} */
+    const turnOpts = {
+      prompt: built.prompt,
+      images: [],
+      model,
+      normalized: email,
+      nowContext: built.nowContext,
+      attachmentCount: 0,
+      sessionAttachmentCount: 0,
+      bubble: "",
+      scheduledKickoff: true,
+    };
+    if (session.imessageDeliverFinal) {
+      turnOpts.imessageDeliverFinal = true;
+      session.imessageDeliverFinal = false;
+    }
+    if (session.teamsDeliverFinal) {
+      turnOpts.teamsDeliverFinal = true;
+      session.teamsDeliverFinal = false;
+    }
+    session.lastUsedAt = Date.now();
+    session.workingLabel = WORKING_LABEL_DEFAULT;
+    notifyScheduledThread(email, workspace, sid, "running");
+    kickoffTurn(sid, session, turnOpts);
+    const pending = session.runPromise;
+    if (pending) {
+      pending.finally(() => {
+        scheduledInflight.delete(sid);
+        notifyScheduledThread(email, workspace, sid, session.status || "idle");
+      });
+    } else {
+      scheduledInflight.delete(sid);
+    }
+  } catch (err) {
+    scheduledInflight.delete(sid);
+    console.error("[future-agents] run", err);
+    await markFutureAgentStatus(sid, "failed").catch(() => {});
+  }
+}
+
+export function startFutureAgentScheduler() {
+  armStoredFutureAgents((record) => runScheduledAgent(record)).catch((err) => {
+    console.error("[future-agents] scheduler", err);
+  });
 }

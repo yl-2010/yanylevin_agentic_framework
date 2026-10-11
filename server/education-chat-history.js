@@ -20,6 +20,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const CHAT_HISTORY_DIRNAME = ".chat-history";
 export const CHAT_HISTORY_READ_FILENAME = ".read.json";
 export const TITLE_MAX = 40;
+/** History titles for future agents. The prefix sits outside TITLE_MAX. */
+export const SCHEDULED_TITLE_PREFIX = "Scheduled: ";
 const PREVIEW_MAX = 80;
 const RECENT_LIMIT = 12;
 const LIST_MAX = 500;
@@ -91,7 +93,7 @@ function messageBody(content) {
  * @param {unknown} raw
  * @returns {string}
  */
-export function sanitizeChatTitle(raw) {
+function normalizeChatTitle(raw) {
   let s = String(raw || "")
     .trim()
     .split(/\r?\n/)[0]
@@ -100,10 +102,47 @@ export function sanitizeChatTitle(raw) {
   s = s.replace(/[—–]/g, "-");
   s = s.replace(/\s+/g, " ").trim();
   s = s.replace(/[.!?]+$/g, "").trim();
-  if (s.length > TITLE_MAX) {
-    s = s.slice(0, TITLE_MAX).replace(/\s+\S*$/, "").trim();
+  return s;
+}
+
+function clampChatTitle(s, max) {
+  if (s.length > max) {
+    s = s.slice(0, max).replace(/\s+\S*$/, "").trim();
   }
   return s;
+}
+
+export function sanitizeChatTitle(raw) {
+  const s = normalizeChatTitle(raw);
+  const lead = `${SCHEDULED_TITLE_PREFIX.toLowerCase()}`;
+  if (s.toLowerCase().startsWith(lead)) {
+    const rest = s.slice(SCHEDULED_TITLE_PREFIX.length).trim();
+    const bare = clampChatTitle(rest, TITLE_MAX);
+    return bare ? `${SCHEDULED_TITLE_PREFIX}${bare}` : "";
+  }
+  return clampChatTitle(s, TITLE_MAX);
+}
+
+/**
+ * Force the Scheduled: prefix. The name after it still uses TITLE_MAX.
+ * @param {unknown} title
+ */
+export function withScheduledTitlePrefix(title) {
+  const s = sanitizeChatTitle(title);
+  if (s.startsWith(SCHEDULED_TITLE_PREFIX)) return s;
+  const bare = clampChatTitle(s, TITLE_MAX) || "Agent";
+  return `${SCHEDULED_TITLE_PREFIX}${bare}`;
+}
+
+/**
+ * First user bubble written when a future agent is scheduled.
+ * Returns the task under the date line, or "".
+ * @param {unknown} raw
+ */
+export function scheduledTaskFromUserMessage(raw) {
+  const text = String(raw || "").trim();
+  const match = text.match(/^Agent scheduled for .+:\s*\n+([\s\S]+)$/);
+  return match ? String(match[1] || "").trim() : "";
 }
 
 /**
@@ -209,6 +248,7 @@ export function prefixChatTitle(title, starter) {
 export function applyChatTitleStarter(title, opts = {}) {
   const resolved = resolveChatStarter(opts);
   let t = sanitizeChatTitle(title);
+  if (t.startsWith(SCHEDULED_TITLE_PREFIX)) return t;
   if (resolved) {
     return prefixChatTitle(stripChatTitlePrefix(t, resolved), resolved);
   }
@@ -299,6 +339,13 @@ export function formatChatHistoryMarkdown(opts) {
   if (starter) lines.push(`starter: ${starter}`);
   lines.push(`visibility: ${visibility}`);
   if (ephemeral) lines.push("ephemeral: true");
+  if (opts?.scheduled) {
+    lines.push("scheduled: true");
+    const runAt = String(opts.scheduledRunAt || "").trim();
+    if (runAt) lines.push(`scheduledRunAt: ${runAt}`);
+    const status = String(opts.scheduledStatus || "").trim();
+    if (status) lines.push(`scheduledStatus: ${status}`);
+  }
   lines.push("");
   for (const m of messages) {
     if (!m || (m.role !== "user" && m.role !== "assistant")) continue;
@@ -329,6 +376,9 @@ export function formatChatHistoryMarkdown(opts) {
  *   preview: string,
  *   workspace: string,
  *   starter: string,
+ *   scheduled: boolean,
+ *   scheduledRunAt: string,
+ *   scheduledStatus: string,
  * }}
  */
 export function parseChatHistoryMeta(markdown) {
@@ -357,6 +407,9 @@ export function parseChatHistoryMeta(markdown) {
     ephemeral: sanitizeChatEphemeral(field("ephemeral")),
     workspace: normalizeJypeWorkspace(field("workspace")),
     starter: field("starter"),
+    scheduled: field("scheduled") === "true",
+    scheduledRunAt: field("scheduledRunAt"),
+    scheduledStatus: field("scheduledStatus"),
     preview,
   };
 }
@@ -628,6 +681,9 @@ export async function persistChatHistory(opts) {
   let previousUpdated = "";
   let isNew = false;
   let starter = String(opts?.starter || "").trim();
+  let scheduled = opts?.scheduled === true ? true : opts?.scheduled === false ? false : null;
+  let scheduledRunAt = String(opts?.scheduledRunAt || "").trim();
+  let scheduledStatus = String(opts?.scheduledStatus || "").trim();
   try {
     const existing = await readFile(abs, "utf8");
     const meta = parseChatHistoryMeta(existing);
@@ -637,6 +693,9 @@ export async function persistChatHistory(opts) {
     if (!visibility) visibility = meta.visibility;
     if (ephemeral == null) ephemeral = meta.ephemeral;
     if (!starter) starter = meta.starter;
+    if (scheduled == null) scheduled = meta.scheduled;
+    if (!scheduledRunAt) scheduledRunAt = meta.scheduledRunAt;
+    if (!scheduledStatus) scheduledStatus = meta.scheduledStatus;
   } catch {
     isNew = true;
   }
@@ -696,6 +755,9 @@ export async function persistChatHistory(opts) {
     ephemeral: Boolean(ephemeral),
     workspace: opts?.workspace,
     starter,
+    scheduled: Boolean(scheduled),
+    scheduledRunAt,
+    scheduledStatus,
   });
   await writeFile(abs, markdown, "utf8");
   return rel;
@@ -853,6 +915,46 @@ export async function patchChatHistoryVisibility(opts) {
 }
 
 /**
+ * Update scheduledStatus on an existing future-agent thread.
+ * @param {{
+ *   email: string,
+ *   sessionId: string,
+ *   status: string,
+ *   root?: string,
+ *   workspace?: string,
+ * }} opts
+ */
+export async function patchChatHistoryScheduled(opts) {
+  const email = canonicalizeEmail(opts?.email);
+  const sessionId = sanitizeSessionId(opts?.sessionId);
+  const status = String(opts?.status || "").trim();
+  const rel = chatHistoryFileRel(email, sessionId, opts?.workspace);
+  if (!email || !sessionId || !status || !rel) return null;
+  const abs = join(resolveRoot(opts?.root), rel);
+  let text;
+  try {
+    text = await readFile(abs, "utf8");
+  } catch (err) {
+    if (err && /** @type {{ code?: string }} */ (err).code === "ENOENT") {
+      return null;
+    }
+    throw err;
+  }
+  if (!/^scheduled:\s+true\s*$/m.test(text)) return null;
+  let next;
+  if (/^scheduledStatus:\s+/m.test(text)) {
+    next = text.replace(/^scheduledStatus:\s+.*$/m, `scheduledStatus: ${status}`);
+  } else if (/^scheduledRunAt:\s+/m.test(text)) {
+    next = text.replace(/^(scheduledRunAt:\s+\S+)\s*$/m, `$1\nscheduledStatus: ${status}`);
+  } else {
+    next = text.replace(/^(scheduled:\s+true)\s*$/m, `$1\nscheduledStatus: ${status}`);
+  }
+  if (next === text) return status;
+  await writeFile(abs, next, "utf8");
+  return status;
+}
+
+/**
  * @param {{ email: string, sessionId: string, root?: string }} opts
  * @returns {Promise<{
  *   sessionId: string,
@@ -891,6 +993,9 @@ export async function loadChatHistory(opts) {
     preview: meta.preview,
     workspace: meta.workspace || normalizeJypeWorkspace(opts?.workspace),
     starter: meta.starter,
+    scheduled: meta.scheduled,
+    scheduledRunAt: meta.scheduledRunAt,
+    scheduledStatus: meta.scheduledStatus,
     messages: parseChatHistoryMessages(text),
   };
 }

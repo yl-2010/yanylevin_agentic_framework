@@ -59,6 +59,15 @@ describe("titleSeedFromUserMessage", () => {
   it("keeps a normal UI first message", () => {
     assert.equal(titleSeedFromUserMessage("what can i eat nearby"), "what can i eat nearby");
   });
+
+  it("titles the task under a scheduled bubble, not the date line", () => {
+    assert.equal(
+      titleSeedFromUserMessage(
+        "Agent scheduled for Tue, Oct 13, 2026, 9:35 AM PT:\n\nSend the Spanish MA link in this Teams chat."
+      ),
+      "Send the Spanish MA link in this Teams chat."
+    );
+  });
 });
 
 describe("isStubChatTitle", () => {

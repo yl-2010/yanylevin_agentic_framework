@@ -831,7 +831,7 @@
     }
   }
 
-  async function openHistoryChat(sid) {
+  async function openHistoryChat(sid, opts) {
     const id = String(sid || "").trim();
     if (!id) return;
     showThread = true;
@@ -870,6 +870,7 @@
     } catch (err) {
       if (gen !== viewGen) return;
       console.error("[edu-chat] resume", err);
+      if (opts?.quiet) throw err;
       appendBubble(
         "assistant",
         "Could not open that chat. Is the Mac API running?"
@@ -2262,10 +2263,31 @@
     if (showingHistory) renderHistory().catch(() => {});
   };
 
+  function chatDeepLinkId() {
+    try {
+      const id = new URLSearchParams(window.location.search).get("chat") || "";
+      return /^[a-zA-Z0-9._-]{8,80}$/.test(id) ? id : "";
+    } catch {
+      return "";
+    }
+  }
+
   // Resume after auth/email is available (app.js boot). Retry briefly.
+  // ?chat=<sessionId> opens that thread (dashboard scheduled-agent cards).
   let resumeAttempts = 0;
+  const deepChat = chatDeepLinkId();
   const resumeKick = () => {
     resumeAttempts += 1;
+    if (deepChat) {
+      if (!window.YanMacApi) {
+        if (resumeAttempts < 8) window.setTimeout(resumeKick, 400);
+        return;
+      }
+      openHistoryChat(deepChat, { quiet: resumeAttempts < 8 }).catch(() => {
+        if (resumeAttempts < 8) window.setTimeout(resumeKick, 400);
+      });
+      return;
+    }
     resumeFromServer().catch(() => {});
     if (resumeAttempts < 8 && !sessionId && !messages.length) {
       window.setTimeout(resumeKick, 400);

@@ -10,6 +10,8 @@ description: >-
 
 Workspace: `education/projects/jype/`. Dashboard: `yanylevin.com/jype`. Chats: `education/projects/jype/.chat-history/` (always listed, no 10-minute hide).
 
+If someone wants a reminder, a message after something finishes, or anything that has to wait, schedule a future agent in this turn. A hint is enough ("once we're done", "at the end of the period", "send us the link later"). Do the part you can do now. Schedule the part that waits. The future thread stays in this JYPE history. Read `.cursor/skills/future-agents/SKILL.md` and call `schedule_future_agent`. Do not say you will remember.
+
 Member quiz and study prefs: `education/projects/jype/agent-alignment.md` (read before Spanish frases sheets or any practice-test PDF; no US History in JYPE).
 
 ## Email
