@@ -56,6 +56,13 @@ describe("decideFileAction", () => {
     assert.doesNotMatch(FILE_BUCKET_TEXT, /not a passcode/i);
   });
 
+  it("asks Jev to file Sign in with Google data notices as security", () => {
+    assert.match(FILE_BUCKET_TEXT, /Sign in with Google/);
+    assert.match(FILE_BUCKET_TEXT, /You shared some Google Account data with/);
+    assert.match(FILE_BUCKET_TEXT, /Keep track of your Google Account data/);
+    assert.match(FILE_BUCKET_TEXT, /nothing to do/);
+  });
+
   it("leaves other and low-confidence mail in the inbox", () => {
     assert.equal(decideFileAction({ choice: "other", confidence: 0.99 }), "skip");
     assert.equal(

@@ -25,7 +25,7 @@ HTTP: https://docs.typesafe.ai/api.md
 - Client: `server/typesafe.js`. Re-exports `choice`, `noul`, `score`, `TypeSafeClient`.
 - Call: `systemOne({ state, questions })` from that file.
 - Smoke: `node --env-file=server/.env server/typesafe.js ping` (repo root) or `npm run typesafe`
-- Mail filer: `server/apple-mail-file.js`. Jev choice `college` / `security` / `other`. Destinations are iCloud **Colleges** and **Security**. Security includes sign-in alerts and verification codes.
+- Mail filer: `server/apple-mail-file.js`. Jev choice `college` / `security` / `other`. Destinations are iCloud **Colleges** and **Security**. Security includes sign-in alerts, Sign in with Google or Apple data-sharing notices, and verification codes.
 - Default model: `jev-latest`
 
 ```js

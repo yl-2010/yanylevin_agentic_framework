@@ -1,6 +1,6 @@
 /**
- * File college-spam, routine security alerts, and verification codes
- * out of Mail.app inbox/junk.
+ * File college-spam, routine security alerts, Sign in with Google
+ * data notices, and verification codes out of Mail.app inbox/junk.
  * Jev only. Destinations are iCloud mailboxes Colleges and Security.
  */
 
@@ -32,14 +32,14 @@ export const BODY_RETRY_FLOOR = 500;
 export const FILE_BUCKET_TEXT = [
   "Pick one bucket for this email.",
   "college: unsolicited college-admissions marketing. Campus tours, apply-now, students-like-you, Common App or Coalition promo, university newsletters the recipient did not ask for, recruitment from a .edu or admissions office that is spam.",
-  "security: account security mail. Routine sign-in or new-device noise from Google, Apple, Microsoft, GitHub, or similar ('new login', 'new device', 'was this you?'), and every verification code, 2FA, OTP, and one-time passcode. File those codes. Do not leave them in the inbox.",
+  "security: account security mail. Routine sign-in or new-device noise from Google, Apple, Microsoft, GitHub, or similar ('new login', 'new device', 'was this you?'). Notices that you used Sign in with Google, Sign in with Apple, or a similar account login on another site or app, including when the email only summarizes the name, email, or profile picture you shared and says there is nothing to do. Subjects like 'You shared some Google Account data with' and headings like 'Keep track of your Google Account data' are this bucket. And every verification code, 2FA, OTP, and one-time passcode. File those. Do not leave them in the inbox.",
   "other: everything else, including real people, PathIvy, EPS/Scoir counseling, a college the recipient already writes, interview or visit scheduling they started, and receipts.",
 ].join(" ");
 
 const FILE_QUESTION = choice(FILE_BUCKET_TEXT, {
   college: "Unsolicited college admissions marketing",
   security:
-    "Sign-in alert, new-device notice, verification code, 2FA, OTP, or one-time passcode",
+    "Sign-in alert, new-device notice, Sign in with Google or Apple data-sharing notice, verification code, 2FA, OTP, or one-time passcode",
   other: "Anything that should stay in the main inbox",
 });
 
