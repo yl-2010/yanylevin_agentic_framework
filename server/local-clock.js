@@ -4,6 +4,8 @@
  * we also give them atLocal and a speaker they cannot confuse with the chat.
  */
 
+import { textHasAgentSentFooter } from "./imessage-mention.js";
+
 export const DEFAULT_LOCAL_TZ = "America/Los_Angeles";
 
 const WEEKDAYS = [
@@ -238,6 +240,12 @@ export function lookupSpeakerName(handle, names) {
  * @param {Map<string, string>|undefined|null} [names]
  */
 export function speakerLabel(message, names) {
+  if (
+    message?.fromAgent === true ||
+    textHasAgentSentFooter(message?.text)
+  ) {
+    return "Agent";
+  }
   if (message?.fromMe) return "Yan";
   const from = String(message?.from || "").trim();
   if (from) {
@@ -275,6 +283,8 @@ export function applyDumpClock(msg, opts = {}) {
   const iso = isoUtcFromDumpAt(msg.at);
   if (iso) msg.at = iso;
   msg.atLocal = formatAtLocal(msg.at, opts.timeZone);
+  msg.fromAgent =
+    msg.fromAgent === true || textHasAgentSentFooter(msg.text);
   msg.speaker = speakerLabel(msg, opts.names);
   return msg;
 }

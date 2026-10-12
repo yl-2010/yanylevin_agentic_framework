@@ -62,8 +62,12 @@ Prefer `search` or `thread --chat <name>` over paging every chat. Channel
 posts: `--team` and `--channel` together.
 
 JSON rows have `at` (UTC ISO with Z), `atLocal` (Pacific with weekday), and
-`speaker` (`Yan` / `Alex` / `Example Friend` / `Example Neighbor` / …). Copy `speaker` and
-`atLocal`. `fromMe=true` is Yan even in a 1:1 named after the other person.
+`speaker` (`Yan` / `Agent` / `Alex` / `Example Friend` / `Example Neighbor` / …). Copy `speaker` and
+`atLocal`. `fromMe=true` is Yan even in a 1:1 named after the other person, unless
+`speaker=Agent`. `speaker=Agent` is you. So is `who=agent`, `fromAgent=true`, or any
+row whose text contains `Sent by Yan's Personal Agent`. `fromMe=true` on those rows
+only means the text left Yan's account. Do not say Yan said that, or given what Yan
+said earlier. `speaker=Yan` with no that footer is Yan himself.
 
 Group chats put several people in one thread. Each row's `speaker` is the
 only author of that `text`. `from` is the display name. The chat title is the
@@ -71,8 +75,7 @@ room (`JYPE`, a class chat), not who spoke. The person who just called
 `@agent` wrote only that call. Earlier lines belong to whoever `speaker`
 says. Before you write "you said", or reuse a class, teacher, block, or plan
 from history, read that row's `speaker` and leave the fact on that person.
-Messages next to each other are often different people. Your own earlier
-replies in the thread are not something they said.
+Messages next to each other are often different people.
 
 ## History fill
 

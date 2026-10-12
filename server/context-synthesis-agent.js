@@ -387,7 +387,7 @@ export function buildEntitiesPrompt({ dateKey, timezone }) {
     `Digest: ${DIGEST_PATH}. Update only entities it lists under "Entities that appeared" (plus creating a missing edge-target entity).`,
     `Do not glob ${brain}/people/. Do not rewrite untouched people. Do not edit generated files (people/index.md, people/graph.md, ${brain}/education/**); the runner regenerates them.`,
     "Times: copy digest atLocal / YYYY-MM-DD. Dump at is UTC. Do not paste 02:15 as 2:15 AM PT.",
-    "Speaker: copy digest speaker (Yan said / Alex said). A fact on someone else's card still needs \"Yan told them …\" when speaker is Yan. In a 1:1, handle is the other person even on Yan's texts.",
+    "Speaker: copy digest speaker (Yan said / Alex said). A fact on someone else's card still needs \"Yan told them …\" when speaker is Yan. speaker=Agent is the personal agent, not Yan. In a 1:1, handle is the other person even on Yan's texts.",
     "Timeline entries are append-only; check an entry is not already there before adding it.",
     "Reply with one line per entity: slug, what changed, plus any suspected duplicates for the lint phase.",
   ].join("\n");

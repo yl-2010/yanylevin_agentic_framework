@@ -9,6 +9,7 @@ import { homedir } from "node:os";
 import { extname, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { textHasAgentSentFooter } from "./imessage-mention.js";
 import {
   applyDumpClock,
   contactHandleNames,
@@ -313,6 +314,12 @@ export function isDirectChatId(chatId, handle) {
  * @param {string[]} [handles] export person handles; empty for JSON APIs
  */
 export function speakerWho(message, handles = []) {
+  if (
+    message?.fromAgent === true ||
+    textHasAgentSentFooter(message?.text)
+  ) {
+    return "agent";
+  }
   if (message.fromMe) return "yan";
   const handleRaw = String(message.handle || "");
   const chatIdRaw = String(message.chatId || "");

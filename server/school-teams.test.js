@@ -448,6 +448,47 @@ describe("school-teams history dump", () => {
     assert.match(text, /fromMe=false/);
     assert.match(text, /atLocal=/);
     assert.match(text, /\nyou free\n/);
+    assert.doesNotMatch(text, /fromAgent=true/);
+  });
+
+  it("labels an agent footer as speaker Agent while fromMe stays true", () => {
+    const oid = "4e03777e-4fc0-4313-bbd0-aaaaaaaaaaaa";
+    const row = normalizeMessage(
+      {
+        id: "m-agent",
+        messagetype: "RichText/Html",
+        contenttype: "text",
+        content:
+          "<p>Calc is limits.</p><p><em>// Sent by Yan's Personal Agent</em></p>",
+        from: `8:orgid:${oid}`,
+        imdisplayname: "Yan Levin",
+        originalarrivaltime: "2026-10-12T18:00:00.000Z",
+      },
+      {
+        chatId: "c1",
+        chat: "JYPE",
+        kind: "chat",
+        self: { objectId: oid },
+        textMax: 12,
+      }
+    );
+    assert.equal(row.fromMe, true);
+    assert.equal(row.fromAgent, true);
+    assert.equal(row.speaker, "Agent");
+    assert.equal(row.text.includes("Sent by"), false);
+    const dumped = formatDumpMessage({
+      at: "2026-10-12T18:00:00.000Z",
+      kind: "chat",
+      chat: "JYPE",
+      chatType: "group",
+      from: "Yan Levin",
+      fromEmail: "owner@school.example",
+      fromMe: true,
+      text: "Calc is limits.\n\n// Sent by Yan's Personal Agent",
+    });
+    assert.match(dumped, /speaker=Agent/);
+    assert.match(dumped, /fromMe=true/);
+    assert.match(dumped, /fromAgent=true/);
   });
 
   it("groups dump rows by month", () => {

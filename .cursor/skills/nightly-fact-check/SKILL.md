@@ -54,7 +54,7 @@ curl -sS --unix-socket /tmp/personal-agent-local.sock "http://localhost/imessage
 
 Use the phone from the person card, not the Contacts display name. Prefetch `/tmp/yanylevin-context-imessage.json` is the same JSON if the cursor still covers the window.
 
-A fact on `people/<slug>/` with no "Yan said" reads as something they said. If `speaker=Yan` / `who=yan` / `fromMe=true`, rewrite Standing to "Yan told them …" and append a timeline correction. Same for identity/org copies ("Yan and Nikita say" when only Yan said it).
+A fact on `people/<slug>/` with no "Yan said" reads as something they said. If `speaker=Yan` / `who=yan` / `fromMe=true`, rewrite Standing to "Yan told them …" and append a timeline correction. `speaker=Agent`, `who=agent`, or a body with `Sent by Yan's Personal Agent` is the personal agent, not Yan. Same for identity/org copies ("Yan and Nikita say" when only Yan said it).
 
 ## Timezone
 

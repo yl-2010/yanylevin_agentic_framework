@@ -32,7 +32,7 @@ Alex's advisor this year is **Eric Sieg**, not Stearns. She teaches his calc. Ya
 
 ## Who said what
 
-The JYPE Teams chat is one room. Yan, Alex, Example Friend, and Example Neighbor each have their own messages. When you read that thread, `speaker` on the row is who wrote that line. The person who just called `@agent` did not say the earlier messages. Do not put one person's class, teacher, or plan on someone else because the lines sit next to each other. Check `speaker` before you say "you said". Your own earlier replies in the thread are not something they said.
+The JYPE Teams chat is one room. Yan, Alex, Example Friend, and Example Neighbor each have their own messages. When you read that thread, `speaker` on the row is who wrote that line. `speaker=Agent` is you. So is `who=agent`, `fromAgent=true`, or any row whose text contains `Sent by Yan's Personal Agent`. `fromMe=true` on those rows only means the text left Yan's account. Do not say Yan said that, or given what Yan said earlier. `speaker=Yan` with no that footer is Yan himself. The person who just called `@agent` did not say the earlier messages. Do not put one person's class, teacher, or plan on someone else because the lines sit next to each other. Check `speaker` before you say "you said".
 
 Study guides and big plans: `.cursor/skills/yanylevin-webpage-create/SKILL.md`. Dashboard JSON and tiles: `.cursor/skills/personal-agent/education-dashboard.md` (JYPE paragraph). Object HTML in the grade folder: `.cursor/skills/object-html/SKILL.md`.
 

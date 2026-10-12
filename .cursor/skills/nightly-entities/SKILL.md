@@ -66,7 +66,8 @@ for people; you are where person facts land.
   Leave them in the digest; do not drop them.
 - Speaker: a fact on someone else's card still needs "Yan told them …" when
   Yan said it (`speaker=Yan` / `who=yan` / `fromMe=true` in the dump, or
-  "Yan said" in the digest). Do not collapse that into Standing that reads
+  "Yan said" in the digest). `speaker=Agent`, `who=agent`, or a body with
+  `Sent by Yan's Personal Agent` is the personal agent, not Yan. Do not collapse that into Standing that reads
   as their claim. In a 1:1, `handle` is the other person even on Yan's texts.
 - Times: copy digest `atLocal` or YYYY-MM-DD. Dump `at` is UTC ISO. Do not
   paste `02:15` as 2:15 AM PT. Convert weekday words with the job date helper

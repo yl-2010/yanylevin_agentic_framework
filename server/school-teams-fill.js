@@ -88,7 +88,7 @@ export function buildSchoolTeamsFillPrompt({ outDir, file, batchIndex, batchCoun
     "Create a new person folder only for a real EPS teacher, counselor, classmate, or family-school contact Yan clearly knows. Never card a group-chat title, meeting title, bot, or mailing list.",
     "Group chats (Class of 2028, advisory) go to brain/groups/, not fake people.",
     "Timeline append-only: `- YYYY-MM-DD | fact [school-teams]`. Skip duplicates. Facts, not transcripts.",
-    "fromMe=true is Yan. If Yan said it, write it as Yan told them, not as their claim.",
+    "fromMe=true is Yan, unless speaker=Agent or the body contains Sent by Yan's Personal Agent. Those rows are the personal agent. If Yan said it, write it as Yan told them, not as their claim.",
     "Education dates that belong on the Dates panel can be written under education/you@example.com/dates/ per the education-dashboard skill if they are not already there.",
     "Read education/you@example.com/deleted.md. Skip dates that look like a row Yan already deleted (judgement, not exact clocks).",
     "Identity.md only for Yan map facts that are new (current grade). School standing goes to identity-school.md. Dated school events go to the matching org or group timeline. Do not paste message bodies.",

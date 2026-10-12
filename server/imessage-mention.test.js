@@ -186,6 +186,7 @@ describe("imessage-mention", () => {
     assert.match(block, /never pass as chatGuid/);
     assert.doesNotMatch(block, /iMessage chat: JYPE \(chat123\)/);
     assert.match(block, /imessage\/thread\?person=chat123/);
+    assert.match(block, /speaker=Agent is you/);
     assert.match(block, /limit=40/);
     assert.doesNotMatch(block, /only @agent/);
     const bare = formatIMessageOriginBlock(
@@ -229,6 +230,7 @@ describe("imessage-mention", () => {
     assert.match(later, /A follow-up on the same topic, typed here, stays here/);
     assert.match(later, /iMessage target if they ask you to text there/);
     assert.match(later, /stays in the app and website only/);
+    assert.match(later, /speaker=Agent is you/);
   });
 
   it("tells the agent a guest called, not Yan", () => {

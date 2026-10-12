@@ -93,6 +93,15 @@ describe("speaker labels", () => {
       }),
       "Yan"
     );
+    assert.equal(
+      speakerLabel({
+        fromMe: true,
+        from: "Yan Levin",
+        chat: "JYPE",
+        text: "Calc is limits.\n\n// Sent by Yan's Personal Agent",
+      }),
+      "Agent"
+    );
   });
 
   it("title-cases an email local-part", () => {
@@ -112,6 +121,20 @@ describe("applyDumpClock", () => {
     assert.equal(msg.at, "2026-09-11T02:15:00.000Z");
     assert.equal(msg.atLocal, "Thu Sep 10, 7:15 PM PT");
     assert.equal(msg.speaker, "Adi");
+    assert.equal(msg.fromAgent, false);
+  });
+
+  it("marks an agent footer as speaker Agent even when fromMe", () => {
+    const msg = applyDumpClock({
+      at: "2026-10-12T18:00:00.000Z",
+      fromMe: true,
+      from: "Yan Levin",
+      chat: "JYPE",
+      text: "Do the verbs first.\n\n// Sent by Yan's Personal Agent",
+    });
+    assert.equal(msg.fromAgent, true);
+    assert.equal(msg.speaker, "Agent");
+    assert.equal(msg.fromMe, true);
   });
 });
 

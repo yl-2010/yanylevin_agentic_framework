@@ -8,6 +8,15 @@ export const AGENT_SENT_FOOTER = "Sent by Yan's Personal Agent";
 export const TEAMS_AGENT_SENT_FOOTER = `// ${AGENT_SENT_FOOTER}`;
 const FOOTER_PHRASE = AGENT_SENT_FOOTER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const FOOTER_RE = new RegExp(`(?:${FOOTER_PHRASE})`, "i");
+
+/** True when this body is an agent send, even if it left Yan's account. */
+export function textHasAgentSentFooter(raw) {
+  return FOOTER_RE.test(String(raw || ""));
+}
+
+/** Live-context line. speaker=Yan is Yan. The footer is the agent. */
+export const AGENT_VS_YAN_LINE =
+  "speaker=Agent is you. So is who=agent, fromAgent=true, or any row whose text contains Sent by Yan's Personal Agent. fromMe=true on those rows only means the text left Yan's account. Do not say Yan said that, or given what Yan said earlier. speaker=Yan with no that footer is Yan himself.";
 const FOOTER_ONLY_RE = new RegExp(
   `^(?://[ \\t]*)?(?:${FOOTER_PHRASE})[ \\t]*$`,
   "i"
@@ -294,6 +303,7 @@ export function formatIMessageOriginBlock(origin, opts = {}) {
     }
     lines.push(
       `Read the surrounding thread before answering: ${threadCmd} (iMessage skill).`,
+      AGENT_VS_YAN_LINE,
       "The app and website thread is a normal Personal Agent chat.",
       `Write the final bubble as the text that should land in that iMessage. Newlines work. When there is more than one point, put each on its own line with • or a dash. Do not leave those as one paragraph. iMessage does not render markdown (no bold or italic) or KaTeX. Write equations in plain words, not $$. No HTML tags, no @agent. The app and website keep that final bubble as the end of the turn (the answer or what you did). Do not write Sent on iMessage. Do not add ${footerPhrase}. The server appends that footer on the iMessage only, never in the app or website thread.`,
       "Keep the reply that lands in this chat short. A few sentences, or a short list. Answer and stop. Write at length only when they asked for a lot of text, such as an essay, a full explanation, or a drafted message. A study guide or plan still goes on a page. This chat gets the URL and one line.",
@@ -309,7 +319,8 @@ export function formatIMessageOriginBlock(origin, opts = {}) {
       opaqueThreadId
         ? "If they do ask you to text that chat, set to to the chat name and leave chatGuid off. That thread id is not a Messages guid. Passing it opens a new chat with the group name."
         : "",
-      `If this message is about what was said in that iMessage, read it first: ${threadCmd} (iMessage skill).`
+      `If this message is about what was said in that iMessage, read it first: ${threadCmd} (iMessage skill).`,
+      AGENT_VS_YAN_LINE
     );
   }
   return lines.filter(Boolean).join("\n");

@@ -12,7 +12,10 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { applyAgentSentFooter } from "./imessage-mention.js";
+import {
+  applyAgentSentFooter,
+  textHasAgentSentFooter,
+} from "./imessage-mention.js";
 import { markdownToTeamsHtml } from "./teams-format.js";
 import { applyDumpClock, givenName } from "./local-clock.js";
 import {
@@ -524,7 +527,10 @@ function normalizeMessageType(raw) {
 
 export function normalizeMessage(raw, extra = {}) {
   const fromUser = raw?.from?.user || {};
+  const rawContent = String(raw?.body?.content || raw?.content || "");
   const text = messageText(raw, extra.textMax || DUMP_BODY_MAX);
+  const fromAgent =
+    textHasAgentSentFooter(rawContent) || textHasAgentSentFooter(text);
   const fromName = String(
     fromUser.displayName ||
       raw?.imdisplayname ||
@@ -548,6 +554,7 @@ export function normalizeMessage(raw, extra = {}) {
     from: fromName,
     fromEmail: String(fromUser.userPrincipalName || fromUser.email || extra.fromEmail || "").trim(),
     fromMe: fromMeOf(raw, extra.self || extra),
+    fromAgent,
     text,
     messageType: normalizeMessageType(raw),
     chatId: extra.chatId || "",
@@ -605,8 +612,9 @@ export function formatDumpMessage(msg) {
     .slice(0, FILL_BODY_MAX);
   const speaker = msg.speaker || (msg.fromMe ? "Yan" : givenName(msg.from) || "them");
   const local = msg.atLocal ? ` | atLocal=${msg.atLocal}` : "";
+  const agent = msg.fromAgent ? " | fromAgent=true" : "";
   return [
-    `${msg.at} | kind=${msg.kind || "chat"} | ${where} | speaker=${speaker} | from=${from} | fromMe=${msg.fromMe ? "true" : "false"}${local}`,
+    `${msg.at} | kind=${msg.kind || "chat"} | ${where} | speaker=${speaker} | from=${from} | fromMe=${msg.fromMe ? "true" : "false"}${agent}${local}`,
     body,
     "",
   ].join("\n");

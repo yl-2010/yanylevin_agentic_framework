@@ -7,6 +7,7 @@
 import {
   AGENT_SENT_FOOTER,
   guestCallerLines,
+  AGENT_VS_YAN_LINE,
   isBareAgentMention,
   isJypeThread,
   messageMentionsAgent,
@@ -92,7 +93,7 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
   ];
   const threadCmd = `node server/school-teams.js thread --chat ${JSON.stringify(chatArg)} --limit ${threadLimit}`;
   const speakerLine =
-    "Each row in that thread has its own speaker. That field is who wrote the text. The chat name is the group, not the author. Do not attribute one person's message to someone else, including the person who just called @agent. Check speaker before you say they said it.";
+    `Each row in that thread has its own speaker. That field is who wrote the text. The chat name is the group, not the author. Do not attribute one person's message to someone else, including the person who just called @agent. Check speaker before you say they said it. ${AGENT_VS_YAN_LINE}`;
   if (deliver) {
     if (chatId) lines.push(`- send replies to chat id: ${chatId}`);
     if (bare) {

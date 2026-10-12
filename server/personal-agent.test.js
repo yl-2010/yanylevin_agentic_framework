@@ -497,6 +497,7 @@ describe("Personal Agent skill files", () => {
     assert.match(schoolTeams, /school-teams-fill/);
     assert.match(schoolTeams, /brain-school-teams/);
     assert.match(schoolTeams, /Each row's `speaker` is the/);
+    assert.match(schoolTeams, /speaker=Agent`? is you/);
 
     const calendar = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.calendar), "utf8");
     assert.match(calendar, /yl-calendar/);
@@ -536,6 +537,7 @@ describe("Personal Agent skill files", () => {
     assert.match(imessage, /who=yan/);
     assert.match(imessage, /atLocal/);
     assert.match(imessage, /handle.*other person/);
+    assert.match(imessage, /speaker=Agent`? is you/);
     assert.match(imessage, /@agent/);
     assert.match(imessage, /fromMe/);
     assert.match(imessage, /only `@agent`/);
@@ -585,6 +587,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /iMessage @agent/);
     assert.match(agent, /Teams @agent/);
     assert.match(agent, /Each row from `school-teams\.js thread` has its own `speaker`/);
+    assert.match(agent, /speaker=Agent`? is you/);
     assert.match(agent, /messages to himself/);
     assert.match(agent, /except the Class of 2028 Teams grade chat/);
     assert.match(agent, /only Yan, Alex, Example Friend, and Example Neighbor/);

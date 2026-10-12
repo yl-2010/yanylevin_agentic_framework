@@ -34,7 +34,7 @@ then a clipped text body.
 Read every message. Skip empty control noise (calls, join/leave). Extract
 classmate, teacher, group, class-channel, and school-logistics facts.
 
-`fromMe=true` / `speaker=Yan` is Yan. Speaker matters: a fact on someone else's card still
+`fromMe=true` / `speaker=Yan` is Yan, unless `speaker=Agent` or the body contains `Sent by Yan's Personal Agent`. Those rows are the personal agent. `fromMe=true` on them only means the text left Yan's account. Speaker matters: a fact on someone else's card still
 needs "Yan told them …" when Yan said it. Copy `atLocal`, not UTC `at`.
 
 ## Write

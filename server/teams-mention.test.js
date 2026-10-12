@@ -75,6 +75,8 @@ describe("teams-mention trigger", () => {
     assert.match(block, /school-teams\.js thread/);
     assert.match(block, /own speaker/);
     assert.match(block, /Check speaker before you say they said it/);
+    assert.match(block, /speaker=Agent is you/);
+    assert.match(block, /given what Yan said earlier/);
     assert.match(block, /Markdown is fine/);
     assert.match(block, /Teams HTML/);
     assert.match(block, /Do not add \/\/ Sent by Yan's Personal Agent/);

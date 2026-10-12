@@ -319,6 +319,22 @@ describe("imessage-read", () => {
     assert.equal(msg.speaker, "Yan");
     assert.equal(msg.at, "2026-08-24T06:33:25.000Z");
     assert.equal(msg.atLocal, "Sun Aug 23, 11:33 PM PT");
+    assert.equal(msg.fromAgent, false);
+  });
+
+  it("labels an agent footer as who=agent even when fromMe", () => {
+    const msg = rowToMessage({
+      is_from_me: 1,
+      handle_id: "+12066976688",
+      chat_identifier: "chatJype",
+      chat_name: "JYPE",
+      text: "Do the verbs first.\n\n// Sent by Yan's Personal Agent",
+      at: "2026-10-12 18:00:00",
+    });
+    assert.equal(msg.who, "agent");
+    assert.equal(msg.fromMe, true);
+    assert.equal(msg.fromAgent, true);
+    assert.equal(msg.speaker, "Agent");
   });
 
   it("labels the other person as them on 1:1 inbound JSON rows", () => {
