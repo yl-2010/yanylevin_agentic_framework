@@ -15,7 +15,7 @@ Do **not** run `vercel git connect`. `vercel.json` has `git.deploymentEnabled: f
 
 After commit + push, run `npm run deploy:web` if Vercel serves the file. Education / fitness / dashboard **UI** counts (`education/app.js`, `education/styles.css`, `education/index.html`, `education/chatbot.js`, same under `fitness/` and `dashboard/`). Homepage and other pages too. `api/**` and `vercel.json` routing too.
 
-Skip only `education/<email>/`, `fitness/<email>/`, chat/login logs, `server/**`, `ios/`, docs, skills, and LaunchAgents. User data is not the UI.
+Skip only `education/<email>/`, `fitness/<email>/`, chat/login logs, `tmp/`, `server/**`, `ios/`, docs, skills, and LaunchAgents. User data is not the UI.
 
 ## Command
 

@@ -10,6 +10,7 @@
  * Paths:
  *   education/$OWNER_EMAIL
  *   fitness/$OWNER_EMAIL
+ *   tmp
  *
  * Run via LaunchAgent com.personalagent.education-sync (Mac Studio + MacBook).
  */
@@ -37,6 +38,7 @@ const OWNER = (process.env.OWNER_EMAIL || "you@example.com").trim().toLowerCase(
 export const PATHS = [
   `education/${OWNER}`,
   `fitness/${OWNER}`,
+  "tmp",
 ];
 
 const DEBOUNCE_MS = Number(process.env.EDU_SYNC_DEBOUNCE_MS || 2500);

@@ -46,6 +46,7 @@ education-sync already commits and pushes these paths. Do not commit them yourse
 - `fitness/<email>/`
 - `data/chat-log.md`
 - `data/login-log.md`
+- `tmp/`
 
 If you edit any other file in this repo, commit only those files and `git push origin main` before the turn ends. That includes `server/`, `.cursor/`, site UI, and scripts. Stay on `main`. Do not `git add` unrelated dirty files that were already in the tree. Never commit `server/.env` or other secrets.
 

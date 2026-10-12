@@ -25,7 +25,7 @@ curl -sS https://api.yanylevin.com/health
 |-------|------|
 | `com.personalagent.server` | Yan Levin Express `:3004` (`node --env-file=.env index.js`) |
 | `com.personalagent.cloudflared` | Tunnel → `api.yanylevin.com` |
-| `com.personalagent.education-sync` | Auto push/pull education + fitness folders, JYPE workspace, ; optional OneDrive relaunch |
+| `com.personalagent.education-sync` | Auto push/pull education + fitness folders, JYPE workspace, `tmp/`; optional OneDrive relaunch |
 
 Plists live in `~/Library/LaunchAgents/`.
 
@@ -36,7 +36,7 @@ Keeps these paths in sync with `origin/main`:
 - `education/you@example.com`, `education/you@example.com`
 - `education/projects/jype` (shared /jype dashboard: chats, todos, classes)
 - `fitness/you@example.com`, `fitness/you@example.com`
-- 
+- `tmp/`
 
 Behavior:
 

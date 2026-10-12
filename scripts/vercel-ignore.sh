@@ -2,4 +2,5 @@
 exec git diff --quiet HEAD^ HEAD -- . \
   ':(exclude)education/you@example.com' \
   ':(exclude)fitness/you@example.com' \
+  ':(exclude)tmp' \
   ':(exclude)ios'
