@@ -1866,7 +1866,7 @@
     }" aria-label="${
       completedExpanded ? "Collapse completed" : "Expand completed"
     }">Completed</button>`;
-    return panelHtml("Completed", listOrEmpty(visible.map(todoRowHtml).join("")), {
+    return panelHtml("Completed", listOrEmpty(todoListItemsHtml(visible)), {
       filterId,
       extraClass: "edu-panel--completed",
       titleHtml,
@@ -2434,7 +2434,7 @@
     return `<li class="edu-day-sep" aria-hidden="true"></li>`;
   }
 
-  /** Open TODO rows with a hairline between different due dates. */
+  /** Rows with a hairline between different due dates. */
   function todoListItemsHtml(todos) {
     const parts = [];
     let prev = null;
@@ -3354,6 +3354,7 @@
     if (row.parentElement !== targetList) {
       animateTodoRowMove(row, targetList, todo, !stayOpen);
       syncTodoDaySeparators(openPanel.querySelector(":scope > .edu-list"));
+      syncTodoDaySeparators(donePanel.querySelector(":scope > .edu-list"));
       markPanelEmptyIfNeeded(sourcePanel);
       if (!todoExpanded || !completedExpanded) {
         window.setTimeout(() => render({ scroll: "keep" }), 520);

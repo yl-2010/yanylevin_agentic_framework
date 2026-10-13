@@ -2046,13 +2046,18 @@ private struct EducationCompletedPanel: View {
                     .padding(.vertical, 6)
             } else {
                 LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(visible) { todo in
-                        EducationTodoRow(
-                            todo: todo,
-                            className: showClass ? className(todo) : nil,
-                            use24Hour: use24Hour,
-                            onToggleDone: { onToggleDone(todo) }
-                        )
+                    ForEach(Array(visible.enumerated()), id: \.element.id) { index, todo in
+                        VStack(alignment: .leading, spacing: 0) {
+                            if showsDaySeparator(before: index) {
+                                EducationTodoDaySeparator()
+                            }
+                            EducationTodoRow(
+                                todo: todo,
+                                className: showClass ? className(todo) : nil,
+                                use24Hour: use24Hour,
+                                onToggleDone: { onToggleDone(todo) }
+                            )
+                        }
                     }
                     .animation(.spring(response: 0.42, dampingFraction: 0.86), value: visible.map(\.id))
                 }
@@ -2062,6 +2067,16 @@ private struct EducationCompletedPanel: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .ylGlassRounded(cornerRadius: 22, interactive: true)
         .opacity(0.55)
+    }
+
+    /// Hairline when the due day changes. Completion time does not count.
+    private func showsDaySeparator(before index: Int) -> Bool {
+        guard index > 0, index < visible.count else { return false }
+        return Self.dayKey(visible[index - 1]) != Self.dayKey(visible[index])
+    }
+
+    private static func dayKey(_ todo: EducationTodo) -> String {
+        todo.dueDateValue ?? ""
     }
 }
 
