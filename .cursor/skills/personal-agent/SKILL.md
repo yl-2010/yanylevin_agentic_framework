@@ -90,6 +90,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Debate case building (`/debate`, Aff/Neg, research a case) | `.cursor/skills/debate-cases/SKILL.md` |
 | Static HTML on a todo / date / project / class | `.cursor/skills/object-html/SKILL.md` |
 | Public yanylevin.com page (study guide, plan, blueprint, liquid-glass report) | `.cursor/skills/yanylevin-webpage-create/SKILL.md` |
+| Celebration site for finishing a book, MA, test, or project | `.cursor/skills/create-celebration-website/SKILL.md` |
 | Weekly PDF, `schedule.json`, bells, another class, the week | `.cursor/skills/class-schedule/SKILL.md` |
 | Reminder, "later", end of a period, send something after an event | `.cursor/skills/future-agents/SKILL.md` |
 | EPS student IDs, four11 course lists, school / yearbook photos | `~/.cursor/skills/eps-four11/SKILL.md` |
@@ -163,6 +164,8 @@ Reply with a short status, run the matching command, then say whether it finishe
 ## Study guides and large plans
 
 When JYPE or close friends ask for a study guide, large plan, or blueprint (not a simple homework question), do not dump it as Teams text. Make a public page per `.cursor/skills/yanylevin-webpage-create/SKILL.md`, nest it under the related **class** folder, and add a `sites[]` URL tile. Do not create a Notes project. On Yan's Mac, push then `npm run deploy:web` per `.cursor/skills/jype-agent/SKILL.md` (JYPE agent) or `AGENTS.md` (personal agent). Reply with the live URL, not "pushed to GitHub."
+
+A celebration site for finishing a book, MA, test, or project is `.cursor/skills/create-celebration-website/SKILL.md`. Leave off the `sites[]` tile and the house theme. Keep the URL out of the reply while the event is still ahead.
 
 **Where the tile goes**
 

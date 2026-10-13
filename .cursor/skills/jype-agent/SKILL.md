@@ -36,6 +36,8 @@ The JYPE Teams chat is one room. Yan, Alex, Example Friend, and Example Neighbor
 
 Study guides and big plans: `.cursor/skills/yanylevin-webpage-create/SKILL.md`. Dashboard JSON and tiles: `.cursor/skills/personal-agent/education-dashboard.md` (JYPE paragraph). Object HTML in the grade folder: `.cursor/skills/object-html/SKILL.md`.
 
+A celebration site for finishing a book, MA, test, or project is `.cursor/skills/create-celebration-website/SKILL.md`. Leave off `sites[]`, the notes hub, and the house theme. Keep the URL out of the reply while the event is still ahead. Schedule the link send only when that skill can name the end time.
+
 ## Vercel deploy (your job on the Mac)
 
 `git push` does **not** update yanylevin.com. Auto-deploy is off on purpose (`AGENTS.md`).

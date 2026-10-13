@@ -80,13 +80,19 @@ If you were called from JYPE Teams, the future agent replies in that same Teams 
 
 It can schedule another future agent if the task needs a later step.
 
+## Celebration sites
+
+Building the site is `.cursor/skills/create-celebration-website/SKILL.md`. Do that now. The link send is the part that waits.
+
+Schedule that send only when the celebration skill can name the end from a todo, a calendar end, or a bell. A vague "when we're done" with no clock time does not get a future agent. Keep the URL out of this reply until they ask or the scheduled send fires. Put the URL in `context`, not in `prompt`, because the prompt is the visible bubble and the thread shows up immediately.
+
 ## Example
 
 Yan in JYPE Teams: "@agentg make a site celebrating being done with the Spanish MA but put it at a non-guessable url bc we haven't had the MA yet, then send us the link once we're done with the MA."
 
-1. Make the site now and deploy it.
+1. Make the site now and deploy it, per the celebration skill.
 2. Find the next Spanish MA, the period, and the period end. Schedule 5 minutes before that end.
-3. `schedule_future_agent` with the live URL, who asked, and the task "send this link in the Teams chat." The tool copies the Teams chat.
+3. `schedule_future_agent`. Prompt: send the celebration link in this chat. Context: the live URL and who asked. The tool copies the Teams chat.
 4. Reply now with the time you picked. Do not send the link yet.
 
 When that time hits, the scheduled agent sends the link in JYPE Teams. The thread is already in JYPE history, titled `Scheduled: …`.

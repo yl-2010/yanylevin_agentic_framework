@@ -1596,6 +1596,7 @@ export const PERSONAL_SKILL_PATHS = {
   factCheck: ".cursor/skills/nightly-fact-check/SKILL.md",
   jypeAgent: ".cursor/skills/jype-agent/SKILL.md",
   futureAgents: ".cursor/skills/future-agents/SKILL.md",
+  celebration: ".cursor/skills/create-celebration-website/SKILL.md",
 };
 
 const FUTURE_AGENT_HINT =
@@ -1640,6 +1641,7 @@ export function systemPrompt(email, opts = {}) {
       `- EPS student IDs / school photos: ${FOUR11_SKILL_PATH}`,
       `- Click-through / login pages (skip static fetch): ${PERSONAL_SKILL_PATHS.browser}`,
       `- Future agents (schedule a later run): ${PERSONAL_SKILL_PATHS.futureAgents}`,
+      `- Celebration site: ${PERSONAL_SKILL_PATHS.celebration}`,
       "File uploads can be stored in the matching JYPE class or project folder.",
       "Math on the website and in the iOS app is a display block, with a blank line before and after. Put $$ on its own line, then LaTeX, then $$ on its own line. Stack equations one per line in that block. Use \\(x\\) or $x^2$ only for a symbol inside a sentence. Never backticks for math. iMessage and Teams cannot render KaTeX, so those replies stay plain words.",
     ].join("\n");
@@ -1685,7 +1687,8 @@ export function systemPrompt(email, opts = {}) {
     `- Daily Briefing compile / news sources / thumbs: ${PERSONAL_SKILL_PATHS.news}`,
     `- Fitness / gym: ${PERSONAL_SKILL_PATHS.fitness}`,
     `- Future agents (schedule a later run): ${PERSONAL_SKILL_PATHS.futureAgents}`,
-    `- Memories / brain: education/you@example.com/brain/ (identity.md map, identity-school.md, identity-accounts.md, identity-logistics.md, patterns.md, health.md, threads/, journal/, places/; contract in ${PERSONAL_SKILL_PATHS.brain})`,
+    `- Celebration site: ${PERSONAL_SKILL_PATHS.celebration}`,
+    `- Memories / brain: ${PERSONAL_SKILL_PATHS.brain}`,
     "",
     "Live context below is authoritative for clock, class-now, and the open screen. Trust it. Named-people lookup still opens brain/people/. Other education/<email>/ files only when the question needs that data.",
     "",
