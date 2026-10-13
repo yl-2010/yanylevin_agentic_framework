@@ -1722,6 +1722,38 @@
     return t.completedAt || "";
   }
 
+  /**
+   * Completed rows stay in due-day blocks so the hairline is a real section.
+   * The newest check-off in a day pulls that whole day up. Inside the day,
+   * newest check-off first.
+   */
+  function sortCompletedTodos(todos) {
+    const groups = new Map();
+    for (const t of todos) {
+      const day = todoDayKey(t);
+      const list = groups.get(day);
+      if (list) list.push(t);
+      else groups.set(day, [t]);
+    }
+    const blocks = [];
+    for (const [day, list] of groups) {
+      list.sort((a, b) => completedSortKey(b).localeCompare(completedSortKey(a)));
+      blocks.push({ day, list, newest: completedSortKey(list[0]) });
+    }
+    blocks.sort((a, b) => {
+      const byNewest = b.newest.localeCompare(a.newest);
+      if (byNewest) return byNewest;
+      if (!a.day && b.day) return 1;
+      if (a.day && !b.day) return -1;
+      return b.day.localeCompare(a.day);
+    });
+    return blocks.flatMap((block) => block.list);
+  }
+
+  function todoListKey(t) {
+    return `${t?.projectId || ""}\t${t?.classId || ""}\t${t?.id || ""}`;
+  }
+
   function dateSortKey(d) {
     const dt = d.date || "9999-99-99";
     const tm = d.time || "99:99";
@@ -2166,10 +2198,7 @@
       }
     }
     open.sort((a, b) => dueSortKey(a).localeCompare(dueSortKey(b)));
-    completed.sort((a, b) =>
-      completedSortKey(b).localeCompare(completedSortKey(a))
-    );
-    return { open, completed };
+    return { open, completed: sortCompletedTodos(completed) };
   }
 
   function msUntilClassTodoArchive(todo, cls, schedule) {
@@ -2511,9 +2540,7 @@
     const open = todos
       .filter((t) => !t.done)
       .sort((a, b) => dueSortKey(a).localeCompare(dueSortKey(b)));
-    const completed = todos
-      .filter((t) => t.done)
-      .sort((a, b) => completedSortKey(b).localeCompare(completedSortKey(a)));
+    const completed = sortCompletedTodos(todos.filter((t) => t.done));
     const sections = classSections(tree.schedule || {}, tree.classes || []);
 
     const dayPanel = (sec, i) => {
@@ -2660,9 +2687,7 @@
     const open = todos
       .filter((t) => !t.done)
       .sort((a, b) => dueSortKey(a).localeCompare(dueSortKey(b)));
-    const completed = todos
-      .filter((t) => t.done)
-      .sort((a, b) => completedSortKey(b).localeCompare(completedSortKey(a)));
+    const completed = sortCompletedTodos(todos.filter((t) => t.done));
     const name = escapeHtml(project.name || project.id);
     const projectDesc = String(project.description || "").trim();
 
@@ -3231,23 +3256,50 @@
     }
   }
 
+  function todoFromRow(child) {
+    const id = child.getAttribute?.("data-todo-id");
+    if (!id) return null;
+    return findTodoById(id, {
+      classId: child.getAttribute("data-todo-class-id") || null,
+      projectId: child.getAttribute("data-todo-project-id") || null,
+    });
+  }
+
   function insertTodoRowSorted(list, row, todo, isDone) {
-    const key = isDone ? completedSortKey(todo || {}) : dueSortKey(todo || {});
+    if (isDone) {
+      const current = [];
+      for (const child of list.children) {
+        if (child === row) continue;
+        const other = todoFromRow(child);
+        if (other) current.push(other);
+      }
+      if (todo) current.push(todo);
+      const ordered = sortCompletedTodos(current);
+      const want = todoListKey(todo);
+      const index = ordered.findIndex((t) => todoListKey(t) === want);
+      const next = index >= 0 ? ordered[index + 1] : null;
+      if (next) {
+        const nextKey = todoListKey(next);
+        for (const child of list.children) {
+          if (child === row) continue;
+          const other = todoFromRow(child);
+          if (other && todoListKey(other) === nextKey) {
+            list.insertBefore(row, child);
+            return;
+          }
+        }
+      }
+      list.appendChild(row);
+      return;
+    }
+
+    const key = dueSortKey(todo || {});
     const children = [...list.children];
     for (const child of children) {
       if (child === row) continue;
-      const id = child.getAttribute("data-todo-id");
-      const childClass = child.getAttribute("data-todo-class-id") || null;
-      const childProject = child.getAttribute("data-todo-project-id") || null;
-      const other = id
-        ? findTodoById(id, { classId: childClass, projectId: childProject })
-        : null;
+      const other = todoFromRow(child);
       if (!other) continue;
-      const otherKey = isDone ? completedSortKey(other) : dueSortKey(other);
-      const before = isDone
-        ? otherKey.localeCompare(key) < 0 // completed: most recently checked-off first
-        : key.localeCompare(otherKey) < 0; // open: soonest first (asc)
-      if (before) {
+      if (key.localeCompare(dueSortKey(other)) < 0) {
         list.insertBefore(row, child);
         return;
       }

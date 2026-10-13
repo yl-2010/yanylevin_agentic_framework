@@ -300,8 +300,7 @@ struct EducationView: View {
 
     private var completedPanel: some View {
         EducationCompletedPanel(
-            todos: filteredTodos(done: true)
-                .sorted { $0.completedSortKey > $1.completedSortKey },
+            todos: EducationTodo.sortedCompleted(filteredTodos(done: true)),
             expanded: completedExpanded,
             use24Hour: use24Hour,
             showClass: true,
@@ -1165,8 +1164,7 @@ struct ClassDetailView: View {
     }
 
     private var doneClassTodos: [EducationTodo] {
-        filteredClassTodos(done: true)
-            .sorted { $0.completedSortKey > $1.completedSortKey }
+        EducationTodo.sortedCompleted(filteredClassTodos(done: true))
     }
 
     private var todosPanel: some View {
@@ -1460,8 +1458,7 @@ struct ProjectDetailView: View {
 
     private var completedPanel: some View {
         EducationCompletedPanel(
-            todos: filteredTodos(done: true)
-                .sorted { $0.completedSortKey > $1.completedSortKey },
+            todos: EducationTodo.sortedCompleted(filteredTodos(done: true)),
             expanded: completedExpanded,
             use24Hour: use24Hour,
             showClass: false,

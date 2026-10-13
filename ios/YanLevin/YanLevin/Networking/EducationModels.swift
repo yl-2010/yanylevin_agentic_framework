@@ -585,6 +585,22 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
         completedAt ?? ""
     }
 
+    /// Due-day blocks. The newest check-off in a day pulls that day up.
+    /// Inside the day, newest check-off first.
+    static func sortedCompleted(_ todos: [EducationTodo]) -> [EducationTodo] {
+        let groups = Dictionary(grouping: todos) { $0.dueDateValue ?? "" }
+        let blocks = groups.map { day, items -> (day: String, items: [EducationTodo], newest: String) in
+            let sorted = items.sorted { $0.completedSortKey > $1.completedSortKey }
+            return (day, sorted, sorted.first?.completedSortKey ?? "")
+        }
+        .sorted { a, b in
+            if a.newest != b.newest { return a.newest > b.newest }
+            if a.day.isEmpty != b.day.isEmpty { return !a.day.isEmpty }
+            return a.day > b.day
+        }
+        return blocks.flatMap(\.items)
+    }
+
     /// Parsed `completedAt` ISO timestamp (fractional seconds optional).
     var completedAtDate: Date? {
         guard let completedAt, !completedAt.isEmpty else { return nil }
