@@ -591,6 +591,21 @@
         line-height: 1.294; resize: none; overflow-x: hidden; overflow-y: hidden;
         white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;
         appearance: none; -webkit-appearance: none; field-sizing: fixed; align-self: center;
+        /* Past 8 lines the field still scrolls. Hide the bar. Styled scrollbars on
+           the thread force a classic white track on this textarea. */
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      .yan-chat-input::-webkit-scrollbar {
+        width: 0;
+        height: 0;
+        display: none;
+        background: transparent;
+      }
+      .yan-chat-input::-webkit-scrollbar-track,
+      .yan-chat-input::-webkit-scrollbar-thumb,
+      .yan-chat-input::-webkit-scrollbar-corner {
+        background: transparent;
       }
       .yan-chat.is-composer-tall .yan-chat-input { align-self: stretch; height: auto; }
       .yan-chat-input::placeholder { color: var(--muted); opacity: 0.8; }

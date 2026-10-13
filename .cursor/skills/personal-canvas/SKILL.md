@@ -11,9 +11,9 @@ disable-model-invocation: true
 
 # Canvas sync — Yan only
 
-**Gate:** signed-in / default user is `you@example.com`. If the user is Alex, skip this whole skill.
+**Gate:** signed-in / default user is `yanylevin@gmail.com`. If the user is Prasham, skip this whole skill.
 
-EPS Canvas is `https://canvas.instructure.com`. A student API token lives in `server/.env` (`CANVAS_ACCESS_TOKEN`). Never print or commit the token.
+EPS Canvas is `https://eastsideprep.instructure.com`. A student API token lives in `server/.env` (`CANVAS_ACCESS_TOKEN`). Never print or commit the token.
 
 This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how dashboard classes line up with Canvas courses, then write education todos/dates. Nightly model: **grok-4.7 xhigh** (reasoning_effort=xhigh, fast=false, context=256k). Hourly model: **composer-2.5** (fast=false).
 
@@ -23,13 +23,13 @@ This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how
 - **Checkoff (Express, not you):** Yan checking off a Canvas-linked todo writes a planner override (`marked_complete`) so Canvas To-Do matches. Local-only todos stay local. You still never POST planner overrides.
 - **Submit (you, only when Yan says submit / turn in / upload this to Canvas):** identify the assignment, rename+store the chat file on OneDrive if he attached one, then `canvas-files.js submit` (file, `--text` / `--text-file`, or `--url`). Save / put this in / handle the file never submits. Ask only if the assignment is actually unclear.
 - **Hourly:** Express runs a light fetch + this skill (mapped classes only, no new-class hunt) at **:00** in the briefing timezone, except the 01:00 nightly window. Restarts wait for the next :00. Writes `last-hourly-sync.json`. After the agent, Express pulls teacher files into OneDrive todos.
-- **Nightly:** Express runs the full fetch + this skill at **01:00** (`nightlyAgentsLocalTime` in `education/you@example.com/daily-briefing/meta.json`). Same slot as location compose/enrichment. Context synthesis is later (02:30). Daily briefing is 06:00. **Re-read what hourly Composer wrote during the day and fix mistakes.** Fold new teacher comments into class/todo `CONTEXT.md`. Then Express pulls teacher files.
+- **Nightly:** Express runs the full fetch + this skill at **01:00** (`nightlyAgentsLocalTime` in `education/yanylevin@gmail.com/daily-briefing/meta.json`). Same slot as location compose/enrichment. Context synthesis is later (02:30). Daily briefing is 06:00. **Re-read what hourly Composer wrote during the day and fix mistakes.** Fold new teacher comments into class/todo `CONTEXT.md`. Then Express pulls teacher files.
 - **Manual (Personal Agent):** Yan says sync / pull / update Canvas. First fetch, then apply this skill **in this turn** (full nightly rules, including class map). Do not spawn a nested Cursor agent. After writes, Express pull still runs on the next hourly/fetch; you may also `canvas-files.js pull`.
 
 ```bash
 node --env-file=server/.env server/canvas-sync.js --fetch-only
 node --env-file=server/.env server/canvas-files.js submit --canvas-id 40335975
-node --env-file=server/.env server/canvas-files.js submit --canvas-id 40335975 --file education/you@example.com/.chat-uploads/<session>/scan.pdf
+node --env-file=server/.env server/canvas-files.js submit --canvas-id 40335975 --file education/yanylevin@gmail.com/.chat-uploads/<session>/scan.pdf
 node --env-file=server/.env server/canvas-files.js submit --canvas-id 40073386 --text "here is the paragraph"
 node --env-file=server/.env server/canvas-files.js submit --canvas-id 40073386 --text-file /tmp/body.txt
 node --env-file=server/.env server/canvas-files.js submit --canvas-id 40073386 --url https://example.com/doc
@@ -45,7 +45,7 @@ If `.canvas/snapshot.json` is missing and the fetch CLI fails, say Canvas is not
 ## Files
 
 ```
-education/you@example.com/.canvas/
+education/yanylevin@gmail.com/.canvas/
   snapshot.json         # only dashboard / junior-year classes (assignments, events, syllabi)
   assignments.md        # readable index of that same subset
   comments.json / comments.md / comments-new.md
@@ -66,7 +66,7 @@ OneDrive <gradeFolder>/<onedriveFolder>/.education/
 <Finder date folder>/date.json + that date's files
 ```
 
-Yan class trees live on OneDrive (see education-dashboard.md). Do not write `education/you@example.com/classes/<id>/` except `_example-dummy`.
+Yan class trees live on OneDrive (see education-dashboard.md). Do not write `education/yanylevin@gmail.com/classes/<id>/` except `_example-dummy`.
 
 Dashboard schema: `.cursor/skills/personal-agent/education-dashboard.md`.
 
@@ -81,7 +81,7 @@ When the runner says hourly: **do not** map new classes, **do not** create class
 3. Match Canvas `courses[]` to those folders by name / course code (American Literature, Physics, Spanish 4, Data Science, US History, Calc, programming titles, PE Yoga, Independent Study, and similar). Fetch still asks Canvas for current and future enrollments, then **drops** anything that is not a dashboard class before writing the snapshot (9th/10th-year shells, Class of 2028, EPS Library, Iceland EBC, Graphic Design, clubs, advisory). Update `course-map.json` when you are confident.
 4. **Skip** any leftover Canvas course with no dashboard class. Do not create new class folders from Canvas. Do not store or import extras.
 5. If two dashboard classes could match one Canvas course, pick the obvious one or skip that course rather than guessing into the wrong folder.
-6. For each mapped class, set `canvasLink` on `class.json` to `{htmlUrl}/grades` (example `https://canvas.instructure.com/courses/3639020/grades`). Web and iOS class pages show the Canvas orb from this.
+6. For each mapped class, set `canvasLink` on `class.json` to `{htmlUrl}/grades` (example `https://eastsideprep.instructure.com/courses/3639020/grades`). Web and iOS class pages show the Canvas orb from this.
 
 ## Stop early (junior year not on Canvas yet)
 
@@ -98,7 +98,7 @@ When at least one class maps, sync **only** those mapped classes and continue be
 For every snapshot assignment whose `courseId` is mapped:
 
 - Match an existing todo in that class by `canvasId`, then `canvasLink`, then same **name + parent + dueDate**.
-- Create if none, unless it looks like a row in `education/you@example.com/deleted.md`. Judgement, not exact due clocks. `canvasId` is a strong hint; similar name + class in the same year is enough. Skip those. OneDrive folder name: `HW Sep 15 Title` (tag, due as `Mon D`, JSON name, spaces not kebab), unique in that class folder. Set `createdAt` now. `done: false` on create only. Express visibility sync will rename if the due date or title later changes.
+- Create if none, unless it looks like a row in `education/yanylevin@gmail.com/deleted.md`. Judgement, not exact due clocks. `canvasId` is a strong hint; similar name + class in the same year is enough. Skip those. OneDrive folder name: `HW Sep 15 Title` (tag, due as `Mon D`, JSON name, spaces not kebab), unique in that class folder. Set `createdAt` now. `done: false` on create only. Express visibility sync will rename if the due date or title later changes.
 - **Update** name, `dueDate`, `dueTime`, `tag`, `description`, `canvasLink`, `canvasId` when Canvas changed.
 - Prefer snapshot `dueDate` / `dueTime` (already in the briefing timezone). Undated Canvas rows may omit due fields.
 - **Advanced Calculus HW (Yan, 2026-09-10):** For `advanced-calculus` todos with `tag: "HW"`, do **not** use the Canvas due as the dashboard due. Canvas is typically two period-C meetings after the start day. Set `dueDate` / `dueTime` to the **previous** period-C meeting before Canvas due, at that day's C start from `schedule.json` (`bells` / `dayOverrides`). Match by `canvasId` first so a shifted due still updates the same todo. Do not pull those dues back to Canvas on later syncs. Leave MA / QA / CW on Canvas times. If Canvas due is not on a C meeting, leave Canvas times.
@@ -229,4 +229,4 @@ Read `last-hourly-sync.json`. Walk mapped class todos against the **full** snaps
 
 ## After writes
 
-Education file watcher refreshes `/education`. Prefer committing `education/you@example.com/` when the nightly runner did not already. Manual chat: 1–3 short lines (`Synced Canvas into Lit, Physics, and Spanish`).
+Education file watcher refreshes `/education`. Prefer committing `education/yanylevin@gmail.com/` when the nightly runner did not already. Manual chat: 1–3 short lines (`Synced Canvas into Lit, Physics, and Spanish`).

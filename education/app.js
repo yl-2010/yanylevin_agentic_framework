@@ -287,6 +287,8 @@
   let classCommentsExpanded = false;
   /** TODO panel: web starts fully expanded; collapsed shows 6 and hides type filters. */
   let todoExpanded = true;
+  /** Completed panel: starts expanded; collapsed shows 6. No type filters of its own. */
+  let completedExpanded = true;
   let route = parseRoute();
 
   function show(name) {
@@ -1855,6 +1857,22 @@
     });
   }
 
+  function completedPanelHtml(completedTodos, filterId) {
+    const visible = completedExpanded
+      ? completedTodos
+      : completedTodos.slice(0, TODOS_COLLAPSED_LIMIT);
+    const titleHtml = `<button type="button" class="edu-completed-toggle" data-completed-expand aria-expanded="${
+      completedExpanded ? "true" : "false"
+    }" aria-label="${
+      completedExpanded ? "Collapse completed" : "Expand completed"
+    }">Completed</button>`;
+    return panelHtml("Completed", listOrEmpty(visible.map(todoRowHtml).join("")), {
+      filterId,
+      extraClass: "edu-panel--completed",
+      titleHtml,
+    });
+  }
+
   function todoCheckHtml({ done, filterId }) {
     return `<span class="edu-check-host"><button type="button" class="edu-check${
       done ? " is-checked" : ""
@@ -2549,10 +2567,7 @@
       <div class="edu-grid edu-grid--home">
         <div class="edu-col edu-col--main">
           ${todoPanelHtml(open, "lg-edu-todo")}
-          ${panelHtml("Completed", listOrEmpty(completed.map(todoRowHtml).join("")), {
-            filterId: "lg-edu-completed",
-            extraClass: "edu-panel--completed",
-          })}
+          ${completedPanelHtml(completed, "lg-edu-completed")}
         </div>
         <div class="edu-col edu-col--side">
           ${rightCol}
@@ -2612,10 +2627,7 @@
       <div class="edu-grid edu-grid--home">
         <div class="edu-col edu-col--main">
           ${todoPanelHtml(open, "lg-edu-class-todo")}
-          ${panelHtml("Completed", listOrEmpty(completed.map(todoRowHtml).join("")), {
-            filterId: "lg-edu-class-completed",
-            extraClass: "edu-panel--completed",
-          })}
+          ${completedPanelHtml(completed, "lg-edu-class-completed")}
         </div>
         <div class="edu-col edu-col--side">
           ${datesPanelHtml({ classId: cls.id }, "lg-edu-class-dates")}
@@ -2663,10 +2675,7 @@
       <div class="edu-grid edu-grid--home">
         <div class="edu-col edu-col--main">
           ${todoPanelHtml(open, "lg-edu-project-todo")}
-          ${panelHtml("Completed", listOrEmpty(completed.map(todoRowHtml).join("")), {
-            filterId: "lg-edu-project-completed",
-            extraClass: "edu-panel--completed",
-          })}
+          ${completedPanelHtml(completed, "lg-edu-project-completed")}
         </div>
         <div class="edu-col edu-col--side">
           ${datesPanelHtml({ projectId: project.id }, "lg-edu-project-dates")}
@@ -3346,7 +3355,7 @@
       animateTodoRowMove(row, targetList, todo, !stayOpen);
       syncTodoDaySeparators(openPanel.querySelector(":scope > .edu-list"));
       markPanelEmptyIfNeeded(sourcePanel);
-      if (!todoExpanded) {
+      if (!todoExpanded || !completedExpanded) {
         window.setTimeout(() => render({ scroll: "keep" }), 520);
         return true;
       }
@@ -3643,6 +3652,14 @@
       if (todosToggle) {
         event.preventDefault();
         todoExpanded = !todoExpanded;
+        render();
+        return;
+      }
+
+      const completedToggle = t.closest?.("[data-completed-expand]");
+      if (completedToggle) {
+        event.preventDefault();
+        completedExpanded = !completedExpanded;
         render();
         return;
       }

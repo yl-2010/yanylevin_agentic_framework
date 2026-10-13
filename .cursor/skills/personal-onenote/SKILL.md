@@ -2,20 +2,20 @@
 name: personal-onenote
 description: >-
   Read Yan's EPS Microsoft 365 OneNote / Class Notebooks
-  (owner@school.example) via node server/school-onenote.js. Use when Yan
+  (ylevin@eastsideprep.org) via node server/school-onenote.js. Use when Yan
   asks about school work that lives in a Class Notebook (agenda, HW
   instructions, maps, day packets, grammar refs), or when a job names a
   notebook or page. Yan only. Never a default nightly source. Never for
-  Alex.
+  Prasham.
 disable-model-invocation: true
 ---
 
 # School OneNote, Yan only
 
-**Gate:** signed-in / default user is `you@example.com`. If the user is
-Alex, skip this whole skill.
+**Gate:** signed-in / default user is `yanylevin@gmail.com`. If the user is
+Prasham, skip this whole skill.
 
-Account: `owner@school.example`. Same Chrome login as school Outlook
+Account: `ylevin@eastsideprep.org`. Same Chrome login as school Outlook
 (`~/.yanylevin/school-mail/chrome-profile`). No Azure app. No API key.
 
 Per-class maps also live on each class `CONTEXT.md`. This file is the
@@ -86,7 +86,7 @@ images. That is how PS2 ink was read. Do not tell Yan ink is unreadable.
 
 If `signedIn` is false or the payload says `not signed in`, run login on the
 Mac Studio. Chrome opens **Graph Explorer**, not Outlook. The script clicks
-`owner@school.example` on the Microsoft account picker, then Run query.
+`ylevin@eastsideprep.org` on the Microsoft account picker, then Run query.
 Do not tell Yan to click Sign in. Stay at the computer only if 2FA appears.
 
 ```bash

@@ -34,15 +34,15 @@ import {
   reloadCursorApiKeyFromEnv,
   requireCursorApiKey,
 } from "./cursor-sdk-auth.js";
-import { OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
 
+export const YAN_EMAIL = "yanylevin@gmail.com";
 export const CANVAS_REL = `education/${YAN_EMAIL}/.canvas`;
 export function canvasSyncHm(meta) {
   return nightlyAgentsHm(meta);
 }
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const DEFAULT_BASE = "https://canvas.instructure.com";
+const DEFAULT_BASE = "https://eastsideprep.instructure.com";
 const META_PATH = join(ROOT, "education", YAN_EMAIL, "daily-briefing", "meta.json");
 const LOCK_PATH = "/tmp/yanylevin-canvas-sync.lock";
 export const CANVAS_LOCK_STALE_MS = 90 * 60 * 1000;
@@ -1473,7 +1473,7 @@ export function buildCanvasSyncPrompt({
       : "";
   return [
     `Follow ${SKILL_PATH}. Sync Canvas into Yan's education dashboard.`,
-    "Yan only (you@example.com). Local only. Never spawn a Cursor cloud agent.",
+    "Yan only (yanylevin@gmail.com). Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} (timezone ${timezone}).`,
     `Snapshot: ${CANVAS_REL}/snapshot.json (also assignments.md). Optional map: ${CANVAS_REL}/course-map.json.`,
     `Agent context dumps: ${CANVAS_REL}/comments.md, comments-new.md, pages.md, modules.md, files.md (and the matching .json). Teacher comments show on the todo page from the live overlay. Pages, modules, and course files stay off the UI.`,
@@ -1504,7 +1504,7 @@ export function buildCanvasHourlyPrompt({ dateKey, hourKey, timezone, deletedBlo
       : "";
   return [
     `Follow ${SKILL_PATH} (hourly pass). Sync Canvas todos into already mapped classes only.`,
-    "Yan only (you@example.com). Local only. Never spawn a Cursor cloud agent.",
+    "Yan only (yanylevin@gmail.com). Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} hour ${hourKey} (timezone ${timezone}).`,
     `Snapshot: ${CANVAS_REL}/snapshot.json (light, mapped courses only). Map: ${CANVAS_REL}/course-map.json.`,
     "Do not look for new classes. Do not create class folders. Do not edit course-map.json. Do not mine syllabi or invent dates from empty events.",

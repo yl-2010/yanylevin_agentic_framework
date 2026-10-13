@@ -123,7 +123,7 @@ describe("formatCanvasAssignmentsMarkdown", () => {
             dueDate: "2026-08-18",
             dueTime: "01:59",
             course: "American Literature",
-            htmlUrl: "https://canvas.instructure.com/courses/1/assignments/2",
+            htmlUrl: "https://eastsideprep.instructure.com/courses/1/assignments/2",
           },
         ],
         courses: [{ id: 1, name: "American Literature", grade: "A" }],

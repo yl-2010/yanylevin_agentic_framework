@@ -1007,6 +1007,7 @@ html[data-resolved-theme="dark"] .edu-file-folder-children {
 
 .edu-dates-toggle,
 .edu-todos-toggle,
+.edu-completed-toggle,
 .edu-comments-toggle {
   display: inline;
   margin: 0;
@@ -1026,6 +1027,7 @@ html[data-resolved-theme="dark"] .edu-file-folder-children {
 
 .edu-dates-toggle:focus-visible,
 .edu-todos-toggle:focus-visible,
+.edu-completed-toggle:focus-visible,
 .edu-comments-toggle:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--accent) 65%, transparent);
   outline-offset: 3px;
@@ -1975,6 +1977,21 @@ html[data-resolved-theme="dark"] .yan-chat-pill.corner.lg-refraction::after {
   line-height: var(--lh-body); resize: none; overflow-x: hidden; overflow-y: hidden;
   white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;
   appearance: none; -webkit-appearance: none; field-sizing: fixed; align-self: center;
+  /* Past 8 lines the field still scrolls. Hide the bar. Styled scrollbars on
+     the thread force a classic white track on this textarea. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.yan-chat-input::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+  background: transparent;
+}
+.yan-chat-input::-webkit-scrollbar-track,
+.yan-chat-input::-webkit-scrollbar-thumb,
+.yan-chat-input::-webkit-scrollbar-corner {
+  background: transparent;
 }
 .yan-chat-column.is-composer-tall .yan-chat-input { align-self: stretch; height: auto; }
 .yan-chat-input::placeholder { color: var(--muted); opacity: 0.8; }

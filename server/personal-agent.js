@@ -3073,7 +3073,7 @@ export async function messageAgent(
     }
     promptParts.push(
       `When storing long-term dashboard context, Read ${PERSONAL_SKILL_PATHS.education} then copy identical bytes into the matching object folder.`,
-      `Yan class files: that class's OneDrive todo/date folder (meta.json onedriveRoot + gradeFolder + onedriveFolder). Do not write class files under education/${normalized}/ except .chat-uploads. Turn in / submit / upload to Canvas: identify the assignment (Live context first), rename junk names, store, then node --env-file=server/.env server/canvas-files.js submit --canvas-id <id> --file <path>. Save / put this in / handle the file: same store path (node --env-file=server/.env server/canvas-files.js store --src <path> --class <id> --todo "<Finder folder>"), do not submit. Ask only if the assignment is unclear.`
+      `Yan class files: that class's OneDrive todo/date folder (meta.json onedriveRoot + gradeFolder + onedriveFolder). Do not write class files under education/${normalized}/ except .chat-uploads. Turn in / submit / upload to Canvas: identify the assignment (Live context first), name the file from the Canvas assignment title (or the todo name if there is no Canvas title; do not use the header printed on the sheet), store, then node --env-file=server/.env server/canvas-files.js submit --canvas-id <id> --file <path>. Save / put this in / handle the file: same store path (node --env-file=server/.env server/canvas-files.js store --src <path> --class <id> --todo "<Finder folder>"), do not submit. Ask only if the assignment is unclear.`
     );
   }
 

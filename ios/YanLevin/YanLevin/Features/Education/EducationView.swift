@@ -12,6 +12,8 @@ struct EducationView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var store = EducationStore()
     @State private var todoExpanded = false
+    /// Completed starts open on iPhone and the site. Collapse only after a tap.
+    @State private var completedExpanded = true
     @State private var todoTypeFilters: Set<String> = EducationTodoFilter.load()
     @State private var datesExpanded = false
     @State private var dateFilters: Set<String> = EducationDateFilter.load()
@@ -297,20 +299,20 @@ struct EducationView: View {
     }
 
     private var completedPanel: some View {
-        eduPanel(title: "Completed", dimmed: true) {
-            let done = filteredTodos(done: true)
-                .sorted { $0.completedSortKey > $1.completedSortKey }
-            if done.isEmpty {
-                emptyRow("Nothing here")
-            } else {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(done) { todo in
-                        todoRow(todo, showClass: true)
-                    }
-                    .animation(.spring(response: 0.42, dampingFraction: 0.86), value: done.map(\.id))
+        EducationCompletedPanel(
+            todos: filteredTodos(done: true)
+                .sorted { $0.completedSortKey > $1.completedSortKey },
+            expanded: completedExpanded,
+            use24Hour: use24Hour,
+            showClass: true,
+            onToggleExpanded: {
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    completedExpanded.toggle()
                 }
-            }
-        }
+            },
+            className: { className(for: $0) },
+            onToggleDone: toggleDone
+        )
     }
 
     private var jypeClassesPanel: some View {
@@ -979,6 +981,8 @@ struct ClassDetailView: View {
     @Environment(\.ylPalette) private var palette
 
     @State private var todoExpanded = false
+    /// Completed starts open. Collapse only after a tap.
+    @State private var completedExpanded = true
     @State private var todoTypeFilters: Set<String> = EducationTodoFilter.load()
     @State private var datesExpanded = false
     @State private var dateFilters: Set<String> = EducationDateFilter.load()
@@ -1186,21 +1190,19 @@ struct ClassDetailView: View {
     }
 
     private var completedClassPanel: some View {
-        eduPanel(title: "Completed", dimmed: true) {
-            if doneClassTodos.isEmpty {
-                emptyRow("Nothing here")
-            } else {
-                ForEach(doneClassTodos) { todo in
-                    EducationTodoRow(
-                        todo: todo,
-                        className: className(for: todo),
-                        use24Hour: use24Hour,
-                        onToggleDone: { toggleDone(todo) }
-                    )
+        EducationCompletedPanel(
+            todos: doneClassTodos,
+            expanded: completedExpanded,
+            use24Hour: use24Hour,
+            showClass: true,
+            onToggleExpanded: {
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    completedExpanded.toggle()
                 }
-                .animation(.spring(response: 0.42, dampingFraction: 0.86), value: doneClassTodos.map(\.id))
-            }
-        }
+            },
+            className: { className(for: $0) },
+            onToggleDone: toggleDone
+        )
     }
 
     private var datesPanel: some View {
@@ -1347,6 +1349,8 @@ struct ProjectDetailView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var todoExpanded = false
+    /// Completed starts open. Collapse only after a tap.
+    @State private var completedExpanded = true
     @State private var todoTypeFilters: Set<String> = EducationTodoFilter.load()
     @State private var datesExpanded = false
     @State private var dateFilters: Set<String> = EducationDateFilter.load()
@@ -1455,23 +1459,20 @@ struct ProjectDetailView: View {
     }
 
     private var completedPanel: some View {
-        eduPanel(title: "Completed", dimmed: true) {
-            let done = filteredTodos(done: true)
-                .sorted { $0.completedSortKey > $1.completedSortKey }
-            if done.isEmpty {
-                emptyRow("Nothing here")
-            } else {
-                ForEach(done) { todo in
-                    EducationTodoRow(
-                        todo: todo,
-                        className: nil,
-                        use24Hour: use24Hour,
-                        onToggleDone: { toggleDone(todo) }
-                    )
+        EducationCompletedPanel(
+            todos: filteredTodos(done: true)
+                .sorted { $0.completedSortKey > $1.completedSortKey },
+            expanded: completedExpanded,
+            use24Hour: use24Hour,
+            showClass: false,
+            onToggleExpanded: {
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    completedExpanded.toggle()
                 }
-                .animation(.spring(response: 0.42, dampingFraction: 0.86), value: done.map(\.id))
-            }
-        }
+            },
+            className: { _ in nil },
+            onToggleDone: toggleDone
+        )
     }
 
     private var datesPanel: some View {
@@ -2006,6 +2007,63 @@ private struct CanvasToolbarChrome: ViewModifier {
 }
 
 // MARK: - Shared todo UI
+
+/// Dimmed completed list. Starts expanded. Collapsed shows 6. No type filters.
+private struct EducationCompletedPanel: View {
+    let todos: [EducationTodo]
+    let expanded: Bool
+    let use24Hour: Bool
+    let showClass: Bool
+    let onToggleExpanded: () -> Void
+    let className: (EducationTodo) -> String?
+    let onToggleDone: (EducationTodo) -> Void
+
+    private static let collapsedLimit = 6
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var visible: [EducationTodo] {
+        expanded ? todos : Array(todos.prefix(Self.collapsedLimit))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                YLHaptics.tap()
+                onToggleExpanded()
+            } label: {
+                Text("Completed")
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(YLTheme.fg(colorScheme))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(expanded ? "Collapse completed" : "Expand completed")
+
+            if visible.isEmpty {
+                Text("Nothing here")
+                    .font(.subheadline)
+                    .foregroundStyle(YLTheme.muted(colorScheme))
+                    .padding(.vertical, 6)
+            } else {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(visible) { todo in
+                        EducationTodoRow(
+                            todo: todo,
+                            className: showClass ? className(todo) : nil,
+                            use24Hour: use24Hour,
+                            onToggleDone: { onToggleDone(todo) }
+                        )
+                    }
+                    .animation(.spring(response: 0.42, dampingFraction: 0.86), value: visible.map(\.id))
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .ylGlassRounded(cornerRadius: 22, interactive: true)
+        .opacity(0.55)
+    }
+}
 
 private struct EducationTodoPanel: View {
     let title: String

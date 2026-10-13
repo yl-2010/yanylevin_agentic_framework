@@ -1711,12 +1711,13 @@ async function loadProjectCases(
       t.caseId = id;
       t.caseName = row.name || id;
     }
+    todos.push(...caseTodos);
+    if (isHiddenFromUi(row)) continue;
     cases.push({
       id,
       name: row.name || id,
       ...publicDebateCase(row),
     });
-    todos.push(...caseTodos);
   }
   cases.sort((a, b) =>
     String(a.name || a.id).localeCompare(String(b.name || b.id), undefined, {
