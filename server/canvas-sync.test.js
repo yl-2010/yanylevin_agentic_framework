@@ -123,7 +123,7 @@ describe("formatCanvasAssignmentsMarkdown", () => {
             dueDate: "2026-08-18",
             dueTime: "01:59",
             course: "American Literature",
-            htmlUrl: "https://eastsideprep.instructure.com/courses/1/assignments/2",
+            htmlUrl: "https://canvas.instructure.com/courses/1/assignments/2",
           },
         ],
         courses: [{ id: 1, name: "American Literature", grade: "A" }],
@@ -503,9 +503,12 @@ describe("buildCanvasSyncPrompt", () => {
     assert.match(prompt, /Fix mistakes/);
     assert.match(prompt, /comments-new\.md/);
     assert.match(prompt, /pages\.md/);
-    assert.match(prompt, /todos imported on earlier nights/);
-    assert.match(prompt, /Go todo by todo/);
-    assert.match(prompt, /Do not start from a page and hunt for a todo/);
+    assert.match(prompt, /Tag does not matter/);
+    assert.match(prompt, /Pass 1:/);
+    assert.match(prompt, /Pass 2:/);
+    assert.match(prompt, /14 days out/);
+    assert.match(prompt, /onenote-seen\.json/);
+    assert.equal(/hunt for a todo/.test(prompt), false);
     assert.match(prompt, /Do not run link-todos/);
     assert.match(prompt, /oneNote content-library/);
     assert.match(prompt, /add linkedFiles on this todo/);

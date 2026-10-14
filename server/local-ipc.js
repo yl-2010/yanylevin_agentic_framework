@@ -19,6 +19,12 @@ import {
   sendIMessage,
 } from "./imessage-send.js";
 import { applyAgentSentFooter } from "./imessage-mention.js";
+import {
+  recentMessages as recentWhatsApp,
+  recentThread as whatsAppThread,
+  searchMessages as searchWhatsApp,
+} from "./whatsapp-read.js";
+import { sendWhatsApp } from "./whatsapp-send.js";
 import { recentSessions, screenTimeSummary } from "./screentime-read.js";
 
 export const LOCAL_SOCK = "/tmp/personal-agent-local.sock";
@@ -221,6 +227,39 @@ export function createLocalIpcHandler(deps = {}) {
           }),
           files,
           chatGuid: chatGuid || undefined,
+        });
+        return sendJson(res, 200, result);
+      }
+      if (method === "GET" && path === "/whatsapp/recent") {
+        const rows = await recentWhatsApp({
+          since: q.get("since") || undefined,
+          limit: q.get("limit") || undefined,
+        });
+        return sendJson(res, 200, rows);
+      }
+      if (method === "GET" && path === "/whatsapp/search") {
+        const rows = await searchWhatsApp(q.get("q") || "", {
+          limit: q.get("limit") || undefined,
+        });
+        return sendJson(res, 200, rows);
+      }
+      if (method === "GET" && path === "/whatsapp/thread") {
+        const rows = await whatsAppThread(q.get("person") || "", {
+          limit: q.get("limit") || undefined,
+        });
+        return sendJson(res, 200, rows);
+      }
+      if (method === "POST" && path === "/whatsapp/send") {
+        const payload = await readJsonBody(req);
+        const to = payload?.to || payload?.chat || payload?.person || "";
+        const result = await sendWhatsApp({
+          to,
+          chat: payload?.chat || to,
+          chatJid: payload?.chatJid || payload?.chatId || "",
+          text: applyAgentSentFooter(payload?.text || payload?.body || "", {
+            platform: "whatsapp",
+            chat: to,
+          }),
         });
         return sendJson(res, 200, result);
       }

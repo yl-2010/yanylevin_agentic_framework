@@ -1136,4 +1136,121 @@ describe("evaluateGuestMention", () => {
     assert.equal(nextHour.action, "start");
     assert.equal(nextHour.caller.model.id, "grok-4.7");
   });
+
+  it("lets a WhatsApp JYPE phone call @agent and @agentg with no cap", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "guest-wa-jype-"));
+    const statePath = join(dir, "limits.json");
+    const message = {
+      fromMe: false,
+      handle: "+15555550111",
+      senderName: "Alex",
+      chat: "Birthday",
+      chatJid: "123@g.us",
+      direct: false,
+      text: "@agentg hey",
+      jypeMember: true,
+      jypeSlug: "alex-rivera",
+    };
+    for (let i = 0; i < 3; i += 1) {
+      const run = await evaluateGuestMention({
+        platform: "whatsapp",
+        message,
+        people: PEOPLE,
+        now: FIVE_PM,
+        statePath,
+      });
+      assert.equal(run.action, "start");
+      assert.equal(run.caller.jypeMember, true);
+      assert.equal(run.caller.forceGrok, true);
+      assert.equal(run.caller.model.id, "grok-4.7");
+      assert.equal(run.caller.slug, "alex-rivera");
+    }
+    const stored = JSON.parse(await import("node:fs/promises").then((fs) => fs.readFile(statePath, "utf8")).catch(() => "{}"));
+    assert.equal(stored.agentg, undefined);
+  });
+
+  it("does not treat a WhatsApp push name as a JYPE member", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "guest-wa-name-"));
+    const statePath = join(dir, "limits.json");
+    const run = await evaluateGuestMention({
+      platform: "whatsapp",
+      message: {
+        fromMe: false,
+        handle: "+15555550999",
+        senderName: "Alex",
+        chat: "Birthday",
+        chatJid: "123@g.us",
+        text: "@agent hi",
+      },
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(run.action, "start");
+    assert.notEqual(run.caller.jypeMember, true);
+    assert.equal(run.caller.model.id, "composer-2.5");
+  });
+
+  it("rate-limits a non-JYPE WhatsApp caller on the contact hourly cap", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "guest-wa-hour-"));
+    const statePath = join(dir, "limits.json");
+    const message = {
+      fromMe: false,
+      handle: "+15555550999",
+      senderName: "Sam",
+      chat: "Birthday",
+      chatJid: "123@g.us",
+      text: "@agent hi",
+    };
+    for (let i = 0; i < HOURLY_LIMIT; i += 1) {
+      const run = await evaluateGuestMention({
+        platform: "whatsapp",
+        message,
+        people: PEOPLE,
+        now: FIVE_PM,
+        statePath,
+      });
+      assert.equal(run.action, "start");
+    }
+    const blocked = await evaluateGuestMention({
+      platform: "whatsapp",
+      message,
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(blocked.action, "rate-limit");
+    assert.match(blocked.text, /hourly rate limit/);
+  });
+
+  it("shares the WhatsApp @agentg daily bag with iMessage", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "guest-wa-day-"));
+    const statePath = join(dir, "limits.json");
+    for (let i = 0; i < AGENTG_DAILY_LIMIT; i += 1) {
+      await takeGuestSlot({
+        platform: "imessage",
+        personKey: "phone:5555550999",
+        slug: "",
+        now: FIVE_PM,
+        statePath,
+        agentg: true,
+      });
+    }
+    const blocked = await evaluateGuestMention({
+      platform: "whatsapp",
+      message: {
+        fromMe: false,
+        handle: "+15555550999",
+        senderName: "Sam",
+        chat: "Sam",
+        direct: true,
+        text: "@agentg hi",
+      },
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(blocked.action, "rate-limit");
+    assert.equal(blocked.text, formatAgentgDailyLimitMessage());
+  });
 });

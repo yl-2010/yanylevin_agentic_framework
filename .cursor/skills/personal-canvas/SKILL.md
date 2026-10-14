@@ -11,9 +11,9 @@ disable-model-invocation: true
 
 # Canvas sync — Yan only
 
-**Gate:** signed-in / default user is `yanylevin@gmail.com`. If the user is Prasham, skip this whole skill.
+**Gate:** signed-in / default user is `you@example.com`. If the user is Alex, skip this whole skill.
 
-EPS Canvas is `https://eastsideprep.instructure.com`. A student API token lives in `server/.env` (`CANVAS_ACCESS_TOKEN`). Never print or commit the token.
+EPS Canvas is `https://canvas.instructure.com`. A student API token lives in `server/.env` (`CANVAS_ACCESS_TOKEN`). Never print or commit the token.
 
 This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how dashboard classes line up with Canvas courses, then write education todos/dates. Nightly model: **grok-4.7 xhigh** (reasoning_effort=xhigh, fast=false, context=256k). Hourly model: **composer-2.5** (fast=false).
 
@@ -23,13 +23,13 @@ This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how
 - **Checkoff (Express, not you):** Yan checking off a Canvas-linked todo writes a planner override (`marked_complete`) so Canvas To-Do matches. Local-only todos stay local. You still never POST planner overrides.
 - **Submit (you, only when Yan says submit / turn in / upload this to Canvas):** identify the assignment, rename+store the chat file on OneDrive if he attached one, then `canvas-files.js submit` (file, `--text` / `--text-file`, or `--url`). Save / put this in / handle the file never submits. Ask only if the assignment is actually unclear.
 - **Hourly:** Express runs a light fetch + this skill (mapped classes only, no new-class hunt) at **:00** in the briefing timezone, except the 01:00 nightly window. Restarts wait for the next :00. Writes `last-hourly-sync.json`. After the agent, Express pulls teacher files into OneDrive todos.
-- **Nightly:** Express runs the full fetch + this skill at **01:00** (`nightlyAgentsLocalTime` in `education/yanylevin@gmail.com/daily-briefing/meta.json`). Same slot as location compose/enrichment. Context synthesis is later (02:30). Daily briefing is 06:00. **Re-read what hourly Composer wrote during the day and fix mistakes.** Fold new teacher comments into class/todo `CONTEXT.md`. Then Express pulls teacher files.
+- **Nightly:** Express runs the full fetch + this skill at **01:00** (`nightlyAgentsLocalTime` in `education/you@example.com/daily-briefing/meta.json`). Same slot as location compose/enrichment. Context synthesis is later (02:30). Daily briefing is 06:00. **Re-read what hourly Composer wrote during the day and fix mistakes.** Fold new teacher comments into class/todo `CONTEXT.md`. Then Express pulls teacher files.
 - **Manual (Personal Agent):** Yan says sync / pull / update Canvas. First fetch, then apply this skill **in this turn** (full nightly rules, including class map). Do not spawn a nested Cursor agent. After writes, Express pull still runs on the next hourly/fetch; you may also `canvas-files.js pull`.
 
 ```bash
 node --env-file=server/.env server/canvas-sync.js --fetch-only
 node --env-file=server/.env server/canvas-files.js submit --canvas-id 40335975
-node --env-file=server/.env server/canvas-files.js submit --canvas-id 40335975 --file education/yanylevin@gmail.com/.chat-uploads/<session>/scan.pdf
+node --env-file=server/.env server/canvas-files.js submit --canvas-id 40335975 --file education/you@example.com/.chat-uploads/<session>/scan.pdf
 node --env-file=server/.env server/canvas-files.js submit --canvas-id 40073386 --text "here is the paragraph"
 node --env-file=server/.env server/canvas-files.js submit --canvas-id 40073386 --text-file /tmp/body.txt
 node --env-file=server/.env server/canvas-files.js submit --canvas-id 40073386 --url https://example.com/doc
@@ -45,7 +45,7 @@ If `.canvas/snapshot.json` is missing and the fetch CLI fails, say Canvas is not
 ## Files
 
 ```
-education/yanylevin@gmail.com/.canvas/
+education/you@example.com/.canvas/
   snapshot.json         # only dashboard / junior-year classes (assignments, events, syllabi)
   assignments.md        # readable index of that same subset
   comments.json / comments.md / comments-new.md
@@ -66,7 +66,7 @@ OneDrive <gradeFolder>/<onedriveFolder>/.education/
 <Finder date folder>/date.json + that date's files
 ```
 
-Yan class trees live on OneDrive (see education-dashboard.md). Do not write `education/yanylevin@gmail.com/classes/<id>/` except `_example-dummy`.
+Yan class trees live on OneDrive (see education-dashboard.md). Do not write `education/you@example.com/classes/<id>/` except `_example-dummy`.
 
 Dashboard schema: `.cursor/skills/personal-agent/education-dashboard.md`.
 
@@ -81,7 +81,7 @@ When the runner says hourly: **do not** map new classes, **do not** create class
 3. Match Canvas `courses[]` to those folders by name / course code (American Literature, Physics, Spanish 4, Data Science, US History, Calc, programming titles, PE Yoga, Independent Study, and similar). Fetch still asks Canvas for current and future enrollments, then **drops** anything that is not a dashboard class before writing the snapshot (9th/10th-year shells, Class of 2028, EPS Library, Iceland EBC, Graphic Design, clubs, advisory). Update `course-map.json` when you are confident.
 4. **Skip** any leftover Canvas course with no dashboard class. Do not create new class folders from Canvas. Do not store or import extras.
 5. If two dashboard classes could match one Canvas course, pick the obvious one or skip that course rather than guessing into the wrong folder.
-6. For each mapped class, set `canvasLink` on `class.json` to `{htmlUrl}/grades` (example `https://eastsideprep.instructure.com/courses/3639020/grades`). Web and iOS class pages show the Canvas orb from this.
+6. For each mapped class, set `canvasLink` on `class.json` to `{htmlUrl}/grades` (example `https://canvas.instructure.com/courses/3639020/grades`). Web and iOS class pages show the Canvas orb from this.
 
 ## Stop early (junior year not on Canvas yet)
 
@@ -98,7 +98,7 @@ When at least one class maps, sync **only** those mapped classes and continue be
 For every snapshot assignment whose `courseId` is mapped:
 
 - Match an existing todo in that class by `canvasId`, then `canvasLink`, then same **name + parent + dueDate**.
-- Create if none, unless it looks like a row in `education/yanylevin@gmail.com/deleted.md`. Judgement, not exact due clocks. `canvasId` is a strong hint; similar name + class in the same year is enough. Skip those. OneDrive folder name: `HW Sep 15 Title` (tag, due as `Mon D`, JSON name, spaces not kebab), unique in that class folder. Set `createdAt` now. `done: false` on create only. Express visibility sync will rename if the due date or title later changes.
+- Create if none, unless it looks like a row in `education/you@example.com/deleted.md`. Judgement, not exact due clocks. `canvasId` is a strong hint; similar name + class in the same year is enough. Skip those. OneDrive folder name: `HW Sep 15 Title` (tag, due as `Mon D`, JSON name, spaces not kebab), unique in that class folder. Set `createdAt` now. `done: false` on create only. Express visibility sync will rename if the due date or title later changes.
 - **Update** name, `dueDate`, `dueTime`, `tag`, `description`, `canvasLink`, `canvasId` when Canvas changed.
 - Prefer snapshot `dueDate` / `dueTime` (already in the briefing timezone). Undated Canvas rows may omit due fields.
 - **Advanced Calculus HW (Yan, 2026-09-10):** For `advanced-calculus` todos with `tag: "HW"`, do **not** use the Canvas due as the dashboard due. Canvas is typically two period-C meetings after the start day. Set `dueDate` / `dueTime` to the **previous** period-C meeting before Canvas due, at that day's C start from `schedule.json` (`bells` / `dayOverrides`). Match by `canvasId` first so a shifted due still updates the same todo. Do not pull those dues back to Canvas on later syncs. Leave MA / QA / CW on Canvas times. If Canvas due is not on a C meeting, leave Canvas times.
@@ -143,7 +143,7 @@ Turn in and save are different jobs.
 
 1. Identify the assignment. Prefer Live context (open todo/class). Then filename vs todo names, due-soon Canvas rows, the class he is in. Ask only if two assignments are equally plausible.
 2. Look at snapshot `types` (or live assignment). File, text, and URL are different submits.
-3. **File:** rename junk upload names (`Scanned Document 17.pdf` → a real title, spaces, keep extension). Store in that todo's OneDrive folder (`canvas-files.js store` or `submit --file`, which stores first). Then submit.
+3. **File:** rename junk upload names (`Scanned Document 17.pdf`) to the Canvas assignment title, or the todo name if there is no Canvas title. Do not use the header printed on the sheet. Illegal filename characters (`/ : " ? *`) become spaces. Keep `#`, hyphens, and the extension. Store in that todo's OneDrive folder (`canvas-files.js store` or `submit --file`, which stores first). Then submit.
 4. **Text:** `submit --text '…'` or `--text-file` when the assignment allows `online_text_entry` (History paragraphs, some Data Sci). Do not wrap it in a fake PDF if text is allowed.
 5. **URL:** `submit --url https://…` when the assignment allows `online_url`.
 
@@ -187,7 +187,9 @@ Junk Canvas names get renamed when they land. `image-` plus a uuid, `image-` plu
 
 ## OneNote links
 
-Teachers post the Class Notebook page after the Canvas todo exists. On the nightly pass, after the Canvas writes, go todo by todo, including todos imported on earlier nights. For each todo, look through that class notebook for pages that belong to it. Do not list pages and then hunt for a todo to attach them to. Do not run `link-todos`. That command scores titles in code and misses real pages.
+Tag does not matter. CW, HW, QA, MA, or no tag. If Yan would open that Class Notebook page to do the todo, link it on that todo.
+
+After the Canvas writes, do two passes. Do not run `link-todos`. That command scores titles in code and misses real pages.
 
 ```bash
 node server/school-onenote.js status
@@ -195,20 +197,30 @@ node server/school-onenote.js sections --notebook "US History 26-27"
 node server/school-onenote.js pages --notebook "US History 26-27" --section "_Content Library/I. Forming A Nation"
 ```
 
-Notebook names are in personal-onenote. For the todo you are on, read `_Content Library` and `Yan Levin` in that class. Skip `_Collaboration Space`. Yoga has no notebook. `pages` returns every page in the section. Finish that todo, then go to the next one. `search` often misses Class Notebooks.
+Notebook names are in personal-onenote. Read `_Content Library` and `Yan Levin`. Skip `_Collaboration Space` and other students' sections. Yoga has no notebook. `search` often misses Class Notebooks.
 
-A todo gets at most two OneNote sites. The same teacher page may sit on more than one todo when Canvas split one lesson.
+Seen page ids live in `education/you@example.com/.canvas/onenote-seen.json`:
+
+```json
+{ "pages": { "<pageId>": { "title": "Day 1 problem set", "notebook": "Advanced Calculus 26-27" } } }
+```
+
+If that file is missing, pass 1 has no new pages. Still run pass 2, then write the file from the pages you listed tonight.
+
+Pass 1, new pages. List those two groups in each class notebook. A page id that is not in `onenote-seen.json` is new. For each new page, look at every todo in that class. Any tag, any due date. Link the page on each todo it applies to.
+
+Pass 2, todos. Take every todo created tonight, and every todo whose `dueDate` is today through 14 days out in the sync timezone. Done or not. Any tag. For each of those, look through that class notebook for pages that apply, including pages already in `onenote-seen.json`. Link every page that applies.
 
 - Yan's page. `name` is the assignment name. `oneNote` is `personal`.
 - Teacher page. `name` is `Content Library: ` plus the page title. `oneNote` is `content-library`.
 
-Copy `url` from the page `webUrl` (https) and `clientUrl` from the page (`onenote:`). Store `pageId` from the page `id`. Keep every site whose `oneNote` is not `personal` or `content-library`. Replace an old OneNote site when you have a better page. If `status` is signed out, or a notebook fails to load, leave the OneNote sites that are already there and finish the Canvas sync. Do not put these URLs in `description`. Hourly Composer does not do this.
+Copy `url` from the page `webUrl` (https) and `clientUrl` from the page (`onenote:`). Store `pageId` from the page `id`. The same page can sit on every todo it applies to. Do not cap how many OneNote sites a todo has. Skip a `pageId` already on that todo. Do not remove an existing OneNote site because this pass did not mention it. Keep every site whose `oneNote` is not `personal` or `content-library`. If `status` is signed out, or a notebook fails to load, leave the OneNote sites that are already there and skip both passes. Do not put these URLs in `description`. A path in the description is not the link. When the Canvas description names a Content Library page, that page applies. Spanish writes that as Biblioteca de contenido, then the section, then the page title (`Pruebas / MA #1: ESCRITO - GUÍA DE ESTUDIO`). After both passes, rewrite `onenote-seen.json` from the pages you listed. Hourly Composer does not do this.
 
 ## Files from another todo
 
 After that todo's own OneNote sites, look at the other todos in the same class. Read the files in each sibling folder and the OneNote pages on that sibling's `sites`. If Yan would open that same doc while doing this todo, add a pointer on this todo's `linkedFiles`. The file stays in the folder it already lives in.
 
-The usual case is a CW or HW that is prep for a later assignment. The essay stays in the MA folder. The CW stores a pointer, so the website and the iPhone show the same Word or OneNote button.
+Tag does not matter here either. Prep for another assignment in the class counts, whatever the tags are. The todo that needs the doc stores the pointer, so the website and the iPhone show the same Word or OneNote button.
 
 ```json
 "linkedFiles": [
@@ -219,7 +231,7 @@ The usual case is a CW or HW that is prep for a later assignment. The essay stay
 
 `name` is one file in the other todo's folder. `pageId` is a OneNote site already on that other todo. `canvasId` is how a later night finds the folder after a rename. `todo` is the Finder folder id without a leading dot, used when there is no Canvas id.
 
-Write the pointer on the todo that needs the doc. A shared draft, outline, or problem set counts. An unrelated worksheet does not. Drop a pointer when the file is gone or this todo no longer uses that doc. Do not move or copy the file. Do not edit `canvasFiles`. A linked OneNote page does not replace this todo's own personal page or Content Library page.
+Write the pointer on the todo that needs the doc. A shared draft, outline, or problem set counts. An unrelated worksheet does not. Drop a pointer when the file is gone or this todo no longer uses that doc. Do not move or copy the file. Do not edit `canvasFiles`. A linked OneNote page does not replace sites you already wrote on this todo. If the page applies here, pass 1 or pass 2 already wrote the site. `pageId` on `linkedFiles` is only the extra button when the site stays on the other todo.
 
 Teacher files Express downloads after you finish are not on disk yet. Link those on the next night. Hourly Composer does not write `linkedFiles`.
 
@@ -229,4 +241,4 @@ Read `last-hourly-sync.json`. Walk mapped class todos against the **full** snaps
 
 ## After writes
 
-Education file watcher refreshes `/education`. Prefer committing `education/yanylevin@gmail.com/` when the nightly runner did not already. Manual chat: 1–3 short lines (`Synced Canvas into Lit, Physics, and Spanish`).
+Education file watcher refreshes `/education`. Prefer committing `education/you@example.com/` when the nightly runner did not already. Manual chat: 1–3 short lines (`Synced Canvas into Lit, Physics, and Spanish`).

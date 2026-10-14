@@ -34,15 +34,15 @@ import {
   reloadCursorApiKeyFromEnv,
   requireCursorApiKey,
 } from "./cursor-sdk-auth.js";
+import { OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
 
-export const YAN_EMAIL = "yanylevin@gmail.com";
 export const CANVAS_REL = `education/${YAN_EMAIL}/.canvas`;
 export function canvasSyncHm(meta) {
   return nightlyAgentsHm(meta);
 }
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const DEFAULT_BASE = "https://eastsideprep.instructure.com";
+const DEFAULT_BASE = "https://canvas.instructure.com";
 const META_PATH = join(ROOT, "education", YAN_EMAIL, "daily-briefing", "meta.json");
 const LOCK_PATH = "/tmp/yanylevin-canvas-sync.lock";
 export const CANVAS_LOCK_STALE_MS = 90 * 60 * 1000;
@@ -1473,7 +1473,7 @@ export function buildCanvasSyncPrompt({
       : "";
   return [
     `Follow ${SKILL_PATH}. Sync Canvas into Yan's education dashboard.`,
-    "Yan only (yanylevin@gmail.com). Local only. Never spawn a Cursor cloud agent.",
+    "Yan only (you@example.com). Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} (timezone ${timezone}).`,
     `Snapshot: ${CANVAS_REL}/snapshot.json (also assignments.md). Optional map: ${CANVAS_REL}/course-map.json.`,
     `Agent context dumps: ${CANVAS_REL}/comments.md, comments-new.md, pages.md, modules.md, files.md (and the matching .json). Teacher comments show on the todo page from the live overlay. Pages, modules, and course files stay off the UI.`,
@@ -1487,8 +1487,8 @@ export function buildCanvasSyncPrompt({
     "Do not POST to Canvas. Do not delete education todos just because Canvas dropped a row.",
     "Leave canvasFiles on .todo.json alone. Express downloads teacher attachments into the OneDrive todo folder after you finish. Spanish 4 pasted decoration images (image-<uuid>, image.png) are not downloaded.",
     "Do not recreate a todo or date that looks like a manually deleted.md row. Judgement, not exact due clocks. canvasId is a strong hint.",
-    "After the Canvas writes, link OneNote pages yourself, including todos imported on earlier nights. Go todo by todo. For each todo, look through that class notebook for pages that belong to it. Do not start from a page and hunt for a todo. Use node server/school-onenote.js (status, sections, pages). Read _Content Library and the Yan Levin group for that todo. Do not run link-todos. A page in Yan's notebook is a site named with the assignment name, oneNote personal. A Content Library page is a site named Content Library: plus the page title, oneNote content-library. Copy url (https webUrl), clientUrl (onenote:), and pageId. The same teacher page may go on more than one todo when you reach each of those todos. Keep sites that are not OneNote. If OneNote is signed out or a notebook fails, leave existing OneNote sites in place. Do not put OneNote URLs in description.",
-    "After that todo's own OneNote sites, look at the other todos in the same class. If Yan would use a file in another todo's folder, or a OneNote page already on that todo, add linkedFiles on this todo. name is the filename. pageId is the other todo's OneNote page. Include canvasId so a renamed folder still resolves, and todo as the Finder folder id. Do not copy the file. Do not replace this todo's own two OneNote sites. Drop a pointer that no longer fits. Files Express downloads after you finish can be linked the next night.",
+    `After the Canvas writes, link OneNote pages yourself. Tag does not matter (CW, HW, QA, MA, or none). If Yan would open the page for that todo, link it. Two passes. Do not run link-todos. Use node server/school-onenote.js (status, sections, pages). Read _Content Library and the Yan Levin group. Skip _Collaboration Space. Seen page ids are ${CANVAS_REL}/onenote-seen.json, shape { "pages": { "<pageId>": { "title": "", "notebook": "" } } }. If that file is missing, pass 1 has no new pages. Pass 1: a page id not in that file is new. For each new page, check every todo in that class, any due date. Pass 2: every todo created tonight, and every todo with dueDate from today through 14 days out in this timezone, done or not, any tag. For each of those, check the class notebook for applicable pages, including pages already in onenote-seen.json. A page in Yan's notebook is a site named with the assignment name, oneNote personal. A Content Library page is a site named Content Library: plus the page title, oneNote content-library. Copy url (https webUrl), clientUrl (onenote:), and pageId. The same page may go on every todo it applies to. Do not cap how many OneNote sites a todo has. Do not remove an existing OneNote site because this pass did not mention it. Skip a pageId already on that todo. Keep sites that are not OneNote. If OneNote is signed out or a notebook fails, leave existing OneNote sites and skip both passes. Do not put OneNote URLs in description. A path in the description is not the link. A Canvas description that names a Content Library page means that page applies. After both passes, rewrite onenote-seen.json from the pages you listed.`,
+    "After the OneNote sites, look at the other todos in the same class. If Yan would use a file in another todo's folder, add linkedFiles on this todo. name is the filename. pageId is optional, only when the OneNote site stays on the other todo and this todo should show the same button. Include canvasId so a renamed folder still resolves, and todo as the Finder folder id. Do not copy the file. Do not replace this todo's OneNote sites. Drop a pointer that no longer fits. Files Express downloads after you finish can be linked the next night. Tag does not matter for these pointers.",
     rebuild,
     hourly,
     deleted,
@@ -1504,7 +1504,7 @@ export function buildCanvasHourlyPrompt({ dateKey, hourKey, timezone, deletedBlo
       : "";
   return [
     `Follow ${SKILL_PATH} (hourly pass). Sync Canvas todos into already mapped classes only.`,
-    "Yan only (yanylevin@gmail.com). Local only. Never spawn a Cursor cloud agent.",
+    "Yan only (you@example.com). Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} hour ${hourKey} (timezone ${timezone}).`,
     `Snapshot: ${CANVAS_REL}/snapshot.json (light, mapped courses only). Map: ${CANVAS_REL}/course-map.json.`,
     "Do not look for new classes. Do not create class folders. Do not edit course-map.json. Do not mine syllabi or invent dates from empty events.",

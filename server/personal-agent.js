@@ -54,6 +54,7 @@ import {
   parseAgentReply,
 } from "./chat-widgets.js";
 import { sendIMessage, takeIMessageReplyFiles } from "./imessage-send.js";
+import { sendWhatsApp } from "./whatsapp-send.js";
 import {
   applyAgentSentFooter,
   formatIMessageOriginBlock,
@@ -67,6 +68,11 @@ import {
   jypeComposerScheduleLine,
   normalizeTeamsOrigin,
 } from "./teams-mention.js";
+import {
+  formatWhatsAppOriginBlock,
+  normalizeWhatsAppOrigin,
+  WHATSAPP_AGENT_ENABLED,
+} from "./whatsapp-mention.js";
 import {
   copyModelSpec,
   formatGuestUserBubble,
@@ -112,6 +118,7 @@ const PA_ERROR_REPLY =
  *   interrupted?: boolean,
  *   imessageDeliverFinal?: boolean,
  *   teamsDeliverFinal?: boolean,
+ *   whatsappDeliverFinal?: boolean,
  * }} TurnOpts
  */
 
@@ -809,6 +816,21 @@ function originFromSession(session) {
       };
     }
   }
+  const wa = session?.whatsappOrigin;
+  if (wa && typeof wa === "object") {
+    const to = String(wa.to || wa.chat || "").trim();
+    const chatJid = String(wa.chatJid || wa.chatId || "").trim();
+    if (to || chatJid) {
+      return {
+        kind: "whatsapp",
+        to,
+        chat: String(wa.chat || "").trim(),
+        chatId: chatJid,
+        chatJid,
+        text: String(wa.text || "").slice(0, 500),
+      };
+    }
+  }
   return { kind: "" };
 }
 
@@ -844,6 +866,15 @@ function attachScheduledToSession(session, record) {
       chatGuid: origin.chatGuid || "",
       chat: origin.chat || "",
       handle: origin.to || "",
+      text: origin.text || "",
+    };
+  } else if (origin.kind === "whatsapp" && (origin.to || origin.chatJid || origin.chatId)) {
+    session.whatsappOrigin = {
+      platform: "whatsapp",
+      to: origin.to || origin.chat || "",
+      chat: origin.chat || "",
+      chatId: origin.chatId || origin.chatJid || "",
+      chatJid: origin.chatJid || origin.chatId || "",
       text: origin.text || "",
     };
   }
@@ -1068,7 +1099,20 @@ function persistSessionHistory(sid, session) {
 export function channelProgressKind(opts) {
   if (opts?.imessageDeliverFinal) return "imessage";
   if (opts?.teamsDeliverFinal) return "teams";
+  if (opts?.whatsappDeliverFinal) return "whatsapp";
   return "";
+}
+
+function originForChannel(session, kind) {
+  if (kind === "whatsapp") return session?.whatsappOrigin;
+  if (kind === "teams") return session?.teamsOrigin;
+  return session?.imessageOrigin;
+}
+
+function channelName(kind) {
+  if (kind === "whatsapp") return "WhatsApp";
+  if (kind === "teams") return "Teams";
+  return "iMessage";
 }
 
 /**
@@ -1111,12 +1155,14 @@ async function deliverChannelProgress(session, content) {
   const body = String(content || "").trim();
   if (!kind || !body) return { ok: false, skipped: "empty" };
   if (body.includes(PA_ERROR_REPLY)) return { ok: false, skipped: "error" };
-  const rawOrigin = kind === "imessage" ? session.imessageOrigin : session.teamsOrigin;
+  const rawOrigin = originForChannel(session, kind);
   try {
     const result =
       kind === "imessage"
         ? await deliverIMessageProgressReply(rawOrigin, body)
-        : await deliverTeamsFinalReply(rawOrigin, body);
+        : kind === "whatsapp"
+          ? await deliverWhatsAppProgressReply(rawOrigin, body)
+          : await deliverTeamsFinalReply(rawOrigin, body);
     if (result?.ok && !result?.skipped) {
       session.lastChannelProgressText = body;
     }
@@ -1161,6 +1207,26 @@ export async function deliverIMessageFinalReply(origin, content) {
  * @param {object|null|undefined} origin
  * @param {string} content
  */
+export async function deliverWhatsAppProgressReply(origin, content) {
+  if (!WHATSAPP_AGENT_ENABLED) return { ok: false, skipped: "disabled" };
+  const body = applyAgentSentFooter(content, { ...origin, platform: "whatsapp" });
+  if (!body) return { ok: false, skipped: "empty" };
+  if (body.includes(PA_ERROR_REPLY)) return { ok: false, skipped: "error" };
+  const chat = String(origin?.chat || origin?.to || "").trim();
+  const chatJid = String(origin?.chatJid || origin?.chatId || "").trim();
+  if (!chat && !chatJid) return { ok: false, skipped: "no-target" };
+  return sendWhatsApp({
+    to: chat || chatJid,
+    chat,
+    chatJid,
+    text: body,
+  });
+}
+
+export async function deliverWhatsAppFinalReply(origin, content) {
+  return deliverWhatsAppProgressReply(origin, content);
+}
+
 export async function deliverTeamsFinalReply(origin, content) {
   const body = String(content || "").trim();
   if (!body) return { ok: false, skipped: "empty" };
@@ -1236,7 +1302,7 @@ export function nextOutboundAction(state) {
  * @param {string} text
  */
 export function outboundResumePrompt(channel, error, text) {
-  const where = channel === "teams" ? "Teams" : "iMessage";
+  const where = channelName(channel);
   return [
     `The ${where} send failed. This turn is not done.`,
     `Error: ${error || "send failed"}`,
@@ -1267,18 +1333,20 @@ export function channelSendToolResult(sent) {
  * @returns {Promise<{ ok?: boolean, skipped?: string, failed?: boolean, error?: string }>}
  */
 export async function confirmOutboundDelivery(session, content, opts) {
-  const imessage = Boolean(opts?.imessageDeliverFinal);
-  const teams = Boolean(opts?.teamsDeliverFinal);
-  if (!imessage && !teams) return { ok: true, skipped: "no-channel" };
+  const kind = channelProgressKind(opts);
+  if (!kind) return { ok: true, skipped: "no-channel" };
   if (shouldSkipDuplicateChannelSend(session.lastChannelProgressText, content)) {
     return { ok: true, skipped: "duplicate" };
   }
 
-  const rawOrigin = imessage ? session.imessageOrigin : session.teamsOrigin;
+  const rawOrigin = originForChannel(session, kind);
   try {
-    const result = imessage
-      ? await deliverIMessageFinalReply(rawOrigin, content)
-      : await deliverTeamsFinalReply(rawOrigin, content);
+    const result =
+      kind === "imessage"
+        ? await deliverIMessageFinalReply(rawOrigin, content)
+        : kind === "whatsapp"
+          ? await deliverWhatsAppFinalReply(rawOrigin, content)
+          : await deliverTeamsFinalReply(rawOrigin, content);
     if (result?.skipped) return { ok: false, skipped: result.skipped };
     if (result?.ok === false) {
       return {
@@ -1292,7 +1360,7 @@ export async function confirmOutboundDelivery(session, content, opts) {
   } catch (err) {
     const error = outboundFailureText(err);
     console.error(
-      `[personal-agent] ${imessage ? "imessage" : "teams"} reply`,
+      `[personal-agent] ${kind} reply`,
       err
     );
     return { ok: false, failed: true, error };
@@ -1373,14 +1441,13 @@ async function settleOutboundSend(session, sid, content, opts, model) {
     const action = nextOutboundAction({ delivery, guidDropped, resumes });
     if (action === "done") return content;
     if (action === "drop-guid") {
-      const origin =
-        channel === "imessage" ? session.imessageOrigin : session.teamsOrigin;
+      const origin = originForChannel(session, channel);
       dropRejectedChatGuid(origin, delivery.error);
       guidDropped = true;
       continue;
     }
     if (action === "give-up" || !session.agent) {
-      const where = channel === "teams" ? "Teams" : "iMessage";
+      const where = channelName(channel);
       const note = `The ${where} send still failed: ${delivery.error || "send failed"}`;
       session.messages.push(
         stampMessage("assistant", note, undefined, { endOfTurn: true })
@@ -1426,7 +1493,7 @@ export function sessionHasBackgroundWork(session) {
  * @param {{ role?: string }[]|undefined} messages
  */
 export function shouldKeepChatHistoryRead(session, messages) {
-  if (!session?.imessageOrigin && !session?.teamsOrigin) return false;
+  if (!session?.imessageOrigin && !session?.teamsOrigin && !session?.whatsappOrigin) return false;
   const userTurns = (messages || []).filter((m) => m.role === "user").length;
   return userTurns <= 1;
 }
@@ -1451,7 +1518,7 @@ export function shouldPersistChatEphemeral(session) {
   if (!session) return null;
   if (sessionWorkspace(session) === "jype") return false;
   if (session.ephemeralPinned) return false;
-  if (session.imessageOrigin || session.teamsOrigin) return true;
+  if (session.imessageOrigin || session.teamsOrigin || session.whatsappOrigin) return true;
   return null;
 }
 
@@ -1581,6 +1648,7 @@ export const PERSONAL_SKILL_PATHS = {
   home: ".cursor/skills/personal-home/SKILL.md",
   canvas: ".cursor/skills/personal-canvas/SKILL.md",
   imessage: ".cursor/skills/personal-imessage/SKILL.md",
+  whatsapp: ".cursor/skills/personal-whatsapp/SKILL.md",
   screentime: ".cursor/skills/personal-screentime/SKILL.md",
   contacts: ".cursor/skills/personal-contacts/SKILL.md",
   people: ".cursor/skills/personal-people/SKILL.md",
@@ -1682,6 +1750,7 @@ export function systemPrompt(email, opts = {}) {
     `- Apple Home: ${PERSONAL_SKILL_PATHS.home}`,
     `- Canvas: ${PERSONAL_SKILL_PATHS.canvas}`,
     `- Yan iMessage search and send: ${PERSONAL_SKILL_PATHS.imessage}`,
+    `- Yan WhatsApp search and send: ${PERSONAL_SKILL_PATHS.whatsapp}`,
     `- Screen Time: ${PERSONAL_SKILL_PATHS.screentime}`,
     `- Contacts: ${PERSONAL_SKILL_PATHS.contacts}`,
     `- Daily Briefing compile / news sources / thumbs: ${PERSONAL_SKILL_PATHS.news}`,
@@ -1692,10 +1761,10 @@ export function systemPrompt(email, opts = {}) {
     "",
     "Live context below is authoritative for clock, class-now, and the open screen. Trust it. Named-people lookup still opens brain/people/. Other education/<email>/ files only when the question needs that data.",
     "",
-    "Reply: short. School mutations 1-3 lines. Markdown OK in the text bubble; never HTML tags or markdown images. Never em dashes. No thinking aloud. Do not tell the user to refresh. Read the widgets skill before emitting any widget fence. Never put Sent by Yan's Personal Agent in app or website bubbles; that footer is only for iMessage, email, and Teams.",
-    "Math on the website and in the iOS app is a display block, with a blank line before and after. Put $$ on its own line, then LaTeX, then $$ on its own line. Stack equations one per line in that block. Use \\(x\\) or $x^2$ only for a symbol inside a sentence. Never backticks for math. iMessage and Teams cannot render KaTeX, so those replies stay plain words.",
+    "Reply: short. School mutations 1-3 lines. Markdown OK in the text bubble; never HTML tags or markdown images. Never em dashes. No thinking aloud. Do not tell the user to refresh. Read the widgets skill before emitting any widget fence. Never put Sent by Yan's Personal Agent in app or website bubbles; that footer is only for iMessage, WhatsApp, email, and Teams.",
+    "Math on the website and in the iOS app is a display block, with a blank line before and after. Put $$ on its own line, then LaTeX, then $$ on its own line. Stack equations one per line in that block. Use \\(x\\) or $x^2$ only for a symbol inside a sentence. Never backticks for math. iMessage, WhatsApp, and Teams cannot render KaTeX, so those replies stay plain words.",
     "Send to a person with no channel named: iMessage, then Teams, then email. Named channel (on Teams / iMessage / email) wins for text. iMessage files are native attachments (iMessage skill), never a URL stand-in. Each file is its own message, then the text. Teams and school Outlook cannot attach a file. A file asked for on Teams goes out from Apple Mail (personal-mail skill). Say you emailed it.",
-    "Long work: send_chat_message first with a short status. Send more mid-run when new info, a change, or a useful update appears. Then a final Done. Quick answers: one reply only (that is the end of turn). On an iMessage or Teams @agent or @agentg first turn, that first status is also posted to the chat before you start the work.",
+    "Long work: send_chat_message first with a short status. Send more mid-run when new info, a change, or a useful update appears. Then a final Done. Quick answers: one reply only (that is the end of turn). On an iMessage, WhatsApp, or Teams @agent or @agentg first turn, that first status is also posted to the chat before you start the work.",
     "To show one education page on web/iOS, call open_education_page (education-dashboard skill). The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Skip if already on that page. Not on Cursor Desktop.",
     "No period when the reply is one word, one phrase, or one sentence.",
   ].join("\n");
@@ -2139,7 +2208,9 @@ function mentionAgentCreateOpts(guest, workspace, platform, forceGrok) {
 export function guestTurnModelSpec(session, hasSessionFiles) {
   if (session.forceGrok) return copyModelSpec(GUEST_GROK_SPEC);
   const mentionFirstTurn =
-    Boolean(session.imessageDeliverFinal) || Boolean(session.teamsDeliverFinal);
+    Boolean(session.imessageDeliverFinal) ||
+    Boolean(session.teamsDeliverFinal) ||
+    Boolean(session.whatsappDeliverFinal);
   if (
     mentionFirstTurn &&
     session.teamsDeliverFinal &&
@@ -2260,6 +2331,8 @@ export async function startAgent(email, opts = {}) {
     imessageDeliverFinal: false,
     teamsOrigin: null,
     teamsDeliverFinal: false,
+    whatsappOrigin: null,
+    whatsappDeliverFinal: false,
     guestCaller: null,
     ephemeralPinned: workspace === "jype",
   });
@@ -2364,6 +2437,62 @@ export async function startAgentFromTeamsMention(message) {
   session.forceGrok = forceGrok;
   return messageAgent(started.sessionId, startEmail, text, [], {
     client: "teams",
+    workspace,
+  });
+}
+
+/**
+ * New Personal Agent thread from a WhatsApp @agent / @agentg.
+ * Same 10-minute UI hide as iMessage unless Yan continues from web or iOS.
+ * @param {object} message
+ */
+export async function startAgentFromWhatsAppMention(message) {
+  if (!WHATSAPP_AGENT_ENABLED) return { ok: false, skipped: "disabled" };
+  const origin = normalizeWhatsAppOrigin(message);
+  const raw = String(origin?.text || message?.text || "").trim();
+  const guest = message?.guestCaller || null;
+  const text = guest
+    ? formatGuestUserBubble({
+        name: guest.displayName,
+        platform: platformLabel("whatsapp"),
+        text: raw,
+      })
+    : raw;
+  if (!origin || !text) {
+    const err = new Error("whatsapp @agent text required");
+    err.status = 400;
+    throw err;
+  }
+  const workspace =
+    originIsJypeThread(origin) || guest?.workspace === "jype" ? "jype" : "";
+  const forceGrok = messageForcesGrok(raw) || guest?.forceGrok === true;
+  const startEmail =
+    workspace === "jype"
+      ? jypeEmailForSlug(guest?.slug) || YAN_EMAIL
+      : YAN_EMAIL;
+  const createOpts = mentionAgentCreateOpts(
+    guest,
+    workspace,
+    "whatsapp",
+    forceGrok
+  );
+  const started = await startAgent(startEmail, {
+    ...createOpts,
+    workspace,
+    guest,
+  });
+  const session = sessions.get(started.sessionId);
+  if (!session) {
+    const err = new Error("session not found");
+    err.status = 500;
+    throw err;
+  }
+  session.whatsappOrigin = origin;
+  session.whatsappDeliverFinal = true;
+  session.guestCaller = guest;
+  session.forceGrok = forceGrok;
+  return messageAgent(started.sessionId, startEmail, text, [], {
+    client: "whatsapp",
     workspace,
   });
 }
@@ -2564,6 +2693,8 @@ export async function resumeAgent(sessionId, email, opts = {}) {
     imessageDeliverFinal: false,
     teamsOrigin: null,
     teamsDeliverFinal: false,
+    whatsappOrigin: null,
+    whatsappDeliverFinal: false,
     guestCaller: null,
     ephemeralPinned: workspace === "jype" ? true : !loaded.ephemeral,
   });
@@ -3044,6 +3175,13 @@ export async function messageAgent(
   if (teamsBlock) {
     promptParts.push("", teamsBlock);
   }
+  const whatsappBlock = formatWhatsAppOriginBlock(session.whatsappOrigin, {
+    deliverFinal: Boolean(session.whatsappDeliverFinal),
+    guestCaller: session.guestCaller,
+  });
+  if (whatsappBlock) {
+    promptParts.push("", whatsappBlock);
+  }
   const composerSchedule = jypeComposerScheduleLine(model, session.teamsOrigin);
   if (composerSchedule) {
     promptParts.push("", composerSchedule);
@@ -3124,6 +3262,10 @@ export async function messageAgent(
   if (session.teamsDeliverFinal) {
     turnOpts.teamsDeliverFinal = true;
     session.teamsDeliverFinal = false;
+  }
+  if (session.whatsappDeliverFinal) {
+    turnOpts.whatsappDeliverFinal = true;
+    session.whatsappDeliverFinal = false;
   }
 
   activeByEmail.set(focusKey(normalized, sessionWorkspace(session)), sid);
@@ -3518,6 +3660,9 @@ async function scheduledTurnPrompt(session, record, kickoff) {
   if (kickoff && record.origin?.kind === "imessage") {
     session.imessageDeliverFinal = true;
   }
+  if (kickoff && record.origin?.kind === "whatsapp" && WHATSAPP_AGENT_ENABLED) {
+    session.whatsappDeliverFinal = true;
+  }
   const imessageBlock = formatIMessageOriginBlock(session.imessageOrigin, {
     deliverFinal: Boolean(session.imessageDeliverFinal),
   });
@@ -3526,6 +3671,11 @@ async function scheduledTurnPrompt(session, record, kickoff) {
     deliverFinal: Boolean(session.teamsDeliverFinal),
   });
   if (teamsBlock) parts.push("", teamsBlock);
+  const whatsappBlock = formatWhatsAppOriginBlock(session.whatsappOrigin, {
+    deliverFinal: Boolean(session.whatsappDeliverFinal),
+    guestCaller: session.guestCaller,
+  });
+  if (whatsappBlock) parts.push("", whatsappBlock);
   parts.push("", formatScheduledSystemBlock(record, { kickoff }));
   if (kickoff) {
     parts.push(
@@ -3604,6 +3754,8 @@ export async function runScheduledAgent(record) {
         imessageDeliverFinal: false,
         teamsOrigin: null,
         teamsDeliverFinal: false,
+        whatsappOrigin: null,
+        whatsappDeliverFinal: false,
         guestCaller: null,
         ephemeralPinned: true,
       };
@@ -3637,6 +3789,10 @@ export async function runScheduledAgent(record) {
     if (session.teamsDeliverFinal) {
       turnOpts.teamsDeliverFinal = true;
       session.teamsDeliverFinal = false;
+    }
+    if (session.whatsappDeliverFinal) {
+      turnOpts.whatsappDeliverFinal = true;
+      session.whatsappDeliverFinal = false;
     }
     session.lastUsedAt = Date.now();
     session.workingLabel = WORKING_LABEL_DEFAULT;

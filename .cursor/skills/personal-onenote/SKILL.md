@@ -2,20 +2,20 @@
 name: personal-onenote
 description: >-
   Read Yan's EPS Microsoft 365 OneNote / Class Notebooks
-  (ylevin@eastsideprep.org) via node server/school-onenote.js. Use when Yan
+  (owner@school.example) via node server/school-onenote.js. Use when Yan
   asks about school work that lives in a Class Notebook (agenda, HW
   instructions, maps, day packets, grammar refs), or when a job names a
   notebook or page. Yan only. Never a default nightly source. Never for
-  Prasham.
+  Alex.
 disable-model-invocation: true
 ---
 
 # School OneNote, Yan only
 
-**Gate:** signed-in / default user is `yanylevin@gmail.com`. If the user is
-Prasham, skip this whole skill.
+**Gate:** signed-in / default user is `you@example.com`. If the user is
+Alex, skip this whole skill.
 
-Account: `ylevin@eastsideprep.org`. Same Chrome login as school Outlook
+Account: `owner@school.example`. Same Chrome login as school Outlook
 (`~/.yanylevin/school-mail/chrome-profile`). No Azure app. No API key.
 
 Per-class maps also live on each class `CONTEXT.md`. This file is the
@@ -39,8 +39,9 @@ fill. There is no `school-onenote-fill`. This is not a default nightly
 source. Nightly triage, synthesis, and fact-check do not scan OneNote
 unless a claim they are already handling is specifically about a page.
 The canvas nightly is the exception. After it writes todos, that Grok
-agent reads the class notebook and writes the sites itself. See
-personal-canvas. Do not run `link-todos` for that.
+agent does two OneNote passes. New pages first, then new todos and
+anything due in the next 14 days. See personal-canvas. Do not run
+`link-todos` for that.
 
 Yoga has no Class Notebook. Free periods neither. Speech & Debate 26-27
 is not in this account yet (only last year's Hayes notebooks).
@@ -86,7 +87,7 @@ images. That is how PS2 ink was read. Do not tell Yan ink is unreadable.
 
 If `signedIn` is false or the payload says `not signed in`, run login on the
 Mac Studio. Chrome opens **Graph Explorer**, not Outlook. The script clicks
-`ylevin@eastsideprep.org` on the Microsoft account picker, then Run query.
+`owner@school.example` on the Microsoft account picker, then Run query.
 Do not tell Yan to click Sign in. Stay at the computer only if 2FA appears.
 
 ```bash

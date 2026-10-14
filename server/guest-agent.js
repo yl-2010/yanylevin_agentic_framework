@@ -17,6 +17,7 @@ import {
   replyTargetForMessage,
 } from "./imessage-mention.js";
 import { sendIMessage } from "./imessage-send.js";
+import { sendWhatsApp } from "./whatsapp-send.js";
 import { isDirectChatId } from "./imessage-read.js";
 import { sendTeamsMessage } from "./school-teams.js";
 import { normalizeTeamsOrigin } from "./teams-mention.js";
@@ -132,7 +133,17 @@ export function isFriendGuest(slug, name = "") {
   return TEAMS_CLASS_OF_2028_ALLOW_GIVEN.has(givenNameOf(name).toLowerCase());
 }
 
-const PLATFORMS = ["imessage", "teams"];
+const PLATFORMS = ["imessage", "teams", "whatsapp"];
+
+/**
+ * @param {unknown} raw
+ * @returns {"imessage"|"teams"|"whatsapp"}
+ */
+export function guestPlatform(raw) {
+  const p = String(raw || "").trim().toLowerCase();
+  if (p === "teams" || p === "whatsapp") return p;
+  return "imessage";
+}
 
 /** @type {{ at: number, rows: object[]|null }} */
 let contactsCache = { at: 0, rows: null };
@@ -232,7 +243,10 @@ export function formatGuestUserBubble(opts) {
 }
 
 export function platformLabel(platform) {
-  return String(platform || "").toLowerCase() === "teams" ? "Teams" : "iMessage";
+  const p = guestPlatform(platform);
+  if (p === "teams") return "Teams";
+  if (p === "whatsapp") return "WhatsApp";
+  return "iMessage";
 }
 
 export function personSlug(entity) {
@@ -419,7 +433,7 @@ export async function saveLimitState(state, path = GUEST_LIMITS_PATH) {
  * }} opts
  */
 export async function takeGuestSlot(opts) {
-  const platform = opts.platform === "teams" ? "teams" : "imessage";
+  const platform = guestPlatform(opts.platform);
   const personKey = String(opts.personKey || "").trim();
   const slug = String(opts.slug || "").trim();
   const now = opts.now || new Date();
@@ -551,9 +565,13 @@ export function describeGuestAudience(platform, message) {
       ? isTeamsOneOnOne(message)
         ? "dm"
         : "group"
-      : isDirectChatId(message?.chatId, message?.handle)
-        ? "dm"
-        : "group";
+      : platform === "whatsapp"
+        ? message?.direct === true
+          ? "dm"
+          : "group"
+        : isDirectChatId(message?.chatId, message?.handle)
+          ? "dm"
+          : "group";
   const viewers =
     platform === "teams"
       ? viewerLabels(message?.members || message?.viewers)
@@ -680,7 +698,7 @@ export function guestRunModels(caller) {
  * }>}
  */
 export async function evaluateGuestMention(opts) {
-  const platform = opts.platform === "teams" ? "teams" : "imessage";
+  const platform = guestPlatform(opts.platform);
   const message = opts.message || {};
   const now = opts.now || new Date();
 
@@ -710,6 +728,12 @@ export async function evaluateGuestMention(opts) {
     if (!inContacts) return { action: "ignore" };
     fromName = String(contact.name || contact.first || "").trim();
     if (handle.includes("@")) email = handle;
+  } else if (platform === "whatsapp") {
+    handle = String(message.handle || message.phone || "").trim();
+    fromName = String(message.from || message.senderName || "").trim();
+    if (!handle && fromName) handle = fromName;
+    if (!handle) return { action: "ignore" };
+    inContacts = true;
   } else {
     email = String(message.fromEmail || "").trim();
     fromName = String(message.from || "").trim();
@@ -718,11 +742,20 @@ export async function evaluateGuestMention(opts) {
     inContacts = true;
   }
 
-  const person = resolvePerson(people, {
+  let person = resolvePerson(people, {
     handle,
     email,
     name: fromName || contact?.name,
   });
+  if (
+    platform === "whatsapp" &&
+    person &&
+    !identifierMatch(person, { handle, email }) &&
+    message.jypeMember !== true &&
+    !jypeEmailForSlug(message.jypeSlug)
+  ) {
+    person = null;
+  }
   const slug = person ? personSlug(person) : "";
   const displayName = displayGivenName({ person, contact, fromName });
   if (
@@ -735,10 +768,37 @@ export async function evaluateGuestMention(opts) {
   const personKey = quotaKeyFor(handle, slug);
   if (!personKey) return { action: "ignore" };
 
-  const jypeCaller = isJypeGuestCaller(slug, email, fromName);
+  const phoneMatchesPerson =
+    Boolean(person) &&
+    phonesOf(person).some((p) => phonesMatch(p, handle));
+  const jypeCaller =
+    platform === "whatsapp"
+      ? Boolean(jypeEmailForSlug(message.jypeSlug)) ||
+        message.jypeMember === true ||
+        (Boolean(jypeEmailForSlug(slug)) && phoneMatchesPerson)
+      : isJypeGuestCaller(slug, email, fromName);
   if (messageIsJypeThread(message) && !jypeCaller) return { action: "ignore" };
 
   const forceGrok = messageForcesGrok(message.text);
+
+  if (platform === "whatsapp" && jypeCaller) {
+    return {
+      action: "start",
+      platform,
+      caller: {
+        displayName,
+        slug,
+        platform,
+        handle,
+        inContacts,
+        audience: describeGuestAudience(platform, message),
+        model: copyModelSpec(GUEST_GROK_SPEC),
+        forceGrok: true,
+        jypeMember: true,
+        ...(messageIsJypeThread(message) ? { workspace: "jype" } : {}),
+      },
+    };
+  }
 
   if (messageIsJypeThread(message)) {
     return {
@@ -859,12 +919,25 @@ export async function evaluateGuestMention(opts) {
  *   text: string,
  *   sendIMessage?: typeof sendIMessage,
  *   sendTeamsMessage?: typeof sendTeamsMessage,
+ *   sendWhatsApp?: typeof sendWhatsApp,
  * }} opts
  */
 export async function deliverGuestRateLimit(opts) {
   const text = String(opts.text || "").trim();
   if (!text) return { ok: false, skipped: "empty" };
   const message = opts.message || {};
+  if (guestPlatform(opts.platform) === "whatsapp") {
+    const chat = String(message.chat || message.to || "").trim();
+    const chatJid = String(message.chatJid || message.chatId || "").trim();
+    if (!chat && !chatJid) return { ok: false, skipped: "no-target" };
+    const send = opts.sendWhatsApp || sendWhatsApp;
+    return send({
+      to: chat || chatJid,
+      chat,
+      chatJid,
+      text: applyAgentSentFooter(text, { platform: "whatsapp", chat }),
+    });
+  }
   if (opts.platform === "teams") {
     const origin = normalizeTeamsOrigin(message);
     const chat = String(origin?.chatId || origin?.to || origin?.chat || "").trim();

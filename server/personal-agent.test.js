@@ -1130,6 +1130,7 @@ describe("channel progress replies", () => {
   it("marks mention first turns and skips a duplicate final", () => {
     assert.equal(channelProgressKind({ imessageDeliverFinal: true }), "imessage");
     assert.equal(channelProgressKind({ teamsDeliverFinal: true }), "teams");
+    assert.equal(channelProgressKind({ whatsappDeliverFinal: true }), "whatsapp");
     assert.equal(
       channelProgressKind({ imessageDeliverFinal: true, teamsDeliverFinal: true }),
       "imessage"

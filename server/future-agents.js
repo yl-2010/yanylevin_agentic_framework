@@ -25,6 +25,7 @@ import {
 } from "./education-chat-history.js";
 import { canonicalizeEmail, isJypeAccessEmail } from "./identity.js";
 import { LOCAL_SOCK } from "./local-ipc.js";
+import { WHATSAPP_AGENT_ENABLED } from "./whatsapp-mention.js";
 import { normalizeJypeWorkspace } from "./jype.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -176,6 +177,16 @@ export function formatScheduledSystemBlock(record, opts = {}) {
         ? `This run answers in Teams chat ${origin.chatId}. The server posts your final reply there. send_chat_message posts there too while you work. Do not send that same final text yourself.`
         : `The scheduled run was tied to Teams chat ${origin.chatId}. A later message typed in the app stays in the app unless this message asks you to post there.`
     );
+  } else if (kind === "whatsapp" && (origin.to || origin.chatJid || origin.chatId)) {
+    const target = origin.chat || origin.to || origin.chatJid || origin.chatId;
+    lines.push(
+      "",
+      WHATSAPP_AGENT_ENABLED
+        ? kickoff
+          ? `This run answers in the WhatsApp chat ${target}. The server posts your final reply there. send_chat_message posts there too while you work. Do not send that same final text yourself.`
+          : `The scheduled run was tied to WhatsApp chat ${target}. A later message typed in the app stays in the app unless this message asks you to send there.`
+        : "The WhatsApp agent is off. This run stays in the app and website chat. Do not send to WhatsApp."
+    );
   } else if (kind === "imessage" && (origin.to || origin.chatGuid)) {
     const target = origin.chatGuid || origin.to;
     lines.push(
@@ -235,6 +246,19 @@ function cleanOrigin(raw) {
       chatId: chatId.slice(0, 200),
       chat: String(origin.chat || "").trim().slice(0, 200),
       to: String(origin.to || chatId).trim().slice(0, 200),
+      text: String(origin.text || "").trim().slice(0, 500),
+    };
+  }
+  if (kind === "whatsapp") {
+    const to = String(origin.to || origin.chat || "").trim().slice(0, 200);
+    const chatJid = String(origin.chatJid || origin.chatId || "").trim().slice(0, 200);
+    if (!to && !chatJid) return { kind: "" };
+    return {
+      kind: "whatsapp",
+      to,
+      chat: String(origin.chat || to).trim().slice(0, 200),
+      chatId: chatJid,
+      chatJid,
       text: String(origin.text || "").trim().slice(0, 500),
     };
   }
