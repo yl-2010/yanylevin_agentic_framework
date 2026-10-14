@@ -3890,6 +3890,7 @@
 
   async function boot() {
     show("loading");
+    let signedIn = false;
     try {
       const res = await fetch("/api/auth/session", {
         credentials: "same-origin",
@@ -3900,6 +3901,7 @@
         show("login");
         return;
       }
+      signedIn = true;
       const allowed = Array.isArray(CFG.allowedAccess) ? CFG.allowedAccess : ["full"];
       if (!allowed.includes(data.access)) {
         show("denied");
@@ -3926,8 +3928,15 @@
       if (window.location.pathname === BASE) {
         navigate(spaHome(), { replace: true, scroll: "keep" });
       }
-    } catch (_) {
-      show("login");
+    } catch (err) {
+      console.error("[edu boot]", err);
+      if (!signedIn) {
+        show("login");
+        return;
+      }
+      const loading = document.getElementById("stage-loading");
+      if (loading) loading.textContent = "Couldn't load your classes. Refresh the page.";
+      show("loading");
     }
   }
 

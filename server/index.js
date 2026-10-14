@@ -617,10 +617,11 @@ app.get("/api/education/data", requireEducationUser, async (req, res) => {
     } catch (err) {
       console.error("[onedrive-reveal]", err);
     }
+    const tree = await readEducationTree(req.user.email);
+    // After the tree read. Overlapping OneDrive reads deadlock (errno -11).
     syncOnedriveObjectVisibility(req.user.email).catch((err) =>
       console.error("[onedrive-visibility]", err)
     );
-    const tree = await readEducationTree(req.user.email);
     const live = /^(1|true|yes)$/i.test(String(req.query?.live || ""));
     if (canonicalizeEmail(req.user.email) === YAN_EMAIL) {
       await applyLiveCanvasOverlay(tree, { force: live });

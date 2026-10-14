@@ -842,13 +842,47 @@ export function userEducationRoot(email, opts = {}) {
   return join(EDUCATION_ROOT, normalized);
 }
 
+/** OneDrive File Provider sometimes returns EDEADLK (errno 11) on read. */
+function isTransientReadError(err) {
+  if (!err || err instanceof SyntaxError) return false;
+  if (err.errno === -11 || err.errno === 11) return true;
+  const code = String(err.code || "");
+  return (
+    code === "EAGAIN" ||
+    code === "EBUSY" ||
+    code === "EDEADLK" ||
+    code === "Unknown system error -11"
+  );
+}
+
 async function readJsonFile(path) {
+  const attempts = 4;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const raw = await readFile(path, "utf8");
+      return JSON.parse(raw);
+    } catch (err) {
+      if (err && (err.code === "ENOENT" || err instanceof SyntaxError)) return null;
+      if (isTransientReadError(err) && i < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50 * (i + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+  return null;
+}
+
+async function readClassProps(objectDir) {
   try {
-    const raw = await readFile(path, "utf8");
-    return JSON.parse(raw);
+    return await readJsonFile(join(objectDir, "class.json"));
   } catch (err) {
-    if (err && (err.code === "ENOENT" || err instanceof SyntaxError)) return null;
-    throw err;
+    console.error(
+      "[education-data] skip class.json",
+      objectDir,
+      err?.code || err?.message || err
+    );
+    return null;
   }
 }
 
@@ -895,7 +929,7 @@ export async function listClassEntriesForRoot(root) {
 
   for (const classId of await listDirs(join(root, "classes"))) {
     const objectDir = join(root, "classes", classId);
-    const props = await readJsonFile(join(objectDir, "class.json"));
+    const props = await readClassProps(objectDir);
     if (!props || typeof props !== "object") continue;
     const id = isSafeObjectId(props.id) || isSafeObjectId(classId);
     if (!id) continue;
@@ -915,7 +949,7 @@ export async function listClassEntriesForRoot(root) {
     for (const name of folderNames) {
       const classFolder = join(gradeDir, name);
       for (const objectDir of await listClassObjectDirs(gradeDir, name)) {
-        const props = await readJsonFile(join(objectDir, "class.json"));
+        const props = await readClassProps(objectDir);
         if (!props || typeof props !== "object") continue;
         const id = isSafeObjectId(props.id);
         if (!id) continue;
@@ -2221,7 +2255,7 @@ export async function readEducationTree(email, { includeFixtures = false, worksp
   for (const entry of classEntries) {
     const classId = entry.id;
     const classDir = entry.objectDir;
-    const props = await readJsonFile(join(classDir, "class.json"));
+    const props = await readClassProps(classDir);
     if (!props || typeof props !== "object") continue;
     const cls = { id: classId, ...props };
     if (!includeFixtures && isFixture(cls)) continue;
