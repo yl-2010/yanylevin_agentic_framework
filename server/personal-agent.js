@@ -151,6 +151,7 @@ const PA_ERROR_REPLY =
  *   activeTurnId?: string,
  *   guestCaller?: object|null,
  *   ephemeralPinned?: boolean,
+ *   channelReplyOwed?: ''|'imessage'|'teams'|'whatsapp',
  * }} Session
  */
 
@@ -229,6 +230,24 @@ export const MAX_QUEUED_TURNS = 8;
 /** Added to a queued turn's prompt when that turn is promoted into an interrupt. */
 export const INTERRUPT_NOTE =
   "The user interrupted your previous work with a new message. Treat this as the current request. Disk changes from the cancelled turn may already be partial. Do not redo completed work unless asked.";
+
+/**
+ * Interrupt of an @agent whose chat reply has not gone out yet.
+ * Default is a clarification, so the final bubble still goes to that chat.
+ * @param {string} [kind]
+ */
+export function interruptClarificationNote(kind) {
+  const where =
+    kind === "teams"
+      ? "Teams"
+      : kind === "imessage"
+        ? "iMessage"
+        : kind === "whatsapp"
+          ? "WhatsApp"
+          : "";
+  if (!where) return INTERRUPT_NOTE;
+  return `The user interrupted the unfinished @agent with a clarification. Treat this message as extra instructions for that same job. Disk changes from the cancelled turn may already be partial. Do not redo completed work unless this message asks. The final reply still goes to that ${where} chat unless this message says not to.`;
+}
 
 /** Final bubble when the model returns no text (and this was not an interrupt). */
 export const EMPTY_TURN_REPLY = "Done";
@@ -394,13 +413,104 @@ export function snapshotMessages(session) {
  * @param {string} prompt
  * @returns {string}
  */
-export function withInterruptNote(prompt) {
-  const text = String(prompt || "");
-  if (!text || text.includes(INTERRUPT_NOTE)) return text;
+export function withInterruptNote(prompt, kind) {
+  const note = interruptClarificationNote(kind);
+  let text = String(prompt || "");
+  if (!text) return text;
+  if (note !== INTERRUPT_NOTE && text.includes(INTERRUPT_NOTE)) {
+    text = text.replace(INTERRUPT_NOTE, note);
+  }
+  if (text.includes(note)) return text;
   const marker = "\n\nUser:\n";
   const at = text.lastIndexOf(marker);
-  if (at < 0) return `${text}\n\n${INTERRUPT_NOTE}`;
-  return `${text.slice(0, at)}\n\n${INTERRUPT_NOTE}${text.slice(at)}`;
+  if (at < 0) return `${text}\n\n${note}`;
+  return `${text.slice(0, at)}\n\n${note}${text.slice(at)}`;
+}
+
+const OWED_CHANNEL_LATER = {
+  teams: [
+    "This turn is on the website or app. The reply stays in this chat. Do not post it to Teams. Do not run school-teams.js send. send_chat_message stays in the app and website only.",
+    "Post to that Teams chat only when this message asks you to tell that chat, reply there, or send something those people should see. A follow-up on the same topic, typed here, stays here. The group already got the first reply.",
+  ].join("\n"),
+  imessage: [
+    "This turn is on the website or app. The reply stays in this chat. Do not text it. Do not sendIMessage or POST /imessage/send for this reply. send_chat_message stays in the app and website only.",
+    "Text that iMessage chat only when this message asks you to tell that chat, reply there, or send something those people should see. A follow-up on the same topic, typed here, stays here. The chat already got the first reply.",
+  ].join("\n"),
+  whatsapp:
+    "This turn is on the website or app. The reply stays here. Do not send it to WhatsApp unless this message asks you to tell that chat.",
+};
+
+const OWED_CHANNEL_DELIVER = {
+  teams:
+    "This interruption is a clarification of the unfinished @agent. Write the final bubble as the text that should land in that Teams chat. Markdown is fine. The server delivers that bubble to Teams. Do not also school-teams send that same final text. On a long job, send_chat_message still posts to that Teams chat.",
+  imessage:
+    "This interruption is a clarification of the unfinished @agent. Write the final bubble as the text that should land in that iMessage. Plain words, no markdown. The server delivers that bubble to iMessage. Do not also sendIMessage that same final text. On a long job, send_chat_message still posts to that iMessage chat.",
+  whatsapp:
+    "This interruption is a clarification of the unfinished @agent. Write the final bubble as the text that should land in that WhatsApp chat. Plain words, no markdown. The server delivers that bubble. Do not also send it yourself.",
+};
+
+/**
+ * A queued prompt was built as a later app turn. The @agent reply never
+ * went out, so swap the stay-in-the-app lines for a delivery instruction.
+ * @param {string} prompt
+ * @param {string} [kind]
+ */
+export function rewritePromptForOwedChannel(prompt, kind) {
+  const text = String(prompt || "");
+  const from = OWED_CHANNEL_LATER[kind];
+  const to = OWED_CHANNEL_DELIVER[kind];
+  if (!text || !from || !to || !text.includes(from)) return text;
+  return text.replace(from, to);
+}
+
+/**
+ * The cancelled @agent turn never delivered. Put the channel flag back
+ * so this turn's prompt and send path still reply in that chat.
+ * @param {Session} session
+ * @returns {''|'imessage'|'teams'|'whatsapp'}
+ */
+export function restoreOwedChannelDelivery(session) {
+  const kind = String(session?.channelReplyOwed || "");
+  if (kind === "imessage") session.imessageDeliverFinal = true;
+  else if (kind === "teams") session.teamsDeliverFinal = true;
+  else if (kind === "whatsapp") session.whatsappDeliverFinal = true;
+  return /** @type {''|'imessage'|'teams'|'whatsapp'} */ (
+    kind === "imessage" || kind === "teams" || kind === "whatsapp" ? kind : ""
+  );
+}
+
+/**
+ * Move session deliver flags onto the turn that will actually send.
+ * @param {Session} session
+ * @param {TurnOpts} turnOpts
+ */
+export function claimChannelDelivery(session, turnOpts) {
+  if (!session || !turnOpts) return "";
+  const kind = channelProgressKind(session);
+  if (!kind) return "";
+  if (kind === "imessage") turnOpts.imessageDeliverFinal = true;
+  else if (kind === "teams") turnOpts.teamsDeliverFinal = true;
+  else if (kind === "whatsapp") turnOpts.whatsappDeliverFinal = true;
+  session.imessageDeliverFinal = false;
+  session.teamsDeliverFinal = false;
+  session.whatsappDeliverFinal = false;
+  session.channelReplyOwed = kind;
+  return kind;
+}
+
+/**
+ * Promoted queued turn takes over a reply that has not gone out yet.
+ * @param {Session} session
+ * @param {TurnOpts} turn
+ */
+export function handOffOwedChannel(session, turn) {
+  const kind = String(session?.channelReplyOwed || "");
+  if (!kind || !turn) return "";
+  if (kind !== "imessage" && kind !== "teams" && kind !== "whatsapp") return "";
+  turn.imessageDeliverFinal = kind === "imessage";
+  turn.teamsDeliverFinal = kind === "teams";
+  turn.whatsappDeliverFinal = kind === "whatsapp";
+  return kind;
 }
 
 /**
@@ -1439,7 +1549,10 @@ async function settleOutboundSend(session, sid, content, opts, model) {
     }
     const delivery = await confirmOutboundDelivery(session, content, opts);
     const action = nextOutboundAction({ delivery, guidDropped, resumes });
-    if (action === "done") return content;
+    if (action === "done") {
+      session.channelReplyOwed = "";
+      return content;
+    }
     if (action === "drop-guid") {
       const origin = originForChannel(session, channel);
       dropRejectedChatGuid(origin, delivery.error);
@@ -1447,6 +1560,7 @@ async function settleOutboundSend(session, sid, content, opts, model) {
       continue;
     }
     if (action === "give-up" || !session.agent) {
+      session.channelReplyOwed = "";
       const where = channelName(channel);
       const note = `The ${where} send still failed: ${delivery.error || "send failed"}`;
       session.messages.push(
@@ -3115,13 +3229,26 @@ export async function messageAgent(
     claimedIdleSlot = true;
   }
 
+  // Cancel before the prompt is built. Otherwise the live @agent can deliver
+  // while this clarification is still being assembled, or the prompt is
+  // written as a later app turn and the chat never gets a reply.
+  if (interrupting) {
+    session.interrupting = true;
+    try {
+      await cancelActiveRun(session);
+    } finally {
+      session.interrupting = false;
+    }
+    restoreOwedChannelDelivery(session);
+  }
+
   session.lastUsedAt = Date.now();
 
   let newFiles;
   try {
     newFiles = await stageAttachments(session, sid, attachments);
   } catch (err) {
-    if (claimedIdleSlot) session.status = "idle";
+    if (claimedIdleSlot || interrupting) session.status = "idle";
     throw err;
   }
   const sessionFiles = session.uploads;
@@ -3144,7 +3271,7 @@ export async function messageAgent(
       guestTurnModelSpec(session, hasSessionFiles)
     );
   } catch (err) {
-    if (claimedIdleSlot) session.status = "idle";
+    if (claimedIdleSlot || interrupting) session.status = "idle";
     throw err;
   }
 
@@ -3193,7 +3320,7 @@ export async function messageAgent(
     );
   }
   if (interrupting) {
-    promptParts.push("", INTERRUPT_NOTE);
+    promptParts.push("", interruptClarificationNote(session.channelReplyOwed));
   }
   promptParts.push("", "User:", text || "(no text — see attachments)");
 
@@ -3255,27 +3382,11 @@ export async function messageAgent(
     bubble,
     interrupted: interrupting,
   };
-  if (session.imessageDeliverFinal) {
-    turnOpts.imessageDeliverFinal = true;
-    session.imessageDeliverFinal = false;
-  }
-  if (session.teamsDeliverFinal) {
-    turnOpts.teamsDeliverFinal = true;
-    session.teamsDeliverFinal = false;
-  }
-  if (session.whatsappDeliverFinal) {
-    turnOpts.whatsappDeliverFinal = true;
-    session.whatsappDeliverFinal = false;
-  }
+  claimChannelDelivery(session, turnOpts);
 
   activeByEmail.set(focusKey(normalized, sessionWorkspace(session)), sid);
 
-  if (interrupting) {
-    session.interrupting = true;
-    await cancelActiveRun(session);
-    session.interrupting = false;
-    session.status = "running";
-  }
+  if (interrupting) session.status = "running";
 
   if (willQueue) {
     // Keep queued user bubbles out of session.messages until their turn
@@ -3380,7 +3491,10 @@ export async function promoteQueuedTurn(sessionId, email, queueIdRaw) {
     } finally {
       session.interrupting = false;
     }
-    turn.prompt = withInterruptNote(turn.prompt);
+    const owed = session.channelReplyOwed || "";
+    turn.prompt = rewritePromptForOwedChannel(turn.prompt, owed);
+    turn.prompt = withInterruptNote(turn.prompt, owed);
+    if (owed) handOffOwedChannel(session, turn);
     turn.interrupted = true;
   }
 
@@ -3782,18 +3896,7 @@ export async function runScheduledAgent(record) {
       bubble: "",
       scheduledKickoff: true,
     };
-    if (session.imessageDeliverFinal) {
-      turnOpts.imessageDeliverFinal = true;
-      session.imessageDeliverFinal = false;
-    }
-    if (session.teamsDeliverFinal) {
-      turnOpts.teamsDeliverFinal = true;
-      session.teamsDeliverFinal = false;
-    }
-    if (session.whatsappDeliverFinal) {
-      turnOpts.whatsappDeliverFinal = true;
-      session.whatsappDeliverFinal = false;
-    }
+    claimChannelDelivery(session, turnOpts);
     session.lastUsedAt = Date.now();
     session.workingLabel = WORKING_LABEL_DEFAULT;
     notifyScheduledThread(email, workspace, sid, "running");

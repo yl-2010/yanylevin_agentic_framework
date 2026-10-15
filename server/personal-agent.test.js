@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { formatTeamsOriginBlock, normalizeTeamsOrigin } from "./teams-mention.js";
+import { formatIMessageOriginBlock, normalizeIMessageOrigin } from "./imessage-mention.js";
+import { formatWhatsAppOriginBlock, normalizeWhatsAppOrigin } from "./whatsapp-mention.js";
 import {
   queueIMessageReplyFiles,
   resetIMessageReplyFiles,
@@ -30,6 +33,11 @@ import {
   stampMessage,
   detachQueuedTurn,
   withInterruptNote,
+  interruptClarificationNote,
+  rewritePromptForOwedChannel,
+  restoreOwedChannelDelivery,
+  claimChannelDelivery,
+  handOffOwedChannel,
   INTERRUPT_NOTE,
   systemPrompt,
   formatVisibleTranscript,
@@ -917,6 +925,78 @@ describe("queued turn promote", () => {
     assert.equal(withInterruptNote(prompt), prompt);
     const bare = withInterruptNote("no user marker");
     assert.match(bare, /interrupted your previous work/);
+  });
+
+  it("keeps the Teams reply when an interrupt clarifies an unfinished @agent", () => {
+    const session = { teamsDeliverFinal: true, channelReplyOwed: "" };
+    const first = {};
+    assert.equal(claimChannelDelivery(session, first), "teams");
+    assert.equal(first.teamsDeliverFinal, true);
+    assert.equal(session.teamsDeliverFinal, false);
+    assert.equal(session.channelReplyOwed, "teams");
+
+    assert.equal(restoreOwedChannelDelivery(session), "teams");
+    assert.equal(session.teamsDeliverFinal, true);
+    const note = interruptClarificationNote(session.channelReplyOwed);
+    assert.match(note, /clarification/);
+    assert.match(note, /still goes to that Teams chat/);
+    const prompt = withInterruptNote(
+      "Live context\n\nUser:\nPut me with the other guys",
+      "teams"
+    );
+    assert.match(prompt, /still goes to that Teams chat/);
+    assert.ok(prompt.indexOf("still goes to that Teams chat") < prompt.indexOf("\n\nUser:\n"));
+
+    const origin = normalizeTeamsOrigin({
+      id: "m1",
+      chatId: "19:abc",
+      chat: "JYPE",
+      text: "@agent make groups",
+    });
+    const baked = [
+      "system",
+      formatTeamsOriginBlock(origin, { deliverFinal: false }),
+      "User:",
+      "Put me with the other guys",
+    ].join("\n\n");
+    const rewritten = rewritePromptForOwedChannel(baked, "teams");
+    assert.doesNotMatch(rewritten, /Do not post it to Teams/);
+    assert.doesNotMatch(rewritten, /already got the first reply/);
+    assert.match(rewritten, /text that should land in that Teams chat/);
+    const handed = {};
+    handOffOwedChannel(session, handed);
+    assert.equal(handed.teamsDeliverFinal, true);
+    assert.equal(session.channelReplyOwed, "teams");
+  });
+
+  it("rewrites an iMessage or WhatsApp later-turn prompt the same way", () => {
+    const imessage = rewritePromptForOwedChannel(
+      formatIMessageOriginBlock(
+        normalizeIMessageOrigin({
+          text: "@agent hi",
+          chat: "Alex",
+          chatId: "+15555550111",
+          handle: "+15555550111",
+        }),
+        { deliverFinal: false }
+      ),
+      "imessage"
+    );
+    assert.doesNotMatch(imessage, /Do not text it/);
+    assert.match(imessage, /text that should land in that iMessage/);
+    const whatsapp = rewritePromptForOwedChannel(
+      formatWhatsAppOriginBlock(
+        normalizeWhatsAppOrigin({
+          text: "@agent hi",
+          chat: "JYPE",
+          chatJid: "123@g.us",
+        }),
+        { deliverFinal: false }
+      ),
+      "whatsapp"
+    );
+    assert.doesNotMatch(whatsapp, /reply stays here/);
+    assert.match(whatsapp, /text that should land in that WhatsApp chat/);
   });
 
   it("snapshots queueId on waiting bubbles", () => {

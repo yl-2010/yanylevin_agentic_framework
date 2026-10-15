@@ -38,6 +38,10 @@ Study guides and big plans: `.cursor/skills/yanylevin-webpage-create/SKILL.md`. 
 
 A celebration site for finishing a book, MA, test, or project is `.cursor/skills/create-celebration-website/SKILL.md`. Leave off `sites[]`, the notes hub, and the house theme. Keep the URL out of the reply while the event is still ahead. Schedule the link send only when that skill can name the end time.
 
+## Unfinished @agent
+
+An interruption from the app or website before the reply has gone out is a clarification of the same job. The final bubble still goes to the chat that called `@agent`, including Teams. A message after that reply already landed stays in the app unless it asks you to post there.
+
 ## Vercel deploy (your job on the Mac)
 
 `git push` does **not** update yanylevin.com. Auto-deploy is off on purpose (`AGENTS.md`).
