@@ -307,6 +307,7 @@ struct EducationClass: Decodable, Identifiable, Hashable {
 
 struct DebateCard: Decodable, Hashable {
     let tag: String
+    let summary: String?
     let quote: String
     let source: String?
     let url: String

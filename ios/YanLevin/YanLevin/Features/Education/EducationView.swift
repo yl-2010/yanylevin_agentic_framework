@@ -747,7 +747,7 @@ struct CaseDetailView: View {
                 }
                 if let resolution = liveCase.resolution?.trimmingCharacters(in: .whitespacesAndNewlines),
                    !resolution.isEmpty {
-                    Text(resolution)
+                    Text("\(sideKey == "neg" ? "I negate" : "I affirm") \(resolution)")
                         .font(.subheadline)
                         .foregroundStyle(YLTheme.muted(colorScheme))
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -823,11 +823,11 @@ struct CaseDetailView: View {
 
     private func speechColumn(_ speech: DebateSide) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            if let framework = speech.framework {
-                frameworkBlock(framework)
-            }
             if let defs = speech.definitions, !defs.isEmpty {
                 definitionsBlock(defs)
+            }
+            if let framework = speech.framework {
+                frameworkBlock(framework)
             }
             ForEach(speech.contentions ?? []) { contention in
                 contentionBlock(contention)
@@ -895,28 +895,57 @@ struct CaseDetailView: View {
         }
     }
 
+    private func debateMarked(_ raw: String) -> Text {
+        let parts = raw.components(separatedBy: "**")
+        var text = Text("")
+        for (index, part) in parts.enumerated() {
+            if part.isEmpty { continue }
+            if index % 2 == 1 {
+                text = text + Text(part).bold()
+            } else {
+                text = text + Text(part)
+            }
+        }
+        return text
+    }
+
     private func cardBlock(_ card: DebateCard) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(card.tag)
-                .font(.body.weight(.bold))
-                .foregroundStyle(YLTheme.fg(colorScheme))
-            HStack(alignment: .top, spacing: 10) {
-                RoundedRectangle(cornerRadius: 1, style: .continuous)
-                    .fill(YLTheme.accent(colorScheme, palette: palette).opacity(0.7))
-                    .frame(width: 2)
-                Text(card.quote)
+            if let url = card.link {
+                Link(destination: url) {
+                    Text(card.tag)
+                        .font(.body.weight(.bold))
+                        .foregroundStyle(YLTheme.fg(colorScheme))
+                        .underline()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                Text(card.tag)
+                    .font(.body.weight(.bold))
+                    .foregroundStyle(YLTheme.fg(colorScheme))
+            }
+            if let summary = card.summary?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !summary.isEmpty {
+                Text(summary)
                     .font(.body)
                     .foregroundStyle(YLTheme.fg(colorScheme))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            if let url = card.link {
-                Link(destination: url) {
-                    Text((card.source ?? "").isEmpty ? card.url : (card.source ?? card.url))
-                        .font(.caption)
-                        .foregroundStyle(YLTheme.accent(colorScheme, palette: palette))
-                        .underline()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+            HStack(alignment: .top, spacing: 10) {
+                RoundedRectangle(cornerRadius: 1, style: .continuous)
+                    .fill(YLTheme.accent(colorScheme, palette: palette).opacity(0.7))
+                    .frame(width: 2)
+                debateMarked(card.quote)
+                    .font(.body)
+                    .foregroundStyle(YLTheme.fg(colorScheme))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if let source = card.source?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !source.isEmpty {
+                Text(source)
+                    .font(.caption)
+                    .foregroundStyle(YLTheme.muted(colorScheme))
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             cueList(card.means ?? [])
         }

@@ -826,6 +826,31 @@ describe("publicDebateCase", () => {
     assert.equal(out.neg, undefined);
   });
 
+  it("keeps the cite, the summary, and bold markers in the quote", () => {
+    const out = publicDebateCase({
+      resolution: "Resolved: Example.",
+      aff: {
+        contentions: [
+          {
+            title: "One",
+            cards: [
+              {
+                tag: "Smith 24",
+                summary: "The line he says.",
+                quote: "Before **the point** after.",
+                url: "https://example.com/a",
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const card = out.aff.contentions[0].cards[0];
+    assert.equal(card.tag, "Smith 24");
+    assert.equal(card.summary, "The line he says.");
+    assert.match(card.quote, /\*\*the point\*\*/);
+  });
+
   it("loads the open borders case with a direct link on every card", async () => {
     const { readFile } = await import("node:fs/promises");
     const raw = JSON.parse(

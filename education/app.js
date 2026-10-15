@@ -2725,18 +2725,28 @@
     return /^https:\/\/[^\s]+$/i.test(s) ? s : "";
   }
 
+  function debateMarkup(text) {
+    return escapeHtml(text).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  }
+
   function debateCardHtml(card) {
     const url = debateHttps(card?.url);
     if (!url) return "";
+    const cite = `<a class="debate-cite" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(card.tag || "")}</a>`;
+    const summary = String(card.summary || "").trim();
+    const summaryHtml = summary
+      ? `<p class="debate-summary">${escapeHtml(summary)}</p>`
+      : "";
     const source = String(card.source || "").trim();
     const sourceHtml = source
-      ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source)}</a>`
-      : `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`;
+      ? `<p class="debate-source">${escapeHtml(source)}</p>`
+      : "";
     const means = debateCues(card.means);
     return `<article class="debate-card">
-      <p class="debate-tag">${escapeHtml(card.tag || "")}</p>
-      <blockquote>${escapeHtml(card.quote || "")}</blockquote>
-      <p class="debate-source">${sourceHtml}</p>
+      <p class="debate-tag">${cite}</p>
+      ${summaryHtml}
+      <blockquote>${debateMarkup(card.quote || "")}</blockquote>
+      ${sourceHtml}
       ${means}
     </article>`;
   }
@@ -2766,6 +2776,21 @@
     const body = c?.[sideKey];
     if (!body || typeof body !== "object") return "";
     const blocks = [];
+    const defs = Array.isArray(body.definitions) ? body.definitions : [];
+    if (defs.length) {
+      const rows = defs
+        .map((def) => {
+          const cues = debateCues(def.points || (def.text ? [def.text] : []));
+          const cards = (def.cards || []).map((card) => debateCardHtml(card)).join("");
+          return `<article class="debate-def">
+            <h3>${escapeHtml(def.term || "")}</h3>
+            ${cues}
+            ${cards ? `<div class="debate-cards">${cards}</div>` : ""}
+          </article>`;
+        })
+        .join("");
+      blocks.push(panelHtml("Definitions", rows, { filterId: "lg-debate-defs" }));
+    }
     const framework = body.framework;
     if (
       framework &&
@@ -2789,21 +2814,6 @@
         .join("");
       if (frameworkCards) bits.push(`<div class="debate-cards">${frameworkCards}</div>`);
       blocks.push(panelHtml("Framework", bits.join(""), { filterId: "lg-debate-framework" }));
-    }
-    const defs = Array.isArray(body.definitions) ? body.definitions : [];
-    if (defs.length) {
-      const rows = defs
-        .map((def) => {
-          const cues = debateCues(def.points || (def.text ? [def.text] : []));
-          const cards = (def.cards || []).map((card) => debateCardHtml(card)).join("");
-          return `<article class="debate-def">
-            <h3>${escapeHtml(def.term || "")}</h3>
-            ${cues}
-            ${cards ? `<div class="debate-cards">${cards}</div>` : ""}
-          </article>`;
-        })
-        .join("");
-      blocks.push(panelHtml("Definitions", rows, { filterId: "lg-debate-defs" }));
     }
     const contentions = Array.isArray(body.contentions) ? body.contentions : [];
     contentions.forEach((contention, i) => {
@@ -2844,6 +2854,9 @@
     const speech = debateSideHtml(c, sideKey);
     const blockfile = debateBlockfileHtml(c, sideKey);
     const resolution = String(c.resolution || "").trim();
+    const resolutionLine = resolution
+      ? `${sideKey === "neg" ? "I negate" : "I affirm"} ${resolution}`
+      : "";
     const hasSpeech = Boolean(
       debateSideHtml(c, "aff") ||
         debateSideHtml(c, "neg") ||
@@ -2875,7 +2888,7 @@
       ${
         speech || blockfile
           ? `<div class="debate-case${blockfile ? " debate-case--split" : ""}">
-              ${resolution ? `<p class="debate-res">${escapeHtml(resolution)}</p>` : ""}
+              ${resolutionLine ? `<p class="debate-res">${escapeHtml(resolutionLine)}</p>` : ""}
               ${
                 blockfile
                   ? `<div class="debate-col">${speech}</div>

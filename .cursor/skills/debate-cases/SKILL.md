@@ -51,22 +51,50 @@ education/you@example.com/projects/debate/
 `/debate` is Yan-only (`allowedEmails: you@example.com`). Routes are
 `/debate/case/<caseId>/aff` and `/neg`. A case with no `aff` / `neg` body
 stays title-only (`Name · Aff`). A case that has a side renders that side
-as a speech, in this order, and no other order:
+as a speech, in this order, and no other order. He reads it straight down
+during the speech. Do not preview the case and then expand it later.
 
-1. Resolution line
-2. Framework. Value, criterion, one short why.
-3. Definitions. Term, then the cut. The cut is the same card shape as a contention card: tag, quote, link, then cue bullets.
-4. Contentions. Cue bullets first. Cards under them.
+1. Resolution sentence, the line he says first. `I affirm Resolved: ...`
+   or `I negate Resolved: ...`. The stored `resolution` stays
+   `Resolved: ...`. The page adds the verb.
+2. Definitions. Each key term in the resolution, then one card. One online
+   dictionary per term. No second source, and no bullet list that restates
+   the definition before the card.
+3. Framework. Value, then criterion, then the cards that justify them.
+   Look at his old cases for the why. Morality plus util is the usual pair
+   when the resolution says ought or unethical. Do not put a bullet summary
+   of the framework and then the same cards again.
+4. Contentions, in the order he says them. No chain of bullets above the
+   cards. The cards are the speech.
 
-The blockfile is not a fifth section of the speech. It is the other column. Each block is `A2`, the claim, cue bullets, then cards in the same shape. A side without a blockfile is unfinished. Write it with the speech. On a wide screen the speech is the left column and the blockfile is the right. That is the website above 720px and the iPad. A phone stacks the blockfile under the speech.
+The blockfile is not a fifth section of the speech. It is the other column.
+Each block is `A2`, the claim they will make, then cards in the same shape.
+No bullet summary of the answer above the cards. A side without a blockfile
+is unfinished. Write it with the speech. The card has to answer that claim.
+The bold lines are the answer he reads. A quote that states their argument,
+or a quote he would have to spin into the opposite, is the wrong card. Hunt
+a source that denies the claim, or that measures it and does not find it.
+Do not park their evidence in the block and explain it away in the means line.
 
-Quotes stay full sentences from the source. Everything else is bullets of
-things to say, not a written speech. He turns the bullets into sentences.
-That includes framework notes, definitions, the chain, and the line after
-a card. Do not write those out as paragraphs.
+On a wide screen the speech is the
+left column and the blockfile is the right. That is the website above 720px
+and the iPad. A phone stacks the blockfile under the speech.
 
-Each card is tag (`Author YY: warrant`), the quote that says the tag, a
-link to the direct text, then cue bullets for the math or the implication.
+Each card, in this order:
+
+1. Cite, at the very start, so he knows what to say. Authored cards are
+   `Smith 24` (last name, two digits of the year). A dictionary cite is the
+   dictionary name. The cite is the link. Put the URL on that tag.
+2. `summary`. One or two sentences on what the source says. This is the
+   only plain-language line before the quote. Do not repeat it in a chain.
+3. `quote`. Exact text from the source. Include the sentences around the
+   point so he has context. Mark the words he should read with `**double
+   asterisks**`. The page bolds those words. Do not bold the whole quote.
+4. `source`. Full name of the publication, not a second link.
+5. `means`, only for the number or the next line that this card alone
+   produces. Not a restatement of the quote, and not a preview of a later
+   card.
+
 Aff and Neg on the same topic use the same framework, the same defs, and
 the same card shape. The side switch is always Aff, then Neg. Do not put a
 todo list on the case page. Do not invent a second layout.
@@ -79,10 +107,11 @@ Brainstorm the chain first: claim, internal link, number, impact. Then hunt
 a source that says that warrant, not a nearby vibe.
 
 - Prefer EPA, USDA, WHO, Congress/CRS, academic journals, official stats.
-- Tag format Yan uses: `Author YY: short warrant` plus a link (he often
-  used Arc quote URLs). After the quote, cue bullets for the math or the
-  implication. Not a written `this means` paragraph.
-- The card body has to say the tag. If it does not, keep looking.
+- Cite format: `Smith 24`, then `summary`, then the quote with the point
+  inside `** **`, then the link on the cite. After the quote, `means` only
+  for math or the implication of that card.
+- The bolded words have to say the summary. If they do not, keep looking.
+- In a blockfile, the bolded words also have to answer the `A2` claim. If the quote is the argument he is answering, it is their card. Find one that rebuts it.
 - Do not paste camp briefs, Victory/Champion dumps, or Kankee packets as
   if they were his case.
 
@@ -129,7 +158,7 @@ node --env-file=server/.env server/school-onenote.js sections --notebook "'25-'2
 
 - Create extra cases in the UI
 - Put objects under JYPE
-- Invent a second case-page layout. Speech order stays resolution, framework, definitions, contentions. The blockfile is the other column, not a new speech order.
+- Invent a second case-page layout. Speech order stays the resolution sentence, then definitions, then framework, then contentions. The blockfile is the other column, not a new speech order. Do not put a bullet outline of the case above the cards.
 - Dump generic util / Kant / "I value morality because ought"
 - Treat leftover paste (Nukes Word mixed with Rewilding, AGI Neg pasted
   from Treaties, later blockfiles copied from Wealth Tax Aff) as his

@@ -1645,12 +1645,14 @@ function debateCards(raw) {
     .map((item) => {
       if (!item || typeof item !== "object") return null;
       const tag = debateCleanLine(item.tag, 300);
-      const quote = debateCleanLine(item.quote, 2500);
+      const summary = debateCleanLine(item.summary, 500);
+      const quote = debateCleanLine(item.quote, 6000);
       const source = debateCleanLine(item.source, 240);
       const url = debateCleanUrl(item.url);
-      const means = debateCleanLines(item.means, 12, 400);
+      const means = debateCleanLines(item.means, 12, 500);
       if (!tag || !quote || !url) return null;
       const card = { tag, quote, url };
+      if (summary) card.summary = summary;
       if (source) card.source = source;
       if (means.length) card.means = means;
       return card;
@@ -1684,7 +1686,7 @@ function debateSide(raw) {
   const framework = debateFramework(raw.framework);
   const definitions = debateDefinitions(raw.definitions);
   const contentions = debateContentions(raw.contentions);
-  const blockfile = debateContentions(raw.blockfile, 8);
+  const blockfile = debateContentions(raw.blockfile, 12);
   if (!framework && !definitions.length && !contentions.length && !blockfile.length) {
     return null;
   }
