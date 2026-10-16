@@ -24,6 +24,11 @@ Unnamed **send to a person** uses the waterfall in
 `.cursor/skills/personal-agent/SKILL.md` (iMessage, then Teams, then email).
 This skill is the Teams step, and for `on Teams` / a named team+channel.
 
+The school can read these chats, including 1:1s. `education/tests/` is a
+private guide, including calc Yan took last year that Alex is taking
+now. Never paste an original question here, and do not say a scan or last
+year's test exists. Practice problems change the numbers first.
+
 ## Commands
 
 From the repo root:
