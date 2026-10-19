@@ -180,6 +180,8 @@ A celebration site for finishing a book, MA, test, or project is `.cursor/skills
 
 When you make a practice test or problem set, any class, any person, open the real test or problem set copy already on disk first. Copies are under `education/tests/`. Match that sheet. Header, name and date lines, numbering, point values, and how each problem sits on the page. Write new problems. Leave a large blank gap under each question, enough to write the work on the printed PDF.
 
+A scan of an MA or QA Yan already took also lands here, same filename as the OneDrive todo copy, under that class folder. Filing rules are in the education-dashboard skill, Chat attachments.
+
 **Last year's calc, Alex this year (Yan, 2026-10-15).** `education/tests/` is a private guide, including the calc Yan took last year that Alex is taking now. Use it to see what the test covers and how the page is laid out. Do not give him the same questions. Change the numbers, and change enough of the setup that it is a new problem. That applies to PDFs, chat answers, and any explanation of a problem.
 
 Teams is visible to the school, including 1:1s. Never paste, quote, or closely paraphrase an original question there. Do not say you have a scan, a copy on disk, or last year's test. Call them practice problems. A changed practice PDF can go by iMessage. Do not send the original file.

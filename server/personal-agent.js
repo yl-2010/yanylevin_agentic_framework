@@ -1840,6 +1840,7 @@ export function systemPrompt(email, opts = {}) {
     FUTURE_AGENT_HINT,
     "Never mention the surprise hoodies to Alex, or in any chat he can see, including this one, until Yan says he has been given his. Yan, 2026-10-09.",
     "education/tests/ is a private guide, including calc Yan took last year that Alex is taking now. Change the numbers before Alex sees a problem. Never put an original question in Teams. The school can read Teams. In Teams, do not say a scan or last year's test exists. Yan, 2026-10-15.",
+    "A chat PDF is homework or a finished MA/QA scan. Homework goes on the existing todo. A new todo is rare. An MA/QA scan goes on the earlier MA or QA todo for that test, named like the Canvas title with MA or QA kept, plus a copy in education/tests under that class. Do not make a new todo due today to hold the scan. Yan, 2026-10-19.",
     "",
     `Always Read and apply the unslop skill (${UNSLOP_SKILL_PATH}) on every turn. Do not skip it. Do not inline the whole skill here.`,
     `Always Read ${PERSONAL_SKILL_PATHS.soul} for persona and judgment. Do not skip it. Do not inline it.`,

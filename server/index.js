@@ -102,6 +102,7 @@ import {
   startHeadlinesWipeScheduler,
 } from "./headlines-activity.js";
 import { attachStudyRoutes } from "./study.js";
+import { readQuizAttempt, saveQuizAttempt } from "./quiz-attempts.js";
 
 const PORT = Number(process.env.PORT || 3004);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -356,6 +357,47 @@ app.post("/api/login-log", requireAuth, async (req, res) => {
     res.status(500).json({
       ok: false,
       error: err.message || "login-log append failed",
+    });
+  }
+});
+
+/**
+ * Quiz answers for the signed-in Google account.
+ * Email is the JWT. The body cannot name a different account.
+ */
+app.post("/api/education/quiz-attempt", requireAuth, async (req, res) => {
+  try {
+    const doc = await saveQuizAttempt(req.user?.email, req.body || {});
+    res.setHeader("Cache-Control", "no-store");
+    res.json({
+      ok: true,
+      quizId: doc.quizId,
+      score: doc.score,
+      total: doc.total,
+      updatedAt: doc.updatedAt,
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error("[/api/education/quiz-attempt POST]", err);
+    res.status(status).json({
+      ok: false,
+      error: err.message || "quiz save failed",
+    });
+  }
+});
+
+app.get("/api/education/quiz-attempt", requireAuth, async (req, res) => {
+  try {
+    const quiz = String(req.query?.quiz || "");
+    const doc = await readQuizAttempt(req.user?.email, quiz);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, attempt: doc });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error("[/api/education/quiz-attempt GET]", err);
+    res.status(status).json({
+      ok: false,
+      error: err.message || "quiz read failed",
     });
   }
 });

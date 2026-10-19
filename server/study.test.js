@@ -39,6 +39,11 @@ describe("study access", () => {
     assert.equal(sanitizeReturnPath("/study"), "/study/");
     assert.equal(sanitizeReturnPath("/study/"), "/study/");
     assert.equal(sanitizeReturnPath("/elsewhere"), "/education/");
+    assert.equal(
+      sanitizeReturnPath("/us-history/constitution-order"),
+      "/us-history/constitution-order/"
+    );
+    assert.equal(sanitizeReturnPath("//evil.com/us-history/x"), "/education/");
   });
 
 });

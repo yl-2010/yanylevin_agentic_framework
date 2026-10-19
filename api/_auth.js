@@ -153,6 +153,8 @@ function sanitizeReturnPath(raw, fallback = "/education/") {
   if (path === "/JYPE" || path === "/JYPE/") return "/jype/";
   if (!path.endsWith("/")) path = `${path}/`;
   if (ALLOWED_RETURN_PATHS.has(path)) return path;
+  // Quiz pages live at /<section>/<page>/. Send the login back there.
+  if (/^\/[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*\/$/.test(path)) return path;
   return fallback;
 }
 

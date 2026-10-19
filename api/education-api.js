@@ -71,7 +71,7 @@ async function forwardEducation(req, res, opts) {
     res.status(401).json({ ok: false, error: "unauthorized" });
     return;
   }
-  if (session.access !== "full") {
+  if (!opts.allowAnySession && session.access !== "full") {
     res.status(403).json({ ok: false, error: "forbidden" });
     return;
   }
@@ -454,6 +454,39 @@ module.exports = async function handler(req, res) {
         path: "/api/education/agent/read",
         body: { sessionId: body?.sessionId },
         timeoutMs: 15_000,
+      });
+      return;
+    }
+
+    if (route === "quiz-attempt") {
+      if (method !== "GET" && method !== "POST") {
+        res.setHeader("Allow", "GET, POST");
+        res.status(405).json({ ok: false, error: "method not allowed" });
+        return;
+      }
+      if (method === "GET") {
+        const raw = req.query?.quiz;
+        const quiz = Array.isArray(raw) ? raw[0] : raw;
+        const id = String(quiz || "");
+        await forwardEducation(req, res, {
+          method: "GET",
+          path: `/api/education/quiz-attempt?quiz=${encodeURIComponent(id)}`,
+          timeoutMs: 15_000,
+          allowAnySession: true,
+        });
+        return;
+      }
+      const body = await readJsonBody(req);
+      await forwardEducation(req, res, {
+        method: "POST",
+        path: "/api/education/quiz-attempt",
+        body: {
+          quizId: body?.quizId,
+          answers: body?.answers,
+          done: body?.done,
+        },
+        timeoutMs: 15_000,
+        allowAnySession: true,
       });
       return;
     }
