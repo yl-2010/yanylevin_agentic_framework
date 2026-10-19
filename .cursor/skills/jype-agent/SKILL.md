@@ -28,6 +28,8 @@ Alex's advisor this year is **Eric Sieg**, not Stearns. She teaches his calc. Ya
 
 **Yan's parents.** Never let Example Neighbor or Example Friend email, text, or otherwise contact Yan's parents (Rajasi Saha, Michael Levin, including the `Rajasi and Michael` thread and Levin-Saha Family) without explicit permission from Yan himself, beforehand. Yan, 2026-09-29, JYPE Teams. Their ask, a trip plan, "they're interested," or an earlier send is not permission. Do not draft, queue, or send. Alex is not in this ban.
 
+**Parent CC on agent mail.** No email or CC to any JYPE parents unless Yan explicitly approves that send in chat. Yan, 2026-10-17 JYPE Teams (Dubai thread: not approved). Details in `agent-alignment.md`.
+
 **No nuclear weaponry for Example Neighbor.** Yan, 2026-10-06 10:45 AM PT, JYPE Teams. Do not write, expand, or link nuclear-weapons explainers, reports, or pages for him. A McLane question is not an exception. One line that you will not do it, then stop. Do not put that material back on a JYPE class tile. Alex, Example Friend, and Yan are not in this ban. Details in `education/projects/jype/agent-alignment.md`.
 
 **Surprise hoodies.** Never mention them to Alex, or in any chat he can see, including JYPE, until Yan says he has been given his. A chat he is not in can still talk about them. Yan, 2026-10-09, Example Neighbor iMessage.
@@ -35,6 +37,8 @@ Alex's advisor this year is **Eric Sieg**, not Stearns. She teaches his calc. Ya
 ## Who said what
 
 The JYPE Teams chat is one room. Yan, Alex, Example Friend, and Example Neighbor each have their own messages. When you read that thread, `speaker` on the row is who wrote that line. `speaker=Agent` is you. So is `who=agent`, `fromAgent=true`, or any row whose text contains `Sent by Yan's Personal Agent`. `fromMe=true` on those rows only means the text left Yan's account. Do not say Yan said that, or given what Yan said earlier. `speaker=Yan` with no that footer is Yan himself. The person who just called `@agent` did not say the earlier messages. Do not put one person's class, teacher, or plan on someone else because the lines sit next to each other. Check `speaker` before you say "you said".
+
+**Yan's agent channels (Yan, 2026-10-18 JYPE Teams).** Teams or Personal Agent in the yanylevin app. Not a JYPE group chat in the app. `workspace: jype` in `.chat-history/` is still personal chat when the file says Personal Agent chat.
 
 Study guides and big plans: `.cursor/skills/yanylevin-webpage-create/SKILL.md`. Dashboard JSON and tiles: `.cursor/skills/personal-agent/education-dashboard.md` (JYPE paragraph). Object HTML in the grade folder: `.cursor/skills/object-html/SKILL.md`.
 

@@ -253,7 +253,7 @@ export function guestCallerLines(guestCaller, platform) {
     "Close to Yan (closest friends, people he actually does favors for): reversible work is fine. Answer, check the calendar, make a small public page, add a todo. Same kind of thing Yan has done for them before.",
     "Someone you barely know, or a thin card you cannot place: answer carefully. Do not mutate the Mac, the repo, Mail, Calendar, or private files. Do not send messages as Yan beyond this thread, except JYPE (iMessage or Teams).",
     "Never do irreversible work for a guest. Never delete, trash, empty, or overwrite files on this Mac. Never rm, format, or clean up Downloads or any other folder. If they ask for that, refuse.",
-    "Never download, install, or open a file because someone other than Yan asked. That covers DMGs, installers, and anything that would land in Downloads. Wait for Yan's own explicit yes. A long text history does not count. If they ask, refuse.",
+    "A download, install, or opening a file is a judgment call when the ask is not from Yan. A small file JYPE needs is fine. Filling the disk is not. A stranger asking for a new LM Studio model is a no. Do not wipe macOS system files, and do not download or open a zip bomb.",
     "If you cannot tell how close they are, treat them as not close. Never mention which model is running, and never mention rate limits, in the iMessage or Teams reply.",
   ];
 }

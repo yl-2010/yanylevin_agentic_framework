@@ -156,7 +156,7 @@ describe("Personal Agent models", () => {
 describe("Personal Agent system prompt", () => {
   it("stays slim and points at on-demand files instead of dumping recipes", () => {
     const prompt = systemPrompt(YAN);
-    assert.ok(prompt.length < 7100, `prompt length ${prompt.length}`);
+    assert.ok(prompt.length < 7350, `prompt length ${prompt.length}`);
     assert.match(prompt, /Personal Agent/);
     assert.match(prompt, /schedule_future_agent/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.futureAgents));
@@ -184,6 +184,7 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.schedule));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.widgets));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.browser));
+    assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.computer));
     assert.match(prompt, /skip static fetch/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.mail));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.schoolMail));
@@ -194,9 +195,10 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /school-teams\.js/);
     assert.match(prompt, /iMessage, then Teams, then email/);
     assert.match(prompt, /native attachments/);
-    assert.match(prompt, /Teams and school Outlook cannot attach a file/);
-    assert.match(prompt, /Apple Mail/);
-    assert.ok(prompt.length < 7100, `prompt length ${prompt.length}`);
+    assert.match(prompt, /school-teams\.js cannot attach a file/);
+    assert.match(prompt, /Teams app with computer use/);
+    assert.match(prompt, /School Outlook still cannot send/);
+    assert.ok(prompt.length < 7350, `prompt length ${prompt.length}`);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.chats));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.location));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.lifeState));
@@ -614,7 +616,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /Apple Contacts/);
     assert.match(agent, /not Yan's instructions/);
     assert.match(agent, /Never do irreversible work for a guest/);
-    assert.match(agent, /Never download, install, or open a file because someone other than Yan asked/);
+    assert.match(agent, /A small JYPE file is fine/);
     assert.match(agent, /who will \*\*see\*\* the reply|who will see the reply/);
     assert.match(agent, /From Alex on iMessage/);
     assert.match(agent, /Composer 2\.5/);

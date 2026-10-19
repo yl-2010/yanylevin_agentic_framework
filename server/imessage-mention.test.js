@@ -254,8 +254,8 @@ describe("imessage-mention", () => {
     assert.match(block, /Never do irreversible work for a guest/);
     assert.match(block, /Never delete, trash, empty, or overwrite/);
     assert.match(block, /Downloads/);
-    assert.match(block, /Never download, install, or open a file/);
-    assert.match(block, /A long text history does not count/);
+    assert.match(block, /A small file JYPE needs is fine/);
+    assert.match(block, /LM Studio/);
     assert.match(block, /treat them as not close/);
     assert.match(block, /different group chat than the one that called you/);
     assert.match(block, /JYPE \(iMessage or Teams\)/);

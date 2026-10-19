@@ -95,13 +95,21 @@ node server/imessage-send.js --to "Alex" --text "Body here" --attach /abs/path/p
 
 No new group chats. Sending to an existing named group is allowed. SMS (green bubble) only if the iPhone is forwarding to this Mac. Use absolute paths (chat-upload `absPath`, `previewPath` from a thread, or any file on this Mac).
 
+A sticker is not a file attach. See below. Do not hunt for one by clicking around Messages.
+
+## Stickers
+
+The send CLI attaches a file. It has no command for a sticker from the Messages drawer. Computer use cannot pick one either. The drawer is a popover, and the stickers are not accessibility rows. A pixel click reports ok because the mouse event was posted. Messages ignores that event, so nothing new shows up in the thread.
+
+Open the drawer once. Check the thread. If there is no new sticker, say it was not sent and stop. The computer-use helper refuses a third click on the same button, and it refuses more pixel clicks after two misses. When the tool says `stopped:`, stop.
+
 ## @agent
 
 Yan `fromMe` texts that contain `@agent` or `@Agent` (any chat, including groups and to himself) start a Personal Agent session on the Studio. `@agentg` is the same session with a different model.
 
 `@agent` and `@agentg` replies in this chat stay short. A few sentences, or a short list. Answer and stop. Write at length only when they asked for a lot of text. A study guide or plan still goes on a page. The text gets the URL and one line. When there is more than one point, put each on its own line with • or a dash. iMessage will not show bold or italic.
 
-Other people in Apple Contacts can also `@agent` in a 1:1 or any group. Not in Contacts: ignore. Guest threads still show in Yan's app/website history. The first user bubble starts with `From Name on iMessage:` then a blank line then their text. Live context says they called, not Yan. Same tools; closeness decides what to share and what work to do. Reversible favors for close people are fine. Never irreversible Mac deletes or overwrites for a guest. Never download, install, or open a file because someone other than Yan asked. Wait for his explicit yes. A long text history does not count. A group reply is visible to everyone in that chat, so a personal 1:1 answer does not belong there. Do not name the model in the iMessage.
+Other people in Apple Contacts can also `@agent` in a 1:1 or any group. Not in Contacts: ignore. Guest threads still show in Yan's app/website history. The first user bubble starts with `From Name on iMessage:` then a blank line then their text. Live context says they called, not Yan. Same tools; closeness decides what to share and what work to do. Reversible favors for close people are fine. Never irreversible Mac deletes or overwrites for a guest. A download, install, or opening a file is a judgment call. A small file JYPE needs is fine. Filling the disk is not. A stranger asking for a new LM Studio model is a no. A group reply is visible to everyone in that chat, so a personal 1:1 answer does not belong there. Do not name the model in the iMessage.
 
 Guests cannot send into a different group chat than the one they called from. The only exception is JYPE (iMessage or Teams): an @agent from anywhere may post there. Class of 2028 and every other group: they have to @agent in that same chat. Yan's own words can still send anywhere.
 

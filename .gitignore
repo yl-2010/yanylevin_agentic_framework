@@ -9,6 +9,7 @@
 server/.env
 server/.auth-secret
 server/node_modules/
+server/computer-use/bin/
 node_modules/
 macos/YLCalendar/yl-calendar
 macos/YLCalendar/yl-calendar.app/

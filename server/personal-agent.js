@@ -16,6 +16,7 @@ import {
   closeAgentBrowser,
   sessionMayUseBrowser,
 } from "./agent-browser.js";
+import { computerUseCustomTools } from "./computer-use.js";
 import {
   jypeEmailForSlug,
   jypeGivenName,
@@ -1090,6 +1091,7 @@ function sessionCustomTools(sid, session) {
     ...futureAgentTools(sid, session),
     ...openEducationPageTool(sid, session),
     ...(sessionMayUseBrowser(session) ? browserCustomTools(session) : {}),
+    ...computerUseCustomTools(session),
   };
 }
 
@@ -1770,6 +1772,7 @@ export const PERSONAL_SKILL_PATHS = {
   news: ".cursor/skills/daily-news/SKILL.md",
   fitness: ".cursor/skills/fitness-os/SKILL.md",
   browser: ".cursor/skills/personal-browser/SKILL.md",
+  computer: ".cursor/skills/personal-computer/SKILL.md",
   brain: "education/you@example.com/brain/schema.md",
   synthesis: ".cursor/skills/context-synthesis/SKILL.md",
   locationEnrichment: ".cursor/skills/location-enrichment/SKILL.md",
@@ -1824,6 +1827,7 @@ export function systemPrompt(email, opts = {}) {
       `- Public yanylevin.com page: ${PERSONAL_SKILL_PATHS.webpage || ".cursor/skills/yanylevin-webpage-create/SKILL.md"}`,
       `- EPS student IDs / school photos: ${FOUR11_SKILL_PATH}`,
       `- Click-through / login pages (skip static fetch): ${PERSONAL_SKILL_PATHS.browser}`,
+      `- Mac apps, Arc if Chrome fails: ${PERSONAL_SKILL_PATHS.computer}`,
       `- Future agents (schedule a later run): ${PERSONAL_SKILL_PATHS.futureAgents}`,
       `- Celebration site: ${PERSONAL_SKILL_PATHS.celebration}`,
       "File uploads can be stored in the matching JYPE class or project folder.",
@@ -1858,6 +1862,7 @@ export function systemPrompt(email, opts = {}) {
     isJypeAccessEmail(email)
       ? `- Click-through / login pages (skip static fetch): ${PERSONAL_SKILL_PATHS.browser}`
       : "",
+    `- Mac apps, Arc if Chrome fails: ${PERSONAL_SKILL_PATHS.computer}`,
     `- Yan Mail.app search and send: ${PERSONAL_SKILL_PATHS.mail}`,
     `- School Outlook (owner@school.example) via school-mail.js: ${PERSONAL_SKILL_PATHS.schoolMail}`,
     `- School OneNote (on demand only): ${PERSONAL_SKILL_PATHS.schoolOnenote}`,
@@ -1881,7 +1886,7 @@ export function systemPrompt(email, opts = {}) {
     "",
     "Reply: short. School mutations 1-3 lines. Markdown OK in the text bubble; never HTML tags or markdown images. Never em dashes. No thinking aloud. Do not tell the user to refresh. Read the widgets skill before emitting any widget fence. Never put Sent by Yan's Personal Agent in app or website bubbles; that footer is only for iMessage, WhatsApp, email, and Teams.",
     "Math on the website and in the iOS app is a display block, with a blank line before and after. Put $$ on its own line, then LaTeX, then $$ on its own line. Stack equations one per line in that block. Use \\(x\\) or $x^2$ only for a symbol inside a sentence. Never backticks for math. iMessage, WhatsApp, and Teams cannot render KaTeX, so those replies stay plain words.",
-    "Send to a person with no channel named: iMessage, then Teams, then email. Named channel (on Teams / iMessage / email) wins for text. iMessage files are native attachments (iMessage skill), never a URL stand-in. Each file is its own message, then the text. Teams and school Outlook cannot attach a file. A file asked for on Teams goes out from Apple Mail (personal-mail skill). Say you emailed it.",
+    "Send to a person with no channel named: iMessage, then Teams, then email. Named channel (on Teams / iMessage / email) wins for text. iMessage files are native attachments (iMessage skill), never a URL stand-in. Each file is its own message, then the text. school-teams.js cannot attach a file. Send that file in the Teams app with computer use. School Outlook still cannot send.",
     "Long work: send_chat_message first with a short status. Send more mid-run when new info, a change, or a useful update appears. Then a final Done. Quick answers: one reply only (that is the end of turn). On an iMessage, WhatsApp, or Teams @agent or @agentg first turn, that first status is also posted to the chat before you start the work.",
     "To show one education page on web/iOS, call open_education_page (education-dashboard skill). The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Skip if already on that page. Not on Cursor Desktop.",
     "No period when the reply is one word, one phrase, or one sentence.",

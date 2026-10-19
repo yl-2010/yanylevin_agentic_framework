@@ -81,9 +81,10 @@ describe("teams-mention trigger", () => {
     assert.match(block, /Teams HTML/);
     assert.match(block, /Do not add \/\/ Sent by Yan's Personal Agent/);
     assert.match(block, /Do not also school-teams send/);
-    assert.match(block, /Teams cannot attach a file/);
-    assert.match(block, /Apple Mail/);
-    assert.match(block, /School Outlook cannot send/);
+    assert.match(block, /school-teams\.js cannot attach a file/);
+    assert.match(block, /Teams app and attach it with computer use/);
+    assert.match(block, /School Outlook still cannot send/);
+    assert.doesNotMatch(block, /Apple Mail/);
     assert.match(block, /keep that final bubble/);
     assert.match(block, /before you start the work/);
     assert.match(block, /posted to this Teams chat immediately/);
