@@ -63,6 +63,7 @@ Use this order. **Omit a section entirely** when it does not apply that day (do 
      the Shortcut ingest, not `healthAt` and not a health-takeaways skip
      when there are no new dumps.
    - Anything else from logs or notes that Yan must fix before things work again.
+   - An URGENT bullet stays every morning until the failure is gone. Read the last 7 daily briefing todos (`education/you@example.com/todos/<dateKey>-daily-briefing/todo.json`, capsule `agent-recap`). If a bullet was URGENT on one of those mornings and you cannot show it is fixed, put it on today's card. A quiet night is not a fix. One morning that forgot the bullet does not clear it. Rewrite the detail from what you checked this morning. Do not paste the old sentence. School OneNote is the case that dropped off after one day. Signed out, or the 1:00 Canvas sync leaving page links unwritten, stays URGENT until a night lists pages and writes the links.
 
 2. **`Actions:`** (only when the nightly-actions phase did something)
    - Bullet list of sends (iMessage, Mail), calendar writes, education dates/todos/projects, or small repo work Yan directed.

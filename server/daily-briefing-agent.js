@@ -670,6 +670,7 @@ export function buildAgentRecapPrompt({ dateKey, timezone }) {
     "healthShortcut.issues is URGENT. Each issue is a missing or stale iPhone Health Shortcut dump (none in the last 12 hours). Copy the detail. Empty issues means omit. This is the Shortcut POST, not a health-takeaways skip.",
     `Write only ${recap} as JSON:`,
     '{ "id": "agent-recap", "title": "Agent Recap", "category": "other", "noVote": true, "vote": null, "body": "..." }',
+    "An URGENT bullet from the last 7 daily briefing agent recaps stays on today's card until you check and the failure is gone. A quiet night is not a fix. One morning that forgot the bullet does not clear it. Rewrite the detail from this morning. School OneNote signed out, or the 1:00 Canvas sync leaving page links unwritten, stays URGENT until a night lists pages and writes the links.",
     "Body: URGENT section (omit if none), Actions section (omit if none), then general recap prose. No citations.",
     "Cover every scheduled overnight agent except the daily briefing itself.",
   ].join("\n");
@@ -686,7 +687,7 @@ export function buildUnslopPrompt({ dateKey, timezone, force, dueTime }) {
     "Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} (timezone ${timezone}).`,
     `Read and apply the unslop skill (${UNSLOP_SKILL_PATH}). Do not inline the whole skill.`,
-    `Read ${draft} and ${recap}. Unslop news capsule titles and bodies plus the agent recap body.`,
+    `Read ${draft} and ${recap}. Unslop news capsule titles and bodies plus the agent recap body. Do not remove an URGENT bullet. Phase 2 kept it because the failure is still open.`,
     `If ${draft} is missing, do not copy yesterday's todo news. Stop and say the news draft is missing.`,
     `Write education/${BRIEFING_EMAIL}/todos/${dateKey}-daily-briefing/todo.json:`,
     `Title like "August 12th Daily Briefing". kind dailyBriefing. dueDate ${dateKey}, dueTime ${dueTime}. showInDates false. done false. createdAt is now, not a copy of yesterday.`,

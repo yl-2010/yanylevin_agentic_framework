@@ -126,6 +126,9 @@ describe("briefing phase prompts", () => {
     assert.match(prompt, /lifeState\.issues/);
     assert.match(prompt, /healthShortcut\.issues/);
     assert.match(prompt, /URGENT/);
+    assert.match(prompt, /last 7 daily briefing agent recaps stays on today's card until you check/);
+    assert.match(prompt, /A quiet night is not a fix/);
+    assert.match(prompt, /School OneNote signed out/);
     assert.match(prompt, /noVote/);
     assert.match(prompt, /stayed put is expected/);
     assert.match(prompt, /no-new-points/);
@@ -141,6 +144,7 @@ describe("briefing phase prompts", () => {
       dueTime: "07:00",
     });
     assert.match(prompt, /unslop skill/);
+    assert.match(prompt, /Do not remove an URGENT bullet/);
     assert.match(prompt, /news-draft-2026-08-22\.json/);
     assert.match(prompt, /agent-recap-2026-08-22\.json/);
     assert.match(prompt, /agent-recap first/);
