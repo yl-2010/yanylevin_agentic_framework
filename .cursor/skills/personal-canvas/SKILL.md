@@ -158,6 +158,8 @@ No chat file and no text/URL: submit the student file already in that OneDrive f
 
 **Save / put this in / handle / store** (and any file request that does not say submit / turn in / upload to Canvas): identify the todo the same way, rename if needed, store on OneDrive. Stop. Do not call `submit`.
 
+Homework goes on the todo that already exists. A new todo is rare. A scan of an MA or QA he already took goes on that earlier assessment todo, named like the Canvas title with MA or QA kept, and a copy goes in `education/tests/<class>/`. Do not make a new todo due today to hold the scan. Full rules are in the education-dashboard skill, Chat attachments.
+
 ```bash
 node --env-file=server/.env server/canvas-files.js store --src <path> --canvas-id <id>
 # or
@@ -189,15 +191,7 @@ Junk Canvas names get renamed when they land. `image-` plus a uuid, `image-` plu
 
 Tag does not matter. CW, HW, QA, MA, or no tag. If Yan would open that Class Notebook page to do the todo, link it on that todo.
 
-After the Canvas writes, do two passes. Do not run `link-todos`. That command scores titles in code and misses real pages.
-
-```bash
-node server/school-onenote.js status
-node server/school-onenote.js sections --notebook "US History 26-27"
-node server/school-onenote.js pages --notebook "US History 26-27" --section "_Content Library/I. Forming A Nation"
-```
-
-Notebook names are in personal-onenote. Read `_Content Library` and `Yan Levin`. Skip `_Collaboration Space` and other students' sections. Yoga has no notebook. `search` often misses Class Notebooks.
+How to open notebooks, sign in, and read pages is [personal-onenote](../personal-onenote/SKILL.md). Follow that. A signed-out `status` means run `login`, then list sections and pages. Leave existing OneNote sites alone only if login itself fails. Do not run `link-todos`. That command scores titles in code and misses real pages.
 
 Seen page ids live in `education/you@example.com/.canvas/onenote-seen.json`:
 
@@ -205,16 +199,16 @@ Seen page ids live in `education/you@example.com/.canvas/onenote-seen.json`:
 { "pages": { "<pageId>": { "title": "Day 1 problem set", "notebook": "Advanced Calculus 26-27" } } }
 ```
 
-If that file is missing, pass 1 has no new pages. Still run pass 2, then write the file from the pages you listed tonight.
+That file is a memory of pages already considered. If it is missing, nothing has been considered. Pass 1 is not empty. Also look at todos created or due on or after 2026-10-08 that still have no OneNote site. After you write the file, later nights use the normal two passes. Leave a todo alone when no page applies.
 
-Pass 1, new pages. List those two groups in each class notebook. A page id that is not in `onenote-seen.json` is new. For each new page, look at every todo in that class. Any tag, any due date. Link the page on each todo it applies to.
+Pass 1, new pages. A page id that is not in `onenote-seen.json` is new. For each new page, look at every todo in that class. Any tag, any due date. Link the page on each todo it applies to.
 
 Pass 2, todos. Take every todo created tonight, and every todo whose `dueDate` is today through 14 days out in the sync timezone. Done or not. Any tag. For each of those, look through that class notebook for pages that apply, including pages already in `onenote-seen.json`. Link every page that applies.
 
 - Yan's page. `name` is the assignment name. `oneNote` is `personal`.
 - Teacher page. `name` is `Content Library: ` plus the page title. `oneNote` is `content-library`.
 
-Copy `url` from the page `webUrl` (https) and `clientUrl` from the page (`onenote:`). Store `pageId` from the page `id`. The same page can sit on every todo it applies to. Do not cap how many OneNote sites a todo has. Skip a `pageId` already on that todo. Do not remove an existing OneNote site because this pass did not mention it. Keep every site whose `oneNote` is not `personal` or `content-library`. If `status` is signed out, or a notebook fails to load, leave the OneNote sites that are already there and skip both passes. Do not put these URLs in `description`. A path in the description is not the link. When the Canvas description names a Content Library page, that page applies. Spanish writes that as Biblioteca de contenido, then the section, then the page title (`Pruebas / MA #1: ESCRITO - GUÍA DE ESTUDIO`). After both passes, rewrite `onenote-seen.json` from the pages you listed. Hourly Composer does not do this.
+Copy `url` from the page `webUrl` (https) and `clientUrl` from the page (`onenote:`). Store `pageId` from the page `id`. The same page can sit on every todo it applies to. Do not cap how many OneNote sites a todo has. Skip a `pageId` already on that todo. Do not remove an existing OneNote site because this pass did not mention it. Keep every site whose `oneNote` is not `personal` or `content-library`. Do not put these URLs in `description`. A path in the description is not the link. When the Canvas description names a Content Library page, that page applies. Spanish writes that as Biblioteca de contenido, then the section, then the page title (`Pruebas / MA #1: ESCRITO - GUÍA DE ESTUDIO`). After both passes, rewrite `onenote-seen.json` from the pages you listed. Hourly Composer does not do this.
 
 ## Files from another todo
 

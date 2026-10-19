@@ -508,7 +508,12 @@ describe("buildCanvasSyncPrompt", () => {
     assert.match(prompt, /Pass 2:/);
     assert.match(prompt, /14 days out/);
     assert.match(prompt, /onenote-seen\.json/);
+    assert.match(prompt, /personal-onenote/);
+    assert.match(prompt, /signed-out status means run login/);
+    assert.match(prompt, /2026-10-08/);
     assert.equal(/hunt for a todo/.test(prompt), false);
+    assert.equal(/skip both passes/.test(prompt), false);
+    assert.equal(/signed out or a notebook fails/.test(prompt), false);
     assert.match(prompt, /Do not run link-todos/);
     assert.match(prompt, /oneNote content-library/);
     assert.match(prompt, /add linkedFiles on this todo/);
