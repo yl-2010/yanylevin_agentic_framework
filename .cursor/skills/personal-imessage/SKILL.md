@@ -95,14 +95,6 @@ node server/imessage-send.js --to "Alex" --text "Body here" --attach /abs/path/p
 
 No new group chats. Sending to an existing named group is allowed. SMS (green bubble) only if the iPhone is forwarding to this Mac. Use absolute paths (chat-upload `absPath`, `previewPath` from a thread, or any file on this Mac).
 
-A sticker is not a file attach. See below. Do not hunt for one by clicking around Messages.
-
-## Stickers
-
-The send CLI attaches a file. It has no command for a sticker from the Messages drawer. Computer use cannot pick one either. The drawer is a popover, and the stickers are not accessibility rows. A pixel click reports ok because the mouse event was posted. Messages ignores that event, so nothing new shows up in the thread.
-
-Open the drawer once. Check the thread. If there is no new sticker, say it was not sent and stop. The computer-use helper refuses a third click on the same button, and it refuses more pixel clicks after two misses. When the tool says `stopped:`, stop.
-
 ## @agent
 
 Yan `fromMe` texts that contain `@agent` or `@Agent` (any chat, including groups and to himself) start a Personal Agent session on the Studio. `@agentg` is the same session with a different model.

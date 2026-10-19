@@ -351,20 +351,38 @@ func imagePointToCG(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
     return cgPointFromTop(ax: ax)
 }
 
-func postMouse(pid: pid_t, type: CGEventType, point: CGPoint, button: CGMouseButton) {
+func cursorLocation() -> CGPoint {
+    CGEvent(source: nil)?.location ?? .zero
+}
+
+func postMouse(pid: pid_t, type: CGEventType, point: CGPoint, button: CGMouseButton, clickState: Int = 1) {
+    // postToPid never moves the pointer, and hosted views drop those events.
+    // A real pointer event is delivered. The caller puts the pointer back.
+    _ = pid
     let src = CGEventSource(stateID: .hidSystemState)
     guard let event = CGEvent(mouseEventSource: src, mouseType: type, mouseCursorPosition: point, mouseButton: button) else { return }
-    event.postToPid(pid)
+    if type == .leftMouseDown || type == .leftMouseUp || type == .rightMouseDown || type == .rightMouseUp {
+        event.setIntegerValueField(.mouseEventClickState, value: Int64(clickState))
+    }
+    event.post(tap: .cghidEventTap)
 }
 
 func clickPoint(pid: pid_t, point: CGPoint, button: CGMouseButton, count: Int) {
+    let saved = cursorLocation()
     let down: CGEventType = button == .right ? .rightMouseDown : .leftMouseDown
     let up: CGEventType = button == .right ? .rightMouseUp : .leftMouseUp
-    for _ in 0..<max(count, 1) {
-        postMouse(pid: pid, type: down, point: point, button: button)
-        postMouse(pid: pid, type: up, point: point, button: button)
-        usleep(30_000)
+    // Hosted views hit-test the live pointer. A move event before the click
+    // turns the tap into a cancelled drag, so warp, wait, then click.
+    CGWarpMouseCursorPosition(point)
+    usleep(180_000)
+    for clickIndex in 1...max(count, 1) {
+        postMouse(pid: pid, type: down, point: point, button: button, clickState: clickIndex)
+        usleep(80_000)
+        postMouse(pid: pid, type: up, point: point, button: button, clickState: clickIndex)
+        usleep(120_000)
     }
+    usleep(200_000)
+    CGWarpMouseCursorPosition(saved)
 }
 
 func elementCenterCG(_ el: AXUIElement) -> CGPoint? {
@@ -624,6 +642,9 @@ func dragPayload(_ body: [String: Any]) -> [String: Any] {
     let y2 = CGFloat(body["toY"] as? Double ?? y1)
     let start = imagePointToCG(x1, y1)
     let end = imagePointToCG(x2, y2)
+    let saved = cursorLocation()
+    postMouse(pid: pid, type: .mouseMoved, point: start, button: .left)
+    usleep(20_000)
     postMouse(pid: pid, type: .leftMouseDown, point: start, button: .left)
     for step in 1...5 {
         let t = CGFloat(step) / 5
@@ -632,6 +653,8 @@ func dragPayload(_ body: [String: Any]) -> [String: Any] {
         usleep(16_000)
     }
     postMouse(pid: pid, type: .leftMouseUp, point: end, button: .left)
+    usleep(20_000)
+    postMouse(pid: pid, type: .mouseMoved, point: saved, button: .left)
     return ["ok": true]
 }
 

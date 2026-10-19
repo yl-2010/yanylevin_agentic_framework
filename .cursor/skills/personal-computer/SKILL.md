@@ -27,7 +27,7 @@ node server/computer-use.js set 2 --value "hello"
 
 1. `list_apps` if you do not already know the pid.
 2. `get_app_state` before every action. Act on the element number. `set_value` when the line says settable.
-3. Screenshot pixels only when the tree has no control. Origin is the top-left of that image. A pixel click returns ok when the event is posted. Check the next tree before counting that as a hit.
+3. Screenshot pixels only when the tree has no control. Origin is the top-left of that image. A pixel click is a real pointer event, because a view with no accessibility children ignores an event that leaves the pointer where it is. The pointer is put back afterward. Check the next tree before counting that as a hit.
 4. `get_app_state` again. The next result is a diff. An unchanged tree means the click missed. Stop that approach. Do not walk nearby pixels, and do not reopen the same menu.
 
 One app at a time. A second chat waits.
@@ -35,8 +35,6 @@ One app at a time. A second chat waits.
 ## When a click misses
 
 The helper keeps a 10 minute count on this Mac. A third click on the same named control is refused. A pixel click that leaves the tree unchanged counts as a miss. After two misses, further pixel clicks are refused. The error starts with `stopped:`. End the turn and say what failed.
-
-iMessage stickers hit this every time. `+` then Stickers opens a popover. The stickers themselves are not in the tree, so there is no element to press. A pixel click on that drawer still returns a posted event, and Messages ignores it, so chat.db gets no new sticker. Open the drawer once. Check the thread. No new sticker row means say it was not sent and stop. Do not drag a grid of points either.
 
 ## Who
 
