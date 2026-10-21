@@ -27,7 +27,7 @@ node server/computer-use.js set 2 --value "hello"
 
 1. `list_apps` if you do not already know the pid.
 2. `get_app_state` before every action. Act on the element number. `set_value` when the line says settable.
-3. Screenshot pixels only when the tree has no control. Origin is the top-left of that image. A pixel click is a real pointer event, because a view with no accessibility children ignores an event that leaves the pointer where it is. The pointer is put back afterward. Check the next tree before counting that as a hit.
+3. Screenshot pixels only when the tree has no control. Origin is the top-left of that image. A pixel click, a drag, and typing stay in that app. They do not move the real cursor or bring the window forward. Check the next tree before counting a click as a hit.
 4. `get_app_state` again. The next result is a diff. An unchanged tree means the click missed. Stop that approach. Do not walk nearby pixels, and do not reopen the same menu.
 
 One app at a time. A second chat waits.
@@ -52,7 +52,7 @@ Start in the dedicated Chrome from the personal-browser skill. If that page will
 
 OneNote, Teams, Mail, iMessage, Calendar, Home, Canvas, and the other personal skills are the default. Use the command they name.
 
-Computer use is the part that skill cannot do. Teams text still goes through `school-teams.js`. A file on Teams does not, so attach it in the Teams app. OneNote reads stay on `school-onenote.js`. A page that command cannot change gets edited in the OneNote app. Do not open the app first when the skill can finish the job.
+Computer use is the part that skill cannot do. Teams text still goes through `school-teams.js`. A message with `images` has no pixels, so open that chat in the Teams app and look. A file on Teams does not go through the CLI, so attach it in the Teams app. An existing Word, Excel, or PowerPoint file is edited in that app and saved there. A new Office file can be written and then placed in OneDrive. OneNote reads stay on `school-onenote.js`. A page that command cannot change gets edited in the OneNote app. Do not open the app first when the skill can finish the job.
 
 ## Reply
 

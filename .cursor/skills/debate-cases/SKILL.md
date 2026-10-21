@@ -138,15 +138,15 @@ Search order:
 6. Leftover Desktop/Downloads/Documents sweep for stray aff/neg/docx.
    Skip GLR debate-pushups video.
 
-Word on Mac: `textutil -convert txt -stdout "file.docx"`. Pages files are
-iCloud packages, not cases.
+Word on Mac: `textutil -convert txt -stdout "file.docx"`. That is a read.
+Do not save over the Word file. Pages files are iCloud packages, not cases.
 
 ## OneNote
 
 Hayes notebooks list as recent, but they live on her personal OneDrive
 (`/personal/mhayes_eastsideprep_org/`). `school-onenote.js` site resolve
 only handles `/sites/` and `/teams/`, so `sections` may 404. `search` may
-400. If that happens, write from the Word files and say so. Do not invent
+400. If that happens, write the case from the Word text and say so. Do not save over those Word files. Do not invent
 Interventionalism cards from the Nat Quals sentence alone.
 
 ```bash

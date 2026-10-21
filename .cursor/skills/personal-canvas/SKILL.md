@@ -72,7 +72,7 @@ Dashboard schema: `.cursor/skills/personal-agent/education-dashboard.md`.
 
 ## Hourly pass (Composer)
 
-When the runner says hourly: **do not** map new classes, **do not** create class folders, **do not** edit `course-map.json`, **do not** mine syllabi, **do not** fold comments/pages/modules/files. Only create/update todos for snapshot assignments whose `courseId` is already in `course-map.json`. Same Adv Calc HW due shift, Data Science number/stat visual due (2026-10-06 13:50, canvasId 40073385), yoga `hiddenFromHome`, tagging, and deleted.md rules. If nothing changed, stop.
+When the runner says hourly: **do not** map new classes, **do not** create class folders, **do not** edit `course-map.json`, **do not** mine syllabi, **do not** fold comments/pages/modules/files. Only create/update todos for snapshot assignments whose `courseId` is already in `course-map.json`. Same Adv Calc HW due shift, Data Science number/stat visual due (2026-10-06 13:50, canvasId 40073385), American Lit Venn due (2026-10-26 08:30, canvasId 40432088), yoga `hiddenFromHome`, tagging, and deleted.md rules. If nothing changed, stop.
 
 ## Map courses first (nightly / manual only)
 
@@ -103,6 +103,7 @@ For every snapshot assignment whose `courseId` is mapped:
 - Prefer snapshot `dueDate` / `dueTime` (already in the briefing timezone). Undated Canvas rows may omit due fields.
 - **Advanced Calculus HW (Yan, 2026-09-10):** For `advanced-calculus` todos with `tag: "HW"`, do **not** use the Canvas due as the dashboard due. Canvas is typically two period-C meetings after the start day. Set `dueDate` / `dueTime` to the **previous** period-C meeting before Canvas due, at that day's C start from `schedule.json` (`bells` / `dayOverrides`). Match by `canvasId` first so a shifted due still updates the same todo. Do not pull those dues back to Canvas on later syncs. Leave MA / QA / CW on Canvas times. If Canvas due is not on a C meeting, leave Canvas times.
 - **Data Science number/stat visual (Yan, 2026-10-02):** Canvas due for `Bring a number/stat/visual to class at least once` (`canvasId` 40073385) is end of term, 2026-11-18 23:59. Yan signed up to present the next Data Science class. Keep dashboard `dueDate` **2026-10-06** and `dueTime` **13:50** (period A start that day). Match by `canvasId`. Do not pull this due back to Canvas on later syncs.
+- **American Literature Venn (Yan, 2026-10-19):** `canvasId` 40432088. Lunstrum extended it by email. Yan asked to turn the Venn in Monday. Keep dashboard `dueDate` **2026-10-26** and `dueTime` **08:30** (period E start that day). Match by `canvasId`. Do not pull this due back to Canvas 2026-10-20 13:50. If you rewrite the description, keep the extension line.
 - **P.E. Yoga CW (Yan, 2026-09-10):** Routine yoga classworks (prep/participation, titles like `Yoga Class #N`) get `hiddenFromHome: true`. They stay on the yoga class page. Do not hide if the assignment is actually something to submit (survey, write-up, student-led session, anything that is not the usual show-up-and-participate CW). On later syncs, set `hiddenFromHome: true` on those routine CWs when the key is missing. If it is already `false`, leave it (Yan unhid that one). Leave MA / HW / QA on home.
 - **Always** set `canvasLink` to the assignment `htmlUrl`.
 - **Always** set `canvasId` to the Canvas assignment id (number or string).
@@ -156,7 +157,7 @@ node --env-file=server/.env server/canvas-files.js submit --canvas-id <id> --url
 
 No chat file and no text/URL: submit the student file already in that OneDrive folder. Skip `todo.json`, `CONTEXT.md`, and `canvasFiles` (teacher attachments). One leftover student file: submit it. None or two+: ask.
 
-**Save / put this in / handle / store** (and any file request that does not say submit / turn in / upload to Canvas): identify the todo the same way, rename if needed, store on OneDrive. Stop. Do not call `submit`.
+**Save / put this in / handle / store** (and any file request that does not say submit / turn in / upload to Canvas): identify the todo the same way, rename if needed, store on OneDrive. Stop. Do not call `submit`. If the destination is an existing Word, Excel, or PowerPoint file, do not store over it. Edit that file in the Office app with computer use and save from the app. A new Office file can be stored.
 
 Homework goes on the todo that already exists. A new todo is rare. A scan of an MA or QA he already took goes on that earlier assessment todo, named like the Canvas title with MA or QA kept, and a copy goes in `education/tests/<class>/`. Do not make a new todo due today to hold the scan. Full rules are in the education-dashboard skill, Chat attachments.
 
@@ -231,7 +232,7 @@ Teacher files Express downloads after you finish are not on disk yet. Link those
 
 ## Nightly review of hourly Composer
 
-Read `last-hourly-sync.json`. Walk mapped class todos against the **full** snapshot. Fix wrong tags, `HW:` prefixes left on names, Adv Calc HW dues pulled back to Canvas time, yoga CW `hiddenFromHome`, missing `canvasId`/`canvasLink`, duplicates, and course-map drift. Then do the usual full map (new junior-year courses may have appeared). Then fold `comments-new.md` into class/todo `CONTEXT.md` as above.
+Read `last-hourly-sync.json`. Walk mapped class todos against the **full** snapshot. Fix wrong tags, `HW:` prefixes left on names, Adv Calc HW dues pulled back to Canvas time, the American Lit Venn due pulled back to 2026-10-20, yoga CW `hiddenFromHome`, missing `canvasId`/`canvasLink`, duplicates, and course-map drift. Then do the usual full map (new junior-year courses may have appeared). Then fold `comments-new.md` into class/todo `CONTEXT.md` as above.
 
 ## After writes
 

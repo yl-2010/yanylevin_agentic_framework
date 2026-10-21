@@ -549,7 +549,7 @@ export function computerUseCustomTools(session) {
       execute: async ({ app }) => stateContent(await readAppState(app)),
     },
     click: {
-      description: `${note} Click an element number from the last tree, or one screenshot x,y when the tree has no control. Pass pid. A click returns ok when the event is posted. If the next tree is unchanged, stop. The helper refuses a third click on the same control and further pixel clicks after two misses.`,
+      description: `${note} Click an element number from the last tree, or one screenshot x,y when the tree has no control. Pass pid. The click stays in that app. It does not move the real cursor or raise the window. A click returns ok when the event is posted. If the next tree is unchanged, stop. The helper refuses a third click on the same control and further pixel clicks after two misses.`,
       inputSchema: {
         type: "object",
         properties: {
@@ -564,7 +564,7 @@ export function computerUseCustomTools(session) {
       execute: async (input) => toolText(await performComputerUse({ ...input, cmd: "click" })),
     },
     type_text: {
-      description: `${note} Type into the focused control, or the element number you pass. Does not move the real cursor.`,
+      description: `${note} Type into the focused control, or the element number you pass. Typing stays in that app. It does not move the real cursor or raise the window.`,
       inputSchema: {
         type: "object",
         properties: {
@@ -577,7 +577,7 @@ export function computerUseCustomTools(session) {
       execute: async (input) => toolText(await performComputerUse({ ...input, cmd: "type" })),
     },
     press_key: {
-      description: `${note} Press a key in that app. Examples: Return, Escape, cmd+a, Meta+a.`,
+      description: `${note} Press a key in that app. Examples: Return, Escape, cmd+a, Meta+a. The key stays in that app. It does not raise the window.`,
       inputSchema: {
         type: "object",
         properties: {
@@ -602,7 +602,7 @@ export function computerUseCustomTools(session) {
       execute: async (input) => toolText(await performComputerUse({ ...input, cmd: "scroll" })),
     },
     drag: {
-      description: `${note} Drag in screenshot pixels from x,y to toX,toY. Same stop rules as a pixel click. Two misses end it.`,
+      description: `${note} Drag in screenshot pixels from x,y to toX,toY. The drag stays in that app and does not move the real cursor. Same stop rules as a pixel click. Two misses end it.`,
       inputSchema: {
         type: "object",
         properties: {

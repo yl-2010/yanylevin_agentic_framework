@@ -83,6 +83,7 @@ describe("teams-mention trigger", () => {
     assert.match(block, /Do not also school-teams send/);
     assert.match(block, /school-teams\.js cannot attach a file/);
     assert.match(block, /Teams app and attach it with computer use/);
+    assert.match(block, /images field on a message has no pixels/);
     assert.match(block, /School Outlook still cannot send/);
     assert.doesNotMatch(block, /Apple Mail/);
     assert.match(block, /keep that final bubble/);
@@ -104,6 +105,7 @@ describe("teams-mention trigger", () => {
     assert.doesNotMatch(later, /text that should land in that Teams chat/);
     assert.doesNotMatch(later, /when a reply belongs there/);
     assert.match(later, /stays in the app and website only/);
+    assert.match(later, /images field on a message has no pixels/);
     const guest = formatTeamsOriginBlock(origin, {
       deliverFinal: true,
       guestCaller: { displayName: "Alex", slug: "alex-rivera" },

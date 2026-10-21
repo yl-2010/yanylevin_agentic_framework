@@ -22,6 +22,8 @@ var keyToId: [String: Int] = [:]
 var lastPid: pid_t = 0
 var lastScale: CGFloat = 1
 var lastWindowOrigin = CGPoint.zero
+var lastWindowSize = CGSize.zero
+var lastWindowID: CGWindowID = 0
 var lastImageSize = CGSize.zero
 
 func log(_ message: String) {
@@ -320,7 +322,7 @@ func captureWindow(pid: pid_t, title: String) -> (data: Data, size: CGSize, orig
     Task.detached {
         defer { sem.signal() }
         do {
-            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
             let owned = content.windows.filter { $0.owningApplication?.processID == pid }
             let match = owned.first { $0.title == title && !title.isEmpty } ?? owned.first { $0.isOnScreen } ?? owned.first
             guard let window = match else { return }
@@ -333,6 +335,8 @@ func captureWindow(pid: pid_t, title: String) -> (data: Data, size: CGSize, orig
             let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
             let bounds = CGRect(origin: window.frame.origin, size: window.frame.size)
             if let jpeg = jpegData(image, bounds: bounds) {
+                lastWindowID = window.windowID
+                lastWindowSize = window.frame.size
                 shot = (jpeg.data, jpeg.size, bounds.origin)
             }
         } catch {
@@ -351,38 +355,220 @@ func imagePointToCG(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
     return cgPointFromTop(ax: ax)
 }
 
-func cursorLocation() -> CGPoint {
-    CGEvent(source: nil)?.location ?? .zero
+// Per-app input. Events go to one pid through SkyLight. The system pointer
+// and the front window stay where the user left them.
+enum Sky {
+    private typealias PostToPidFn = @convention(c) (pid_t, CGEvent) -> Void
+    private typealias SetAuthFn = @convention(c) (CGEvent, AnyObject) -> Void
+    private typealias SetIntFn = @convention(c) (CGEvent, UInt32, Int64) -> Void
+    private typealias SetWindowLocFn = @convention(c) (CGEvent, CGPoint) -> Void
+    private typealias FactoryFn = @convention(c) (AnyObject, Selector, UnsafeMutableRawPointer, Int32, UInt32) -> AnyObject?
+    private typealias PostRecordFn = @convention(c) (UnsafeRawPointer, UnsafePointer<UInt8>) -> Int32
+    private typealias GetFrontFn = @convention(c) (UnsafeMutableRawPointer) -> Int32
+    private typealias OwnerFn = @convention(c) (UInt32, UInt32, UnsafeMutablePointer<UInt32>) -> Int32
+    private typealias ConnPsnFn = @convention(c) (UInt32, UnsafeMutableRawPointer) -> Int32
+    private typealias CidFn = @convention(c) () -> UInt32
+
+    private static let sky: UnsafeMutableRawPointer? = dlopen(
+        "/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight",
+        RTLD_LAZY
+    )
+
+    private static func sym<T>(_ name: String, as: T.Type) -> T? {
+        _ = sky
+        guard let p = dlsym(UnsafeMutableRawPointer(bitPattern: -2), name) else { return nil }
+        return unsafeBitCast(p, to: T.self)
+    }
+
+    private static let postToPidFn: PostToPidFn? = sym("SLEventPostToPid", as: PostToPidFn.self)
+    private static let setAuthFn: SetAuthFn? = sym("SLEventSetAuthenticationMessage", as: SetAuthFn.self)
+    private static let setIntFn: SetIntFn? = sym("SLEventSetIntegerValueField", as: SetIntFn.self)
+    private static let setWindowLocFn: SetWindowLocFn? = sym("CGEventSetWindowLocation", as: SetWindowLocFn.self)
+    private static let msgSendFn: FactoryFn? = sym("objc_msgSend", as: FactoryFn.self)
+    private static let postRecordFn: PostRecordFn? = sym("SLPSPostEventRecordTo", as: PostRecordFn.self)
+    private static let getFrontFn: GetFrontFn? = sym("_SLPSGetFrontProcess", as: GetFrontFn.self)
+    private static let ownerFn: OwnerFn? = sym("SLSGetWindowOwner", as: OwnerFn.self)
+    private static let connPsnFn: ConnPsnFn? = sym("SLSGetConnectionPSN", as: ConnPsnFn.self)
+    private static let cidFn: CidFn? = sym("CGSMainConnectionID", as: CidFn.self)
+    private static let authClass: AnyClass? = {
+        _ = sky
+        return NSClassFromString("SLSEventAuthenticationMessage")
+    }()
+    private static let authSel = NSSelectorFromString("messageWithEventRecord:pid:version:")
+
+    private static func eventRecord(_ event: CGEvent) -> UnsafeMutableRawPointer? {
+        let base = Unmanaged.passUnretained(event).toOpaque()
+        for offset in [24, 32, 16] {
+            let slot = base.advanced(by: offset).assumingMemoryBound(to: UnsafeMutableRawPointer?.self)
+            if let p = slot.pointee { return p }
+        }
+        return nil
+    }
+
+    static func post(_ pid: pid_t, _ event: CGEvent, auth: Bool) -> Bool {
+        guard let post = postToPidFn else { return false }
+        if auth,
+           let setAuth = setAuthFn,
+           let send = msgSendFn,
+           let cls = authClass,
+           cls.responds(to: authSel),
+           let record = eventRecord(event),
+           let msg = send(cls as AnyObject, authSel, record, pid, 0) {
+            setAuth(event, msg)
+        }
+        post(pid, event)
+        return true
+    }
+
+    static func setWindowLocation(_ event: CGEvent, _ point: CGPoint) {
+        setWindowLocFn?(event, point)
+    }
+
+    static func setField(_ event: CGEvent, _ field: UInt32, _ value: Int64) {
+        setIntFn?(event, field, value)
+    }
+
+    // AppKit-active without a raise. Skip SLPSSetFrontProcessWithOptions.
+    // 0x100 raises the window. 0x400 does not, and Chrome then drops the click.
+    static func focusWithoutRaise(windowID: CGWindowID) -> Bool {
+        guard windowID != 0,
+              let getFront = getFrontFn,
+              let post = postRecordFn,
+              let owner = ownerFn,
+              let psnOf = connPsnFn,
+              let cid = cidFn else { return false }
+        var prev = [UInt32](repeating: 0, count: 2)
+        var target = [UInt32](repeating: 0, count: 2)
+        let prevOk = prev.withUnsafeMutableBytes { raw in
+            getFront(raw.baseAddress!) == 0
+        }
+        guard prevOk else { return false }
+        var ownerCid: UInt32 = 0
+        guard owner(cid(), UInt32(windowID), &ownerCid) == 0 else { return false }
+        let targetOk = target.withUnsafeMutableBytes { raw in
+            psnOf(ownerCid, raw.baseAddress!) == 0
+        }
+        guard targetOk else { return false }
+        var buf = [UInt8](repeating: 0, count: 0xF8)
+        buf[0x04] = 0xF8
+        buf[0x08] = 0x0D
+        let wid = UInt32(windowID)
+        buf[0x3C] = UInt8(wid & 0xFF)
+        buf[0x3D] = UInt8((wid >> 8) & 0xFF)
+        buf[0x3E] = UInt8((wid >> 16) & 0xFF)
+        buf[0x3F] = UInt8((wid >> 24) & 0xFF)
+        func send(_ psn: [UInt32], _ marker: UInt8) -> Bool {
+            var bytes = buf
+            bytes[0x8A] = marker
+            return psn.withUnsafeBytes { raw in
+                bytes.withUnsafeBufferPointer { bp in
+                    post(raw.baseAddress!, bp.baseAddress!) == 0
+                }
+            }
+        }
+        return send(prev, 0x02) && send(target, 0x01)
+    }
 }
 
-func postMouse(pid: pid_t, type: CGEventType, point: CGPoint, button: CGMouseButton, clickState: Int = 1) {
-    // postToPid never moves the pointer, and hosted views drop those events.
-    // A real pointer event is delivered. The caller puts the pointer back.
-    _ = pid
-    let src = CGEventSource(stateID: .hidSystemState)
-    guard let event = CGEvent(mouseEventSource: src, mouseType: type, mouseCursorPosition: point, mouseButton: button) else { return }
-    if type == .leftMouseDown || type == .leftMouseUp || type == .rightMouseDown || type == .rightMouseUp {
-        event.setIntegerValueField(.mouseEventClickState, value: Int64(clickState))
+func screenToWindowLocal(_ point: CGPoint) -> CGPoint {
+    let height = NSScreen.screens.map { $0.frame.maxY }.max() ?? point.y
+    let pre = CGPoint(x: point.x, y: height - point.y)
+    return CGPoint(x: pre.x - lastWindowOrigin.x, y: pre.y - lastWindowOrigin.y)
+}
+
+func deliverMouse(_ pid: pid_t, _ event: CGEvent) {
+    event.timestamp = clock_gettime_nsec_np(CLOCK_UPTIME_RAW)
+    _ = Sky.post(pid, event, auth: false)
+    event.postToPid(pid)
+}
+
+func deliverKey(_ pid: pid_t, _ event: CGEvent) {
+    event.timestamp = clock_gettime_nsec_np(CLOCK_UPTIME_RAW)
+    if !Sky.post(pid, event, auth: true) {
+        event.postToPid(pid)
     }
-    event.post(tap: .cghidEventTap)
+}
+
+func mouseEvent(type: NSEvent.EventType, clickCount: Int, windowID: CGWindowID) -> CGEvent? {
+    NSEvent.mouseEvent(
+        with: type,
+        location: .zero,
+        modifierFlags: [],
+        timestamp: 0,
+        windowNumber: Int(windowID),
+        context: nil,
+        eventNumber: 0,
+        clickCount: clickCount,
+        pressure: 1
+    )?.cgEvent
+}
+
+func stampMouse(_ event: CGEvent, screen: CGPoint, local: CGPoint, windowID: CGWindowID, pid: pid_t, button: Int64, clickState: Int64) {
+    event.location = screen
+    event.setIntegerValueField(.mouseEventButtonNumber, value: button)
+    event.setIntegerValueField(.mouseEventSubtype, value: 3)
+    event.setIntegerValueField(.mouseEventClickState, value: clickState)
+    if windowID != 0 {
+        event.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: Int64(windowID))
+        event.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: Int64(windowID))
+    }
+    Sky.setWindowLocation(event, local)
+    Sky.setField(event, 40, Int64(pid))
 }
 
 func clickPoint(pid: pid_t, point: CGPoint, button: CGMouseButton, count: Int) {
-    let saved = cursorLocation()
-    let down: CGEventType = button == .right ? .rightMouseDown : .leftMouseDown
-    let up: CGEventType = button == .right ? .rightMouseUp : .leftMouseUp
-    // Hosted views hit-test the live pointer. A move event before the click
-    // turns the tap into a cancelled drag, so warp, wait, then click.
-    CGWarpMouseCursorPosition(point)
-    usleep(180_000)
-    for clickIndex in 1...max(count, 1) {
-        postMouse(pid: pid, type: down, point: point, button: button, clickState: clickIndex)
-        usleep(80_000)
-        postMouse(pid: pid, type: up, point: point, button: button, clickState: clickIndex)
-        usleep(120_000)
+    let wid = lastWindowID
+    let local = screenToWindowLocal(point)
+    if wid != 0 {
+        _ = Sky.focusWithoutRaise(windowID: wid)
+        usleep(50_000)
     }
-    usleep(200_000)
-    CGWarpMouseCursorPosition(saved)
+    let pairs = max(1, min(3, count))
+    let buttonNumber: Int64 = button == .right ? 1 : 0
+    let downType: NSEvent.EventType = button == .right ? .rightMouseDown : .leftMouseDown
+    let upType: NSEvent.EventType = button == .right ? .rightMouseUp : .leftMouseUp
+    if button == .left {
+        guard let move = mouseEvent(type: .mouseMoved, clickCount: 0, windowID: wid),
+              let primerDown = mouseEvent(type: .leftMouseDown, clickCount: 1, windowID: wid),
+              let primerUp = mouseEvent(type: .leftMouseUp, clickCount: 1, windowID: wid) else { return }
+        stampMouse(move, screen: point, local: local, windowID: wid, pid: pid, button: 0, clickState: 0)
+        let off = CGPoint(x: -1, y: -1)
+        stampMouse(primerDown, screen: off, local: off, windowID: wid, pid: pid, button: 0, clickState: 1)
+        stampMouse(primerUp, screen: off, local: off, windowID: wid, pid: pid, button: 0, clickState: 1)
+        deliverMouse(pid, move)
+        usleep(15_000)
+        deliverMouse(pid, primerDown)
+        usleep(1_000)
+        deliverMouse(pid, primerUp)
+        usleep(100_000)
+        for index in 1...pairs {
+            guard let down = mouseEvent(type: downType, clickCount: index, windowID: wid),
+                  let up = mouseEvent(type: upType, clickCount: index, windowID: wid) else { return }
+            let state = Int64(index)
+            stampMouse(down, screen: point, local: local, windowID: wid, pid: pid, button: 0, clickState: state)
+            stampMouse(up, screen: point, local: local, windowID: wid, pid: pid, button: 0, clickState: state)
+            deliverMouse(pid, down)
+            usleep(1_000)
+            deliverMouse(pid, up)
+            if index < pairs { usleep(80_000) }
+        }
+        return
+    }
+    guard let move = mouseEvent(type: .mouseMoved, clickCount: 0, windowID: wid) else { return }
+    stampMouse(move, screen: point, local: local, windowID: wid, pid: pid, button: buttonNumber, clickState: 0)
+    deliverMouse(pid, move)
+    usleep(15_000)
+    for index in 1...pairs {
+        guard let down = mouseEvent(type: downType, clickCount: index, windowID: wid),
+              let up = mouseEvent(type: upType, clickCount: index, windowID: wid) else { return }
+        let state = Int64(index)
+        stampMouse(down, screen: point, local: local, windowID: wid, pid: pid, button: buttonNumber, clickState: state)
+        stampMouse(up, screen: point, local: local, windowID: wid, pid: pid, button: buttonNumber, clickState: state)
+        deliverMouse(pid, down)
+        usleep(1_000)
+        deliverMouse(pid, up)
+        if index < pairs { usleep(80_000) }
+    }
 }
 
 func elementCenterCG(_ el: AXUIElement) -> CGPoint? {
@@ -402,30 +588,20 @@ func focusElement(_ el: AXUIElement) {
     AXUIElementSetAttributeValue(el, kAXFocusedAttribute as CFString, kCFBooleanTrue)
 }
 
-func activatePid(_ pid: pid_t) {
-    let ax = AXUIElementCreateApplication(pid)
-    AXUIElementSetAttributeValue(ax, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
-    if let raw = axCopy(ax, kAXFocusedWindowAttribute), CFGetTypeID(raw) == AXUIElementGetTypeID() {
-        AXUIElementPerformAction(raw as! AXUIElement, kAXRaiseAction as CFString)
-    }
-    NSRunningApplication(processIdentifier: pid)?.activate(options: [])
-    usleep(80_000)
-}
-
 func typeUnicode(pid: pid_t, text: String) {
     if text.isEmpty { return }
-    activatePid(pid)
-    let src = CGEventSource(stateID: .hidSystemState)
     let units = Array(text.utf16)
-    guard let down = CGEvent(keyboardEventSource: src, virtualKey: 0, keyDown: true),
-          let up = CGEvent(keyboardEventSource: src, virtualKey: 0, keyDown: false) else { return }
+    guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true),
+          let up = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false) else { return }
     units.withUnsafeBufferPointer { ptr in
         guard let base = ptr.baseAddress else { return }
         down.keyboardSetUnicodeString(stringLength: units.count, unicodeString: base)
         up.keyboardSetUnicodeString(stringLength: units.count, unicodeString: base)
     }
-    down.postToPid(pid)
-    up.postToPid(pid)
+    down.flags = []
+    up.flags = []
+    deliverKey(pid, down)
+    deliverKey(pid, up)
 }
 
 func keyCode(_ name: String) -> CGKeyCode? {
@@ -447,7 +623,6 @@ func keyCode(_ name: String) -> CGKeyCode? {
 func postKey(pid: pid_t, spec: String) {
     let parts = spec.split { $0 == "+" || $0 == "-" }.map { String($0).trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty }
     guard let last = parts.last, let code = keyCode(last == "meta" ? "command" : last) else { return }
-    activatePid(pid)
     var flags = CGEventFlags()
     for part in parts.dropLast() {
         switch part {
@@ -458,13 +633,12 @@ func postKey(pid: pid_t, spec: String) {
         default: break
         }
     }
-    let src = CGEventSource(stateID: .hidSystemState)
-    guard let down = CGEvent(keyboardEventSource: src, virtualKey: code, keyDown: true),
-          let up = CGEvent(keyboardEventSource: src, virtualKey: code, keyDown: false) else { return }
+    guard let down = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true),
+          let up = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: false) else { return }
     down.flags = flags
     up.flags = flags
-    down.postToPid(pid)
-    up.postToPid(pid)
+    deliverKey(pid, down)
+    deliverKey(pid, up)
 }
 
 func jsonInt(_ value: Any?) -> Int? {
@@ -626,7 +800,7 @@ func scrollPayload(_ body: [String: Any]) -> [String: Any] {
         return ["ok": false, "error": "scroll event failed"]
     }
     event.location = point
-    event.postToPid(pid)
+    deliverMouse(pid, event)
     return ["ok": true]
     }
 }
@@ -642,19 +816,26 @@ func dragPayload(_ body: [String: Any]) -> [String: Any] {
     let y2 = CGFloat(body["toY"] as? Double ?? y1)
     let start = imagePointToCG(x1, y1)
     let end = imagePointToCG(x2, y2)
-    let saved = cursorLocation()
-    postMouse(pid: pid, type: .mouseMoved, point: start, button: .left)
-    usleep(20_000)
-    postMouse(pid: pid, type: .leftMouseDown, point: start, button: .left)
+    let wid = lastWindowID
+    if wid != 0 {
+        _ = Sky.focusWithoutRaise(windowID: wid)
+        usleep(50_000)
+    }
+    func postDrag(_ type: NSEvent.EventType, _ screen: CGPoint) {
+        guard let event = mouseEvent(type: type, clickCount: type == .leftMouseDown || type == .leftMouseUp ? 1 : 0, windowID: wid) else { return }
+        stampMouse(event, screen: screen, local: screenToWindowLocal(screen), windowID: wid, pid: pid, button: 0, clickState: type == .mouseMoved ? 0 : 1)
+        deliverMouse(pid, event)
+    }
+    postDrag(.mouseMoved, start)
+    usleep(15_000)
+    postDrag(.leftMouseDown, start)
     for step in 1...5 {
         let t = CGFloat(step) / 5
         let mid = CGPoint(x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t)
-        postMouse(pid: pid, type: .leftMouseDragged, point: mid, button: .left)
+        postDrag(.leftMouseDragged, mid)
         usleep(16_000)
     }
-    postMouse(pid: pid, type: .leftMouseUp, point: end, button: .left)
-    usleep(20_000)
-    postMouse(pid: pid, type: .mouseMoved, point: saved, button: .left)
+    postDrag(.leftMouseUp, end)
     return ["ok": true]
 }
 

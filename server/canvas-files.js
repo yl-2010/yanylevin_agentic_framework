@@ -26,6 +26,18 @@ import { listClassEntriesForRoot } from "./education-data.js";
 import { objectDirId, resolveBookkeepingFile } from "./education-onedrive.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const OFFICE_EDIT_EXTS = new Set([
+  ".doc",
+  ".docx",
+  ".xls",
+  ".xlsx",
+  ".ppt",
+  ".pptx",
+]);
+
+export function officeBytesRefusal(name) {
+  return `${name} already exists. Edit that Word, Excel, or PowerPoint file in the app with computer use. A new file can be stored under a new name.`;
+}
 const SKIP_SUBMIT_NAMES = new Set([
   "todo.json",
   "date.json",
@@ -266,6 +278,18 @@ export async function writeFileIntoFolder(dir, name, srcPath) {
   }
   await mkdir(dir, { recursive: true });
   const dest = join(dir, safe);
+  if (OFFICE_EDIT_EXTS.has(extname(safe).toLowerCase())) {
+    try {
+      const existing = await stat(dest);
+      if (existing.isFile()) {
+        const err = new Error(officeBytesRefusal(safe));
+        err.code = "EXISTING_OFFICE";
+        throw err;
+      }
+    } catch (err) {
+      if (err?.code === "EXISTING_OFFICE") throw err;
+    }
+  }
   const tmp = join(
     tmpdir(),
     `yl-canvas-${process.pid}-${randomBytes(4).toString("hex")}${extname(safe) || ".bin"}`
@@ -648,7 +672,15 @@ export async function storeClassFile(opts) {
     String(opts?.name || "").trim() ||
     displayUploadName(basename(src), todo.props?.name || "");
   const name = basename(wanted);
-  const dest = await writeFileIntoFolder(todo.dir, name, src);
+  let dest;
+  try {
+    dest = await writeFileIntoFolder(todo.dir, name, src);
+  } catch (err) {
+    if (err?.code === "EXISTING_OFFICE") {
+      return { ok: false, reason: "existing-office", error: err.message, name };
+    }
+    throw err;
+  }
   return {
     ok: true,
     path: dest,

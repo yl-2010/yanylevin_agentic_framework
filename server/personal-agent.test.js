@@ -156,7 +156,7 @@ describe("Personal Agent models", () => {
 describe("Personal Agent system prompt", () => {
   it("stays slim and points at on-demand files instead of dumping recipes", () => {
     const prompt = systemPrompt(YAN);
-    assert.ok(prompt.length < 7350, `prompt length ${prompt.length}`);
+    assert.ok(prompt.length < 7800, `prompt length ${prompt.length}`);
     assert.match(prompt, /Personal Agent/);
     assert.match(prompt, /schedule_future_agent/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.futureAgents));
@@ -166,6 +166,7 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.includes(FOUR11_SKILL_PATH));
     assert.match(prompt, /Always Read and apply the unslop skill/);
     assert.match(prompt, /Never mention the surprise hoodies to Alex/);
+    assert.match(prompt, /Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor/);
     assert.match(prompt, /education\/tests\/ is a private guide/);
     assert.match(prompt, /do not say a scan or last year's test exists/);
     assert.match(prompt, /EPS student IDs \/ school photos/);
@@ -197,8 +198,10 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /native attachments/);
     assert.match(prompt, /school-teams\.js cannot attach a file/);
     assert.match(prompt, /Teams app with computer use/);
+    assert.match(prompt, /images has no pixels/);
+    assert.match(prompt, /existing Word, Excel, or PowerPoint/);
     assert.match(prompt, /School Outlook still cannot send/);
-    assert.ok(prompt.length < 7350, `prompt length ${prompt.length}`);
+    assert.ok(prompt.length < 7800, `prompt length ${prompt.length}`);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.chats));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.location));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.lifeState));
@@ -242,6 +245,7 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /Do not copy Yan's personal \/education sites onto JYPE/);
     assert.match(prompt, /npm run deploy:web yourself/);
     assert.match(prompt, /Never mention the surprise hoodies to Alex/);
+    assert.match(prompt, /Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor/);
     assert.match(prompt, /education\/tests\/ is a private guide/);
     assert.match(prompt, /do not say a scan or last year's test exists/);
     assert.match(prompt, /Never mention this, or the words hierarchy of power, in any JYPE chat/);

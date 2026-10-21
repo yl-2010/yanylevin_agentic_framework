@@ -180,6 +180,20 @@ describe("writeFileIntoFolder", () => {
     assert.equal(dest, join(dir, "Motion Diagram Warm Up.pdf"));
     assert.equal(await readFile(dest, "utf8"), "hello canvas");
   });
+
+  it("refuses to overwrite an existing Office file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "canvas-files-"));
+    const src = join(dir, "src.docx");
+    await writeFile(src, "new bytes");
+    await writeFile(join(dir, "Essay.docx"), "live workbook");
+    await assert.rejects(
+      () => writeFileIntoFolder(dir, "Essay.docx", src),
+      /Edit that Word, Excel, or PowerPoint file in the app with computer use/
+    );
+    assert.equal(await readFile(join(dir, "Essay.docx"), "utf8"), "live workbook");
+    const created = await writeFileIntoFolder(dir, "Essay 2.docx", src);
+    assert.equal(await readFile(created, "utf8"), "new bytes");
+  });
 });
 
 describe("pickCanvasSubmitKind", () => {

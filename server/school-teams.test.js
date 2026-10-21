@@ -363,6 +363,22 @@ describe("school-teams urls and shapes", () => {
     assert.equal(row.chat, "Alex");
   });
 
+  it("keeps an image-only Teams message and names a file", () => {
+    const row = normalizeMessage({
+      id: "pic1",
+      messageType: "message",
+      body: { contentType: "html", content: '<p></p><img src="https://teams.example/a.png" alt="">' },
+      attachments: [{ name: "worksheet.pdf", contentType: "reference" }],
+    });
+    assert.equal(row.text, "");
+    assert.equal(row.images, 1);
+    assert.deepEqual(row.files, ["worksheet.pdf"]);
+    assert.equal(shouldSkipTeamsDumpMessage(row), false);
+    const dump = formatDumpMessage({ ...row, at: "2026-05-13T18:00:00.000Z", kind: "chat", chat: "Alex" });
+    assert.match(dump, /images=1/);
+    assert.match(dump, /files=worksheet.pdf/);
+  });
+
   it("drops a quoted parent so a reply does not inherit @agent", () => {
     const html =
       '<blockquote itemscope="" itemtype="http://schema.skype.com/Reply" itemid="1777952706097"><strong itemprop="mri" itemid="8:orgid:x">Connor West</strong><span itemprop="time" itemid="1777952706097"></span><p itemprop="preview">@agent what model are you and in what harness</p></blockquote>\n<p>It’s composer 2.5 running in cursor cli</p>';

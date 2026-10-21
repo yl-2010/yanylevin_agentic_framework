@@ -525,10 +525,36 @@ function normalizeMessageType(raw) {
   return t;
 }
 
+const IMAGE_FILE = /\.(png|jpe?g|gif|webp|heic|bmp|tiff?)$/i;
+
+/** Pictures and files the text CLI drops. images is a count. files are names. */
+export function teamsMedia(raw) {
+  const html = stripTeamsReplyQuoteHtml(String(raw?.body?.content || raw?.content || ""));
+  const imgTags = (html.match(/<img\b/gi) || []).length;
+  const cards = (html.match(/schema\.skype\.com\/[A-Za-z]*Image/gi) || []).length;
+  const attachments = Array.isArray(raw?.attachments) ? raw.attachments : [];
+  let imageAttachments = 0;
+  const files = [];
+  for (const item of attachments) {
+    const name = String(item?.name || item?.content?.name || item?.fileName || "").trim();
+    const type = String(item?.contentType || item?.contenttype || "").toLowerCase();
+    if (type.includes("image") || IMAGE_FILE.test(name)) {
+      imageAttachments += 1;
+      continue;
+    }
+    if (name) files.push(name);
+  }
+  return {
+    images: Math.max(imgTags, cards, imageAttachments),
+    files,
+  };
+}
+
 export function normalizeMessage(raw, extra = {}) {
   const fromUser = raw?.from?.user || {};
   const rawContent = String(raw?.body?.content || raw?.content || "");
   const text = messageText(raw, extra.textMax || DUMP_BODY_MAX);
+  const media = teamsMedia(raw);
   const fromAgent =
     textHasAgentSentFooter(rawContent) || textHasAgentSentFooter(text);
   const fromName = String(
@@ -548,7 +574,7 @@ export function normalizeMessage(raw, extra = {}) {
       raw?.composeTime ||
       ""
   ).trim();
-  return applyDumpClock({
+  const row = applyDumpClock({
     id: String(raw?.id || "").trim(),
     at: isoOrEmpty(at) || at,
     from: fromName,
@@ -564,6 +590,9 @@ export function normalizeMessage(raw, extra = {}) {
     channel: extra.channel || "",
     kind: extra.kind || "chat",
   });
+  if (media.images) row.images = media.images;
+  if (media.files.length) row.files = media.files;
+  return row;
 }
 
 export function defaultDumpDir() {
@@ -596,6 +625,8 @@ export function shouldSkipTeamsDumpMessage(msg, raw = {}) {
   const type = String(msg?.messageType || raw?.messagetype || raw?.type || "");
   if (/^(control|event|threadactivity)\b/i.test(type)) return true;
   if (/^(Control|Event|ThreadActivity)\//.test(type)) return true;
+  if (Number(msg?.images) > 0) return false;
+  if (Array.isArray(msg?.files) && msg.files.length) return false;
   return !String(msg?.text || "").trim();
 }
 
@@ -613,8 +644,11 @@ export function formatDumpMessage(msg) {
   const speaker = msg.speaker || (msg.fromMe ? "Yan" : givenName(msg.from) || "them");
   const local = msg.atLocal ? ` | atLocal=${msg.atLocal}` : "";
   const agent = msg.fromAgent ? " | fromAgent=true" : "";
+  const images = Number(msg.images) > 0 ? ` | images=${Number(msg.images)}` : "";
+  const fileNames = Array.isArray(msg.files) ? msg.files.filter(Boolean) : [];
+  const files = fileNames.length ? ` | files=${fileNames.join(", ")}` : "";
   return [
-    `${msg.at} | kind=${msg.kind || "chat"} | ${where} | speaker=${speaker} | from=${from} | fromMe=${msg.fromMe ? "true" : "false"}${agent}${local}`,
+    `${msg.at} | kind=${msg.kind || "chat"} | ${where} | speaker=${speaker} | from=${from} | fromMe=${msg.fromMe ? "true" : "false"}${agent}${local}${images}${files}`,
     body,
     "",
   ].join("\n");
