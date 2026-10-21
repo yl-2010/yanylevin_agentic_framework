@@ -149,6 +149,25 @@ async function post(body) {
 }
 
 /**
+ * @param {object[]} headers
+ */
+function parentComposerIndex(headers) {
+  /** @type {Map<string, string>} */
+  const map = new Map();
+  for (const row of headers) {
+    const value = asText(row.value);
+    if (!value.includes("subComposerIds")) continue;
+    const meta = parseJson(value);
+    const ids = meta?.subComposerIds;
+    if (!Array.isArray(ids)) continue;
+    for (const id of ids) {
+      if (id) map.set(String(id), String(row.composerId));
+    }
+  }
+  return map;
+}
+
+/**
  * @param {import('node:sqlite').DatabaseSync} db
  * @param {object} state
  * @param {Map<string, string>} folders
@@ -161,8 +180,15 @@ async function scanDesktop(db, state, folders, person) {
     )
     .all();
   const seen = state.composers || {};
+  const parents = parentComposerIndex(headers);
+  const relinked = state.relinkedSubagents || {};
+  const relinkDone = state.subagentRelink === true;
   const pending = headers
-    .filter((row) => Number(row.lastUpdatedAt) > Number(seen[row.composerId] || 0))
+    .filter((row) => {
+      const fresh = Number(row.lastUpdatedAt) > Number(seen[row.composerId] || 0);
+      const relink = !relinkDone && row.isSubagent && !relinked[row.composerId];
+      return fresh || relink;
+    })
     .sort((a, b) => Number(b.lastUpdatedAt) - Number(a.lastUpdatedAt))
     .slice(0, COMPOSERS_PER_TICK);
   if (!pending.length) return 0;
@@ -178,6 +204,7 @@ async function scanDesktop(db, state, folders, person) {
     const gitPath = meta.trackedGitRepos?.[0]?.repoPath || folders.get(header.workspaceId) || "";
     const repo = repoFromPath(gitPath) || "Other";
     const kind = header.isSubagent ? "subagent" : String(meta.unifiedMode || "agent");
+    const parentComposerId = parents.get(String(header.composerId)) || "";
     const prefix = `bubbleId:${header.composerId}:`;
     const bubbles = db
       .prepare(
@@ -221,6 +248,7 @@ async function scanDesktop(db, state, folders, person) {
         windowEnd: next?.at || "",
         repo,
         kind,
+        parentComposerId,
         composerUpdatedAt: Number(header.lastUpdatedAt) || undefined,
       });
     });
@@ -232,6 +260,15 @@ async function scanDesktop(db, state, folders, person) {
     if (!ok) return pending.length;
   }
   state.composers = { ...seen, ...done };
+  if (!relinkDone) {
+    const nextRelinked = { ...relinked };
+    for (const header of pending) {
+      if (header.isSubagent) nextRelinked[header.composerId] = 1;
+    }
+    state.relinkedSubagents = nextRelinked;
+    const still = headers.some((row) => row.isSubagent && !nextRelinked[row.composerId]);
+    if (!still) state.subagentRelink = true;
+  }
   await writeState(state);
   console.log(
     `[usage-collect] desktop ${machine} composers=${Object.keys(done).length} prompts=${prompts.length}`

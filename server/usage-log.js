@@ -112,6 +112,19 @@ export function emptyTokens() {
  * @param {ReturnType<typeof emptyTokens>} a
  * @param {ReturnType<typeof emptyTokens>} b
  */
+function addTokensKeepBlank(a, b) {
+  const sum = (x, y) => (x == null && y == null ? null : (Number(x) || 0) + (Number(y) || 0));
+  const left = a || emptyTokens();
+  const right = b || emptyTokens();
+  return {
+    input: (left.input || 0) + (right.input || 0),
+    output: (left.output || 0) + (right.output || 0),
+    cacheRead: sum(left.cacheRead, right.cacheRead),
+    cacheWrite: sum(left.cacheWrite, right.cacheWrite),
+    reasoning: (left.reasoning || 0) + (right.reasoning || 0),
+  };
+}
+
 export function addTokens(a, b) {
   return {
     input: a.input + b.input,
@@ -306,6 +319,7 @@ export async function ingestUsageBatch(body) {
       prompt: clip(raw.prompt || "", PROMPT_STORE_MAX),
       threadId: composerId,
       composerId,
+      parentComposerId: clip(raw.parentComposerId || "", 80),
       bubbleId,
       machine,
       usageUuids: stringList(raw.usageUuids).slice(0, 80),
@@ -336,14 +350,23 @@ export async function ingestUsageBatch(body) {
 
   let wrote = 0;
   await enqueue(async () => {
-    const existing = new Set((await readRows(USAGE_ROWS_PATH)).map((r) => `${r.id}\0${tokenSum(r.tokens)}`));
+    const existing = new Map();
+    for (const prior of await readRows(USAGE_ROWS_PATH)) {
+      if (prior?.id) existing.set(prior.id, prior);
+    }
     await mkdir(USAGE_DIR, { recursive: true });
     /** @type {string[]} */
     const lines = [];
     for (const row of rows) {
-      const key = `${row.id}\0${tokenSum(row.tokens)}`;
-      if (existing.has(key)) continue;
-      existing.add(key);
+      const prior = existing.get(row.id);
+      if (
+        prior &&
+        tokenSum(prior.tokens) === tokenSum(row.tokens) &&
+        String(prior.parentComposerId || "") === String(row.parentComposerId || "")
+      ) {
+        continue;
+      }
+      existing.set(row.id, row);
       lines.push(JSON.stringify(row));
       wrote += 1;
     }
@@ -419,6 +442,9 @@ export function buildClumps(rows) {
     for (const bill of matched) explained.add(bill.id);
     clumps.push(toClump(prompt, matched));
   }
+  const folded = foldSubagents(clumps);
+  clumps.length = 0;
+  clumps.push(...folded);
   for (const bill of billing) {
     if (explained.has(bill.id)) continue;
     clumps.push(billingOnlyClump(bill));
@@ -581,6 +607,7 @@ function toClump(prompt, matched) {
     modelConfig: prompt.modelConfig || null,
     prompt: prompt.prompt || "",
     threadId: prompt.threadId || prompt.composerId || "",
+    parentComposerId: prompt.parentComposerId || "",
     machine: prompt.machine || "",
     tokens,
     calls,
@@ -590,6 +617,51 @@ function toClump(prompt, matched) {
 /**
  * @param {object} bill
  */
+function foldSubagents(clumps) {
+  /** @type {Map<string, object[]>} */
+  const parents = new Map();
+  for (const row of clumps) {
+    if (row.kind === "subagent" || !row.threadId) continue;
+    const list = parents.get(row.threadId) || [];
+    list.push(row);
+    parents.set(row.threadId, list);
+  }
+  /** @type {object[]} */
+  const kept = [];
+  for (const row of clumps) {
+    if (row.kind !== "subagent" || !row.parentComposerId) {
+      kept.push(row);
+      continue;
+    }
+    const list = parents.get(row.parentComposerId) || [];
+    const parent = pickParentPrompt(list, row);
+    if (!parent) {
+      kept.push(row);
+      continue;
+    }
+    parent.tokens = addTokensKeepBlank(parent.tokens, row.tokens);
+    parent.calls = [...(parent.calls || []), ...(row.calls || [])];
+  }
+  return kept;
+}
+
+/**
+ * @param {object[]} parents
+ * @param {object} child
+ */
+function pickParentPrompt(parents, child) {
+  const t = Date.parse(child.at);
+  let best = null;
+  for (const parent of parents) {
+    const pt = Date.parse(parent.at);
+    if (Number.isNaN(pt)) continue;
+    if (Number.isNaN(t) || pt <= t) {
+      if (!best || Date.parse(best.at) < pt) best = parent;
+    }
+  }
+  return best || parents[0] || null;
+}
+
 function billingOnlyClump(bill) {
   const tokens = tokensFromUsage(bill.tokens);
   return {

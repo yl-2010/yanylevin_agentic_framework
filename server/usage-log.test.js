@@ -80,6 +80,45 @@ describe("usage clumps", () => {
     assert.equal(summary.totals.input, 50);
     assert.equal(summary.byPerson[0].name, "Yan");
   });
+
+  it("rolls a linked subagent into the parent prompt", () => {
+    const clumps = buildClumps([
+      desktop("a", 0, "2026-10-20T18:00:00.000Z"),
+      {
+        ...desktop("child", 0, "2026-10-20T18:01:00.000Z"),
+        id: "desk:studio:child:c",
+        composerId: "child",
+        threadId: "child",
+        kind: "subagent",
+        parentComposerId: "comp",
+        prompt: "hidden",
+        tokens: tokensFromUsage({ inputTokens: 1, outputTokens: 1 }),
+        usageUuids: ["sub"],
+      },
+      {
+        id: "bill:sub",
+        source: "billing",
+        at: "2026-10-20T18:01:00.000Z",
+        usageEventId: "sub",
+        conversationId: "child",
+        model: "grok-4.7-high",
+        tokens: tokensFromUsage({ inputTokens: 7, outputTokens: 3, cacheReadTokens: 4, cacheWriteTokens: 1 }),
+      },
+      {
+        ...desktop("orphan", 0, "2026-10-20T18:02:00.000Z"),
+        id: "desk:studio:orphan:o",
+        composerId: "orphan",
+        threadId: "orphan",
+        kind: "subagent",
+        prompt: "still here",
+      },
+    ]);
+    assert.equal(clumps.some((row) => row.id.endsWith(":c")), false);
+    const parent = clumps.find((row) => row.id.endsWith(":a"));
+    assert.equal(parent.tokens.input, 8);
+    assert.equal(parent.tokens.cacheRead, 4);
+    assert.equal(clumps.some((row) => row.prompt === "still here"), true);
+  });
 });
 
 function desktop(bubbleId, index, at) {
