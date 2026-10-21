@@ -23,6 +23,7 @@ const WORKSPACE_ROOT = join(
 );
 const BILLING_URL = "https://api2.cursor.sh/aiserver.v1.DashboardService/GetFilteredUsageEvents";
 const USAGE_URL = "https://api2.cursor.sh/auth/usage";
+const PLAN_URL = "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage";
 const BACKFILL_MS = 45 * 24 * 60 * 60 * 1000;
 const COMPOSERS_PER_TICK = 25;
 
@@ -312,6 +313,7 @@ async function pullBilling(state, person, db) {
   } catch (err) {
     console.error("[usage-collect] period", err instanceof Error ? err.message : err);
   }
+  const plan = await pullPlan(headers);
 
   if (!state.billingBackfillDone) {
     const page = Number(state.billingPage) || 1;
@@ -324,7 +326,7 @@ async function pullBilling(state, person, db) {
       return;
     }
     const rows = evs.map(billingRow).filter(Boolean);
-    const ok = await post({ machine: machineName(), person, billing: rows, periodStart });
+    const ok = await post({ machine: machineName(), person, billing: rows, periodStart, plan });
     if (!ok) return;
     const newest = rows.reduce((max, row) => Math.max(max, Number(row.timestamp) || 0), state.billingUntil || 0);
     state.billingUntil = newest;
@@ -359,10 +361,10 @@ async function pullBilling(state, person, db) {
     if (older === evs.length) break;
   }
   if (!fresh.length) {
-    if (periodStart) await post({ machine: machineName(), person, billing: [], periodStart });
+    if (periodStart || plan) await post({ machine: machineName(), person, billing: [], periodStart, plan });
     return;
   }
-  const ok = await post({ machine: machineName(), person, billing: fresh, periodStart });
+  const ok = await post({ machine: machineName(), person, billing: fresh, periodStart, plan });
   if (!ok) return;
   state.billingUntil = fresh.reduce(
     (max, row) => Math.max(max, Number(row.timestamp) || 0),
@@ -370,6 +372,28 @@ async function pullBilling(state, person, db) {
   );
   await writeState(state);
   console.log(`[usage-collect] billing new=${fresh.length}`);
+}
+
+async function pullPlan(headers) {
+  try {
+    const res = await fetch(PLAN_URL, { method: "POST", headers, body: "{}" });
+    if (!res.ok) return null;
+    const body = await res.json();
+    const usage = body.planUsage || {};
+    if (!Number.isFinite(Number(usage.totalPercentUsed)) || !Number(usage.totalSpend)) return null;
+    return {
+      totalPercentUsed: usage.totalPercentUsed,
+      apiPercentUsed: usage.apiPercentUsed,
+      autoPercentUsed: usage.autoPercentUsed,
+      totalSpend: usage.totalSpend,
+      limit: usage.limit,
+      cycleStart: body.billingCycleStart,
+      cycleEnd: body.billingCycleEnd,
+    };
+  } catch (err) {
+    console.error("[usage-collect] plan", err instanceof Error ? err.message : err);
+    return null;
+  }
 }
 
 async function billingPage(headers, start, end, page) {

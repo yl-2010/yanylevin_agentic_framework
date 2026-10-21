@@ -47,6 +47,7 @@ describe("usage clumps", () => {
         conversationId: "laptop",
         model: "composer-2.5",
         tokens: tokensFromUsage({ inputTokens: 50, outputTokens: 10, cacheReadTokens: 3 }),
+        chargedCents: 12.5,
       },
     ]);
     assert.equal(clumps.length, 2);
@@ -59,6 +60,8 @@ describe("usage clumps", () => {
     assert.equal(other.repo, "Other");
     assert.equal(other.prompt, "");
     assert.equal(other.tokens.input, 50);
+    assert.equal(other.chargedCents, 12.5);
+    assert.equal(summarizeClumps(clumps).cents, 12.5);
   });
 
   it("splits one desktop thread across prompts and can filter", () => {

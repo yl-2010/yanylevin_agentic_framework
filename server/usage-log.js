@@ -371,18 +371,18 @@ export async function ingestUsageBatch(body) {
       wrote += 1;
     }
     if (lines.length) await appendFile(USAGE_ROWS_PATH, `${lines.join("\n")}\n`, "utf8");
-    if (body?.periodStart) {
-      const periodStart = isoOrEmpty(body.periodStart);
-      if (periodStart) {
-        let meta = {};
-        try {
-          meta = JSON.parse(await readFile(USAGE_META_PATH, "utf8"));
-        } catch {
-          meta = {};
-        }
-        meta.periodStart = periodStart;
-        await writeFile(USAGE_META_PATH, `${JSON.stringify(meta)}\n`, "utf8");
+    if (body?.periodStart || body?.plan) {
+      let meta = {};
+      try {
+        meta = JSON.parse(await readFile(USAGE_META_PATH, "utf8"));
+      } catch {
+        meta = {};
       }
+      const periodStart = isoOrEmpty(body.periodStart);
+      if (periodStart) meta.periodStart = periodStart;
+      const plan = planFromBody(body.plan);
+      if (plan) meta.plan = plan;
+      if (periodStart || plan) await writeFile(USAGE_META_PATH, `${JSON.stringify(meta)}\n`, "utf8");
     }
   });
   return { ok: true, wrote };
@@ -574,12 +574,14 @@ function modelFamily(model) {
  */
 function toClump(prompt, matched) {
   let tokens = emptyTokens();
+  let chargedCents = 0;
   /** @type {object[]} */
   const calls = [];
   if (matched.length) {
     for (const bill of matched) {
       const part = tokensFromUsage(bill.tokens);
       tokens = addTokens(tokens, part);
+      chargedCents += num(bill.chargedCents);
       calls.push({
         at: bill.at,
         model: bill.model || prompt.model || "",
@@ -610,6 +612,7 @@ function toClump(prompt, matched) {
     parentComposerId: prompt.parentComposerId || "",
     machine: prompt.machine || "",
     tokens,
+    chargedCents,
     calls,
   };
 }
@@ -640,6 +643,7 @@ function foldSubagents(clumps) {
       continue;
     }
     parent.tokens = addTokensKeepBlank(parent.tokens, row.tokens);
+    parent.chargedCents = num(parent.chargedCents) + num(row.chargedCents);
     parent.calls = [...(parent.calls || []), ...(row.calls || [])];
   }
   return kept;
@@ -677,6 +681,7 @@ function billingOnlyClump(bill) {
     threadId: bill.conversationId || "",
     machine: "",
     tokens,
+    chargedCents: num(bill.chargedCents),
     calls: [
       {
         at: bill.at,
@@ -732,29 +737,34 @@ export function filterClumps(clumps, query) {
  */
 export function summarizeClumps(clumps) {
   let totals = emptyTokens();
-  /** @type {Map<string, ReturnType<typeof emptyTokens>>} */
+  let cents = 0;
+  /** @type {Map<string, { tokens: ReturnType<typeof emptyTokens>, cents: number }>} */
   const byPerson = new Map();
-  /** @type {Map<string, ReturnType<typeof emptyTokens>>} */
+  /** @type {Map<string, { tokens: ReturnType<typeof emptyTokens>, cents: number }>} */
   const byModel = new Map();
-  /** @type {Map<string, ReturnType<typeof emptyTokens>>} */
+  /** @type {Map<string, { tokens: ReturnType<typeof emptyTokens>, cents: number }>} */
   const byRepo = new Map();
-  /** @type {Map<string, ReturnType<typeof emptyTokens>>} */
+  /** @type {Map<string, { tokens: ReturnType<typeof emptyTokens>, cents: number }>} */
   const byKind = new Map();
-  /** @type {Map<string, Map<string, number>>} */
+  /** @type {Map<string, Map<string, { total: number, cents: number }>>} */
   const byDay = new Map();
 
   for (const row of clumps) {
     const tokens = tokensFromUsage(row.tokens);
+    const rowCents = num(row.chargedCents);
     totals = addTokens(totals, tokens);
-    addMap(byPerson, row.person || "Other", tokens);
-    addMap(byModel, row.model || "unknown", tokens);
-    addMap(byRepo, row.repo || "Other", tokens);
-    addMap(byKind, row.kind || "other", tokens);
+    cents += rowCents;
+    addMap(byPerson, row.person || "Other", tokens, rowCents);
+    addMap(byModel, row.model || "unknown", tokens, rowCents);
+    addMap(byRepo, row.repo || "Other", tokens, rowCents);
+    addMap(byKind, row.kind || "other", tokens, rowCents);
     const day = pacificDay(row.at);
     if (!day) continue;
     const weight = tokenSum(tokens);
     const people = byDay.get(day) || new Map();
-    people.set(row.person || "Other", (people.get(row.person || "Other") || 0) + weight);
+    const person = row.person || "Other";
+    const prev = people.get(person) || { total: 0, cents: 0 };
+    people.set(person, { total: prev.total + weight, cents: prev.cents + rowCents });
     byDay.set(day, people);
   }
 
@@ -762,6 +772,7 @@ export function summarizeClumps(clumps) {
   return {
     totals,
     total: tokenSum(totals),
+    cents,
     byPerson: barsFrom(byPerson, grand),
     byModel: barsFrom(byModel, grand),
     byRepo: barsFrom(byRepo, grand),
@@ -771,38 +782,69 @@ export function summarizeClumps(clumps) {
       .map(([date, people]) => ({
         date,
         people: [...people.entries()]
-          .map(([name, total]) => ({ name, total }))
+          .map(([name, bucket]) => ({ name, total: bucket.total, cents: bucket.cents }))
           .sort((a, b) => b.total - a.total),
       })),
   };
 }
 
 /**
- * @param {Map<string, ReturnType<typeof emptyTokens>>} map
+ * @param {Map<string, { tokens: ReturnType<typeof emptyTokens>, cents: number }>} map
  * @param {string} key
  * @param {ReturnType<typeof emptyTokens>} tokens
+ * @param {number} cents
  */
-function addMap(map, key, tokens) {
-  map.set(key, addTokens(map.get(key) || emptyTokens(), tokens));
+function addMap(map, key, tokens, cents) {
+  const prev = map.get(key) || { tokens: emptyTokens(), cents: 0 };
+  map.set(key, { tokens: addTokens(prev.tokens, tokens), cents: prev.cents + cents });
 }
 
 /**
- * @param {Map<string, ReturnType<typeof emptyTokens>>} map
+ * @param {Map<string, { tokens: ReturnType<typeof emptyTokens>, cents: number }>} map
  * @param {number} grand
  */
 function barsFrom(map, grand) {
   return [...map.entries()]
-    .map(([name, tokens]) => {
-      const total = tokenSum(tokens);
+    .map(([name, bucket]) => {
+      const total = tokenSum(bucket.tokens);
       return {
         name,
         total,
-        tokens,
+        cents: bucket.cents,
         share: total / grand,
       };
     })
-    .filter((row) => row.total > 0)
+    .filter((row) => row.total > 0 || row.cents > 0)
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+}
+
+/**
+ * @param {unknown} raw
+ */
+function planFromBody(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const plan = /** @type {Record<string, unknown>} */ (raw);
+  const totalSpend = num(plan.totalSpend);
+  const totalPercentUsed = Number(plan.totalPercentUsed);
+  if (!totalSpend || !Number.isFinite(totalPercentUsed)) return null;
+  return {
+    totalPercentUsed,
+    apiPercentUsed: Number(plan.apiPercentUsed) || 0,
+    autoPercentUsed: Number(plan.autoPercentUsed) || 0,
+    totalSpend,
+    limit: num(plan.limit),
+    cycleStart: isoOrEmpty(plan.cycleStart),
+    cycleEnd: isoOrEmpty(plan.cycleEnd),
+  };
+}
+
+async function readPlan() {
+  try {
+    const meta = JSON.parse(await readFile(USAGE_META_PATH, "utf8"));
+    return planFromBody(meta.plan);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -842,6 +884,7 @@ export async function usageReport(query) {
     to: bounds.to,
   });
   const summary = summarizeClumps(clumps);
+  summary.plan = await readPlan();
   const group = String(query.group || "");
   const offset = Math.max(0, Number(query.offset) || 0);
   const limit = Math.min(200, Math.max(1, Number(query.limit) || 40));
@@ -862,12 +905,14 @@ export async function usageReport(query) {
           at: row.at,
           count: 1,
           tokens: tokensFromUsage(row.tokens),
+          chargedCents: num(row.chargedCents),
           preview: clip(row.prompt, 180),
         });
         continue;
       }
       prev.count += 1;
       prev.tokens = addTokens(prev.tokens, tokensFromUsage(row.tokens));
+      prev.chargedCents = num(prev.chargedCents) + num(row.chargedCents);
       if (Date.parse(row.at) > Date.parse(prev.at)) {
         prev.at = row.at;
         prev.model = row.model || prev.model;
@@ -911,6 +956,7 @@ function publicClump(row) {
     prompt: prompt.slice(0, PROMPT_API_MAX),
     promptTruncated: prompt.length > PROMPT_API_MAX,
     tokens: publicTokens(row.tokens),
+    chargedCents: num(row.chargedCents),
     calls: Array.isArray(row.calls) ? row.calls : [],
   };
 }
@@ -935,6 +981,7 @@ function publicThread(row) {
     at: row.at,
     count: row.count,
     tokens: publicTokens(row.tokens),
+    chargedCents: num(row.chargedCents),
     preview: row.preview,
   };
 }

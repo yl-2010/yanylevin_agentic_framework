@@ -358,12 +358,13 @@
       el.classList.contains("yan-chat-widget") ||
       el.classList.contains("yan-chat-map-ios") ||
       el.classList.contains("yan-chat-bubble") ||
-      el.classList.contains("sheet")
+      el.classList.contains("sheet") ||
+      el.classList.contains("glass-pill")
     );
   }
 
   const STATIC_BOX_SEL =
-    ".edu-panel.lg-static, .edu-file-tile.lg-static, .dash-login.lg-static, .dash-entry.lg-static, .dash-agent.lg-static, .yan-chat-widget.lg-static, .yan-chat-map-ios.lg-static, .yan-chat-bubble.lg-static, .sheet.lg-static";
+    ".edu-panel.lg-static, .edu-file-tile.lg-static, .dash-login.lg-static, .dash-entry.lg-static, .dash-agent.lg-static, .yan-chat-widget.lg-static, .yan-chat-map-ios.lg-static, .yan-chat-bubble.lg-static, .sheet.lg-static, .glass-pill.lg-static";
 
   const STATIC_BOX_MAG_SCALE = 0.6;
 
