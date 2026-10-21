@@ -18,6 +18,7 @@
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { kindFromPrefix, logSdkResult } from "./usage-log.js";
 
 const DEFAULT_ENV_PATH = join(dirname(fileURLToPath(import.meta.url)), ".env");
 
@@ -575,6 +576,7 @@ export async function runWithModelFallback({
  * @param {number[]} [opts.fallbackDelaysMs]
  * @param {number[]} [opts.laterDelaysMs]
  * @param {(apiKey: string, model?: { id: string, params?: { id: string, value: string }[] }) => Promise<any>} [opts.promptFn]
+ * @param {false|{ person?: string, kind?: string, threadId?: string, prompt?: string }} [opts.usage]
  * @returns {Promise<{
  *   result: any,
  *   authFailed: boolean,
@@ -596,7 +598,9 @@ export async function promptWithAuthRetry({
   fallbackDelaysMs,
   laterDelaysMs,
   promptFn,
+  usage,
 }) {
+  const startedAt = new Date().toISOString();
   const preferred = model || AUTO_MODEL_SELECTION;
   const preferredDelays = delaysMs ?? scheduledPreferredDelaysMs(preferred);
   const fbModel =
@@ -628,23 +632,43 @@ export async function promptWithAuthRetry({
   }
 
   beginScheduledCursorWork();
-  return runWithModelFallback({
-    prefix,
-    preferredModel: preferred,
-    delaysMs: preferredDelays,
-    fallbackModel: fbModel,
-    fallbackDelaysMs: fbDelays,
-    laterDelaysMs: laterDelaysMs ?? CAPACITY_LATER_RETRY_MS,
-    onBeforeAttempt: async ({ recreate }) => {
-      if (recreate) {
-        await evictLocalCursorExecutor({ skipIfScheduledAtLeast: 2 });
+  try {
+    const outcome = await runWithModelFallback({
+      prefix,
+      preferredModel: preferred,
+      delaysMs: preferredDelays,
+      fallbackModel: fbModel,
+      fallbackDelaysMs: fbDelays,
+      laterDelaysMs: laterDelaysMs ?? CAPACITY_LATER_RETRY_MS,
+      onBeforeAttempt: async ({ recreate }) => {
+        if (recreate) {
+          await evictLocalCursorExecutor({ skipIfScheduledAtLeast: 2 });
+        }
+      },
+      run: async (currentModel) =>
+        runPrompt(requireCursorApiKey(), currentModel),
+    });
+    if (usage !== false && prefix !== "test") {
+      try {
+        const note = usage && typeof usage === "object" ? usage : {};
+        await logSdkResult({
+          person: note.person || "Yan",
+          kind: note.kind || kindFromPrefix(prefix),
+          threadId: note.threadId || "",
+          prompt: note.prompt != null ? note.prompt : prompt,
+          model: outcome.model,
+          result: outcome.aborted ? null : outcome.result,
+          startedAt,
+          repo: "yanylevin-agents",
+        });
+      } catch (err) {
+        console.error("[usage] sdk log failed", err);
       }
-    },
-    run: async (currentModel) =>
-      runPrompt(requireCursorApiKey(), currentModel),
-  }).finally(() => {
+    }
+    return outcome;
+  } finally {
     endScheduledCursorWork();
-  });
+  }
 }
 
 /**

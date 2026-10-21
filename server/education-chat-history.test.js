@@ -98,7 +98,7 @@ describe("chat title starter", () => {
     assert.equal(
       applyChatTitleStarter("caber hard verb", {
         workspace: "jype",
-        email: "everettedeng@gmail.com",
+        email: "neighbor@example.com",
       }),
       "Example Neighbor: caber hard verb"
     );

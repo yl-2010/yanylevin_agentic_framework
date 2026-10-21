@@ -26,6 +26,7 @@ curl -sS https://api.yanylevin.com/health
 | `com.personalagent.server` | Yan Levin Express `:3004` (`node --env-file=.env index.js`) |
 | `com.personalagent.cloudflared` | Tunnel → `api.yanylevin.com` |
 | `com.personalagent.education-sync` | Auto push/pull education + fitness folders, JYPE workspace, `tmp/`; optional OneDrive relaunch |
+| `com.yanylevin.cursor-usage` | Read this Mac's Cursor chats and post them to `/api/usage/ingest`. Studio also pulls the billing feed. Person is Yan unless `data/usage/machine.json` says otherwise |
 
 Plists live in `~/Library/LaunchAgents/`.
 
@@ -51,6 +52,16 @@ bash $HOME/yanylevin_agentic_framework/deploy/launchagents/install-education-syn
 ```
 
 Logs: `/tmp/yanylevin-education-sync.log`. Those user-data commits never deploy the site. Git auto-deploy is off. Agents run `npm run deploy:web` for homepage, `/education` `/fitness` `/dashboard` UI, and `api/`, not for `education/<email>/` or `education/projects/jype/` sync.
+
+### Cursor usage collector (Mac Studio + MacBook)
+
+Reads Cursor's local chat database and posts prompts to the Studio API. The Studio copy also pulls token totals from Cursor's billing feed. Logs stay in `data/usage/` on the Studio and are not committed.
+
+```bash
+bash $HOME/yanylevin_agentic_framework/deploy/launchagents/install-cursor-usage.sh
+```
+
+`USAGE_INGEST_TOKEN` lives in `server/.env` on both Macs (same value). The MacBook posts to `https://api.yanylevin.com`. Person is Yan. A one-line `data/usage/machine.json` (`{"person":"Yan"}`) overrides that. Logs: `/tmp/yanylevin-cursor-usage.log`.
 
 ---
 

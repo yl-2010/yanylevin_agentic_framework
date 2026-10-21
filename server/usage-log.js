@@ -1,0 +1,868 @@
+/**
+ * Cursor usage clumps. One user prompt is one row.
+ * Billing events that never join a prompt stay person Other, repo Other.
+ * Files stay on the Mac under data/usage/. Gitignored.
+ */
+
+import { timingSafeEqual, randomUUID } from "node:crypto";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { canonicalizeEmail } from "./identity.js";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+export const USAGE_DIR = join(ROOT, "data", "usage");
+export const USAGE_ROWS_PATH = join(USAGE_DIR, "rows.jsonl");
+export const USAGE_META_PATH = join(USAGE_DIR, "meta.json");
+
+const PROMPT_STORE_MAX = 80_000;
+const PROMPT_API_MAX = 8_000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** @type {Promise<void>} */
+let writeChain = Promise.resolve();
+
+/**
+ * @param {string|null|undefined} email
+ */
+export function personFromEmail(email) {
+  const canonical = canonicalizeEmail(email);
+  if (!canonical) return "Yan";
+  if (canonical === "you@example.com") return "Yan";
+  if (canonical === "you@example.com") return "Alex";
+  if (canonical === "friend@example.com") return "Example Friend";
+  if (canonical === "neighbor@example.com") return "Example Neighbor";
+  return "Other";
+}
+
+/**
+ * @param {string} prefix
+ */
+export function kindFromPrefix(prefix) {
+  const p = String(prefix || "").trim();
+  if (!p || p === "test") return "unspecified";
+  if (p.startsWith("daily-briefing")) return "daily-briefing";
+  if (p.startsWith("nightly-")) return p.slice("nightly-".length) || "context-synthesis";
+  if (p.startsWith("health-history")) return "health-history";
+  if (p === "location-history") return "location-compose";
+  if (p === "canvas-sync") return "canvas-nightly";
+  if (p === "brain-extraction") return "brain-extract";
+  if (p === "people-enrich" || p === "people-bootstrap") return "context-synthesis";
+  return p;
+}
+
+/**
+ * @param {string|undefined} header
+ */
+export function ingestTokenOk(header) {
+  const expected = String(process.env.USAGE_INGEST_TOKEN || "");
+  if (!expected) return false;
+  const match = String(header || "").match(/^Bearer\s+(\S+)\s*$/i);
+  if (!match) return false;
+  const got = Buffer.from(match[1]);
+  const want = Buffer.from(expected);
+  if (got.length !== want.length) return false;
+  return timingSafeEqual(got, want);
+}
+
+/**
+ * @param {unknown} model
+ */
+export function describeModel(model) {
+  if (!model) return { model: "", modelConfig: null };
+  if (typeof model === "string") return { model: model.trim(), modelConfig: null };
+  const id = String(/** @type {{ id?: string }} */ (model).id || "").trim();
+  const raw = /** @type {{ params?: { id?: string, value?: unknown }[] }} */ (model).params;
+  const params = Array.isArray(raw)
+    ? raw
+        .filter((p) => p && p.id)
+        .map((p) => ({ id: String(p.id), value: String(p.value ?? "") }))
+    : [];
+  let name = id;
+  const reasoning = params.find((p) => /reason|thinking/i.test(p.id));
+  const fast = params.find((p) => p.id === "fast");
+  if (reasoning?.value) name = `${name}-${reasoning.value}`;
+  if (fast && /^(true|on|1)$/i.test(fast.value)) name = `${name}-fast`;
+  return {
+    model: name,
+    modelConfig: id ? { id, params } : null,
+  };
+}
+
+/**
+ * @param {unknown} usage
+ */
+export function tokensFromUsage(usage) {
+  if (!usage || typeof usage !== "object") return emptyTokens();
+  const row = /** @type {Record<string, unknown>} */ (usage);
+  return {
+    input: num(row.inputTokens ?? row.input),
+    output: num(row.outputTokens ?? row.output),
+    cacheRead: num(row.cacheReadTokens ?? row.cacheRead),
+    cacheWrite: num(row.cacheWriteTokens ?? row.cacheWrite),
+    reasoning: num(row.reasoningTokens ?? row.reasoning),
+  };
+}
+
+export function emptyTokens() {
+  return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 };
+}
+
+/**
+ * @param {ReturnType<typeof emptyTokens>} a
+ * @param {ReturnType<typeof emptyTokens>} b
+ */
+export function addTokens(a, b) {
+  return {
+    input: a.input + b.input,
+    output: a.output + b.output,
+    cacheRead: a.cacheRead + b.cacheRead,
+    cacheWrite: a.cacheWrite + b.cacheWrite,
+    reasoning: a.reasoning + b.reasoning,
+  };
+}
+
+export function tokenSum(tokens) {
+  const t = tokens || emptyTokens();
+  return (t.input || 0) + (t.output || 0) + (t.cacheRead || 0) + (t.cacheWrite || 0);
+}
+
+/**
+ * The SDK folds cache read and cache write into inputTokens.
+ * Billing reports those separately. Subtract cache out of input when it fits.
+ * @param {ReturnType<typeof emptyTokens>} tokens
+ */
+export function splitCacheFromInput(tokens) {
+  const t = tokensFromUsage(tokens);
+  const cache = t.cacheRead + t.cacheWrite;
+  if (cache > 0 && t.input >= cache) t.input -= cache;
+  return t;
+}
+
+/**
+ * @param {number} n
+ */
+function num(n) {
+  const v = Number(n);
+  return Number.isFinite(v) && v > 0 ? v : 0;
+}
+
+/**
+ * @param {string} text
+ * @param {number} max
+ */
+function clip(text, max) {
+  const s = String(text || "");
+  if (s.length <= max) return s;
+  return s.slice(0, max);
+}
+
+/**
+ * @param {() => Promise<void>} fn
+ */
+function enqueue(fn) {
+  const run = writeChain.then(fn, fn);
+  writeChain = run.then(
+    () => {},
+    () => {}
+  );
+  return run;
+}
+
+/**
+ * @param {string} path
+ */
+async function readRows(path) {
+  let text = "";
+  try {
+    text = await readFile(path, "utf8");
+  } catch (err) {
+    if (err && /** @type {{ code?: string }} */ (err).code === "ENOENT") return [];
+    throw err;
+  }
+  /** @type {object[]} */
+  const rows = [];
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      rows.push(JSON.parse(trimmed));
+    } catch {
+      /* torn line */
+    }
+  }
+  return rows;
+}
+
+/**
+ * Last line for an id wins.
+ * @param {object[]} rows
+ */
+function latestById(rows) {
+  /** @type {Map<string, object>} */
+  const map = new Map();
+  for (const row of rows) {
+    const id = String(row?.id || "");
+    if (!id) continue;
+    map.set(id, row);
+  }
+  return [...map.values()];
+}
+
+/**
+ * @param {object} row
+ */
+async function appendRow(row) {
+  await mkdir(USAGE_DIR, { recursive: true });
+  await appendFile(USAGE_ROWS_PATH, `${JSON.stringify(row)}\n`, "utf8");
+}
+
+/**
+ * Log one SDK run. Skips auth failures that never reported tokens.
+ * @param {{
+ *   person?: string,
+ *   kind?: string,
+ *   threadId?: string,
+ *   prompt?: string,
+ *   model?: unknown,
+ *   result?: { id?: string, requestId?: string, status?: string, usage?: object }|null,
+ *   startedAt?: string,
+ *   repo?: string,
+ *   always?: boolean,
+ * }} input
+ */
+export async function logSdkResult(input) {
+  const result = input?.result || null;
+  const usage = result && typeof result === "object" ? result.usage : null;
+  const status = result && typeof result === "object" ? String(result.status || "") : "";
+  if (!usage && status !== "finished" && !input?.always) return;
+
+  const described = describeModel(input.model || result?.model);
+  const tokens = tokensFromUsage(usage);
+  const requestId = String(result?.requestId || "").trim();
+  const runId = String(result?.id || "").trim();
+  const at = new Date().toISOString();
+  const id = `sdk:${requestId || runId || randomUUID()}`;
+  const prompt = clip(input.prompt || "", PROMPT_STORE_MAX);
+  const row = {
+    id,
+    source: "sdk",
+    at,
+    startedAt: input.startedAt || at,
+    endedAt: at,
+    person: String(input.person || "Yan").trim() || "Yan",
+    repo: input.repo || "yanylevin-agents",
+    kind: String(input.kind || "unspecified").trim() || "unspecified",
+    model: described.model,
+    modelConfig: described.modelConfig,
+    prompt,
+    threadId: String(input.threadId || "").trim(),
+    requestId,
+    runId,
+    tokens,
+  };
+  await enqueue(async () => {
+    const existing = await readRows(USAGE_ROWS_PATH);
+    if (existing.some((r) => r.id === id && r.source === "sdk")) return;
+    await appendRow(row);
+  });
+}
+
+/**
+ * @param {{
+ *   machine?: string,
+ *   person?: string,
+ *   prompts?: object[],
+ *   billing?: object[],
+ *   periodStart?: string,
+ * }} body
+ */
+export async function ingestUsageBatch(body) {
+  const machine = String(body?.machine || "").trim().slice(0, 40);
+  const person = String(body?.person || "Yan").trim().slice(0, 80) || "Yan";
+  const prompts = Array.isArray(body?.prompts) ? body.prompts : [];
+  const billing = Array.isArray(body?.billing) ? body.billing : [];
+  /** @type {object[]} */
+  const rows = [];
+
+  for (const raw of prompts) {
+    if (!raw || typeof raw !== "object") continue;
+    const composerId = String(raw.composerId || "").trim();
+    const bubbleId = String(raw.bubbleId || "").trim();
+    if (!composerId || !bubbleId) continue;
+    const id = `desk:${machine || "mac"}:${composerId}:${bubbleId}`;
+    const described = describeModel(raw.model);
+    rows.push({
+      id,
+      source: "desktop",
+      at: isoOrEmpty(raw.at),
+      composerCreatedAt: isoOrEmpty(raw.composerCreatedAt),
+      composerUpdatedAt: isoOrEmpty(raw.composerUpdatedAt),
+      person,
+      repo: clip(raw.repo || "Other", 120) || "Other",
+      kind: clip(raw.kind || "agent", 80) || "agent",
+      model: described.model || clip(raw.modelName || "", 120),
+      modelConfig: described.modelConfig,
+      prompt: clip(raw.prompt || "", PROMPT_STORE_MAX),
+      threadId: composerId,
+      composerId,
+      bubbleId,
+      machine,
+      usageUuids: stringList(raw.usageUuids).slice(0, 80),
+      tokens: tokensFromUsage(raw.tokens),
+      index: Number.isFinite(Number(raw.index)) ? Number(raw.index) : 0,
+      windowEnd: isoOrEmpty(raw.windowEnd),
+    });
+  }
+
+  for (const raw of billing) {
+    if (!raw || typeof raw !== "object") continue;
+    const usageEventId = String(raw.usageEventId || "").trim();
+    if (!usageEventId) continue;
+    const atMs = Number(raw.timestamp || raw.at);
+    const at = Number.isFinite(atMs) && atMs > 1e11 ? new Date(atMs).toISOString() : isoOrEmpty(raw.at);
+    rows.push({
+      id: `bill:${usageEventId}`,
+      source: "billing",
+      at: at || new Date().toISOString(),
+      usageEventId,
+      conversationId: String(raw.conversationId || "").trim(),
+      model: clip(raw.model || "", 120),
+      billingKind: clip(raw.kind || raw.billingKind || "", 80),
+      tokens: tokensFromUsage(raw.tokenUsage || raw.tokens),
+      chargedCents: num(raw.chargedCents),
+    });
+  }
+
+  let wrote = 0;
+  await enqueue(async () => {
+    const existing = new Set((await readRows(USAGE_ROWS_PATH)).map((r) => `${r.id}\0${tokenSum(r.tokens)}`));
+    await mkdir(USAGE_DIR, { recursive: true });
+    /** @type {string[]} */
+    const lines = [];
+    for (const row of rows) {
+      const key = `${row.id}\0${tokenSum(row.tokens)}`;
+      if (existing.has(key)) continue;
+      existing.add(key);
+      lines.push(JSON.stringify(row));
+      wrote += 1;
+    }
+    if (lines.length) await appendFile(USAGE_ROWS_PATH, `${lines.join("\n")}\n`, "utf8");
+    if (body?.periodStart) {
+      const periodStart = isoOrEmpty(body.periodStart);
+      if (periodStart) {
+        let meta = {};
+        try {
+          meta = JSON.parse(await readFile(USAGE_META_PATH, "utf8"));
+        } catch {
+          meta = {};
+        }
+        meta.periodStart = periodStart;
+        await writeFile(USAGE_META_PATH, `${JSON.stringify(meta)}\n`, "utf8");
+      }
+    }
+  });
+  return { ok: true, wrote };
+}
+
+/**
+ * @param {unknown} value
+ */
+function isoOrEmpty(value) {
+  if (typeof value === "number" && value > 1e11) return new Date(value).toISOString();
+  const s = String(value || "").trim();
+  if (!s) return "";
+  if (/^\d{12,}$/.test(s)) return new Date(Number(s)).toISOString();
+  const t = Date.parse(s);
+  if (Number.isNaN(t)) return "";
+  return new Date(t).toISOString();
+}
+
+/**
+ * @param {unknown} value
+ */
+function stringList(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((v) => String(v || "").trim()).filter(Boolean);
+}
+
+/**
+ * @param {object[]} rows
+ */
+export function buildClumps(rows) {
+  const all = latestById(rows);
+  const billing = all.filter((r) => r.source === "billing");
+  const prompts = all.filter((r) => r.source === "sdk" || r.source === "desktop");
+  /** @type {Set<string>} */
+  const explained = new Set();
+  /** @type {Map<string, object>} */
+  const byEvent = new Map();
+  for (const bill of billing) {
+    if (bill.usageEventId) byEvent.set(bill.usageEventId, bill);
+  }
+
+  /** @type {object[]} */
+  const clumps = [];
+  const sdk = prompts
+    .filter((p) => p.source === "sdk")
+    .map((prompt) => ({ ...prompt, tokens: splitCacheFromInput(prompt.tokens) }))
+    .sort((a, b) => Date.parse(a.startedAt || a.at) - Date.parse(b.startedAt || b.at));
+  for (const prompt of sdk) {
+    const matched = matchSdkBilling(prompt, billing, explained);
+    for (const bill of matched) explained.add(bill.id);
+    clumps.push(toClump(prompt, matched));
+  }
+  const desktop = prompts.filter((p) => p.source === "desktop");
+  const desktopMatches = matchDesktopGroups(desktop, billing, byEvent, explained);
+  for (const prompt of desktop) {
+    const matched = desktopMatches.get(prompt.id) || [];
+    for (const bill of matched) explained.add(bill.id);
+    clumps.push(toClump(prompt, matched));
+  }
+  for (const bill of billing) {
+    if (explained.has(bill.id)) continue;
+    clumps.push(billingOnlyClump(bill));
+  }
+  clumps.sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0));
+  return clumps;
+}
+
+/**
+ * @param {object} prompt
+ * @param {object[]} billing
+ * @param {Set<string>} explained
+ */
+function matchSdkBilling(prompt, billing, explained) {
+  /** @type {object[]} */
+  const direct = [];
+  for (const key of [prompt.requestId, prompt.runId]) {
+    if (!key) continue;
+    const hit = billing.find((b) => b.usageEventId === key && !explained.has(b.id));
+    if (hit) direct.push(hit);
+  }
+  if (direct.length) return direct;
+
+  const start = Date.parse(prompt.startedAt || prompt.at) - 5000;
+  const end = Date.parse(prompt.endedAt || prompt.at) + 20_000;
+  if (Number.isNaN(start) || Number.isNaN(end)) return [];
+  const window = billing
+    .filter((b) => !explained.has(b.id))
+    .filter((b) => {
+      const t = Date.parse(b.at);
+      return t >= start && t <= end;
+    })
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  if (!window.length) return [];
+
+  const want = prompt.tokens?.input || 0;
+  if (!want) {
+    const family = modelFamily(prompt.model);
+    return window.filter((b) => !family || modelFamily(b.model) === family);
+  }
+  /** @type {object[]} */
+  const taken = [];
+  let sum = 0;
+  for (const bill of window) {
+    const next = sum + (bill.tokens?.input || 0);
+    if (taken.length && next > want * 1.12) break;
+    if (!taken.length && next > want * 1.25) continue;
+    taken.push(bill);
+    sum = next;
+    if (sum >= want * 0.92) break;
+  }
+  return taken;
+}
+
+/**
+ * Split a composer's billing events across its prompts.
+ * usageUuid hits stick to that prompt. The rest go by time window,
+ * or in order when the bubbles have no clock.
+ * @param {object[]} desktops
+ * @param {object[]} billing
+ * @param {Map<string, object>} byEvent
+ * @param {Set<string>} explained
+ */
+function matchDesktopGroups(desktops, billing, byEvent, explained) {
+  /** @type {Map<string, object[]>} */
+  const out = new Map();
+  /** @type {Map<string, object[]>} */
+  const groups = new Map();
+  for (const prompt of desktops) {
+    const key = String(prompt.composerId || prompt.id);
+    const list = groups.get(key) || [];
+    list.push(prompt);
+    groups.set(key, list);
+    out.set(prompt.id, []);
+  }
+  for (const prompts of groups.values()) {
+    prompts.sort((a, b) => (a.index || 0) - (b.index || 0) || String(a.at).localeCompare(String(b.at)));
+    /** @type {Set<string>} */
+    const claimed = new Set();
+    for (const prompt of prompts) {
+      for (const id of prompt.usageUuids || []) {
+        const bill = byEvent.get(id);
+        if (!bill || explained.has(bill.id) || claimed.has(bill.id)) continue;
+        out.get(prompt.id).push(bill);
+        claimed.add(bill.id);
+      }
+    }
+    const conv = String(prompts[0].composerId || "");
+    const pool = billing
+      .filter((b) => b.conversationId && b.conversationId === conv)
+      .filter((b) => !explained.has(b.id) && !claimed.has(b.id))
+      .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+    if (!pool.length) continue;
+    const timed = prompts.every((p) => p.at) && new Set(prompts.map((p) => p.at)).size === prompts.length;
+    if (timed && prompts.length > 1) {
+      for (const bill of pool) {
+        const t = Date.parse(bill.at);
+        let dest = prompts[0];
+        for (const prompt of prompts) {
+          if (Date.parse(prompt.at) <= t) dest = prompt;
+        }
+        out.get(dest.id).push(bill);
+      }
+      continue;
+    }
+    const size = Math.ceil(pool.length / prompts.length);
+    prompts.forEach((prompt, i) => {
+      out.get(prompt.id).push(...pool.slice(i * size, (i + 1) * size));
+    });
+  }
+  return out;
+}
+
+/**
+ * @param {string} model
+ */
+function modelFamily(model) {
+  return String(model || "")
+    .toLowerCase()
+    .replace(/-fast$/, "")
+    .replace(/-(high|xhigh|low|medium|thinking.*)$/, "");
+}
+
+/**
+ * @param {object} prompt
+ * @param {object[]} matched
+ */
+function toClump(prompt, matched) {
+  let tokens = emptyTokens();
+  /** @type {object[]} */
+  const calls = [];
+  if (matched.length) {
+    for (const bill of matched) {
+      const part = tokensFromUsage(bill.tokens);
+      tokens = addTokens(tokens, part);
+      calls.push({
+        at: bill.at,
+        model: bill.model || prompt.model || "",
+        usageEventId: bill.usageEventId || "",
+        tokens: part,
+      });
+    }
+    const own = tokensFromUsage(prompt.tokens);
+    if (tokenSum(own) > tokenSum(tokens)) tokens = own;
+  } else {
+    tokens = tokensFromUsage(prompt.tokens);
+    if (prompt.source === "desktop") {
+      tokens = { ...tokens, cacheRead: null, cacheWrite: null };
+    }
+  }
+  const model = prompt.model || calls.find((c) => c.model)?.model || "";
+  return {
+    id: prompt.id,
+    source: prompt.source,
+    at: prompt.at || prompt.composerUpdatedAt || prompt.startedAt || "",
+    person: prompt.person || "Other",
+    repo: prompt.repo || "Other",
+    kind: prompt.kind || "",
+    model,
+    modelConfig: prompt.modelConfig || null,
+    prompt: prompt.prompt || "",
+    threadId: prompt.threadId || prompt.composerId || "",
+    machine: prompt.machine || "",
+    tokens,
+    calls,
+  };
+}
+
+/**
+ * @param {object} bill
+ */
+function billingOnlyClump(bill) {
+  const tokens = tokensFromUsage(bill.tokens);
+  return {
+    id: bill.id,
+    source: "billing",
+    at: bill.at || "",
+    person: "Other",
+    repo: "Other",
+    kind: "other",
+    model: bill.model || "",
+    modelConfig: null,
+    prompt: "",
+    threadId: bill.conversationId || "",
+    machine: "",
+    tokens,
+    calls: [
+      {
+        at: bill.at,
+        model: bill.model || "",
+        usageEventId: bill.usageEventId || "",
+        tokens,
+      },
+    ],
+  };
+}
+
+/**
+ * @param {string} iso
+ */
+export function pacificDay(iso) {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(t));
+}
+
+/**
+ * @param {object[]} clumps
+ * @param {object} query
+ */
+export function filterClumps(clumps, query) {
+  const person = String(query.person || "").trim();
+  const repo = String(query.repo || "").trim();
+  const kind = String(query.kind || "").trim();
+  const model = String(query.model || "").trim();
+  const threadId = String(query.threadId || query.thread || "").trim();
+  const from = query.from ? Date.parse(query.from) : NaN;
+  const to = query.to ? Date.parse(query.to) : NaN;
+  return clumps.filter((row) => {
+    if (person && row.person !== person) return false;
+    if (repo && row.repo !== repo) return false;
+    if (kind && row.kind !== kind) return false;
+    if (model && row.model !== model) return false;
+    if (threadId && row.threadId !== threadId) return false;
+    const t = Date.parse(row.at || "");
+    if (!Number.isNaN(from) && (Number.isNaN(t) || t < from)) return false;
+    if (!Number.isNaN(to) && (Number.isNaN(t) || t > to)) return false;
+    return true;
+  });
+}
+
+/**
+ * @param {object[]} clumps
+ */
+export function summarizeClumps(clumps) {
+  let totals = emptyTokens();
+  /** @type {Map<string, ReturnType<typeof emptyTokens>>} */
+  const byPerson = new Map();
+  /** @type {Map<string, ReturnType<typeof emptyTokens>>} */
+  const byModel = new Map();
+  /** @type {Map<string, ReturnType<typeof emptyTokens>>} */
+  const byRepo = new Map();
+  /** @type {Map<string, ReturnType<typeof emptyTokens>>} */
+  const byKind = new Map();
+  /** @type {Map<string, Map<string, number>>} */
+  const byDay = new Map();
+
+  for (const row of clumps) {
+    const tokens = tokensFromUsage(row.tokens);
+    totals = addTokens(totals, tokens);
+    addMap(byPerson, row.person || "Other", tokens);
+    addMap(byModel, row.model || "unknown", tokens);
+    addMap(byRepo, row.repo || "Other", tokens);
+    addMap(byKind, row.kind || "other", tokens);
+    const day = pacificDay(row.at);
+    if (!day) continue;
+    const weight = tokenSum(tokens);
+    const people = byDay.get(day) || new Map();
+    people.set(row.person || "Other", (people.get(row.person || "Other") || 0) + weight);
+    byDay.set(day, people);
+  }
+
+  const grand = tokenSum(totals) || 1;
+  return {
+    totals,
+    total: tokenSum(totals),
+    byPerson: barsFrom(byPerson, grand),
+    byModel: barsFrom(byModel, grand),
+    byRepo: barsFrom(byRepo, grand),
+    byKind: barsFrom(byKind, grand),
+    byDay: [...byDay.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, people]) => ({
+        date,
+        people: [...people.entries()]
+          .map(([name, total]) => ({ name, total }))
+          .sort((a, b) => b.total - a.total),
+      })),
+  };
+}
+
+/**
+ * @param {Map<string, ReturnType<typeof emptyTokens>>} map
+ * @param {string} key
+ * @param {ReturnType<typeof emptyTokens>} tokens
+ */
+function addMap(map, key, tokens) {
+  map.set(key, addTokens(map.get(key) || emptyTokens(), tokens));
+}
+
+/**
+ * @param {Map<string, ReturnType<typeof emptyTokens>>} map
+ * @param {number} grand
+ */
+function barsFrom(map, grand) {
+  return [...map.entries()]
+    .map(([name, tokens]) => {
+      const total = tokenSum(tokens);
+      return {
+        name,
+        total,
+        tokens,
+        share: total / grand,
+      };
+    })
+    .filter((row) => row.total > 0)
+    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+}
+
+/**
+ * @param {object} query
+ * @param {number} [now]
+ */
+export async function resolveRange(query, now = Date.now()) {
+  const range = String(query.range || "30d");
+  const to = now;
+  if (range === "7d") return { from: new Date(to - 7 * DAY_MS).toISOString(), to: new Date(to).toISOString(), range };
+  if (range === "period") {
+    let start = "";
+    try {
+      const meta = JSON.parse(await readFile(USAGE_META_PATH, "utf8"));
+      start = isoOrEmpty(meta.periodStart);
+    } catch {
+      start = "";
+    }
+    if (!start) {
+      const day = pacificDay(new Date(to).toISOString());
+      start = `${day.slice(0, 8)}01T00:00:00-07:00`;
+    }
+    return { from: start, to: new Date(to).toISOString(), range };
+  }
+  return { from: new Date(to - 30 * DAY_MS).toISOString(), to: new Date(to).toISOString(), range: "30d" };
+}
+
+/**
+ * @param {object} query
+ */
+export async function usageReport(query) {
+  const bounds = await resolveRange(query);
+  const rows = await readRows(USAGE_ROWS_PATH);
+  const clumps = filterClumps(buildClumps(rows), {
+    ...query,
+    from: bounds.from,
+    to: bounds.to,
+  });
+  const summary = summarizeClumps(clumps);
+  const group = String(query.group || "");
+  const offset = Math.max(0, Number(query.offset) || 0);
+  const limit = Math.min(200, Math.max(1, Number(query.limit) || 40));
+
+  if (group === "thread") {
+    /** @type {Map<string, object>} */
+    const threads = new Map();
+    for (const row of clumps) {
+      const key = row.threadId || row.id;
+      const prev = threads.get(key);
+      if (!prev) {
+        threads.set(key, {
+          threadId: key,
+          person: row.person,
+          repo: row.repo,
+          kind: row.kind,
+          model: row.model,
+          at: row.at,
+          count: 1,
+          tokens: tokensFromUsage(row.tokens),
+          preview: clip(row.prompt, 180),
+        });
+        continue;
+      }
+      prev.count += 1;
+      prev.tokens = addTokens(prev.tokens, tokensFromUsage(row.tokens));
+      if (Date.parse(row.at) > Date.parse(prev.at)) {
+        prev.at = row.at;
+        prev.model = row.model || prev.model;
+        if (row.prompt) prev.preview = clip(row.prompt, 180);
+      }
+    }
+    const list = [...threads.values()].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+    return {
+      ok: true,
+      ...bounds,
+      summary,
+      total: list.length,
+      threads: list.slice(offset, offset + limit).map(publicThread),
+    };
+  }
+
+  const page = clumps.slice(offset, offset + limit).map(publicClump);
+  return {
+    ok: true,
+    ...bounds,
+    summary,
+    total: clumps.length,
+    prompts: page,
+  };
+}
+
+/**
+ * @param {object} row
+ */
+function publicClump(row) {
+  const prompt = String(row.prompt || "");
+  return {
+    id: row.id,
+    at: row.at,
+    person: row.person,
+    repo: row.repo,
+    kind: row.kind,
+    model: row.model,
+    modelConfig: row.modelConfig,
+    threadId: row.threadId,
+    prompt: prompt.slice(0, PROMPT_API_MAX),
+    promptTruncated: prompt.length > PROMPT_API_MAX,
+    tokens: publicTokens(row.tokens),
+    calls: Array.isArray(row.calls) ? row.calls : [],
+  };
+}
+
+/**
+ * @param {object} row
+ */
+function publicTokens(tokens) {
+  const t = tokensFromUsage(tokens);
+  if (tokens && tokens.cacheRead == null) t.cacheRead = null;
+  if (tokens && tokens.cacheWrite == null) t.cacheWrite = null;
+  return t;
+}
+
+function publicThread(row) {
+  return {
+    threadId: row.threadId,
+    person: row.person,
+    repo: row.repo,
+    kind: row.kind,
+    model: row.model,
+    at: row.at,
+    count: row.count,
+    tokens: publicTokens(row.tokens),
+    preview: row.preview,
+  };
+}

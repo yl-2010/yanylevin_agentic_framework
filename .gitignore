@@ -26,6 +26,7 @@ ios/shortcuts/**/workflow.json
 education/*/.projects-opened.json
 data/headlines-assignments.json
 data/agent-actions.jsonl
+data/usage/
 data/future-agents/
 data/study/
 **/.venv/

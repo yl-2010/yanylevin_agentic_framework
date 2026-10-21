@@ -17,8 +17,8 @@ export const JYPE_ROOT_REL = "education/projects/jype";
 export const JYPE_MEMBERS = Object.freeze({
   "you@example.com": { slug: "yan-levin", given: "Yan" },
   "you@example.com": { slug: "alex-rivera", given: "Alex" },
-  "xujeffery9@gmail.com": { slug: "example-friend", given: "Example Friend" },
-  "everettedeng@gmail.com": { slug: "example-neighbor", given: "Example Neighbor" },
+  "friend@example.com": { slug: "example-friend", given: "Example Friend" },
+  "neighbor@example.com": { slug: "example-neighbor", given: "Example Neighbor" },
 });
 
 export const JYPE_EMAILS = new Set(Object.keys(JYPE_MEMBERS));
@@ -29,8 +29,8 @@ export const JYPE_EMAIL_ALIASES = Object.freeze({
   "you@icloud.com": "you@example.com",
   "you@example.com": "you@example.com",
   "friend@school.example": "you@example.com",
-  "jxu28@school.example": "xujeffery9@gmail.com",
-  "edeng@school.example": "everettedeng@gmail.com",
+  "jxu28@school.example": "friend@example.com",
+  "edeng@school.example": "neighbor@example.com",
 });
 
 export function jypeRootAbs(root = ROOT) {

@@ -26,6 +26,7 @@ import {
   runWithModelFallback,
 } from "./cursor-sdk-auth.js";
 import { isStudyAccessEmail } from "./identity.js";
+import { logSdkResult, personFromEmail } from "./usage-log.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -639,7 +640,7 @@ async function textFromRun(run) {
  * @param {string} dir
  * @param {string} material
  */
-async function writeExamWithModel(dir, material) {
+async function writeExamWithModel(dir, material, email) {
   await reloadCursorApiKeyFromEnv();
   const model = await resolveModelSelection(requireCursorApiKey(), STUDY_MODEL);
   const holder = { agent: null };
@@ -694,6 +695,14 @@ async function writeExamWithModel(dir, material) {
           clearTimeout(timer);
           const spoken = await textFromRun(run);
           const result = typeof run.wait === "function" ? await run.wait() : null;
+          await logSdkResult({
+            person: personFromEmail(email),
+            kind: "study",
+            prompt,
+            model: nextModel,
+            result,
+            always: true,
+          }).catch((err) => console.error("[usage] study log failed", err));
           const status = String(result?.status || "").toLowerCase();
           if (status === "error") return result;
           const text =
@@ -775,7 +784,7 @@ export async function runJob(id, root = STUDY_ROOT) {
     const sources = join(dir, "sources");
     await seedNotesFile(sources, notes);
     await extractSourceText(sources);
-    const exam = await writeExamWithModel(dir, await jobMaterial(sources, notes));
+    const exam = await writeExamWithModel(dir, await jobMaterial(sources, notes), meta.email);
     const workHtml = renderExamHtml(exam, "work");
     const keyHtml = renderExamHtml(exam, "key");
     await writeFile(join(dir, "work.html"), workHtml);

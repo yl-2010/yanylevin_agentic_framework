@@ -10,7 +10,8 @@ import { dirname, join, basename, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isEducationUser, resolveNowScheduleContext } from "./education-data.js";
 import { notifyEducationClients } from "./education-events.js";
-import { canonicalizeEmail, isJypeAccessEmail } from "./identity.js";
+import { canonicalizeEmail, isJypeAccessEmail, isFullAccessEmail, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
+import { logSdkResult, personFromEmail } from "./usage-log.js";
 import {
   browserCustomTools,
   closeAgentBrowser,
@@ -99,7 +100,6 @@ import {
 } from "./cursor-sdk-auth.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const YAN_EMAIL = "yanylevin@gmail.com";
 const PA_ERROR_REPLY =
   "The personal agent hit an error. Try again or use Cursor Desktop with the personal-agent skill.";
 
@@ -188,6 +188,22 @@ const activeByEmail = new Map();
 
 function sessionWorkspace(session) {
   return normalizeJypeWorkspace(session?.workspace);
+}
+
+function usagePerson(session) {
+  if (session?.usagePerson) return String(session.usagePerson).trim();
+  const guest = session?.guestCaller?.displayName;
+  if (guest) return String(guest).trim();
+  return personFromEmail(session?.email);
+}
+
+function usageKind(session, opts) {
+  if (opts?.scheduledKickoff) return "future-agent";
+  if (session?.teamsOrigin) return "teams-agent";
+  if (session?.imessageOrigin) return "imessage-agent";
+  if (session?.whatsappOrigin) return "whatsapp-agent";
+  if (sessionWorkspace(session) === "jype") return "jype-chat";
+  return "personal-chat";
 }
 
 function focusKey(email, workspace) {
@@ -1042,6 +1058,7 @@ function futureAgentTools(sid, session) {
             context,
             workspace: sessionWorkspace(session),
             email: session.email,
+            person: usagePerson(session),
             origin: originFromSession(session),
           });
           return JSON.stringify({
@@ -1514,6 +1531,15 @@ async function continueAgentSend(session, sid, text, model) {
     }
     if (session.interrupting) return "";
     const result = await run.wait();
+    await logSdkResult({
+      person: usagePerson(session),
+      kind: usageKind(session),
+      threadId: sid,
+      prompt: "Channel delivery",
+      model,
+      result,
+      startedAt: new Date().toISOString(),
+    }).catch((err) => console.error("[usage] delivery log failed", err));
     let content =
       result && typeof result.result === "string" ? result.result.trim() : "";
     if (!content) {
@@ -1739,10 +1765,7 @@ onLocalCursorExecutorEvict(() => {
 });
 
 /** Global unslop skill. Always Read; never inline the whole file into the prompt. */
-export const UNSLOP_SKILL_PATH = join(
-  homedir(),
-  ".cursor/skills/unslop/SKILL.md"
-);
+export const UNSLOP_SKILL_PATH = join(REPO_ROOT, ".cursor/skills/unslop/SKILL.md");
 
 /** Four11 IDs + Fix Photo Group school photos. User-level; not in the repo. */
 export const FOUR11_SKILL_PATH = join(
@@ -1777,7 +1800,7 @@ export const PERSONAL_SKILL_PATHS = {
   fitness: ".cursor/skills/fitness-os/SKILL.md",
   browser: ".cursor/skills/personal-browser/SKILL.md",
   computer: ".cursor/skills/personal-computer/SKILL.md",
-  brain: "education/yanylevin@gmail.com/brain/schema.md",
+  brain: "education/you@example.com/brain/schema.md",
   synthesis: ".cursor/skills/context-synthesis/SKILL.md",
   locationEnrichment: ".cursor/skills/location-enrichment/SKILL.md",
   locationBrain: ".cursor/skills/location-brain/SKILL.md",
@@ -1806,23 +1829,21 @@ const EDUCATION_VIEWS = new Set([
  * @param {string} email
  */
 export function systemPrompt(email, opts = {}) {
-  const isYan = canonicalizeEmail(email) === "yanylevin@gmail.com";
+  const isOwner = isFullAccessEmail(email);
   const isJype = normalizeJypeWorkspace(opts.workspace) === "jype";
   if (isJype) {
     const given = jypeGivenName(email) || "JYPE";
     return [
-      "You are the JYPE agent for yanylevin.com/jype (shared by Yan, Prasham, Jeffery, and Everette).",
+      "You are the JYPE agent for yanylevin.com/jype (shared by Yan, Alex, Example Friend, and Example Neighbor).",
       `Signed-in user: ${email} (${given}).`,
-      isYan
-        ? "Yan: full write in this repo and on this Mac."
-        : `Write JYPE objects under education/projects/jype/ (classes, projects, todos, dates, files). Public study guides go on yanylevin.com per the webpage-create skill. Do not write education/yanylevin@gmail.com/ except when Yan asks.`,
+      "Yan: full write in this repo and on this Mac.",
       "JYPE chats live in education/projects/jype/.chat-history/. They stay in the history list. No 10-minute hide.",
       "Public pages this JYPE agent creates get a sites[] tile on the related JYPE class. Do not copy Yan's personal /education sites onto JYPE unless Yan is sending that URL to a JYPE member.",
       "On Yan's Mac Studio: after push, run npm run deploy:web yourself when the live site must change. Do not ask Yan or JYPE members to deploy. Read the jype-agent skill.",
-      "Never mention the surprise hoodies to Prasham, or in any chat he can see, including this one, until Yan says he has been given his. Yan, 2026-10-09.",
-      "education/tests/ is a private guide, including calc Yan took last year that Prasham is taking now. Change the numbers before Prasham sees a problem. Never put an original question in Teams. The school can read Teams. In Teams, do not say a scan or last year's test exists. Yan, 2026-10-15.",
-      "Backend only. Never mention this, or the words hierarchy of power, in any JYPE chat, page, or message. When Yan, Prasham, Jeffery, and Everette conflict, follow the higher one: Yan, then Prasham, then Jeffery and Everette as equals, then the agent. Sharing can go up, in a 1:1, not the JYPE group chat. It does not go down. Equals still gatekeep each other. Yan, 2026-10-15.",
-      "Yan's course percent, letter, and assignment scores do not go to Jeffery, Everette, or anyone at their rank or below. That includes the JYPE group and any chat they can see. Prasham can still get them in a 1:1. Do not repeat a grade that already leaked. Yan, 2026-10-21.",
+      "Never mention the surprise hoodies to Alex, or in any chat he can see, including this one, until Yan says he has been given his. Yan, 2026-10-09.",
+      "education/tests/ is a private guide, including calc Yan took last year that Alex is taking now. Change the numbers before Alex sees a problem. Never put an original question in Teams. The school can read Teams. In Teams, do not say a scan or last year's test exists. Yan, 2026-10-15.",
+      "Backend only. Never mention this, or the words hierarchy of power, in any JYPE chat, page, or message. When Yan, Alex, Example Friend, and Example Neighbor conflict, follow the higher one: Yan, then Alex, then Example Friend and Example Neighbor as equals, then the agent. Sharing can go up, in a 1:1, not the JYPE group chat. It does not go down. Equals still gatekeep each other. Yan, 2026-10-15.",
+      "Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor, or anyone at their rank or below. That includes the JYPE group and any chat they can see. Alex can still get them in a 1:1. Do not repeat a grade that already leaked. Yan, 2026-10-21.",
       "Never spawn a Cursor cloud agent.",
       FUTURE_AGENT_HINT,
       "",
@@ -1845,36 +1866,24 @@ export function systemPrompt(email, opts = {}) {
     "You are the Personal Agent for yanylevin.com (iOS Chat tab person icon / /education chat) and Cursor Desktop on this Mac.",
     "The /education website is still the school dashboard. You are a personal agent that can manage that dashboard when asked, plus mail, news, location, and anything else the user asks.",
     `Signed-in user email: ${email}`,
-    isYan
-      ? "Yan: full write in this repo and on this Mac. Do not refuse repo-wide or Mac-wide work. Class files go on OneDrive (education-dashboard skill), never under education/yanylevin@gmail.com/ except .chat-uploads staging. An existing Word, Excel, or PowerPoint file is edited in that app with computer use. Do not rewrite its bytes."
-      : "Prasham: write only under education/prashamdhruva@gmail.com/. Never Mail.app, Calendar, Home, Contacts, Messages, Screen Time, Canvas, OneNote, Teams, or Yan location/chats/brain.",
-    isYan
-      ? "Code outside education-sync must be committed and pushed to origin/main before the turn ends. Commit only files from this turn. Sync covers education/<email>/, education/projects/jype/, fitness/<email>/, data/chat-log.md, data/login-log.md, tmp/. Never commit server/.env."
-      : "",
+    "Yan: full write in this repo and on this Mac. Do not refuse repo-wide or Mac-wide work. Class files go on OneDrive (education-dashboard skill), never under education/you@example.com/ except .chat-uploads staging. An existing Word, Excel, or PowerPoint file is edited in that app with computer use. Do not rewrite its bytes.",
+    "Code outside education-sync must be committed and pushed to origin/main before the turn ends. Commit only files from this turn. Sync covers education/<email>/, education/projects/jype/, fitness/<email>/, data/chat-log.md, data/login-log.md, tmp/. Never commit server/.env.",
     "Never spawn a Cursor cloud agent. Never edit main-site chatbot.js / /api/chat / LM Studio unless Yan explicitly asks.",
     FUTURE_AGENT_HINT,
-    "Never mention the surprise hoodies to Prasham, or in any chat he can see, including this one, until Yan says he has been given his. Yan, 2026-10-09.",
-    "education/tests/ is a private guide, including calc Yan took last year that Prasham is taking now. Change the numbers before Prasham sees a problem. Never put an original question in Teams. The school can read Teams. In Teams, do not say a scan or last year's test exists. Yan, 2026-10-15.",
+    "Never mention the surprise hoodies to Alex, or in any chat he can see, including this one, until Yan says he has been given his. Yan, 2026-10-09.",
+    "education/tests/ is a private guide, including calc Yan took last year that Alex is taking now. Change the numbers before Alex sees a problem. Never put an original question in Teams. The school can read Teams. In Teams, do not say a scan or last year's test exists. Yan, 2026-10-15.",
     "A chat PDF is homework or a finished MA/QA scan. Homework goes on the existing todo. A new todo is rare. An MA/QA scan goes on the earlier MA or QA todo for that test, named like the Canvas title with MA or QA kept, plus a copy in education/tests under that class. Do not make a new todo due today to hold the scan. Yan, 2026-10-19.",
-    "Yan's course percent, letter, and assignment scores do not go to Jeffery, Everette, or anyone at their rank or below. That includes the JYPE group and any chat they can see. Prasham can still get them in a 1:1. Do not repeat a grade that already leaked. Yan, 2026-10-21.",
+    "Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor, or anyone at their rank or below. That includes the JYPE group and any chat they can see. Alex can still get them in a 1:1. Do not repeat a grade that already leaked. Yan, 2026-10-21.",
     "",
     `Always Read and apply the unslop skill (${UNSLOP_SKILL_PATH}) on every turn. Do not skip it. Do not inline the whole skill here.`,
     `Always Read ${PERSONAL_SKILL_PATHS.soul} for persona and judgment. Do not skip it. Do not inline it.`,
-    isYan
-      ? `When this turn names a person (given name, nickname, or alias), pull the entity card: node server/brain-entity-card.js "<name or slug>" (fields, edges, typed files, recent timeline in one call), guided by ${PERSONAL_SKILL_PATHS.people}. Aliases live on the card. Do not guess who they are, and do not glob brain/people/.`
-      : "Do not read Yan's people files.",
-    isYan
-      ? `Unknown shorthand: node server/brain-glossary.js "<term>". New slang this turn: node server/brain-glossary.js add --term "..." --gloss "..." before the turn ends. Person nicknames stay on the person card.`
-      : "",
-    isYan
-      ? `When Yan states a fact or correction about a person or entity, write it the same turn per ${PERSONAL_SKILL_PATHS.people}: dated timeline entry or frontmatter field on that entity. Do not also copy the person fact onto identity.md. Identity people lines are name, role, and a people/slug pointer. Facts about Yan himself go to education/yanylevin@gmail.com/brain/identity.md (map) or identity-school.md / identity-accounts.md / identity-logistics.md or threads/. Rewrite a standing line. Do not wait for the nightly job.`
-      : "Never write to Yan's brain.",
+    `When this turn names a person (given name, nickname, or alias), pull the entity card: node server/brain-entity-card.js "<name or slug>" (fields, edges, typed files, recent timeline in one call), guided by ${PERSONAL_SKILL_PATHS.people}. Aliases live on the card. Do not guess who they are, and do not glob brain/people/.`,
+    `Unknown shorthand: node server/brain-glossary.js "<term>". New slang this turn: node server/brain-glossary.js add --term "..." --gloss "..." before the turn ends. Person nicknames stay on the person card.`,
+    `When Yan states a fact or correction about a person or entity, write it the same turn per ${PERSONAL_SKILL_PATHS.people}: dated timeline entry or frontmatter field on that entity. Do not also copy the person fact onto identity.md. Identity people lines are name, role, and a people/slug pointer. Facts about Yan himself go to education/you@example.com/brain/identity.md (map) or identity-school.md / identity-accounts.md / identity-logistics.md or threads/. Rewrite a standing line. Do not wait for the nightly job.`,
     "Do not preload other skills. Read only the file this turn needs:",
     `- Identity / permissions / reply style: ${PERSONAL_SKILL_PATHS.agent}`,
     `- Education dashboard (classes, todos, dates, projects, school attachments): ${PERSONAL_SKILL_PATHS.education}`,
-    isYan
-      ? `- Debate / case building: ${PERSONAL_SKILL_PATHS.debate}`
-      : "",
+    `- Debate / case building: ${PERSONAL_SKILL_PATHS.debate}`,
     `- Class schedule: ${PERSONAL_SKILL_PATHS.schedule}`,
     `- EPS student IDs / school photos: ${FOUR11_SKILL_PATH}`,
     `- Past chats: ${PERSONAL_SKILL_PATHS.chats}`,
@@ -1883,60 +1892,30 @@ export function systemPrompt(email, opts = {}) {
       ? `- Click-through / login pages (skip static fetch): ${PERSONAL_SKILL_PATHS.browser}`
       : "",
     `- Mac apps, Arc if Chrome fails. Computer use when the CLI cannot do the job: ${PERSONAL_SKILL_PATHS.computer}`,
-    isYan
-      ? `- Yan Mail.app search and send: ${PERSONAL_SKILL_PATHS.mail}`
-      : "Do not access Mail.app or run osascript mail searches for this user.",
-    isYan
-      ? `- School Outlook (ylevin@eastsideprep.org) via school-mail.js: ${PERSONAL_SKILL_PATHS.schoolMail}`
-      : "Do not read Yan's school Outlook.",
-    isYan
-      ? `- School OneNote (on demand only): ${PERSONAL_SKILL_PATHS.schoolOnenote}`
-      : "Do not read Yan's school OneNote.",
-    isYan
-      ? `- School Teams (ylevin@eastsideprep.org) via school-teams.js: ${PERSONAL_SKILL_PATHS.schoolTeams}`
-      : "Do not read Yan's school Teams.",
-    isYan
-      ? `- Phone location: ${PERSONAL_SKILL_PATHS.location}`
-      : "Do not read Yan's phone location.",
-    isYan
-      ? `- Life state (what Yan is doing now or at a past time): ${PERSONAL_SKILL_PATHS.lifeState}`
-      : "Do not read Yan's 5-minute activity log.",
-    isYan
-      ? `- Apple Calendar: ${PERSONAL_SKILL_PATHS.calendar}`
-      : "Do not use Apple Calendar.",
-    isYan
-      ? `- Apple Home: ${PERSONAL_SKILL_PATHS.home}`
-      : "Do not use Apple Home.",
-    isYan
-      ? `- Canvas: ${PERSONAL_SKILL_PATHS.canvas}`
-      : "Do not read Yan's Canvas snapshot.",
-    isYan
-      ? `- Yan iMessage search and send: ${PERSONAL_SKILL_PATHS.imessage}`
-      : "Do not read Messages.app or chat.db.",
-    isYan
-      ? `- Yan WhatsApp search and send: ${PERSONAL_SKILL_PATHS.whatsapp}`
-      : "Do not read WhatsApp.",
-    isYan
-      ? `- Screen Time: ${PERSONAL_SKILL_PATHS.screentime}`
-      : "Do not read Yan's Screen Time or knowledgeC.db.",
-    isYan
-      ? `- Contacts: ${PERSONAL_SKILL_PATHS.contacts}`
-      : "Do not use Contacts.app.",
+    `- Yan Mail.app search and send: ${PERSONAL_SKILL_PATHS.mail}`,
+    `- School Outlook (owner@school.example) via school-mail.js: ${PERSONAL_SKILL_PATHS.schoolMail}`,
+    `- School OneNote (on demand only): ${PERSONAL_SKILL_PATHS.schoolOnenote}`,
+    `- School Teams (owner@school.example) via school-teams.js: ${PERSONAL_SKILL_PATHS.schoolTeams}`,
+    `- Phone location: ${PERSONAL_SKILL_PATHS.location}`,
+    `- Life state (what Yan is doing now or at a past time): ${PERSONAL_SKILL_PATHS.lifeState}`,
+    `- Apple Calendar: ${PERSONAL_SKILL_PATHS.calendar}`,
+    `- Apple Home: ${PERSONAL_SKILL_PATHS.home}`,
+    `- Canvas: ${PERSONAL_SKILL_PATHS.canvas}`,
+    `- Yan iMessage search and send: ${PERSONAL_SKILL_PATHS.imessage}`,
+    `- Yan WhatsApp search and send: ${PERSONAL_SKILL_PATHS.whatsapp}`,
+    `- Screen Time: ${PERSONAL_SKILL_PATHS.screentime}`,
+    `- Contacts: ${PERSONAL_SKILL_PATHS.contacts}`,
     `- Daily Briefing compile / news sources / thumbs: ${PERSONAL_SKILL_PATHS.news}`,
     `- Fitness / gym: ${PERSONAL_SKILL_PATHS.fitness}`,
     `- Future agents (schedule a later run): ${PERSONAL_SKILL_PATHS.futureAgents}`,
     `- Celebration site: ${PERSONAL_SKILL_PATHS.celebration}`,
-    isYan
-      ? `- Memories / brain: ${PERSONAL_SKILL_PATHS.brain}`
-      : "Do not read Yan's brain/memories.",
+    `- Memories / brain: ${PERSONAL_SKILL_PATHS.brain}`,
     "",
     "Live context below is authoritative for clock, class-now, and the open screen. Trust it. Named-people lookup still opens brain/people/. Other education/<email>/ files only when the question needs that data.",
     "",
     "Reply: short. School mutations 1-3 lines. Markdown OK in the text bubble; never HTML tags or markdown images. Never em dashes. No thinking aloud. Do not tell the user to refresh. Read the widgets skill before emitting any widget fence. Never put Sent by Yan's Personal Agent in app or website bubbles; that footer is only for iMessage, WhatsApp, email, and Teams.",
     "Math on the website and in the iOS app is a display block, with a blank line before and after. Put $$ on its own line, then LaTeX, then $$ on its own line. Stack equations one per line in that block. Use \\(x\\) or $x^2$ only for a symbol inside a sentence. Never backticks for math. iMessage, WhatsApp, and Teams cannot render KaTeX, so those replies stay plain words.",
-    isYan
-      ? "Send to a person with no channel named: iMessage, then Teams, then email. Named channel (on Teams / iMessage / email) wins for text. iMessage files are native attachments (iMessage skill), never a URL stand-in. Each file is its own message, then the text. school-teams.js cannot attach a file. Send that file in the Teams app with computer use. A message with images has no pixels. Open that chat in the Teams app and look. School Outlook still cannot send."
-      : "Send to a person with no channel named: iMessage, then Teams, then email. Named channel (on Teams / iMessage / email) wins. iMessage files are native attachments (iMessage skill), never a URL stand-in. Each file is its own message, then the text.",
+    "Send to a person with no channel named: iMessage, then Teams, then email. Named channel (on Teams / iMessage / email) wins for text. iMessage files are native attachments (iMessage skill), never a URL stand-in. Each file is its own message, then the text. school-teams.js cannot attach a file. Send that file in the Teams app with computer use. A message with images has no pixels. Open that chat in the Teams app and look. School Outlook still cannot send.",
     "Long work: send_chat_message first with a short status. Send more mid-run when new info, a change, or a useful update appears. Then a final Done. Quick answers: one reply only (that is the end of turn). On an iMessage, WhatsApp, or Teams @agent or @agentg first turn, that first status is also posted to the chat before you start the work.",
     "To show one education page on web/iOS, call open_education_page (education-dashboard skill). The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Skip if already on that page. Not on Cursor Desktop.",
     "No period when the reply is one word, one phrase, or one sentence.",
@@ -2161,7 +2140,7 @@ export function formatLiveContextBlock(nowContext, uiContext, appendix = "") {
  * @param {string} [timeZone]
  */
 export async function buildYanLiveAppendix(email, timeZone) {
-  if (canonicalizeEmail(email) !== "yanylevin@gmail.com") return "";
+  if (!isFullAccessEmail(email)) return "";
   /** @type {string[]} */
   const lines = [];
   try {
@@ -2946,6 +2925,7 @@ async function executeAgentTurn(sid, session, opts) {
   } = opts;
 
   session.pendingNavigate = null;
+  const usageStartedAt = new Date().toISOString();
   const turnId = mintNavigateId();
   session.activeTurnId = turnId;
   session.channelProgress = channelProgressKind(opts);
@@ -3040,6 +3020,20 @@ async function executeAgentTurn(sid, session, opts) {
     }
     if (!sessions.has(sid) || sessions.get(sid) !== session) return;
     const result = outcome.result;
+    const shownPrompt =
+      opts.scheduledKickoff && session.futureAgentRecord?.prompt
+        ? session.futureAgentRecord.prompt
+        : opts.bubble || prompt;
+    await logSdkResult({
+      person: usagePerson(session),
+      kind: usageKind(session, opts),
+      threadId: sid,
+      prompt: shownPrompt,
+      model: outcome.model || model,
+      result,
+      startedAt: usageStartedAt,
+      always: true,
+    }).catch((err) => console.error("[usage] turn log failed", err));
     if (outcome.usedFallback) {
       console.warn(
         `[personal-agent] turn used ${outcome.model?.id || "auto"} after grok/auto retries`
@@ -3313,7 +3307,7 @@ export async function messageAgent(
   const sessionFiles = session.uploads;
   const hasSessionFiles = sessionFiles.length > 0;
   const hasNewAttachments = newFiles.length > 0;
-  const isYan = normalized === "yanylevin@gmail.com";
+  const isOwner = normalized === "you@example.com";
 
   let nowContext = null;
   try {
@@ -3400,9 +3394,7 @@ export async function messageAgent(
     }
     promptParts.push(
       `When storing long-term dashboard context, Read ${PERSONAL_SKILL_PATHS.education} then copy identical bytes into the matching object folder.`,
-      isYan
-        ? `Yan class files: that class's OneDrive todo/date folder (meta.json onedriveRoot + gradeFolder + onedriveFolder). Do not write class files under education/${normalized}/ except .chat-uploads. A new Word, Excel, or PowerPoint file can be stored. If that Office file already exists, edit it in the app with computer use. Do not store over it. Turn in / submit / upload to Canvas: identify the assignment (Live context first), name the file from the Canvas assignment title (or the todo name if there is no Canvas title; do not use the header printed on the sheet), store, then node --env-file=server/.env server/canvas-files.js submit --canvas-id <id> --file <path>. Save / put this in / handle the file: same store path (node --env-file=server/.env server/canvas-files.js store --src <path> --class <id> --todo "<Finder folder>"), do not submit. Ask only if the assignment is unclear.`
-        : `User-level / "main education folder" = education/${normalized}/ (next to meta.json / schedule.json).`
+      `Yan class files: that class's OneDrive todo/date folder (meta.json onedriveRoot + gradeFolder + onedriveFolder). Do not write class files under education/${normalized}/ except .chat-uploads. A new Word, Excel, or PowerPoint file can be stored. If that Office file already exists, edit it in the app with computer use. Do not store over it. Turn in / submit / upload to Canvas: identify the assignment (Live context first), name the file from the Canvas assignment title (or the todo name if there is no Canvas title; do not use the header printed on the sheet), store, then node --env-file=server/.env server/canvas-files.js submit --canvas-id <id> --file <path>. Save / put this in / handle the file: same store path (node --env-file=server/.env server/canvas-files.js store --src <path> --class <id> --todo "<Finder folder>"), do not submit. Ask only if the assignment is unclear.`
     );
   }
 
@@ -3932,10 +3924,12 @@ export async function runScheduledAgent(record) {
         whatsappOrigin: null,
         whatsappDeliverFinal: false,
         guestCaller: null,
+        usagePerson: fresh.person || personFromEmail(email),
         ephemeralPinned: true,
       };
       sessions.set(sid, session);
     }
+    session.usagePerson = fresh.person || personFromEmail(email);
     attachScheduledToSession(session, fresh);
     session.scheduledStatus = "running";
     session.futureAgentRecord = { ...fresh, status: "running" };

@@ -11,6 +11,7 @@ import {
   reloadCursorApiKeyFromEnv,
   requireCursorApiKey,
 } from "./cursor-sdk-auth.js";
+import { logSdkResult, personFromEmail } from "./usage-log.js";
 import {
   applyChatTitleStarter,
   CHAT_GUEST_WRAP_RE,
@@ -214,7 +215,7 @@ export async function generateAndStoreChatTitle(opts) {
   const seed = titleSeedFromUserMessage(firstUser);
   let title = "";
   try {
-    title = await generateTitleWithAgent(seed);
+    title = await generateTitleWithAgent(seed, opts.email);
     if (title && isStubChatTitle(title, firstUser)) title = "";
   } catch (err) {
     console.warn(
@@ -259,9 +260,10 @@ export async function generateAndStoreChatTitle(opts) {
 
 /**
  * @param {string} firstPrompt
+ * @param {string} [email]
  * @returns {Promise<string>}
  */
-async function generateTitleWithAgent(firstPrompt) {
+async function generateTitleWithAgent(firstPrompt, email) {
   const seed = String(firstPrompt || "").trim();
   if (!seed) return "";
 
@@ -297,11 +299,20 @@ async function generateTitleWithAgent(firstPrompt) {
       }
       content = chunks.join("");
     }
-    if (!content && run && typeof run.wait === "function") {
-      const result = await run.wait();
-      content =
-        result && typeof result.result === "string" ? result.result : "";
+    let result = null;
+    if (run && typeof run.wait === "function") {
+      result = await run.wait();
     }
+    if (!content && result && typeof result.result === "string") {
+      content = result.result;
+    }
+    await logSdkResult({
+      person: personFromEmail(email),
+      kind: "chat-title",
+      prompt: seed,
+      model: TITLE_MODEL,
+      result,
+    }).catch((err) => console.error("[usage] title log failed", err));
     return titleFromAgentReply(content);
   } finally {
     await disposeCursorAgent(agent);

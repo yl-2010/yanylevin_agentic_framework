@@ -43,7 +43,8 @@ import { startContextSynthesisScheduler } from "./context-synthesis-agent.js";
 import { startChatTitleRefreshScheduler } from "./chat-title-refresh-agent.js";
 import { startLifeStateCleanupScheduler } from "./life-state-cleanup-agent.js";
 import { startCanvasSyncScheduler, applyLiveCanvasOverlay, seedLiveCanvasTodoDone, syncCanvasTodoDone, YAN_EMAIL } from "./canvas-sync.js";
-import { canonicalizeEmail, isJypeAccessEmail } from "./identity.js";
+import { canonicalizeEmail, isFullAccessEmail, isJypeAccessEmail } from "./identity.js";
+import { ingestTokenOk, ingestUsageBatch, usageReport } from "./usage-log.js";
 import {
   revealOpenEducationObject,
   syncOnedriveObjectVisibility,
@@ -479,6 +480,67 @@ app.get("/api/agent-actions", requireAuth, async (req, res) => {
       ok: false,
       error: err.message || "agent-actions read failed",
     });
+  }
+});
+
+function requireUsageReader(req, res, next) {
+  return requireAuth(req, res, () => {
+    if (!isFullAccessEmail(req.user?.email)) {
+      res.status(403).json({ ok: false, error: "forbidden" });
+      return;
+    }
+    next();
+  });
+}
+
+app.post("/api/usage/ingest", async (req, res) => {
+  try {
+    if (!ingestTokenOk(req.get("authorization") || "")) {
+      requireUsageReader(req, res, async () => {
+        try {
+          const result = await ingestUsageBatch(req.body || {});
+          res.json(result);
+        } catch (err) {
+          console.error("[/api/usage/ingest]", err);
+          res.status(500).json({ ok: false, error: "usage ingest failed" });
+        }
+      });
+      return;
+    }
+    const result = await ingestUsageBatch(req.body || {});
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/usage/ingest]", err);
+    res.status(500).json({ ok: false, error: "usage ingest failed" });
+  }
+});
+
+app.get("/api/usage/summary", requireUsageReader, async (req, res) => {
+  try {
+    const report = await usageReport({ ...req.query, limit: 1, offset: 0 });
+    res.setHeader("Cache-Control", "no-store");
+    res.json({
+      ok: true,
+      range: report.range,
+      from: report.from,
+      to: report.to,
+      summary: report.summary,
+      total: report.total,
+    });
+  } catch (err) {
+    console.error("[/api/usage/summary]", err);
+    res.status(500).json({ ok: false, error: "usage summary failed" });
+  }
+});
+
+app.get("/api/usage/prompts", requireUsageReader, async (req, res) => {
+  try {
+    const report = await usageReport(req.query || {});
+    res.setHeader("Cache-Control", "no-store");
+    res.json(report);
+  } catch (err) {
+    console.error("[/api/usage/prompts]", err);
+    res.status(500).json({ ok: false, error: "usage prompts failed" });
   }
 });
 

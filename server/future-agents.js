@@ -17,6 +17,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { isEducationUser } from "./education-data.js";
+import { personFromEmail } from "./usage-log.js";
 import {
   patchChatHistoryScheduled,
   patchChatHistoryVisibility,
@@ -301,6 +302,7 @@ export function normalizeFutureAgentRecord(raw) {
     status,
     workspace,
     email,
+    person: String(raw?.person || "").trim() || personFromEmail(email),
     prompt: String(raw?.prompt || "").trim(),
     context: String(raw?.context || "").trim(),
     origin: cleanOrigin(raw?.origin),
@@ -399,6 +401,7 @@ export function publicFutureAgentEntry(record) {
  *   context?: string,
  *   workspace?: string,
  *   email: string,
+ *   person?: string,
  *   origin?: object,
  *   root?: string,
  *   now?: number,
@@ -429,6 +432,7 @@ export async function scheduleFutureAgent(input) {
     status: "pending",
     workspace,
     email,
+    person: String(input?.person || "").trim() || personFromEmail(email),
     prompt,
     context,
     origin: cleanOrigin(input?.origin),
@@ -660,6 +664,7 @@ async function cliMain() {
       context: argValue("--context"),
       workspace: argValue("--workspace") || "personal",
       email: argValue("--email"),
+      person: argValue("--person"),
       origin,
     });
     process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);

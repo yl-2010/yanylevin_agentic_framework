@@ -146,7 +146,7 @@ export function jypeComposerScheduleLine(model, origin) {
     "When Composer 2.5 answers in this JYPE Teams chat, Live context bells are Yan's.",
     "Before you name a class time, alarm, or tomorrow for anyone in the thread, open that person's roster and that date's rotation.",
     "Files: people/<slug>/schedule.md and education/<email>/schedule.json.",
-    "Alex is alex-rivera / you@example.com. Example Friend is example-friend / xujeffery9@gmail.com. Example Neighbor is example-neighbor / everettedeng@gmail.com.",
+    "Alex is alex-rivera / you@example.com. Example Friend is example-friend / friend@example.com. Example Neighbor is example-neighbor / neighbor@example.com.",
     "Spanish at 8:30 only when that person's D block is first that day.",
   ].join(" ");
 }

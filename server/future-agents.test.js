@@ -16,7 +16,7 @@ import {
 } from "./future-agents.js";
 
 const YAN = "you@example.com";
-const JEFFERY = "xujeffery9@gmail.com";
+const JEFFERY = "friend@example.com";
 const RUN_AT = "2026-10-13T16:35:00.000Z";
 const NOW = Date.parse("2026-10-11T08:00:00.000Z");
 

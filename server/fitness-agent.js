@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isFitnessUser } from "./fitness-data.js";
 import { canonicalizeEmail } from "./identity.js";
+import { logSdkResult, personFromEmail } from "./usage-log.js";
 import { gitAddCommitPush } from "./git-publish.js";
 import {
   AUTO_MODEL_SELECTION,
@@ -348,6 +349,15 @@ export async function messageFitnessAgent(sessionId, email, message, ctx = {}) {
     },
   });
   const result = outcome.result;
+  await logSdkResult({
+    person: personFromEmail(normalized),
+    kind: "fitness-agent",
+    threadId: sid,
+    prompt: text,
+    model: outcome.model || model,
+    result,
+    always: true,
+  }).catch((err) => console.error("[usage] fitness log failed", err));
   let content =
     result && typeof result.result === "string" ? result.result.trim() : "";
   if (!content) {
