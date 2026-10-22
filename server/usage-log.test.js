@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildClumps, filterClumps, kindFromPrefix, personFromEmail, summarizeClumps, tokensFromUsage } from "./usage-log.js";
+import { agentTypeLabel, buildClumps, filterClumps, kindFromPrefix, personFromEmail, summarizeClumps, threadLabelFromRows, tokensFromUsage } from "./usage-log.js";
 import { classifyLocalPrompt, projectRepo } from "./usage-local.js";
 
 describe("usage clumps", () => {
@@ -174,6 +174,39 @@ describe("usage clumps", () => {
     const other = clumps.find((row) => row.person === "Other");
     assert.equal(other.repo, "Other");
     assert.equal(other.prompt, "");
+  });
+
+  it("names a collapsed thread by agent type, not the prompt", () => {
+    assert.equal(agentTypeLabel({ kind: "life-state", prompt: "Follow the life-state skill." }), "life state");
+    assert.equal(
+      agentTypeLabel({
+        kind: "canvas-hourly",
+        prompt: "Called by Example Neighbor (not Yan) on Teams. personal-canvas sync.",
+      }),
+      "canvas hourly"
+    );
+    assert.equal(
+      agentTypeLabel({
+        kind: "jype-agent",
+        prompt: "Called by Example Neighbor (not Yan) on Teams. This is a group.",
+      }),
+      "Example Neighbor teams"
+    );
+    assert.equal(
+      threadLabelFromRows([
+        {
+          kind: "jype-agent",
+          at: "2026-10-21T18:00:00.000Z",
+          prompt: "Called by Example Neighbor (not Yan) on Teams. hello",
+        },
+        {
+          kind: "jype-agent",
+          at: "2026-10-21T18:05:00.000Z",
+          prompt: "what about the second message",
+        },
+      ]),
+      "Example Neighbor teams"
+    );
   });
 
   it("reads agent kind, caller, and repo from a local prompt", () => {

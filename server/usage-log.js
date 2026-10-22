@@ -18,6 +18,8 @@ export const USAGE_META_PATH = join(USAGE_DIR, "meta.json");
 const PROMPT_STORE_MAX = 80_000;
 const PROMPT_API_MAX = 8_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const CHAT_KINDS = new Set(["jype-agent", "personal-agent", "agent", "teams-agent"]);
+const CHANNEL_LABEL = { Teams: "teams", iMessage: "iMessage", WhatsApp: "WhatsApp" };
 
 /** @type {Promise<void>} */
 let writeChain = Promise.resolve();
@@ -36,8 +38,55 @@ export function personFromEmail(email) {
 }
 
 /**
- * @param {string} prefix
+ * Collapsed thread name. Scheduled jobs stay the kind ("life state", "canvas hourly").
+ * A chat turn named in the transcript is the person and channel ("Example Neighbor teams").
+ * @param {{ kind?: string, prompt?: string }} input
  */
+export function agentTypeLabel(input) {
+  const kind = String(input?.kind || "agent").trim() || "agent";
+  if (CHAT_KINDS.has(kind)) {
+    const called = String(input?.prompt || "").match(
+      /Called by ([A-Za-z]+)(?: \([^)]*\))? on (Teams|iMessage|WhatsApp)/
+    );
+    if (called) return called[1] + " " + (CHANNEL_LABEL[called[2]] || called[2].toLowerCase());
+  }
+  return kind.replace(/-/g, " ");
+}
+
+function personChannelLabel(label) {
+  return / (teams|iMessage|WhatsApp)$/.test(String(label || ""));
+}
+
+/**
+ * @param {{ label?: string, labelAt?: number }} thread
+ * @param {{ kind?: string, prompt?: string, at?: string }} row
+ */
+function applyThreadLabel(thread, row) {
+  const next = agentTypeLabel(row);
+  const rowTime = Date.parse(row.at || "") || 0;
+  if (personChannelLabel(next)) {
+    if (!personChannelLabel(thread.label) || rowTime >= (thread.labelAt || 0)) {
+      thread.label = next;
+      thread.labelAt = rowTime;
+    }
+    return;
+  }
+  if (personChannelLabel(thread.label) && CHAT_KINDS.has(String(row.kind || ""))) return;
+  if (!thread.label || rowTime >= (thread.labelAt || 0)) {
+    thread.label = next;
+    thread.labelAt = rowTime;
+  }
+}
+
+/**
+ * @param {object[]} rows
+ */
+export function threadLabelFromRows(rows) {
+  const thread = { label: "", labelAt: 0 };
+  for (const row of rows) applyThreadLabel(thread, row);
+  return thread.label || "agent";
+}
+
 export function kindFromPrefix(prefix) {
   const p = String(prefix || "").trim();
   if (!p || p === "test") return "unspecified";
@@ -949,7 +998,7 @@ export async function usageReport(query) {
       const key = row.threadId || row.id;
       const prev = threads.get(key);
       if (!prev) {
-        threads.set(key, {
+        const thread = {
           threadId: key,
           person: row.person,
           repo: row.repo,
@@ -959,8 +1008,11 @@ export async function usageReport(query) {
           count: 1,
           tokens: tokensFromUsage(row.tokens),
           chargedCents: num(row.chargedCents),
-          preview: clip(row.prompt, 180),
-        });
+          label: "",
+          labelAt: 0,
+        };
+        applyThreadLabel(thread, row);
+        threads.set(key, thread);
         continue;
       }
       prev.count += 1;
@@ -969,8 +1021,10 @@ export async function usageReport(query) {
       if (Date.parse(row.at) > Date.parse(prev.at)) {
         prev.at = row.at;
         prev.model = row.model || prev.model;
-        if (row.prompt) prev.preview = clip(row.prompt, 180);
+        prev.kind = row.kind || prev.kind;
+        prev.person = row.person || prev.person;
       }
+      applyThreadLabel(prev, row);
     }
     const list = [...threads.values()].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
     return {
@@ -1040,11 +1094,11 @@ function publicThread(row) {
     person: row.person,
     repo: row.repo,
     kind: row.kind,
+    label: row.label || agentTypeLabel(row),
     model: row.model,
     at: row.at,
     count: row.count,
     tokens: publicTokens(row.tokens),
     chargedCents: num(row.chargedCents),
-    preview: row.preview,
   };
 }
