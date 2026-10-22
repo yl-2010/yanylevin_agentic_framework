@@ -663,7 +663,9 @@ func jsonBool(_ value: Any?) -> Bool {
     return false
 }
 
-func bringForward(_ pid: pid_t) {
+var parkedFrontPid: pid_t = 0
+
+func activateApp(_ pid: pid_t) {
     guard pid > 0,
           let app = NSRunningApplication(processIdentifier: pid),
           let url = app.bundleURL else { return }
@@ -673,6 +675,29 @@ func bringForward(_ pid: pid_t) {
     try? task.run()
     task.waitUntilExit()
     usleep(400_000)
+}
+
+func bringForward(_ pid: pid_t) {
+    let front = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
+    if parkedFrontPid == 0, front > 0, front != pid {
+        parkedFrontPid = front
+    }
+    activateApp(pid)
+}
+
+func restorePayload() -> [String: Any] {
+    let pid = parkedFrontPid
+    parkedFrontPid = 0
+    guard pid > 0, let app = NSRunningApplication(processIdentifier: pid) else {
+        return ["ok": true, "restored": false]
+    }
+    activateApp(pid)
+    return [
+        "ok": true,
+        "restored": true,
+        "pid": Int(pid),
+        "app": app.localizedName ?? "",
+    ]
 }
 
 func postAtCursor(_ type: CGEventType, _ point: CGPoint, clickState: Int64) {
@@ -805,7 +830,6 @@ func clickPayload(_ body: [String: Any]) -> [String: Any] {
         let button: CGMouseButton = (body["button"] as? String) == "right" ? .right : .left
         let count = jsonInt(body["count"]) ?? 1
         if jsonBool(body["foreground"]) {
-            bringForward(pid)
             postRealClick(point: point, button: button, count: count)
         } else {
             clickPoint(pid: pid, point: point, button: button, count: count)
@@ -881,7 +905,6 @@ func dragPayload(_ body: [String: Any]) -> [String: Any] {
     let start = imagePointToCG(x1, y1)
     let end = imagePointToCG(x2, y2)
     if jsonBool(body["foreground"]) {
-        bringForward(pid)
         postAtCursor(.mouseMoved, start, clickState: 0)
         usleep(20_000)
         postAtCursor(.leftMouseDown, start, clickState: 1)
@@ -938,16 +961,14 @@ func setValuePayload(_ body: [String: Any]) -> [String: Any] {
 
 func actionPayload(_ body: [String: Any]) -> [String: Any] {
     let name = body["name"] as? String ?? "Press"
-    if name.lowercased() == "raise" {
-        return ["ok": false, "error": "refused: raising the window switches desktops"]
-    }
     return performOnElement(body) { el, pid, _ in
+        let token = axActionToken(name)
+        if name.lowercased() == "raise" || token == "AXRaise" {
+            bringForward(pid)
+            return ["ok": true]
+        }
         _ = Sky.focusWithoutRaise(pid: pid, windowID: lastWindowID)
         usleep(30_000)
-        let token = axActionToken(name)
-        if token == "AXRaise" {
-            return ["ok": false, "error": "refused: raising the window switches desktops"]
-        }
         let err = AXUIElementPerformAction(el, token as CFString)
         if err != .success { return ["ok": false, "error": "action failed (\(err.rawValue))"] }
         return ["ok": true]
@@ -974,6 +995,10 @@ func selectPayload(_ body: [String: Any]) -> [String: Any] {
 func handle(_ body: [String: Any]) -> [String: Any] {
     let cmd = body["cmd"] as? String ?? ""
     log("cmd \(cmd)")
+    if cmd != "restore", cmd != "state", jsonBool(body["foreground"]) {
+        let pid = pid_t(jsonInt(body["pid"]) ?? Int(lastPid))
+        if pid > 0 { bringForward(pid) }
+    }
     var reply: [String: Any]
     switch cmd {
     case "apps": reply = appsPayload()
@@ -986,6 +1011,7 @@ func handle(_ body: [String: Any]) -> [String: Any] {
     case "set_value": reply = setValuePayload(body)
     case "action": reply = actionPayload(body)
     case "select": reply = selectPayload(body)
+    case "restore": reply = restorePayload()
     default: reply = ["ok": false, "error": "unknown command"]
     }
     if let id = body["id"] { reply["id"] = id }

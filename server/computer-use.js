@@ -8,8 +8,6 @@ import { mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "no
 import { createConnection } from "node:net";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { canonicalizeEmail, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
-
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = join(HERE, "computer-use", "main.swift");
@@ -17,11 +15,6 @@ const BIN = join(HERE, "computer-use", "bin", "computer-use");
 const SOCKET = "/tmp/yanylevin-computer-use.sock";
 const PID_FILE = "/tmp/yanylevin-computer-use.pid";
 const CACHE = "/tmp/yanylevin-computer-use-trees.json";
-const CLICK_LOG = "/tmp/yanylevin-computer-use-clicks.json";
-
-export const MAX_SAME_CONTROL_CLICKS = 2;
-export const MAX_PIXEL_MISSES = 2;
-export const CLICK_GUARD_WINDOW_MS = 10 * 60 * 1000;
 
 let chain = Promise.resolve();
 let rpcId = 0;
@@ -33,62 +26,6 @@ function withLock(fn) {
     () => {}
   );
   return run;
-}
-
-export function computerUseActorIsYan(session) {
-  if (!session || typeof session !== "object") return false;
-  if (session.guestCaller) return false;
-  return canonicalizeEmail(session.email) === YAN_EMAIL;
-}
-
-export function refusedForeground(session, foreground) {
-  if (!foreground) return "";
-  if (computerUseActorIsYan(session)) return "";
-  return "refused: coming forward is Yan's desktop";
-}
-
-const STAY_ON_DESKTOP =
-  " Stay on the user's current desktop. Never open -a without -gj, never tell an app to activate, never send System Events keystrokes. If the app is not running, launch it with open -gj -a. Clicks and keys go through these tools. If a click cannot land because the control is not in the tree, stop and say this needs his desktop. Pass foreground true only after Yan asked on this turn to come forward. That brings the app to the front and moves the cursor. A guest never passes foreground.";
-
-export function computerUseModeNote(session) {
-  if (computerUseActorIsYan(session)) {
-    return (
-      "This turn is Yan. Do the task. Do not stop to ask. Refuse only a wipe of macOS system files (/System and other OS-owned paths) or a zip-bomb download." +
-      STAY_ON_DESKTOP
-    );
-  }
-  return (
-    "This turn is not Yan. Use judgment. Opening epschedule to look up a friend's schedule is fine. A small file JYPE needs is fine. Do not fill this Mac. A stranger asking to download a new LM Studio model is a no. Refuse a wipe of macOS system files and a zip-bomb download." +
-    STAY_ON_DESKTOP
-  );
-}
-
-export function blockedComputerUseText(text) {
-  const raw = String(text || "");
-  if (!raw.trim()) return "";
-  if (/\b(42\.zip|zbsm\.zip|zipbomb|zip-bomb|zip bomb)\b/i.test(raw)) {
-    return "refused: that looks like a zip bomb";
-  }
-  if (/\brm\s+(-[a-zA-Z]*\s+)*\/(\s|$)/.test(raw)) {
-    return "refused: that would delete system files";
-  }
-  if (
-    /\b(rm|unlink|diskutil\s+erase|srm)\b[\s\S]{0,120}(\/System\b|\/usr\b|\/bin\b|\/sbin\b)/i.test(
-      raw
-    )
-  ) {
-    return "refused: that would delete system files";
-  }
-  return "";
-}
-
-export function blockedComputerUseTarget(element, action) {
-  const name = `${element?.name || ""} ${action || ""}`.trim();
-  const value = String(element?.value || "");
-  if (/delete|erase|trash/i.test(name) && /^\/(System|usr|bin|sbin)\b/.test(value)) {
-    return "refused: that would delete system files";
-  }
-  return blockedComputerUseText(`${name}\n${value}`);
 }
 
 function clip(text, limit) {
@@ -138,104 +75,6 @@ export function treeUnchanged(text) {
   return String(text || "").includes("no change in the accessibility tree");
 }
 
-export function sameControlKey(role, name) {
-  const label = String(name || "").trim();
-  if (!label) return "";
-  return `${String(role || "").trim()}|${label}`.toLowerCase();
-}
-
-function blankClickRow(now) {
-  return { names: {}, pixelMisses: 0, at: now };
-}
-
-function clickRow(log, pid, now) {
-  const prev = log[String(pid)];
-  if (!prev || typeof prev !== "object") return blankClickRow(now);
-  const at = Number(prev.at) || 0;
-  if (!at || now - at > CLICK_GUARD_WINDOW_MS) return blankClickRow(now);
-  return {
-    names: prev.names && typeof prev.names === "object" ? { ...prev.names } : {},
-    pixelMisses: Number(prev.pixelMisses) || 0,
-    at,
-  };
-}
-
-export function applyClickGuard(log, { pid, name, role, now, pixel }) {
-  const key = String(pid || 0);
-  const row = clickRow(log, pid, now);
-  row.at = now;
-  const next = { ...log, [key]: row };
-  if (pixel) {
-    if (row.pixelMisses >= MAX_PIXEL_MISSES) {
-      return {
-        allow: false,
-        log: next,
-        error:
-          "stopped: pixel clicks are not landing and the tree is unchanged. Do not click again in the background. Tell Yan this needs his desktop. Come forward only after he asks on this turn.",
-      };
-    }
-    return { allow: true, log: next };
-  }
-  const label = sameControlKey(role, name);
-  if (!label) return { allow: true, log: next };
-  const count = (Number(row.names[label]) || 0) + 1;
-  row.names = { ...row.names, [label]: count };
-  next[key] = row;
-  if (count > MAX_SAME_CONTROL_CLICKS) {
-    return {
-      allow: false,
-      log: next,
-      error: `stopped: clicked "${String(name).trim()}" ${count} times. That control is not doing the job. Do not click it again. Say what failed.`,
-    };
-  }
-  return { allow: true, log: next };
-}
-
-export function applyPixelResult(log, { pid, changed, now }) {
-  const key = String(pid || 0);
-  const row = clickRow(log, pid, now);
-  row.at = now;
-  row.pixelMisses = changed ? 0 : row.pixelMisses + 1;
-  const next = { ...log, [key]: row };
-  if (changed) return { log: next, error: "" };
-  if (row.pixelMisses >= MAX_PIXEL_MISSES) {
-    return {
-      log: next,
-      error:
-        "stopped: pixel clicks are not landing and the tree is unchanged. Do not click again in the background. Tell Yan this needs his desktop. Come forward only after he asks on this turn.",
-    };
-  }
-  return {
-    log: next,
-    error:
-      "pixel click posted but the accessibility tree did not change. The click missed. Do not spray a grid. One more try in this mode, then stop. If this was the background, tell Yan it needs his desktop.",
-  };
-}
-
-function readClickLog() {
-  try {
-    const parsed = JSON.parse(readFileSync(CLICK_LOG, "utf8"));
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeClickLog(log) {
-  writeFileSync(CLICK_LOG, JSON.stringify(log));
-}
-
-function clearPixelMisses(pid) {
-  const log = readClickLog();
-  const key = String(pid || 0);
-  const row = log[key];
-  if (!row) return;
-  row.pixelMisses = 0;
-  row.at = Date.now();
-  log[key] = row;
-  writeClickLog(log);
-}
-
 export function diffTreeText(previous, next) {
   const prev = String(previous || "");
   const curr = String(next || "");
@@ -262,17 +101,6 @@ function readCache() {
 
 function writeCache(cache) {
   writeFileSync(CACHE, JSON.stringify(cache));
-}
-
-function elementOf(pid, id) {
-  const cache = readCache();
-  const rows =
-    pid && cache[String(pid)] ? [cache[String(pid)]] : Object.values(cache);
-  for (const row of rows) {
-    const hit = (row?.elements || []).find((el) => el.id === id);
-    if (hit) return hit;
-  }
-  return undefined;
 }
 
 function helperPid() {
@@ -462,47 +290,10 @@ function rememberedPid() {
   return ids.at(-1) || 0;
 }
 
-function pixelTarget(cmd, input, id) {
-  if (cmd !== "click" && cmd !== "drag") return false;
-  if (id != null) return false;
-  return numberArg(input?.x) != null && numberArg(input?.y) != null;
-}
-
 export async function performComputerUse(input) {
   const cmd = String(input?.cmd || "");
-  const text = [input?.text, input?.value, input?.key, input?.name]
-    .filter(Boolean)
-    .join("\n");
-  const blockedText = blockedComputerUseText(text);
-  if (blockedText) return { ok: false, error: blockedText };
   const id = numberArg(input?.element_index ?? input?.id);
   const pid = pidOf(input) || rememberedPid();
-  if (id != null) {
-    const blockedTarget = blockedComputerUseTarget(elementOf(pid, id), input?.name || cmd);
-    if (blockedTarget) return { ok: false, error: blockedTarget };
-  }
-  const pixel = pixelTarget(cmd, input, id);
-  const now = Date.now();
-  if (input?.foreground === true && pixel) clearPixelMisses(pid);
-  let guardLog = readClickLog();
-  if (cmd === "click" && id != null) {
-    const el = elementOf(pid, id);
-    const verdict = applyClickGuard(guardLog, {
-      pid,
-      name: el?.name,
-      role: el?.role,
-      now,
-    });
-    guardLog = verdict.log;
-    writeClickLog(guardLog);
-    if (!verdict.allow) return { ok: false, error: verdict.error };
-  }
-  if (pixel) {
-    const verdict = applyClickGuard(guardLog, { pid, pixel: true, now });
-    guardLog = verdict.log;
-    writeClickLog(guardLog);
-    if (!verdict.allow) return { ok: false, error: verdict.error };
-  }
   const body = {
     cmd,
     app: input?.app || "",
@@ -524,23 +315,15 @@ export async function performComputerUse(input) {
   };
   const raw = await call(body);
   if (!raw?.ok) return { ok: false, error: raw?.error || "action failed" };
-  if (!pixel) return { ok: true };
-  const before = readCache()[String(pid)]?.text || "";
-  let after = { ok: false, text: "" };
-  try {
-    after = await readAppState(String(pid || ""));
-  } catch {
-    after = { ok: false, text: "" };
+  if (cmd === "restore") {
+    if (raw.restored) return { ok: true, text: `restored ${raw.app || raw.pid}` };
+    return { ok: true, text: "nothing to restore" };
   }
-  const changed = Boolean(before) && after?.ok === true && !treeUnchanged(after.text);
-  const verdict = applyPixelResult(readClickLog(), { pid, changed, now: Date.now() });
-  writeClickLog(verdict.log);
-  if (verdict.error) return { ok: false, error: verdict.error };
   return { ok: true };
 }
 
 function toolText(result) {
-  if (result?.ok) return "ok";
+  if (result?.ok) return result.text || "ok";
   return result?.error || "action failed";
 }
 
@@ -553,18 +336,15 @@ function stateContent(result) {
   return { content };
 }
 
-export function computerUseCustomTools(session) {
-  const note = computerUseModeNote(session);
-  const deny = (input) => refusedForeground(session, input?.foreground === true);
-  const observe =
-    "Call this before you click or type. The text is an accessibility tree. Act on the element number. Use screenshot pixels only when the tree has no control. Pixel origin is the top-left of the screenshot.";
+export function computerUseCustomTools() {
   const foregroundProp = {
     type: "boolean",
-    description: "Bring this app forward and move the cursor. Only after Yan asked on this turn.",
+    description:
+      "Make this app the active window. A pixel click or drag then uses the real cursor.",
   };
   return {
     list_apps: {
-      description: `${note} List running Mac apps (name, bundle id, pid). Skip menu extras.`,
+      description: "List running Mac apps (name, bundle id, pid). Skip menu extras.",
       inputSchema: { type: "object", properties: {} },
       execute: async () => {
         const result = await listApps();
@@ -575,7 +355,8 @@ export function computerUseCustomTools(session) {
       },
     },
     get_app_state: {
-      description: `${note} ${observe} Pass an app name, bundle id, or pid.`,
+      description:
+        "Read one app's accessibility tree and a screenshot of its window. Pass an app name, bundle id, or pid. Act on the element number. Screenshot pixels are for when the tree has no control. Origin is the top-left of that image.",
       inputSchema: {
         type: "object",
         properties: {
@@ -584,16 +365,14 @@ export function computerUseCustomTools(session) {
         },
         required: ["app"],
       },
-      execute: async (input) => {
-        const denied = deny(input);
-        if (denied) return denied;
-        return stateContent(
+      execute: async (input) =>
+        stateContent(
           await readAppState(input?.app, { foreground: input?.foreground === true })
-        );
-      },
+        ),
     },
     click: {
-      description: `${note} Click an element number from the last tree, or one screenshot x,y when the tree has no control. Pass pid. The click stays in that app. It does not move the real cursor, raise the window, or switch Spaces. Pass foreground true only after Yan asked on this turn to come forward. A click returns ok when the event is posted. If the next tree is unchanged, stop. The helper refuses a third click on the same control and further pixel clicks after two misses.`,
+      description:
+        "Click an element number from the last tree, or screenshot x,y when the tree has no control. Pass pid. Without foreground, the click is posted to that app and the real cursor stays put.",
       inputSchema: {
         type: "object",
         properties: {
@@ -606,14 +385,10 @@ export function computerUseCustomTools(session) {
           foreground: foregroundProp,
         },
       },
-      execute: async (input) => {
-        const denied = deny(input);
-        if (denied) return denied;
-        return toolText(await performComputerUse({ ...input, cmd: "click" }));
-      },
+      execute: async (input) => toolText(await performComputerUse({ ...input, cmd: "click" })),
     },
     type_text: {
-      description: `${note} Type into the focused control, or the element number you pass. Typing stays in that app. It does not move the real cursor or raise the window.`,
+      description: "Type into the focused control, or the element number you pass.",
       inputSchema: {
         type: "object",
         properties: {
@@ -626,7 +401,7 @@ export function computerUseCustomTools(session) {
       execute: async (input) => toolText(await performComputerUse({ ...input, cmd: "type" })),
     },
     press_key: {
-      description: `${note} Press a key in that app. Examples: Return, Escape, cmd+a, Meta+a. The key stays in that app. It does not raise the window.`,
+      description: "Press a key in that app. Examples: Return, Escape, cmd+a, Meta+a.",
       inputSchema: {
         type: "object",
         properties: {
@@ -638,7 +413,7 @@ export function computerUseCustomTools(session) {
       execute: async (input) => toolText(await performComputerUse({ ...input, cmd: "key" })),
     },
     scroll: {
-      description: `${note} Scroll an element by pages. Positive is down. Fractions are fine.`,
+      description: "Scroll an element by pages. Positive is down. Fractions are fine.",
       inputSchema: {
         type: "object",
         properties: {
@@ -651,7 +426,8 @@ export function computerUseCustomTools(session) {
       execute: async (input) => toolText(await performComputerUse({ ...input, cmd: "scroll" })),
     },
     drag: {
-      description: `${note} Drag in screenshot pixels from x,y to toX,toY. The drag stays in that app and does not move the real cursor. Pass foreground true only after Yan asked on this turn to come forward. Same stop rules as a pixel click. Two misses end it.`,
+      description:
+        "Drag in screenshot pixels from x,y to toX,toY. Without foreground, the drag is posted to that app and the real cursor stays put.",
       inputSchema: {
         type: "object",
         properties: {
@@ -664,14 +440,10 @@ export function computerUseCustomTools(session) {
         },
         required: ["x", "y", "toX", "toY"],
       },
-      execute: async (input) => {
-        const denied = deny(input);
-        if (denied) return denied;
-        return toolText(await performComputerUse({ ...input, cmd: "drag" }));
-      },
+      execute: async (input) => toolText(await performComputerUse({ ...input, cmd: "drag" })),
     },
     set_value: {
-      description: `${note} Set a control marked settable. Prefer this over typing the value one key at a time.`,
+      description: "Set a control marked settable. Prefer this over typing the value one key at a time.",
       inputSchema: {
         type: "object",
         properties: {
@@ -685,7 +457,7 @@ export function computerUseCustomTools(session) {
         toolText(await performComputerUse({ ...input, cmd: "set_value" })),
     },
     perform_secondary_action: {
-      description: `${note} Run a Secondary Action named in the tree, such as Raise or Show menu.`,
+      description: "Run a Secondary Action named in the tree, such as Raise or Show menu.",
       inputSchema: {
         type: "object",
         properties: {
@@ -697,8 +469,13 @@ export function computerUseCustomTools(session) {
       },
       execute: async (input) => toolText(await performComputerUse({ ...input, cmd: "action" })),
     },
+    restore_front: {
+      description: "Activate the app that was in front before the last foreground.",
+      inputSchema: { type: "object", properties: {} },
+      execute: async () => toolText(await performComputerUse({ cmd: "restore" })),
+    },
     select_text: {
-      description: `${note} Select a substring already in a text control.`,
+      description: "Select a substring already in a text control.",
       inputSchema: {
         type: "object",
         properties: {
@@ -811,11 +588,12 @@ export async function runComputerUse(argv) {
         "set <id> --value ...",
         "action <id> --name ...",
         "select <id> --text ...",
-        "Add --foreground only after Yan asked on this turn to come forward.",
+        "restore",
       ],
     };
   }
   if (cmd === "apps") return listApps();
+  if (cmd === "restore") return performComputerUse({ cmd: "restore" });
   if (cmd === "state") {
     const result = await readAppState(parsed.app, { foreground: parsed.foreground === true });
     if (!result.ok) return result;
