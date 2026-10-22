@@ -322,33 +322,48 @@ func captureWindow(pid: pid_t, title: String) -> (data: Data, size: CGSize, orig
         do {
             let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
             let owned = content.windows.filter { $0.owningApplication?.processID == pid }
-            let match = owned.first { $0.title == title && !title.isEmpty } ?? owned.first { $0.isOnScreen } ?? owned.first
-            guard let window = match else { return }
-            let filter = SCContentFilter(desktopIndependentWindow: window)
-            let config = SCStreamConfiguration()
-            config.width = max(1, Int(window.frame.width.rounded()))
-            config.height = max(1, Int(window.frame.height.rounded()))
-            config.showsCursor = false
-            config.captureResolution = .best
-            let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
-            let bounds = CGRect(origin: window.frame.origin, size: window.frame.size)
-            if let jpeg = jpegData(image, bounds: bounds) {
-                lastWindowID = window.windowID
-                lastWindowSize = window.frame.size
-                shot = (jpeg.data, jpeg.size, bounds.origin)
+            let titled = owned.filter { $0.title == title && !title.isEmpty }
+            let popovers = owned.filter { window in
+                let frame = window.frame
+                let name = window.title ?? ""
+                return name.isEmpty && frame.width > 200 && frame.width < 700 && frame.height > 200 && frame.height < 900
+            }.sorted { $0.frame.minX < $1.frame.minX }
+            // A titled window often fails to capture while a popover is up. Try each until one images.
+            for window in popovers + titled {
+                do {
+                    let filter = SCContentFilter(desktopIndependentWindow: window)
+                    let config = SCStreamConfiguration()
+                    config.width = max(1, Int(window.frame.width.rounded()))
+                    config.height = max(1, Int(window.frame.height.rounded()))
+                    config.showsCursor = false
+                    config.captureResolution = .best
+                    let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+                    let bounds = CGRect(origin: window.frame.origin, size: window.frame.size)
+                    if let jpeg = jpegData(image, bounds: bounds) {
+                        lastWindowID = window.windowID
+                        lastWindowSize = window.frame.size
+                        shot = (jpeg.data, jpeg.size, bounds.origin)
+                        log("shot \(window.windowID) \(Int(window.frame.width))x\(Int(window.frame.height))")
+                        return
+                    }
+                } catch {
+                    log("capture \(window.windowID) \(error)")
+                }
             }
         } catch {
             log("capture \(error)")
         }
     }
-    _ = sem.wait(timeout: .now() + 8)
+    _ = sem.wait(timeout: .now() + 15)
     return shot
 }
 
 func imagePointToCG(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+    let scale = max(lastScale, 0.01)
+    // SCWindow.frame origin is the top-left of the window. CGEvent location is bottom-left global.
     let ax = CGPoint(
-        x: lastWindowOrigin.x + (x / max(lastScale, 0.01)),
-        y: lastWindowOrigin.y + (y / max(lastScale, 0.01))
+        x: lastWindowOrigin.x + (x / scale),
+        y: lastWindowOrigin.y + (y / scale)
     )
     return cgPointFromTop(ax: ax)
 }
@@ -466,8 +481,11 @@ func screenToWindowLocal(_ point: CGPoint) -> CGPoint {
 
 func deliverMouse(_ pid: pid_t, _ event: CGEvent) {
     event.timestamp = clock_gettime_nsec_np(CLOCK_UPTIME_RAW)
-    _ = Sky.post(pid, event, auth: false)
-    event.postToPid(pid)
+    // Same authenticated post as keys. An unauthenticated mouse event is
+    // dropped unless the app is frontmost, and making it frontmost switches Spaces.
+    if !Sky.post(pid, event, auth: true) {
+        event.postToPid(pid)
+    }
 }
 
 func deliverKey(_ pid: pid_t, _ event: CGEvent) {
@@ -855,7 +873,9 @@ func actionPayload(_ body: [String: Any]) -> [String: Any] {
     if name.lowercased() == "raise" {
         return ["ok": false, "error": "refused: raising the window switches desktops"]
     }
-    return performOnElement(body) { el, _, _ in
+    return performOnElement(body) { el, pid, _ in
+        _ = Sky.focusWithoutRaise(pid: pid, windowID: lastWindowID)
+        usleep(30_000)
         let token = axActionToken(name)
         if token == "AXRaise" {
             return ["ok": false, "error": "refused: raising the window switches desktops"]
