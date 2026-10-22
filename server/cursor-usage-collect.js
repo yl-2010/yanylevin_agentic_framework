@@ -9,6 +9,7 @@ import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { homedir, hostname } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { refreshLocalIndex } from "./usage-local.js";
 
 const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const STATE_PATH = join(ROOT, "data", "usage", "collector-state.json");
@@ -430,6 +431,11 @@ function billingRow(ev) {
 }
 
 async function tick() {
+  try {
+    await refreshLocalIndex();
+  } catch (err) {
+    console.error("[usage-collect] local index", err instanceof Error ? err.message : err);
+  }
   const state = await readState();
   const person = await personName();
   const folders = await workspaceFolders();

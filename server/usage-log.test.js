@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { buildClumps, filterClumps, kindFromPrefix, personFromEmail, summarizeClumps, tokensFromUsage } from "./usage-log.js";
+import { classifyLocalPrompt, projectRepo } from "./usage-local.js";
 
 describe("usage clumps", () => {
   it("names the account and maps nightly prefixes", () => {
@@ -121,6 +122,95 @@ describe("usage clumps", () => {
     assert.equal(parent.tokens.input, 8);
     assert.equal(parent.tokens.cacheRead, 4);
     assert.equal(clumps.some((row) => row.prompt === "still here"), true);
+  });
+
+  it("tags a local transcript and keeps off-machine billing as Other", () => {
+    const index = new Map([
+      ["agent-1", { person: "Alex", repo: "yanylevin-agents", kind: "jype-agent", prompt: "what is due" }],
+    ]);
+    const clumps = buildClumps(
+      [
+        {
+          id: "bill:a",
+          source: "billing",
+          at: "2026-10-20T18:00:00.000Z",
+          usageEventId: "a",
+          conversationId: "agent-1",
+          model: "grok-4.7-high",
+          chargedCents: 4,
+          tokens: tokensFromUsage({ inputTokens: 10, outputTokens: 2, cacheReadTokens: 3, cacheWriteTokens: 1 }),
+        },
+        {
+          id: "bill:b",
+          source: "billing",
+          at: "2026-10-20T18:00:20.000Z",
+          usageEventId: "b",
+          conversationId: "agent-1",
+          model: "grok-4.7-high",
+          chargedCents: 1,
+          tokens: tokensFromUsage({ inputTokens: 5, outputTokens: 1, cacheReadTokens: 1 }),
+        },
+        {
+          id: "bill:c",
+          source: "billing",
+          at: "2026-10-20T19:00:00.000Z",
+          usageEventId: "c",
+          conversationId: "laptop",
+          model: "composer-2.5",
+          chargedCents: 2,
+          tokens: tokensFromUsage({ inputTokens: 8, outputTokens: 1 }),
+        },
+      ],
+      index
+    );
+    assert.equal(clumps.length, 2);
+    const jype = clumps.find((row) => row.kind === "jype-agent");
+    assert.equal(jype.person, "Alex");
+    assert.equal(jype.repo, "yanylevin-agents");
+    assert.equal(jype.prompt, "what is due");
+    assert.equal(jype.tokens.input, 15);
+    assert.equal(jype.tokens.cacheRead, 4);
+    assert.equal(jype.chargedCents, 5);
+    const other = clumps.find((row) => row.person === "Other");
+    assert.equal(other.repo, "Other");
+    assert.equal(other.prompt, "");
+  });
+
+  it("reads agent kind, caller, and repo from a local prompt", () => {
+    const life = classifyLocalPrompt(
+      "<timestamp>x</timestamp>\n<user_query>Follow the life-state skill (.cursor/skills/life-state/SKILL.md).\nRun it.</user_query>",
+      "yanylevin"
+    );
+    assert.equal(life.kind, "life-state");
+    assert.equal(life.repo, "yanylevin-agents");
+    assert.equal(life.person, "Yan");
+    assert.match(life.prompt, /life-state skill/);
+    const jype = classifyLocalPrompt("You are the JYPE agent for the group.\nFrom Alex in Teams.", "yanylevin");
+    assert.equal(jype.person, "Alex");
+    assert.equal(jype.kind, "jype-agent");
+    assert.equal(jype.repo, "yanylevin-agents");
+    const title = classifyLocalPrompt("Reply with only a short chat list title for this first user message.\nMessage:\nsend a sticker", "yanylevin");
+    assert.equal(title.kind, "chat-title");
+    assert.equal(title.prompt, "send a sticker");
+    const caller = classifyLocalPrompt("Signed-in user: owner@example.com (Yan).\nFrom Example Friend on Teams:\nhello", "yanylevin");
+    assert.equal(caller.person, "Example Friend");
+    const desk = classifyLocalPrompt("<user_query>plan a site</user_query>", "sockethr");
+    assert.equal(desk.repo, "sockethr");
+    assert.equal(desk.kind, "agent");
+    assert.equal(desk.prompt, "plan a site");
+    const home = "/Users/yanlevin";
+    const known = new Set([
+      "/Users/you/github",
+      "$HOME/yanylevin_agentic_framework",
+      "$HOME/yanylevin_agentic_framework/.git",
+      "$HOME/yanylevin_agentic_framework/data",
+      "$HOME/yanylevin_agentic_framework/data/study",
+    ]);
+    assert.equal(
+      projectRepo("Users-yanlevin-github-yanylevin-data-study-abcdefabcdefabcdefabcd", home, (path) => known.has(path)),
+      "yanylevin"
+    );
+    assert.equal(projectRepo("var-folders-tmp", home, () => false), "temp");
   });
 });
 

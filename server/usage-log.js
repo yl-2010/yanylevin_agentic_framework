@@ -1,6 +1,6 @@
 /**
  * Cursor usage clumps. One user prompt is one row.
- * Billing events that never join a prompt stay person Other, repo Other.
+ * Billing events that never join a prompt or a local transcript stay person Other, repo Other.
  * Files stay on the Mac under data/usage/. Gitignored.
  */
 
@@ -411,8 +411,9 @@ function stringList(value) {
 
 /**
  * @param {object[]} rows
+ * @param {Map<string, { person?: string, repo?: string, kind?: string, prompt?: string }>|null} [local]
  */
-export function buildClumps(rows) {
+export function buildClumps(rows, local = null) {
   const all = latestById(rows);
   const billing = all.filter((r) => r.source === "billing");
   const prompts = all.filter((r) => r.source === "sdk" || r.source === "desktop");
@@ -445,9 +446,39 @@ export function buildClumps(rows) {
   const folded = foldSubagents(clumps);
   clumps.length = 0;
   clumps.push(...folded);
+  const index = local instanceof Map ? local : new Map();
+  /** @type {Map<string, object[]>} */
+  const localGroups = new Map();
   for (const bill of billing) {
     if (explained.has(bill.id)) continue;
-    clumps.push(billingOnlyClump(bill));
+    const conv = String(bill.conversationId || "");
+    if (!conv || !index.has(conv)) {
+      clumps.push(billingOnlyClump(bill));
+      continue;
+    }
+    const list = localGroups.get(conv) || [];
+    list.push(bill);
+    localGroups.set(conv, list);
+  }
+  for (const [conv, list] of localGroups) {
+    const hit = index.get(conv) || {};
+    clumps.push(
+      toClump(
+        {
+          id: `local:${conv}`,
+          source: "local",
+          at: list.map((bill) => bill.at).sort().at(-1) || "",
+          person: hit.person || "Yan",
+          repo: hit.repo || "Other",
+          kind: hit.kind || "agent",
+          model: dominantModel(list),
+          prompt: hit.prompt || "",
+          threadId: conv,
+          tokens: emptyTokens(),
+        },
+        list
+      )
+    );
   }
   clumps.sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0));
   return clumps;
@@ -561,6 +592,19 @@ function matchDesktopGroups(desktops, billing, byEvent, explained) {
 /**
  * @param {string} model
  */
+/**
+ * @param {object[]} bills
+ */
+function dominantModel(bills) {
+  /** @type {Map<string, number>} */
+  const score = new Map();
+  for (const bill of bills) {
+    const model = String(bill.model || "");
+    score.set(model, (score.get(model) || 0) + (Number(bill.chargedCents) || 0) + 0.0001);
+  }
+  return [...score.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || "";
+}
+
 function modelFamily(model) {
   return String(model || "")
     .toLowerCase()
@@ -878,12 +922,21 @@ export async function resolveRange(query, now = Date.now()) {
 export async function usageReport(query) {
   const bounds = await resolveRange(query);
   const rows = await readRows(USAGE_ROWS_PATH);
-  const clumps = filterClumps(buildClumps(rows), {
-    ...query,
-    from: bounds.from,
-    to: bounds.to,
-  });
+  const { localIndexForReport } = await import("./usage-local.js");
+  const built = buildClumps(rows, await localIndexForReport());
+  const ranged = filterClumps(built, { from: bounds.from, to: bounds.to });
+  const clumps = filterClumps(ranged, query);
   const summary = summarizeClumps(clumps);
+  summary.byPerson = summarizeClumps(filterClumps(ranged, { ...query, person: "" })).byPerson;
+  summary.byModel = summarizeClumps(filterClumps(ranged, { ...query, model: "" })).byModel;
+  summary.byRepo = summarizeClumps(filterClumps(ranged, { ...query, repo: "" })).byRepo;
+  summary.byKind = summarizeClumps(filterClumps(ranged, { ...query, kind: "" })).byKind;
+  summary.facets = {
+    person: facetNames(ranged, "person"),
+    model: facetNames(ranged, "model"),
+    repo: facetNames(ranged, "repo"),
+    kind: facetNames(ranged, "kind"),
+  };
   summary.plan = await readPlan();
   const group = String(query.group || "");
   const offset = Math.max(0, Number(query.offset) || 0);
@@ -942,6 +995,16 @@ export async function usageReport(query) {
 /**
  * @param {object} row
  */
+/**
+ * @param {object[]} rows
+ * @param {string} key
+ */
+function facetNames(rows, key) {
+  return [...new Set(rows.map((row) => String(row[key] || "").trim()).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b)
+  );
+}
+
 function publicClump(row) {
   const prompt = String(row.prompt || "");
   return {
