@@ -10,7 +10,9 @@ disable-model-invocation: true
 
 # Mac apps
 
-The helper is `server/computer-use.js`. It reads an app's accessibility tree and posts clicks and keystrokes to that app. The real cursor stays put.
+The helper is `server/computer-use.js`. It reads an app's accessibility tree and posts clicks and keystrokes to that app. The real cursor stays put. The user's Space stays put. An app on another desktop stays on that desktop.
+
+Do not `open -a` without `-gj`. Do not `tell application "…" to activate`. Do not send keystrokes through System Events. Those switch desktops. If the app is not running, `open -gj -a AppName`, then use this helper.
 
 Express, iOS, web, and `@agent` get tools: `list_apps`, `get_app_state`, `click`, `type_text`, `press_key`, `scroll`, `drag`, `set_value`, `perform_secondary_action`, `select_text`.
 
@@ -27,7 +29,7 @@ node server/computer-use.js set 2 --value "hello"
 
 1. `list_apps` if you do not already know the pid.
 2. `get_app_state` before every action. Act on the element number. `set_value` when the line says settable.
-3. Screenshot pixels only when the tree has no control. Origin is the top-left of that image. A pixel click, a drag, and typing stay in that app. They do not move the real cursor or bring the window forward. Check the next tree before counting a click as a hit.
+3. Screenshot pixels only when the tree has no control. Origin is the top-left of that image. A pixel click, a drag, and typing stay in that app. They do not move the real cursor, bring the window forward, or switch Spaces. Check the next tree before counting a click as a hit.
 4. `get_app_state` again. The next result is a diff. An unchanged tree means the click missed. Stop that approach. Do not walk nearby pixels, and do not reopen the same menu.
 
 One app at a time. A second chat waits.

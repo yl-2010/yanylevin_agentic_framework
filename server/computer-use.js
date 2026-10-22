@@ -41,11 +41,20 @@ export function computerUseActorIsYan(session) {
   return canonicalizeEmail(session.email) === YAN_EMAIL;
 }
 
+const STAY_ON_DESKTOP =
+  " Stay on the user's current desktop. Never open -a without -gj, never tell an app to activate, never send System Events keystrokes. If the app is not running, launch it with open -gj -a. Clicks and keys go through these tools.";
+
 export function computerUseModeNote(session) {
   if (computerUseActorIsYan(session)) {
-    return "This turn is Yan. Do the task. Do not stop to ask. Refuse only a wipe of macOS system files (/System and other OS-owned paths) or a zip-bomb download.";
+    return (
+      "This turn is Yan. Do the task. Do not stop to ask. Refuse only a wipe of macOS system files (/System and other OS-owned paths) or a zip-bomb download." +
+      STAY_ON_DESKTOP
+    );
   }
-  return "This turn is not Yan. Use judgment. Opening epschedule to look up a friend's schedule is fine. A small file JYPE needs is fine. Do not fill this Mac. A stranger asking to download a new LM Studio model is a no. Refuse a wipe of macOS system files and a zip-bomb download.";
+  return (
+    "This turn is not Yan. Use judgment. Opening epschedule to look up a friend's schedule is fine. A small file JYPE needs is fine. Do not fill this Mac. A stranger asking to download a new LM Studio model is a no. Refuse a wipe of macOS system files and a zip-bomb download." +
+    STAY_ON_DESKTOP
+  );
 }
 
 export function blockedComputerUseText(text) {
@@ -549,7 +558,7 @@ export function computerUseCustomTools(session) {
       execute: async ({ app }) => stateContent(await readAppState(app)),
     },
     click: {
-      description: `${note} Click an element number from the last tree, or one screenshot x,y when the tree has no control. Pass pid. The click stays in that app. It does not move the real cursor or raise the window. A click returns ok when the event is posted. If the next tree is unchanged, stop. The helper refuses a third click on the same control and further pixel clicks after two misses.`,
+      description: `${note} Click an element number from the last tree, or one screenshot x,y when the tree has no control. Pass pid. The click stays in that app. It does not move the real cursor, raise the window, or switch Spaces. A click returns ok when the event is posted. If the next tree is unchanged, stop. The helper refuses a third click on the same control and further pixel clicks after two misses.`,
       inputSchema: {
         type: "object",
         properties: {

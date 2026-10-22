@@ -138,9 +138,8 @@ func axFrame(_ el: AXUIElement) -> CGRect? {
 }
 
 func plainAction(_ name: String) -> String? {
-    if name == "AXPress" || name == "AXShowMenu" && false { return nil }
+    if name == "AXPress" || name == "AXRaise" { return nil }
     let known = [
-        "AXRaise": "Raise",
         "AXShowMenu": "Show menu",
         "AXPick": "Pick",
         "AXCancel": "Cancel",
@@ -173,7 +172,6 @@ func actionNames(_ el: AXUIElement) -> [String] {
 
 func axActionToken(_ label: String) -> String {
     let known = [
-        "raise": "AXRaise",
         "show menu": "AXShowMenu",
         "pick": "AXPick",
         "cancel": "AXCancel",
@@ -364,10 +362,6 @@ enum Sky {
     private typealias SetWindowLocFn = @convention(c) (CGEvent, CGPoint) -> Void
     private typealias FactoryFn = @convention(c) (AnyObject, Selector, UnsafeMutableRawPointer, Int32, UInt32) -> AnyObject?
     private typealias PostRecordFn = @convention(c) (UnsafeRawPointer, UnsafePointer<UInt8>) -> Int32
-    private typealias GetFrontFn = @convention(c) (UnsafeMutableRawPointer) -> Int32
-    private typealias OwnerFn = @convention(c) (UInt32, UInt32, UnsafeMutablePointer<UInt32>) -> Int32
-    private typealias ConnPsnFn = @convention(c) (UInt32, UnsafeMutableRawPointer) -> Int32
-    private typealias CidFn = @convention(c) () -> UInt32
 
     private static let sky: UnsafeMutableRawPointer? = dlopen(
         "/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight",
@@ -386,10 +380,6 @@ enum Sky {
     private static let setWindowLocFn: SetWindowLocFn? = sym("CGEventSetWindowLocation", as: SetWindowLocFn.self)
     private static let msgSendFn: FactoryFn? = sym("objc_msgSend", as: FactoryFn.self)
     private static let postRecordFn: PostRecordFn? = sym("SLPSPostEventRecordTo", as: PostRecordFn.self)
-    private static let getFrontFn: GetFrontFn? = sym("_SLPSGetFrontProcess", as: GetFrontFn.self)
-    private static let ownerFn: OwnerFn? = sym("SLSGetWindowOwner", as: OwnerFn.self)
-    private static let connPsnFn: ConnPsnFn? = sym("SLSGetConnectionPSN", as: ConnPsnFn.self)
-    private static let cidFn: CidFn? = sym("CGSMainConnectionID", as: CidFn.self)
     private static let authClass: AnyClass? = {
         _ = sky
         return NSClassFromString("SLSEventAuthenticationMessage")
@@ -428,47 +418,45 @@ enum Sky {
         setIntFn?(event, field, value)
     }
 
-    // AppKit-active without a raise. Skip SLPSSetFrontProcessWithOptions.
-    // 0x100 raises the window. 0x400 does not, and Chrome then drops the click.
-    static func focusWithoutRaise(windowID: CGWindowID) -> Bool {
-        guard windowID != 0,
-              let getFront = getFrontFn,
-              let post = postRecordFn,
-              let owner = ownerFn,
-              let psnOf = connPsnFn,
-              let cid = cidFn else { return false }
-        var prev = [UInt32](repeating: 0, count: 2)
-        var target = [UInt32](repeating: 0, count: 2)
-        let prevOk = prev.withUnsafeMutableBytes { raw in
-            getFront(raw.baseAddress!) == 0
+    // Make the window key without making the app frontmost.
+    // yabai window_manager_make_key_window: type 0x01 then 0x02, same PSN.
+    // The 0x0d record (byte 0x8a = 0x01) marks the process front and macOS
+    // follows that app onto its Space. Do not post that record.
+    static func focusWithoutRaise(pid: pid_t, windowID: CGWindowID) -> Bool {
+        guard windowID != 0, pid > 0, let post = postRecordFn else { return false }
+        var psn = [UInt32](repeating: 0, count: 2)
+        let psnOk = psn.withUnsafeMutableBytes { raw -> Bool in
+            guard let base = raw.baseAddress else { return false }
+            return GetProcessForPID(pid, base) == 0
         }
-        guard prevOk else { return false }
-        var ownerCid: UInt32 = 0
-        guard owner(cid(), UInt32(windowID), &ownerCid) == 0 else { return false }
-        let targetOk = target.withUnsafeMutableBytes { raw in
-            psnOf(ownerCid, raw.baseAddress!) == 0
-        }
-        guard targetOk else { return false }
+        guard psnOk else { return false }
         var buf = [UInt8](repeating: 0, count: 0xF8)
         buf[0x04] = 0xF8
-        buf[0x08] = 0x0D
+        buf[0x3A] = 0x10
+        for i in 0..<0x10 { buf[0x20 + i] = 0xFF }
         let wid = UInt32(windowID)
         buf[0x3C] = UInt8(wid & 0xFF)
         buf[0x3D] = UInt8((wid >> 8) & 0xFF)
         buf[0x3E] = UInt8((wid >> 16) & 0xFF)
         buf[0x3F] = UInt8((wid >> 24) & 0xFF)
-        func send(_ psn: [UInt32], _ marker: UInt8) -> Bool {
+        func send(_ kind: UInt8) {
             var bytes = buf
-            bytes[0x8A] = marker
-            return psn.withUnsafeBytes { raw in
+            bytes[0x08] = kind
+            psn.withUnsafeBytes { raw in
                 bytes.withUnsafeBufferPointer { bp in
-                    post(raw.baseAddress!, bp.baseAddress!) == 0
+                    guard let psnBase = raw.baseAddress, let ev = bp.baseAddress else { return }
+                    _ = post(psnBase, ev)
                 }
             }
         }
-        return send(prev, 0x02) && send(target, 0x01)
+        send(0x01)
+        send(0x02)
+        return true
     }
 }
+
+@_silgen_name("GetProcessForPID")
+func GetProcessForPID(_ pid: pid_t, _ psn: UnsafeMutableRawPointer) -> Int32
 
 func screenToWindowLocal(_ point: CGPoint) -> CGPoint {
     let height = NSScreen.screens.map { $0.frame.maxY }.max() ?? point.y
@@ -520,7 +508,7 @@ func clickPoint(pid: pid_t, point: CGPoint, button: CGMouseButton, count: Int) {
     let wid = lastWindowID
     let local = screenToWindowLocal(point)
     if wid != 0 {
-        _ = Sky.focusWithoutRaise(windowID: wid)
+        _ = Sky.focusWithoutRaise(pid: pid, windowID: wid)
         usleep(50_000)
     }
     let pairs = max(1, min(3, count))
@@ -585,11 +573,14 @@ func pressElement(_ el: AXUIElement, pid: pid_t) -> String? {
 }
 
 func focusElement(_ el: AXUIElement) {
-    AXUIElementSetAttributeValue(el, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+    // AXFocused raises the window and macOS switches to that Space.
+    _ = el
+    _ = Sky.focusWithoutRaise(pid: lastPid, windowID: lastWindowID)
 }
 
 func typeUnicode(pid: pid_t, text: String) {
     if text.isEmpty { return }
+    if lastPid == pid { _ = Sky.focusWithoutRaise(pid: pid, windowID: lastWindowID) }
     let units = Array(text.utf16)
     guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true),
           let up = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false) else { return }
@@ -621,6 +612,7 @@ func keyCode(_ name: String) -> CGKeyCode? {
 }
 
 func postKey(pid: pid_t, spec: String) {
+    if lastPid == pid { _ = Sky.focusWithoutRaise(pid: pid, windowID: lastWindowID) }
     let parts = spec.split { $0 == "+" || $0 == "-" }.map { String($0).trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty }
     guard let last = parts.last, let code = keyCode(last == "meta" ? "command" : last) else { return }
     var flags = CGEventFlags()
@@ -818,7 +810,7 @@ func dragPayload(_ body: [String: Any]) -> [String: Any] {
     let end = imagePointToCG(x2, y2)
     let wid = lastWindowID
     if wid != 0 {
-        _ = Sky.focusWithoutRaise(windowID: wid)
+        _ = Sky.focusWithoutRaise(pid: pid, windowID: wid)
         usleep(50_000)
     }
     func postDrag(_ type: NSEvent.EventType, _ screen: CGPoint) {
@@ -860,8 +852,14 @@ func setValuePayload(_ body: [String: Any]) -> [String: Any] {
 
 func actionPayload(_ body: [String: Any]) -> [String: Any] {
     let name = body["name"] as? String ?? "Press"
+    if name.lowercased() == "raise" {
+        return ["ok": false, "error": "refused: raising the window switches desktops"]
+    }
     return performOnElement(body) { el, _, _ in
         let token = axActionToken(name)
+        if token == "AXRaise" {
+            return ["ok": false, "error": "refused: raising the window switches desktops"]
+        }
         let err = AXUIElementPerformAction(el, token as CFString)
         if err != .success { return ["ok": false, "error": "action failed (\(err.rawValue))"] }
         return ["ok": true]
