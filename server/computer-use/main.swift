@@ -657,6 +657,54 @@ func jsonInt(_ value: Any?) -> Int? {
     return nil
 }
 
+func jsonBool(_ value: Any?) -> Bool {
+    if let n = value as? NSNumber { return n.boolValue }
+    if let b = value as? Bool { return b }
+    return false
+}
+
+func bringForward(_ pid: pid_t) {
+    guard pid > 0,
+          let app = NSRunningApplication(processIdentifier: pid),
+          let url = app.bundleURL else { return }
+    let task = Process()
+    task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+    task.arguments = ["-a", url.path]
+    try? task.run()
+    task.waitUntilExit()
+    usleep(400_000)
+}
+
+func postAtCursor(_ type: CGEventType, _ point: CGPoint, clickState: Int64) {
+    CGWarpMouseCursorPosition(point)
+    let button: CGMouseButton = (type == .rightMouseDown || type == .rightMouseUp) ? .right : .left
+    guard let event = CGEvent(
+        mouseEventSource: CGEventSource(stateID: .hidSystemState),
+        mouseType: type,
+        mouseCursorPosition: point,
+        mouseButton: button
+    ) else { return }
+    if clickState > 0 {
+        event.setIntegerValueField(.mouseEventClickState, value: clickState)
+    }
+    event.post(tap: .cghidEventTap)
+}
+
+func postRealClick(point: CGPoint, button: CGMouseButton, count: Int) {
+    let down: CGEventType = button == .right ? .rightMouseDown : .leftMouseDown
+    let up: CGEventType = button == .right ? .rightMouseUp : .leftMouseUp
+    postAtCursor(.mouseMoved, point, clickState: 0)
+    usleep(30_000)
+    let pairs = max(1, min(3, count))
+    for index in 1...pairs {
+        let state = Int64(index)
+        postAtCursor(down, point, clickState: state)
+        usleep(12_000)
+        postAtCursor(up, point, clickState: state)
+        if index < pairs { usleep(80_000) }
+    }
+}
+
 func performOnElement(_ body: [String: Any], _ action: @escaping (AXUIElement, pid_t, String) -> [String: Any]) -> [String: Any] {
     if screenLocked() { return ["ok": false, "error": "screen locked"] }
     let pid = pid_t(jsonInt(body["pid"]) ?? Int(lastPid))
@@ -707,6 +755,7 @@ func statePayload(_ body: [String: Any]) -> [String: Any] {
     let pid = app.processIdentifier
     lastPid = pid
     log("pid \(pid)")
+    if jsonBool(body["foreground"]) { bringForward(pid) }
     let ax = AXUIElementCreateApplication(pid)
     AXUIElementSetMessagingTimeout(ax, 1)
     log("ax app")
@@ -755,7 +804,12 @@ func clickPayload(_ body: [String: Any]) -> [String: Any] {
         let point = imagePointToCG(CGFloat(x), CGFloat(y))
         let button: CGMouseButton = (body["button"] as? String) == "right" ? .right : .left
         let count = jsonInt(body["count"]) ?? 1
-        clickPoint(pid: pid, point: point, button: button, count: count)
+        if jsonBool(body["foreground"]) {
+            bringForward(pid)
+            postRealClick(point: point, button: button, count: count)
+        } else {
+            clickPoint(pid: pid, point: point, button: button, count: count)
+        }
         return ["ok": true]
     }
     return performOnElement(body) { el, pid, _ in
@@ -826,6 +880,20 @@ func dragPayload(_ body: [String: Any]) -> [String: Any] {
     let y2 = CGFloat(body["toY"] as? Double ?? y1)
     let start = imagePointToCG(x1, y1)
     let end = imagePointToCG(x2, y2)
+    if jsonBool(body["foreground"]) {
+        bringForward(pid)
+        postAtCursor(.mouseMoved, start, clickState: 0)
+        usleep(20_000)
+        postAtCursor(.leftMouseDown, start, clickState: 1)
+        for step in 1...5 {
+            let t = CGFloat(step) / 5
+            let mid = CGPoint(x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t)
+            postAtCursor(.leftMouseDragged, mid, clickState: 1)
+            usleep(16_000)
+        }
+        postAtCursor(.leftMouseUp, end, clickState: 1)
+        return ["ok": true]
+    }
     let wid = lastWindowID
     if wid != 0 {
         _ = Sky.focusWithoutRaise(pid: pid, windowID: wid)

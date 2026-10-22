@@ -246,7 +246,7 @@ Yan naming the channel wins for text: `on Teams`, `iMessage` / `text`, `email` /
 
 ## What each channel can carry
 
-If the CLI for that channel cannot carry the thing, do that part in the app with computer use and name it in the reply. Do not ask which app. Do not claim a file went out on a channel that did not take it.
+If the CLI for that channel cannot carry the thing, do that part in the app with computer use and name it in the reply. Do not ask which app. Do not claim a file went out on a channel that did not take it. Computer use starts in the background and leaves the desktop where it is. If the control is not a button and the click misses, stop and say it needs Yan's desktop. Come forward only after Yan asks on this turn.
 
 - **iMessage** can send text and files (photos, PDFs, anything on disk). Each file is its own message, then the text.
 - **Teams** text goes through `school-teams.js send`. That CLI has no attachment and no picture pixels. A link is fine when the file is already a URL. A real file goes in the Teams app with computer use (personal-computer skill). A message with `images` is looked at in the Teams app the same way. Do not paste a path into the chat.

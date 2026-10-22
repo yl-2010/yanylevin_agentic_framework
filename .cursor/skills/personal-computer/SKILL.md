@@ -36,7 +36,20 @@ One app at a time. A second chat waits.
 
 ## When a click misses
 
-The helper keeps a 10 minute count on this Mac. A third click on the same named control is refused. A pixel click that leaves the tree unchanged counts as a miss. After two misses, further pixel clicks are refused. The error starts with `stopped:`. End the turn and say what failed.
+The helper keeps a 10 minute count on this Mac. A third click on the same named control is refused. A pixel click that leaves the tree unchanged counts as a miss. After two misses, further background pixel clicks are refused. The error starts with `stopped:`.
+
+That stop is the handoff. Tell Yan which app, and that the control is not a button, so it needs his desktop. Do not come forward on your own.
+
+## Coming forward
+
+Every task starts in the background. If Yan's message on this turn tells you to come forward, take the desktop, or switch so you can finish, pass `foreground` true on `get_app_state`, then on the click or drag.
+
+```bash
+node server/computer-use.js state "Messages" --foreground
+node server/computer-use.js click --x 40 --y 80 --pid 815 --foreground
+```
+
+That activates the app, switches to its Space, and moves the real cursor. A sticker panel and other drawn surfaces can take that click. Finish the task there. A guest never passes `foreground`. The server refuses them.
 
 ## Who
 

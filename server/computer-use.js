@@ -41,8 +41,14 @@ export function computerUseActorIsYan(session) {
   return canonicalizeEmail(session.email) === YAN_EMAIL;
 }
 
+export function refusedForeground(session, foreground) {
+  if (!foreground) return "";
+  if (computerUseActorIsYan(session)) return "";
+  return "refused: coming forward is Yan's desktop";
+}
+
 const STAY_ON_DESKTOP =
-  " Stay on the user's current desktop. Never open -a without -gj, never tell an app to activate, never send System Events keystrokes. If the app is not running, launch it with open -gj -a. Clicks and keys go through these tools.";
+  " Stay on the user's current desktop. Never open -a without -gj, never tell an app to activate, never send System Events keystrokes. If the app is not running, launch it with open -gj -a. Clicks and keys go through these tools. If a click cannot land because the control is not in the tree, stop and say this needs his desktop. Pass foreground true only after Yan asked on this turn to come forward. That brings the app to the front and moves the cursor. A guest never passes foreground.";
 
 export function computerUseModeNote(session) {
   if (computerUseActorIsYan(session)) {
@@ -165,7 +171,7 @@ export function applyClickGuard(log, { pid, name, role, now, pixel }) {
         allow: false,
         log: next,
         error:
-          "stopped: pixel clicks are not landing and the tree is unchanged. Do not click again. Tell the user the control is not in the accessibility tree.",
+          "stopped: pixel clicks are not landing and the tree is unchanged. Do not click again in the background. Tell Yan this needs his desktop. Come forward only after he asks on this turn.",
       };
     }
     return { allow: true, log: next };
@@ -196,13 +202,13 @@ export function applyPixelResult(log, { pid, changed, now }) {
     return {
       log: next,
       error:
-        "stopped: pixel clicks are not landing and the tree is unchanged. Do not click again. Tell the user the control is not in the accessibility tree.",
+        "stopped: pixel clicks are not landing and the tree is unchanged. Do not click again in the background. Tell Yan this needs his desktop. Come forward only after he asks on this turn.",
     };
   }
   return {
     log: next,
     error:
-      "pixel click posted but the accessibility tree did not change. The click missed. Do not spray a grid. One more try, then stop.",
+      "pixel click posted but the accessibility tree did not change. The click missed. Do not spray a grid. One more try in this mode, then stop. If this was the background, tell Yan it needs his desktop.",
   };
 }
 
@@ -217,6 +223,17 @@ function readClickLog() {
 
 function writeClickLog(log) {
   writeFileSync(CLICK_LOG, JSON.stringify(log));
+}
+
+function clearPixelMisses(pid) {
+  const log = readClickLog();
+  const key = String(pid || 0);
+  const row = log[key];
+  if (!row) return;
+  row.pixelMisses = 0;
+  row.at = Date.now();
+  log[key] = row;
+  writeClickLog(log);
 }
 
 export function diffTreeText(previous, next) {
@@ -410,8 +427,12 @@ export async function listApps() {
   return { ok: true, apps: raw.apps || [] };
 }
 
-export async function readAppState(app) {
-  const raw = await call({ cmd: "state", app: String(app || "") });
+export async function readAppState(app, opts = {}) {
+  const raw = await call({
+    cmd: "state",
+    app: String(app || ""),
+    foreground: opts.foreground === true,
+  });
   if (!raw?.ok) return { ok: false, error: raw?.error || "state failed" };
   const fullText = formatAppState(raw);
   const cache = readCache();
@@ -462,6 +483,7 @@ export async function performComputerUse(input) {
   }
   const pixel = pixelTarget(cmd, input, id);
   const now = Date.now();
+  if (input?.foreground === true && pixel) clearPixelMisses(pid);
   let guardLog = readClickLog();
   if (cmd === "click" && id != null) {
     const el = elementOf(pid, id);
@@ -498,6 +520,7 @@ export async function performComputerUse(input) {
     toY: input?.toY,
     button: input?.button,
     count: input?.count,
+    foreground: input?.foreground === true,
   };
   const raw = await call(body);
   if (!raw?.ok) return { ok: false, error: raw?.error || "action failed" };
@@ -532,8 +555,13 @@ function stateContent(result) {
 
 export function computerUseCustomTools(session) {
   const note = computerUseModeNote(session);
+  const deny = (input) => refusedForeground(session, input?.foreground === true);
   const observe =
     "Call this before you click or type. The text is an accessibility tree. Act on the element number. Use screenshot pixels only when the tree has no control. Pixel origin is the top-left of the screenshot.";
+  const foregroundProp = {
+    type: "boolean",
+    description: "Bring this app forward and move the cursor. Only after Yan asked on this turn.",
+  };
   return {
     list_apps: {
       description: `${note} List running Mac apps (name, bundle id, pid). Skip menu extras.`,
@@ -552,13 +580,20 @@ export function computerUseCustomTools(session) {
         type: "object",
         properties: {
           app: { type: "string", description: "App name, bundle id, or pid" },
+          foreground: foregroundProp,
         },
         required: ["app"],
       },
-      execute: async ({ app }) => stateContent(await readAppState(app)),
+      execute: async (input) => {
+        const denied = deny(input);
+        if (denied) return denied;
+        return stateContent(
+          await readAppState(input?.app, { foreground: input?.foreground === true })
+        );
+      },
     },
     click: {
-      description: `${note} Click an element number from the last tree, or one screenshot x,y when the tree has no control. Pass pid. The click stays in that app. It does not move the real cursor, raise the window, or switch Spaces. A click returns ok when the event is posted. If the next tree is unchanged, stop. The helper refuses a third click on the same control and further pixel clicks after two misses.`,
+      description: `${note} Click an element number from the last tree, or one screenshot x,y when the tree has no control. Pass pid. The click stays in that app. It does not move the real cursor, raise the window, or switch Spaces. Pass foreground true only after Yan asked on this turn to come forward. A click returns ok when the event is posted. If the next tree is unchanged, stop. The helper refuses a third click on the same control and further pixel clicks after two misses.`,
       inputSchema: {
         type: "object",
         properties: {
@@ -568,9 +603,14 @@ export function computerUseCustomTools(session) {
           y: { type: "number" },
           button: { type: "string" },
           count: { type: "number" },
+          foreground: foregroundProp,
         },
       },
-      execute: async (input) => toolText(await performComputerUse({ ...input, cmd: "click" })),
+      execute: async (input) => {
+        const denied = deny(input);
+        if (denied) return denied;
+        return toolText(await performComputerUse({ ...input, cmd: "click" }));
+      },
     },
     type_text: {
       description: `${note} Type into the focused control, or the element number you pass. Typing stays in that app. It does not move the real cursor or raise the window.`,
@@ -611,7 +651,7 @@ export function computerUseCustomTools(session) {
       execute: async (input) => toolText(await performComputerUse({ ...input, cmd: "scroll" })),
     },
     drag: {
-      description: `${note} Drag in screenshot pixels from x,y to toX,toY. The drag stays in that app and does not move the real cursor. Same stop rules as a pixel click. Two misses end it.`,
+      description: `${note} Drag in screenshot pixels from x,y to toX,toY. The drag stays in that app and does not move the real cursor. Pass foreground true only after Yan asked on this turn to come forward. Same stop rules as a pixel click. Two misses end it.`,
       inputSchema: {
         type: "object",
         properties: {
@@ -620,10 +660,15 @@ export function computerUseCustomTools(session) {
           y: { type: "number" },
           toX: { type: "number" },
           toY: { type: "number" },
+          foreground: foregroundProp,
         },
         required: ["x", "y", "toX", "toY"],
       },
-      execute: async (input) => toolText(await performComputerUse({ ...input, cmd: "drag" })),
+      execute: async (input) => {
+        const denied = deny(input);
+        if (denied) return denied;
+        return toolText(await performComputerUse({ ...input, cmd: "drag" }));
+      },
     },
     set_value: {
       description: `${note} Set a control marked settable. Prefer this over typing the value one key at a time.`,
@@ -684,6 +729,7 @@ export function parseComputerUseArgs(argv) {
     toX: undefined,
     toY: undefined,
     pid: undefined,
+    foreground: false,
   };
   const positional = [];
   for (let i = 0; i < args.length; i += 1) {
@@ -733,6 +779,10 @@ export function parseComputerUseArgs(argv) {
       i += 1;
       continue;
     }
+    if (token === "--foreground") {
+      out.foreground = true;
+      continue;
+    }
     positional.push(token);
   }
   if (cmd === "state") out.app = positional.join(" ");
@@ -761,12 +811,13 @@ export async function runComputerUse(argv) {
         "set <id> --value ...",
         "action <id> --name ...",
         "select <id> --text ...",
+        "Add --foreground only after Yan asked on this turn to come forward.",
       ],
     };
   }
   if (cmd === "apps") return listApps();
   if (cmd === "state") {
-    const result = await readAppState(parsed.app);
+    const result = await readAppState(parsed.app, { foreground: parsed.foreground === true });
     if (!result.ok) return result;
     return { ok: true, text: result.text, pid: result.pid, image: Boolean(result.jpeg) };
   }
@@ -800,6 +851,7 @@ export async function runComputerUse(argv) {
     y: parsed.y,
     toX: parsed.toX,
     toY: parsed.toY,
+    foreground: parsed.foreground === true,
   });
 }
 

