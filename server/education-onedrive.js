@@ -5,6 +5,7 @@
 
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, extname, join, relative, resolve, sep } from "node:path";
+import { isTransientCloudError, withCloudRetry } from "./cloud-storage-io.js";
 
 const PROPERTY_JSON = new Set([
   "class.json",
@@ -45,7 +46,7 @@ export async function resolveBookkeepingFile(dir, fileName) {
   for (const name of bookkeepingBasenames(fileName)) {
     const path = join(dir, name);
     try {
-      const st = await stat(path);
+      const st = await withCloudRetry(path, () => stat(path));
       if (st.isFile()) return path;
     } catch {
       /* missing */
@@ -148,9 +149,9 @@ export async function urlTileFromDroppedFile(abs, name, extra = {}) {
   const lower = base.toLowerCase();
   if (!lower.endsWith(".json") && !lower.endsWith(".url")) return null;
   try {
-    const st = await stat(abs);
+    const st = await withCloudRetry(abs, () => stat(abs));
     if (!st.isFile() || st.size > URL_TILE_MAX_BYTES) return null;
-    const text = await readFile(abs, "utf8");
+    const text = await withCloudRetry(abs, () => readFile(abs, "utf8"));
     const fallback = base.replace(/\.(json|url)$/i, "");
     const tile = lower.endsWith(".json")
       ? urlTileFromObject(JSON.parse(text), fallback)
@@ -490,9 +491,10 @@ export async function listClassObjectDirs(gradeDir, onedriveFolder) {
   const dirs = [metaDir];
   let entries;
   try {
-    entries = await readdir(metaDir, { withFileTypes: true });
+    entries = await withCloudRetry(metaDir, () => readdir(metaDir, { withFileTypes: true }));
   } catch (err) {
     if (err?.code === "ENOENT") return [];
+    if (isTransientCloudError(err)) return dirs;
     throw err;
   }
   for (const entry of entries) {
@@ -629,7 +631,9 @@ async function dirHasPropertyJson(abs) {
 export async function listOnedriveFolderNames(gradeDir, { includeHidden = false } = {}) {
   if (!gradeDir) return [];
   try {
-    const entries = await readdir(gradeDir, { withFileTypes: true });
+    const entries = await withCloudRetry(gradeDir, () =>
+      readdir(gradeDir, { withFileTypes: true })
+    );
     return entries
       .filter((e) => {
         if (!e.isDirectory()) return false;
@@ -640,7 +644,7 @@ export async function listOnedriveFolderNames(gradeDir, { includeHidden = false 
       .map((e) => e.name)
       .sort((a, b) => a.localeCompare(b, "en"));
   } catch (err) {
-    if (err?.code === "ENOENT") return [];
+    if (err?.code === "ENOENT" || isTransientCloudError(err)) return [];
     throw err;
   }
 }
@@ -697,9 +701,9 @@ export async function listOnedriveTree(dir, opts = {}) {
 
   let entries;
   try {
-    entries = await readdir(dir, { withFileTypes: true });
+    entries = await withCloudRetry(dir, () => readdir(dir, { withFileTypes: true }));
   } catch (err) {
-    if (err?.code === "ENOENT") return [];
+    if (err?.code === "ENOENT" || isTransientCloudError(err)) return [];
     throw err;
   }
 
@@ -719,7 +723,7 @@ export async function listOnedriveTree(dir, opts = {}) {
     const abs = join(dir, entry.name);
     const rel = relPrefix ? `${relPrefix}/${entry.name}` : entry.name;
     try {
-      const st = await stat(abs);
+      const st = await withCloudRetry(abs, () => stat(abs));
       const mtimeMs = st.mtimeMs;
       const mtime = new Date(mtimeMs).toISOString();
       if (entry.isDirectory() || st.isDirectory()) {
@@ -843,7 +847,7 @@ export function resolveOnedriveAbsolutePath(classDir, relPath) {
 export async function statOnedriveFile(absFile) {
   let st;
   try {
-    st = await stat(absFile);
+    st = await withCloudRetry(absFile, () => stat(absFile));
   } catch (err) {
     if (err?.code === "ENOENT") {
       const missing = new Error("file not found");

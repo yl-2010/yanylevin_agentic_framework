@@ -714,6 +714,43 @@ app.post("/api/education/health", requireYanHealthWriter, async (req, res) => {
   }
 });
 
+const educationTreeCache = new Map();
+const educationTreeInflight = new Map();
+const EDUCATION_TREE_CACHE_MS = 20_000;
+let onedriveVisibilityJob = null;
+let onedriveVisibilityFinishedAt = 0;
+const ONEDRIVE_VISIBILITY_GAP_MS = 3 * 60_000;
+
+function scheduleOnedriveVisibility(email) {
+  if (canonicalizeEmail(email) !== YAN_EMAIL) return;
+  if (onedriveVisibilityJob) return;
+  if (Date.now() - onedriveVisibilityFinishedAt < ONEDRIVE_VISIBILITY_GAP_MS) return;
+  onedriveVisibilityJob = syncOnedriveObjectVisibility(email)
+    .catch((err) => console.error("[onedrive-visibility]", err))
+    .finally(() => {
+      onedriveVisibilityJob = null;
+      onedriveVisibilityFinishedAt = Date.now();
+    });
+}
+
+async function educationDataTree(email) {
+  const key = canonicalizeEmail(email);
+  const hit = educationTreeCache.get(key);
+  if (hit && Date.now() - hit.at < EDUCATION_TREE_CACHE_MS) return hit.tree;
+  const pending = educationTreeInflight.get(key);
+  if (pending) return pending;
+  const job = readEducationTree(email)
+    .then((tree) => {
+      educationTreeCache.set(key, { at: Date.now(), tree });
+      return tree;
+    })
+    .finally(() => {
+      educationTreeInflight.delete(key);
+    });
+  educationTreeInflight.set(key, job);
+  return job;
+}
+
 app.get("/api/education/data", requireEducationUser, async (req, res) => {
   try {
     try {
@@ -721,11 +758,9 @@ app.get("/api/education/data", requireEducationUser, async (req, res) => {
     } catch (err) {
       console.error("[onedrive-reveal]", err);
     }
-    const tree = await readEducationTree(req.user.email);
-    // After the tree read. Overlapping OneDrive reads deadlock (errno -11).
-    syncOnedriveObjectVisibility(req.user.email).catch((err) =>
-      console.error("[onedrive-visibility]", err)
-    );
+    const tree = await educationDataTree(req.user.email);
+    // Finder hide/show walks the same CloudStorage files. Not on every poll.
+    scheduleOnedriveVisibility(req.user.email);
     const live = /^(1|true|yes)$/i.test(String(req.query?.live || ""));
     if (canonicalizeEmail(req.user.email) === YAN_EMAIL) {
       await applyLiveCanvasOverlay(tree, { force: live });

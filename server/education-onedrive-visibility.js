@@ -32,6 +32,27 @@ import {
   uniqueFinderFolderName,
 } from "./education-onedrive.js";
 import { canonicalizeEmail, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
+import { isTransientCloudError, withCloudRetry } from "./cloud-storage-io.js";
+
+function cloudReaddir(dir) {
+  return withCloudRetry(dir, () => readdir(dir, { withFileTypes: true }));
+}
+
+function cloudStat(path) {
+  return withCloudRetry(path, () => stat(path));
+}
+
+function cloudReadFile(path) {
+  return withCloudRetry(path, () => readFile(path, "utf8"));
+}
+
+function cloudRename(from, to) {
+  return withCloudRetry(from, () => rename(from, to));
+}
+
+function cloudRm(path, opts) {
+  return withCloudRetry(path, () => rm(path, opts));
+}
 
 const execFileAsync = promisify(execFile);
 
@@ -66,9 +87,9 @@ export async function objectFolderHasUserFiles(dir, depth = 0, ignoreNames = nul
   if (depth > 8) return false;
   let entries;
   try {
-    entries = await readdir(dir, { withFileTypes: true });
+    entries = await cloudReaddir(dir);
   } catch (err) {
-    if (err?.code === "ENOENT") return false;
+    if (err?.code === "ENOENT" || isTransientCloudError(err)) return false;
     throw err;
   }
   for (const entry of entries) {
@@ -96,7 +117,7 @@ const BOOKKEEPING_HIDES = [
 
 async function fileExists(path) {
   try {
-    const st = await stat(path);
+    const st = await cloudStat(path);
     return st.isFile();
   } catch {
     return false;
@@ -116,17 +137,17 @@ export async function hideBookkeepingFiles(dir) {
     if (!srcOk) continue;
     const destOk = await fileExists(dest);
     if (!destOk) {
-      await rename(src, dest);
+      await cloudRename(src, dest);
       continue;
     }
     if (src === dest) continue;
-    const srcStat = await stat(src);
-    const destStat = await stat(dest);
+    const srcStat = await cloudStat(src);
+    const destStat = await cloudStat(dest);
     if (srcStat.mtimeMs >= destStat.mtimeMs) {
-      await rm(dest, { force: true });
-      await rename(src, dest);
+      await cloudRm(dest, { force: true });
+      await cloudRename(src, dest);
     } else {
-      await rm(src, { force: true });
+      await cloudRm(src, { force: true });
     }
   }
 }
@@ -183,7 +204,7 @@ function isSafeObjectId(id) {
 
 async function readJson(path) {
   try {
-    const raw = await readFile(path, "utf8");
+    const raw = await cloudReadFile(path);
     const val = JSON.parse(raw);
     return val && typeof val === "object" ? val : null;
   } catch {
@@ -193,7 +214,7 @@ async function readJson(path) {
 
 async function dirExists(path) {
   try {
-    const st = await stat(path);
+    const st = await cloudStat(path);
     return st.isDirectory();
   } catch {
     return false;
@@ -216,29 +237,29 @@ async function clearFinderHiddenFlag(absPath) {
  * @param {string} intoDir
  */
 async function absorbDuplicateFolder(fromDir, intoDir) {
-  const entries = await readdir(fromDir, { withFileTypes: true });
+  const entries = await cloudReaddir(fromDir);
   for (const entry of entries) {
     const src = join(fromDir, entry.name);
     const dest = join(intoDir, entry.name);
     let destExists = false;
     try {
-      await stat(dest);
+      await cloudStat(dest);
       destExists = true;
     } catch {
       destExists = false;
     }
     if (!destExists) {
-      await rename(src, dest);
+      await cloudRename(src, dest);
       continue;
     }
-    const srcSt = await stat(src);
-    const destSt = await stat(dest);
+    const srcSt = await cloudStat(src);
+    const destSt = await cloudStat(dest);
     if (srcSt.mtimeMs > destSt.mtimeMs) {
-      await rm(dest, { recursive: true, force: true });
-      await rename(src, dest);
+      await cloudRm(dest, { recursive: true, force: true });
+      await cloudRename(src, dest);
     }
   }
-  await rm(fromDir, { recursive: true, force: true });
+  await cloudRm(fromDir, { recursive: true, force: true });
 }
 
 /**
@@ -266,7 +287,7 @@ export async function setObjectFolderHidden(parent, id, hidden) {
     }
     if (vis) {
       await clearFinderHiddenFlag(visiblePath);
-      await rename(visiblePath, hiddenPath);
+      await cloudRename(visiblePath, hiddenPath);
       await clearFinderHiddenFlag(hiddenPath);
       return hiddenPath;
     }
@@ -283,7 +304,7 @@ export async function setObjectFolderHidden(parent, id, hidden) {
   }
   if (hid) {
     await clearFinderHiddenFlag(hiddenPath);
-    await rename(hiddenPath, visiblePath);
+    await cloudRename(hiddenPath, visiblePath);
     await clearFinderHiddenFlag(visiblePath);
     return visiblePath;
   }
@@ -320,10 +341,10 @@ export async function renameObjectFolder(parent, fromId, toId) {
 
   if (caseOnly) {
     const tmpPath = join(parent, `.__yan_rename_${process.hrtime.bigint()}__`);
-    await rename(fromPath, tmpPath);
-    await rename(tmpPath, toPath);
+    await cloudRename(fromPath, tmpPath);
+    await cloudRename(tmpPath, toPath);
   } else {
-    await rename(fromPath, toPath);
+    await cloudRename(fromPath, toPath);
   }
   await clearFinderHiddenFlag(toPath);
   return toClean;
@@ -331,10 +352,10 @@ export async function renameObjectFolder(parent, fromId, toId) {
 
 async function listChildDirs(dir) {
   try {
-    const entries = await readdir(dir, { withFileTypes: true });
+    const entries = await cloudReaddir(dir);
     return entries.filter((e) => e.isDirectory() && e.name).map((e) => e.name);
   } catch (err) {
-    if (err?.code === "ENOENT") return [];
+    if (err?.code === "ENOENT" || isTransientCloudError(err)) return [];
     throw err;
   }
 }
@@ -407,7 +428,9 @@ async function findDate(email, dateId, { classId = null } = {}) {
 async function stampRevealed(jsonPath, props) {
   if (props?.folderRevealedAt) return false;
   const next = { ...props, folderRevealedAt: new Date().toISOString() };
-  await writeFile(jsonPath, JSON.stringify(next, null, 2) + "\n", "utf8");
+  await withCloudRetry(jsonPath, () =>
+    writeFile(jsonPath, JSON.stringify(next, null, 2) + "\n", "utf8")
+  );
   return true;
 }
 

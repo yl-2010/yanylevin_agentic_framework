@@ -8,6 +8,11 @@ import { createRequire } from "node:module";
 import { readdir, readFile, writeFile, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  isTransientCloudError,
+  runCloudStorageIo,
+  withCloudRetry,
+} from "./cloud-storage-io.js";
 import { gitAddCommitPush } from "./git-publish.js";
 import { attachCanvasOverlay } from "./canvas-grades.js";
 import {
@@ -411,9 +416,14 @@ export async function listContextFiles(dir, opts = {}) {
   const out = [];
   let entries;
   try {
-    entries = await readdir(dir, { withFileTypes: true });
+    entries = await withCloudRetry(dir, () => readdir(dir, { withFileTypes: true }));
   } catch (err) {
-    if (err?.code === "ENOENT") return [];
+    if (err?.code === "ENOENT" || isTransientCloudError(err)) {
+      if (isTransientCloudError(err)) {
+        console.error("[education-data] skip dir", dir, err?.code || err?.message || err);
+      }
+      return [];
+    }
     throw err;
   }
   for (const entry of entries) {
@@ -842,35 +852,14 @@ export function userEducationRoot(email, opts = {}) {
   return join(EDUCATION_ROOT, normalized);
 }
 
-/** OneDrive File Provider sometimes returns EDEADLK (errno 11) on read. */
-function isTransientReadError(err) {
-  if (!err || err instanceof SyntaxError) return false;
-  if (err.errno === -11 || err.errno === 11) return true;
-  const code = String(err.code || "");
-  return (
-    code === "EAGAIN" ||
-    code === "EBUSY" ||
-    code === "EDEADLK" ||
-    code === "Unknown system error -11"
-  );
-}
-
 async function readJsonFile(path) {
-  const attempts = 4;
-  for (let i = 0; i < attempts; i++) {
-    try {
-      const raw = await readFile(path, "utf8");
-      return JSON.parse(raw);
-    } catch (err) {
-      if (err && (err.code === "ENOENT" || err instanceof SyntaxError)) return null;
-      if (isTransientReadError(err) && i < attempts - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 50 * (i + 1)));
-        continue;
-      }
-      throw err;
-    }
+  try {
+    const raw = await withCloudRetry(path, () => readFile(path, "utf8"));
+    return JSON.parse(raw);
+  } catch (err) {
+    if (err && (err.code === "ENOENT" || err instanceof SyntaxError)) return null;
+    throw err;
   }
-  return null;
 }
 
 async function readClassProps(objectDir) {
@@ -901,10 +890,15 @@ async function firstExistingDir(paths) {
 
 async function listDirs(dir) {
   try {
-    const entries = await readdir(dir, { withFileTypes: true });
+    const entries = await withCloudRetry(dir, () => readdir(dir, { withFileTypes: true }));
     return entries.filter((e) => e.isDirectory()).map((e) => e.name);
   } catch (err) {
-    if (err?.code === "ENOENT") return [];
+    if (err?.code === "ENOENT" || isTransientCloudError(err)) {
+      if (isTransientCloudError(err)) {
+        console.error("[education-data] skip dir", dir, err?.code || err?.message || err);
+      }
+      return [];
+    }
     throw err;
   }
 }
@@ -1549,7 +1543,18 @@ async function loadObjectFolder(
     const objectDir = join(parentDir, dirName);
     const jsonPath = await resolveBookkeepingFile(objectDir, fileName);
     if (!jsonPath) continue;
-    const props = await readJsonFile(jsonPath);
+    let props;
+    try {
+      props = await readJsonFile(jsonPath);
+    } catch (err) {
+      console.error(
+        "[education-data] skip",
+        fileName,
+        jsonPath,
+        err?.code || err?.message || err
+      );
+      continue;
+    }
     if (!props || typeof props !== "object") continue;
     const item = { id, ...props };
     if (classId) item.classId = classId;
@@ -2227,7 +2232,13 @@ export function partitionClassTodos(todos) {
  *   When false (default), strip fixture + out-of-season classes for the web UI
  *   and omit trimester fields. Agents still read on-disk trees directly.
  */
-export async function readEducationTree(email, { includeFixtures = false, workspace = "" } = {}) {
+export async function readEducationTree(email, opts = {}) {
+  // One walk holds the CloudStorage queue so Finder hide/show cannot
+  // interleave and deadlock the File Provider mid-read.
+  return runCloudStorageIo(() => loadEducationTree(email, opts));
+}
+
+async function loadEducationTree(email, { includeFixtures = false, workspace = "" } = {}) {
   const root = userEducationRoot(email, { workspace });
   const meta = (await readJsonFile(join(root, "meta.json"))) || {};
   const schedule = (await readJsonFile(join(root, "schedule.json"))) || {};
