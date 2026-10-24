@@ -37,9 +37,14 @@
           model: "Composer 2.5",
           kind: "clock",
         },
+      ],
+    },
+    {
+      time: "new assignment",
+      items: [
         {
-          id: "canvas-hourly",
-          name: "Canvas hourly",
+          id: "canvas-assignment",
+          name: "Canvas assignment",
           model: "Composer 2.5",
           kind: "clock",
         },

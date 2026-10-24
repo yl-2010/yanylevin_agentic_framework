@@ -19,7 +19,9 @@ import {
   selectDashboardCanvasCourses,
   filterCanvasSnapshotToDashboard,
   buildCanvasSyncPrompt,
-  buildCanvasHourlyPrompt,
+  buildCanvasNewAssignmentPrompt,
+  newCanvasAssignments,
+  normalizeAssignmentIds,
   shouldSkipCanvasHourly,
   nextCanvasHourlyAt,
   canvasHourKey,
@@ -521,21 +523,54 @@ describe("buildCanvasSyncPrompt", () => {
   });
 });
 
-describe("buildCanvasHourlyPrompt", () => {
-  it("stays on mapped classes and does not hunt for new ones", () => {
-    const prompt = buildCanvasHourlyPrompt({
+describe("newCanvasAssignments", () => {
+  it("returns only ids the watch has not seen", () => {
+    const rows = [
+      { id: 1, title: "Old" },
+      { id: 2, title: "New" },
+    ];
+    assert.deepEqual(
+      newCanvasAssignments(["1"], rows).map((row) => row.id),
+      [2]
+    );
+    assert.equal(newCanvasAssignments(["1", "2"], rows).length, 0);
+    assert.deepEqual(normalizeAssignmentIds([2, "2", 10, 1]), ["1", "2", "10"]);
+  });
+});
+
+describe("buildCanvasNewAssignmentPrompt", () => {
+  it("names only the new assignments and does not walk the snapshot", () => {
+    const prompt = buildCanvasNewAssignmentPrompt({
       dateKey: "2026-09-14",
       hourKey: "2026-09-14T15",
       timezone: "America/Los_Angeles",
-      deletedBlock: "Manually deleted objects (deleted.md).",
+      assignments: [
+        {
+          id: 40440347,
+          courseId: 3639000,
+          course: "Advanced Calculus",
+          title: "HW: Day 12 problem set",
+          dueDate: "2026-10-21",
+          dueTime: "09:55",
+          htmlUrl: "https://canvas.instructure.com/courses/3639000/assignments/40440347",
+          pointsPossible: 10,
+          types: ["online_upload"],
+          description: "<p>Do the set.</p>",
+        },
+      ],
     });
-    assert.match(prompt, /hourly pass/);
+    assert.match(prompt, /new assignment pass/);
+    assert.match(prompt, /40440347/);
+    assert.match(prompt, /Do not open snapshot\.json/);
+    assert.match(prompt, /Do not update existing todos/);
     assert.match(prompt, /Do not look for new classes/);
     assert.match(prompt, /Do not edit course-map\.json/);
     assert.match(prompt, /NEVER write done/);
     assert.match(prompt, /Do not fold Canvas comments/);
     assert.match(prompt, /Do not run link-todos/);
     assert.match(prompt, /Do not edit linkedFiles/);
+    assert.equal(/For every snapshot assignment/.test(prompt), false);
+    assert.equal(/deleted\.md rows follow/.test(prompt), false);
   });
 });
 

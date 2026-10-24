@@ -92,7 +92,7 @@ const laterAuthRetry = createLaterAuthRetry({
 });
 
 const hourlyLaterAuthRetry = createLaterAuthRetry({
-  prefix: "canvas-hourly",
+  prefix: "canvas-assignment",
   run: () => runCanvasHourlySync({ force: true }),
 });
 
@@ -1478,7 +1478,7 @@ export function buildCanvasSyncPrompt({
     `Snapshot: ${CANVAS_REL}/snapshot.json (also assignments.md). Optional map: ${CANVAS_REL}/course-map.json.`,
     `Agent context dumps: ${CANVAS_REL}/comments.md, comments-new.md, pages.md, modules.md, files.md (and the matching .json). Teacher comments show on the todo page from the live overlay. Pages, modules, and course files stay off the UI.`,
     "Read comments-new.md. Fold new teacher comments into that class or todo .CONTEXT.md on OneDrive (Finder-hidden, and hidden from the education UI). Skip a comment already in .CONTEXT.md. Do not copy comments into .todo.json description. Do not create dashboard tiles from pages, modules, or course files. Use those dumps when writing todo descriptions or class .CONTEXT.md if they explain the work.",
-    `Hourly Composer log: ${CANVAS_REL}/last-hourly-sync.json. Read it. Fix mistakes those daytime Composer 2.5 passes made (wrong tags, HW: prefixes left on names, Adv Calc HW dues pulled back to Canvas time, Data Science number/stat visual due pulled back to 2026-11-18, American Lit Venn due pulled back to 2026-10-20, yoga CW hiddenFromHome, missing canvasId, duplicate todos, course-map drift). Day 12 problem set (canvasId 40440347) stays 2026-10-27 09:55. Yan set that to the start of Tuesday calc. Do not shift it to the previous period C.`,
+    `New-assignment log: ${CANVAS_REL}/last-hourly-sync.json. Read it. Fix mistakes the daytime Composer pass made when it created a new todo (wrong tags, HW: prefixes left on names, Adv Calc HW dues pulled back to Canvas time, Data Science number/stat visual due pulled back to 2026-11-18, American Lit Venn due pulled back to 2026-10-20, yoga CW hiddenFromHome, missing canvasId, duplicate todos, course-map drift). Day 12 problem set (canvasId 40440347) stays 2026-10-27 09:55. Yan set that to the start of Tuesday calc. Do not shift it to the previous period C. Due and title updates on todos that already exist are applied in code each hour. Review those too.`,
     "Yan is a 2026-27 junior. Those academic dashboard classes are often missing from Canvas until school publishes them. That is expected.",
     "FIRST: map snapshot courses to Yan's class folders (OneDrive `.education` under the grade folder, skip free-period shells and fixtures). The snapshot already dropped non-dashboard enrollments. If ZERO dashboard classes appear in Canvas, STOP immediately. Do not invent Class of 2028, EPS Library, Iceland EBC, Graphic Design, or prior-year shells. Do not create todos. One short note is enough.",
     "If at least one class maps: set class.json canvasLink to that course gradebook (htmlUrl + /grades). Create or update todos for every Canvas assignment on those mapped classes only. Set canvasLink and canvasId. Tag CW/HW/QA/MA. Store name without a CW/HW/QA/MA prefix (HW: Signed Syllabus → Signed Syllabus). Use snapshot dueDate/dueTime.",
@@ -1497,27 +1497,110 @@ export function buildCanvasSyncPrompt({
     .join("\n");
 }
 
-export function buildCanvasHourlyPrompt({ dateKey, hourKey, timezone, deletedBlock }) {
-  const deleted =
-    typeof deletedBlock === "string" && deletedBlock.trim()
-      ? deletedBlock.trim()
-      : "";
+export function normalizeAssignmentIds(ids) {
   return [
-    `Follow ${SKILL_PATH} (hourly pass). Sync Canvas todos into already mapped classes only.`,
+    ...new Set(
+      (ids || []).map((id) => String(id ?? "").trim()).filter(Boolean)
+    ),
+  ].sort((a, b) => Number(a) - Number(b));
+}
+
+/**
+ * Assignments whose id is not in the seen set. Missing seen means the
+ * caller must seed, not treat every row as new.
+ * @param {Array<string|number>|null|undefined} seenIds
+ * @param {object[]} assignments
+ */
+export function newCanvasAssignments(seenIds, assignments) {
+  const seen = new Set(normalizeAssignmentIds(seenIds));
+  return (assignments || []).filter(
+    (row) => row && row.id != null && !seen.has(String(row.id))
+  );
+}
+
+export function canvasAssignmentBrief(assignment) {
+  return {
+    id: assignment.id,
+    courseId: assignment.courseId,
+    course: assignment.course || "",
+    title: assignment.title || "",
+    dueDate: assignment.dueDate || "",
+    dueTime: assignment.dueTime || "",
+    htmlUrl: assignment.htmlUrl || "",
+    pointsPossible: assignment.pointsPossible,
+    types: Array.isArray(assignment.types) ? assignment.types : [],
+    description: stripHtml(assignment.description, 1200),
+  };
+}
+
+export function buildCanvasNewAssignmentPrompt({
+  dateKey,
+  hourKey,
+  timezone,
+  assignments,
+}) {
+  const briefs = (assignments || []).map(canvasAssignmentBrief);
+  return [
+    `Follow ${SKILL_PATH} (new assignment pass). Create todos only for the Canvas assignments listed below.`,
     "Yan only (you@example.com). Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} hour ${hourKey} (timezone ${timezone}).`,
-    `Snapshot: ${CANVAS_REL}/snapshot.json (light, mapped courses only). Map: ${CANVAS_REL}/course-map.json.`,
-    "Do not look for new classes. Do not create class folders. Do not edit course-map.json. Do not mine syllabi or invent dates from empty events.",
-    "Do not fold Canvas comments, pages, modules, or course files on the hourly pass. That is nightly / manual.",
-    "For every snapshot assignment whose courseId is already in course-map.json: create or update the class todo (canvasId, canvasLink, tag, name without CW/HW/QA/MA prefix, dueDate/dueTime). Same Adv Calc HW due shift, Data Science number/stat visual due (2026-10-06 13:50, canvasId 40073385), American Lit Venn due (2026-10-26 08:30, canvasId 40432088), Day 12 problem set due (2026-10-27 09:55, canvasId 40440347), and yoga hiddenFromHome rules.",
-    "If the snapshot matches existing todos, do nothing.",
-    "NEVER write done or completedAt from Canvas. Do not POST to Canvas. Do not delete todos because Canvas dropped a row. Do not recreate deleted.md rows. Preserve finderHidden when it is already set.",
+    `Course map: ${CANVAS_REL}/course-map.json. Read education/${YAN_EMAIL}/deleted.md before you create. Skip a row that looks like a deleted todo. Judgement, not exact clocks.`,
+    "Do not open snapshot.json. Do not walk other assignments. Do not update existing todos. Do not look for new classes. Do not create class folders. Do not edit course-map.json. Do not mine syllabi or invent dates.",
+    "Do not fold Canvas comments, pages, modules, or course files. Do not run link-todos. Do not link OneNote pages. Do not edit linkedFiles.",
+    "For each assignment below, create one class todo: canvasId, canvasLink, tag, name without a CW/HW/QA/MA prefix, dueDate/dueTime, and a short description. Same Adv Calc HW due shift, Data Science number/stat visual due (2026-10-06 13:50, canvasId 40073385), American Lit Venn due (2026-10-26 08:30, canvasId 40432088), Day 12 problem set due (2026-10-27 09:55, canvasId 40440347), and yoga hiddenFromHome rules.",
+    "NEVER write done or completedAt from Canvas. Do not POST to Canvas. Do not delete todos. Do not recreate a deleted.md row. Preserve finderHidden when it is already set.",
     "Leave canvasFiles on .todo.json alone. Express downloads teacher attachments into the OneDrive todo folder after you finish. Spanish 4 pasted decoration images (image-<uuid>, image.png) are not downloaded.",
-    "Do not run link-todos. Do not link OneNote pages on the hourly pass. That is the nightly Grok pass. Do not edit linkedFiles. Cross-todo file links are the nightly pass.",
-    deleted,
+    "New assignments:",
+    JSON.stringify(briefs, null, 2),
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+const SEEN_ASSIGNMENTS = "seen-assignment-ids.json";
+
+async function readSeenAssignmentIds(dir) {
+  try {
+    const raw = JSON.parse(
+      await readFile(join(dir || canvasDir(), SEEN_ASSIGNMENTS), "utf8")
+    );
+    const ids = Array.isArray(raw?.ids) ? raw.ids : [];
+    return normalizeAssignmentIds(ids);
+  } catch (err) {
+    if (err?.code === "ENOENT") return null;
+    return null;
+  }
+}
+
+async function writeSeenAssignmentIds(dir, ids) {
+  const prev = await readSeenAssignmentIds(dir);
+  const unique = normalizeAssignmentIds([...(prev || []), ...(ids || [])]);
+  if (!unique.length) return;
+  await writeFile(
+    join(dir || canvasDir(), SEEN_ASSIGNMENTS),
+    `${JSON.stringify({ at: new Date().toISOString(), ids: unique }, null, 2)}\n`,
+    "utf8"
+  );
+}
+
+async function applyExistingCanvasTodos() {
+  try {
+    const { applyCanvasHourlyTodos } = await import("./canvas-hourly-apply.js");
+    const result = await applyCanvasHourlyTodos({ skipCreate: true });
+    if (result?.updated) {
+      console.log(`[canvas-watch] updated ${result.updated} existing todos`);
+    }
+    if (result?.errors?.length) {
+      console.error(
+        "[canvas-watch] apply",
+        result.errors.slice(0, 5).join("; ")
+      );
+    }
+    return result || { updated: 0 };
+  } catch (err) {
+    console.error("[canvas-watch] apply failed", err);
+    return { ok: false, updated: 0, errors: [err instanceof Error ? err.message : String(err)] };
+  }
 }
 
 export async function getLiveCanvasSnapshot({ force = false } = {}) {
@@ -1771,8 +1854,8 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
     );
     const lastHourly = await readLastHourlySync(dir);
     const hourlyBlock = lastHourly
-      ? `Last hourly Composer run: ${JSON.stringify(lastHourly)}. Review those writes against the full snapshot.`
-      : "No last-hourly-sync.json yet (no daytime Composer run recorded).";
+      ? `Last canvas watch: ${JSON.stringify(lastHourly)}. Review new todos from that run against the full snapshot.`
+      : "No last-hourly-sync.json yet (no daytime canvas watch recorded).";
     const prompt = buildCanvasSyncPrompt({
       dateKey,
       timezone,
@@ -1820,6 +1903,10 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
       at: new Date().toISOString(),
       status: result?.status || "finished",
     });
+    await writeSeenAssignmentIds(
+      dir,
+      (fetched.snapshot?.assignments || []).map((row) => row.id)
+    );
     await gitAddCommitPush({
       paths: [`education/${YAN_EMAIL}`],
       message: `education: ${dateKey} canvas sync`,
@@ -1908,32 +1995,107 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
       return { ok: true, skipped: true, reason: "no-mapped-courses", dateKey, hourKey };
     }
 
+    const assignments = fetched.snapshot?.assignments || [];
+    const seen = await readSeenAssignmentIds(dir);
+    const fresh = seen == null ? [] : newCanvasAssignments(seen, assignments);
+    const applied = await applyExistingCanvasTodos();
+    const canvasPaths = [`education/${YAN_EMAIL}/.canvas`];
+
+    if (seen == null) {
+      await writeSeenAssignmentIds(
+        dir,
+        assignments.map((row) => row.id)
+      );
+      const files = await pullCanvasAssignmentFiles(fetched.snapshot);
+      console.log(
+        `[canvas-watch] seed ${hourKey} assignments=${assignments.length} updated=${applied.updated || 0}`
+      );
+      await writeLastHourlySync(dir, {
+        dateKey,
+        hourKey,
+        at: new Date().toISOString(),
+        status: "seeded",
+        reason: "seen-ids-missing",
+        assignments: assignments.length,
+        newAssignments: 0,
+        updated: applied.updated || 0,
+      });
+      hourlyLaterAuthRetry.clear();
+      await gitAddCommitPush({
+        paths: canvasPaths,
+        message: `education: ${hourKey} canvas watch seed`,
+      });
+      return {
+        ok: true,
+        skipped: true,
+        reason: "seeded",
+        dateKey,
+        hourKey,
+        assignments: assignments.length,
+        updated: applied.updated || 0,
+        files,
+      };
+    }
+
+    if (!fresh.length) {
+      await writeSeenAssignmentIds(
+        dir,
+        assignments.map((row) => row.id)
+      );
+      const files = await pullCanvasAssignmentFiles(fetched.snapshot);
+      console.log(
+        `[canvas-watch] no new assignments ${hourKey} assignments=${assignments.length} updated=${applied.updated || 0}`
+      );
+      await writeLastHourlySync(dir, {
+        dateKey,
+        hourKey,
+        at: new Date().toISOString(),
+        status: "skipped",
+        reason: "no-new-assignments",
+        assignments: assignments.length,
+        newAssignments: 0,
+        updated: applied.updated || 0,
+      });
+      hourlyLaterAuthRetry.clear();
+      await gitAddCommitPush({
+        paths: canvasPaths,
+        message: `education: ${hourKey} canvas watch`,
+      });
+      return {
+        ok: true,
+        skipped: true,
+        reason: "no-new-assignments",
+        dateKey,
+        hourKey,
+        assignments: assignments.length,
+        updated: applied.updated || 0,
+        files,
+      };
+    }
+
     await reloadCursorApiKeyFromEnv();
     const apiKey = requireCursorApiKey();
     const model = await resolveModelSelection(apiKey, CANVAS_HOURLY_MODEL_SPEC);
     console.log(
-      `[canvas-hourly] agent ${hourKey} tz=${timezone} model=${model.id} assignments=${fetched.assignments}`
+      `[canvas-assignment] agent ${hourKey} tz=${timezone} model=${model.id} new=${fresh.length} assignments=${assignments.length}`
     );
 
-    const deletedBlock = formatDeletedBlock(
-      await loadDeletedMarkdown(join(ROOT, "education", YAN_EMAIL))
-    );
-    const prompt = buildCanvasHourlyPrompt({
+    const prompt = buildCanvasNewAssignmentPrompt({
       dateKey,
       hourKey,
       timezone,
-      deletedBlock,
+      assignments: fresh,
     });
     const { result, authFailed, capacityFailed, transientFailed, usedFallback } =
       await promptWithAuthRetry({
-        prefix: "canvas-hourly",
+        prefix: "canvas-assignment",
         prompt,
         model,
         cwd: ROOT,
       });
 
     if (usedFallback) {
-      console.warn("[canvas-hourly] used auto after composer retries");
+      console.warn("[canvas-assignment] used auto after composer retries");
     }
     if (transientFailed) {
       hourlyLaterAuthRetry.schedule(hourKey);
@@ -1945,10 +2107,15 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
         reason: authFailed ? "auth" : capacityFailed ? "capacity" : "error",
         courses: fetched.courses,
         assignments: fetched.assignments,
+        newAssignments: fresh.length,
       };
     }
 
     hourlyLaterAuthRetry.clear();
+    await writeSeenAssignmentIds(
+      dir,
+      assignments.map((row) => row.id)
+    );
     const files = await pullCanvasAssignmentFiles(fetched.snapshot);
     await writeLastHourlySync(dir, {
       dateKey,
@@ -1956,11 +2123,14 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
       at: new Date().toISOString(),
       status: result?.status || "finished",
       model: model.id,
-      assignments: fetched.assignments,
+      assignments: assignments.length,
+      newAssignments: fresh.length,
+      newIds: fresh.map((row) => row.id),
+      updated: applied.updated || 0,
     });
     await gitAddCommitPush({
-      paths: [`education/${YAN_EMAIL}`],
-      message: `education: ${hourKey} canvas hourly`,
+      paths: canvasPaths,
+      message: `education: ${hourKey} canvas assignment`,
     });
     return {
       ok: true,
@@ -1969,6 +2139,7 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
       status: result?.status || "finished",
       courses: fetched.courses,
       assignments: fetched.assignments,
+      newAssignments: fresh.length,
       files,
     };
   } finally {

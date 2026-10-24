@@ -1,6 +1,8 @@
 /**
  * Apply Canvas snapshot assignments to Yan's mapped OneDrive class todos.
- * Hourly agent helper; does not touch done, canvasFiles, linkedFiles, or sites.
+ * The hourly watch uses this for due, name, and tag updates. It does not
+ * touch done, canvasFiles, linkedFiles, or sites. New todos are the
+ * new-assignment agent, so the watch passes skipCreate.
  *
  *   node server/canvas-hourly-apply.js [--dry-run]
  */
@@ -449,6 +451,7 @@ async function loadContext() {
  */
 export async function applyCanvasHourlyTodos(opts = {}) {
   const dryRun = Boolean(opts.dryRun);
+  const skipCreate = Boolean(opts.skipCreate);
   const { snapshot, courseMap, schedule, deletedTodos, classById, classProps } =
     await loadContext();
   const mappedIds = new Set(Object.keys(courseMap).map(Number));
@@ -505,6 +508,10 @@ export async function applyCanvasHourlyTodos(opts = {}) {
     }
 
     if (!existing) {
+      if (skipCreate) {
+        skipped += 1;
+        continue;
+      }
       const candidate = {
         parent,
         name: desired.name,
