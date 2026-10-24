@@ -79,7 +79,10 @@ export function serializeFrontmatter(fields) {
       lines.push(`${key}: null`);
     } else if (typeof value === "object") {
       lines.push(`${key}: ${JSON.stringify(value)}`);
-    } else if (typeof value === "string" && /["\\]/.test(value)) {
+    } else if (
+      typeof value === "string" &&
+      (/["\\]/.test(value) || value.startsWith("[") || value.startsWith("{"))
+    ) {
       lines.push(`${key}: ${JSON.stringify(value)}`);
     } else {
       lines.push(`${key}: ${value}`);

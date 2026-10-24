@@ -44,7 +44,7 @@ import { startChatTitleRefreshScheduler } from "./chat-title-refresh-agent.js";
 import { startLifeStateCleanupScheduler } from "./life-state-cleanup-agent.js";
 import { startCanvasSyncScheduler, applyLiveCanvasOverlay, seedLiveCanvasTodoDone, syncCanvasTodoDone, YAN_EMAIL } from "./canvas-sync.js";
 import { canonicalizeEmail, isFullAccessEmail, isJypeAccessEmail } from "./identity.js";
-import { ingestTokenOk, ingestUsageBatch, usageReport } from "./usage-log.js";
+import { ingestTokenOk, ingestUsageBatch, usageIndex, usageReport } from "./usage-log.js";
 import {
   revealOpenEducationObject,
   syncOnedriveObjectVisibility,
@@ -512,6 +512,17 @@ app.post("/api/usage/ingest", async (req, res) => {
   } catch (err) {
     console.error("[/api/usage/ingest]", err);
     res.status(500).json({ ok: false, error: "usage ingest failed" });
+  }
+});
+
+app.get("/api/usage/index", requireUsageReader, async (req, res) => {
+  try {
+    const index = await usageIndex();
+    res.setHeader("Cache-Control", "no-store");
+    res.json(index);
+  } catch (err) {
+    console.error("[/api/usage/index]", err);
+    res.status(500).json({ ok: false, error: "usage index failed" });
   }
 });
 

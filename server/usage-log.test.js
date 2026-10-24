@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { agentTypeLabel, buildClumps, filterClumps, kindFromPrefix, personFromEmail, summarizeClumps, threadLabelFromRows, tokensFromUsage } from "./usage-log.js";
+import { agentTypeLabel, buildClumps, filterClumps, kindFromPrefix, packUsageEvents, personFromEmail, summarizeClumps, threadLabelFromRows, tokensFromUsage, unpackUsageEvents } from "./usage-log.js";
 import { classifyLocalPrompt, projectRepo } from "./usage-local.js";
 
 describe("usage clumps", () => {
@@ -207,6 +207,24 @@ describe("usage clumps", () => {
       ]),
       "Example Neighbor teams"
     );
+  });
+
+  it("packs clumps without changing the totals", () => {
+    const clumps = buildClumps([
+      desktop("a", 0, "2026-10-20T18:00:00.000Z"),
+      desktop("b", 1, "2026-10-20T18:10:00.000Z"),
+      bill("e1", "2026-10-20T18:01:00.000Z", 10),
+      bill("e2", "2026-10-20T18:11:00.000Z", 40),
+    ]);
+    const back = unpackUsageEvents(packUsageEvents(clumps));
+    const left = summarizeClumps(clumps);
+    const right = summarizeClumps(back);
+    assert.equal(right.totals.input, left.totals.input);
+    assert.equal(right.totals.output, left.totals.output);
+    assert.equal(right.cents, left.cents);
+    assert.equal(right.byModel[0].name, left.byModel[0].name);
+    assert.equal(back[0].label, agentTypeLabel(clumps[0]));
+    assert.equal(back[0].threadId, "comp");
   });
 
   it("reads agent kind, caller, and repo from a local prompt", () => {

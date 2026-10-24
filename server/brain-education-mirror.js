@@ -7,8 +7,10 @@
 //   node server/brain-education-mirror.js --dry-run  print what would be written
 
 import fs from "node:fs";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { EDU_ROOT, BRAIN_ROOT, serializeFrontmatter } from "./brain-lib.js";
+import { withCloudRetry, isTransientCloudError } from "./cloud-storage-io.js";
 import { EDUCATION_META_DIR, gradeDirFromMeta, objectDirId } from "./education-onedrive.js";
 
 const MIRROR_ROOT = path.join(BRAIN_ROOT, "education");
@@ -25,14 +27,23 @@ function dirHasEntries(dirPath) {
 
 // Empty leftover directories exist (e.g. a todo moved under a project). Skip
 // those quietly. Warn only when the folder still has files but no properties json.
-function readJson(filePath) {
+async function readJson(filePath) {
   if (!fs.existsSync(filePath)) {
     if (dirHasEntries(path.dirname(filePath))) {
       warnings.push(`missing ${path.relative(EDU_ROOT, filePath)}, skipped`);
     }
     return null;
   }
-  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  try {
+    const text = await withCloudRetry(filePath, () => readFile(filePath, "utf8"));
+    return JSON.parse(text);
+  } catch (err) {
+    if (isTransientCloudError(err)) {
+      warnings.push(`unreadable ${path.relative(EDU_ROOT, filePath)}, skipped`);
+      return null;
+    }
+    throw err;
+  }
 }
 
 function listDirs(dir) {
@@ -80,14 +91,14 @@ function objectJsonPath(dirPath, fileName) {
   return null;
 }
 
-function readObjectJson(dirPath, fileName) {
+async function readObjectJson(dirPath, fileName) {
   const filePath = objectJsonPath(dirPath, fileName);
   if (!filePath) return null;
   return readJson(filePath);
 }
 
-function collectTodo({ slug, parentEdge, dirPath, sourceRel }) {
-  const todo = readObjectJson(dirPath, "todo.json");
+async function collectTodo({ slug, parentEdge, dirPath, sourceRel }) {
+  const todo = await readObjectJson(dirPath, "todo.json");
   if (!todo) return null;
   return stub({
     outPath: path.join(MIRROR_ROOT, "todos", `${slug}.md`),
@@ -105,8 +116,8 @@ function collectTodo({ slug, parentEdge, dirPath, sourceRel }) {
   });
 }
 
-function collectDate({ slug, parentEdge, dirPath, sourceRel }) {
-  const date = readObjectJson(dirPath, "date.json");
+async function collectDate({ slug, parentEdge, dirPath, sourceRel }) {
+  const date = await readObjectJson(dirPath, "date.json");
   if (!date) return null;
   return stub({
     outPath: path.join(MIRROR_ROOT, "dates", `${slug}.md`),
@@ -124,7 +135,7 @@ function collectDate({ slug, parentEdge, dirPath, sourceRel }) {
 
 // Todos/dates nested under a class or project get a `<parent>--<slug>` mirror
 // slug so top-level and nested names cannot collide.
-function collectChildren(stubs, parentDir, parentId, parentSlug, classFolder) {
+async function collectChildren(stubs, parentDir, parentId, parentSlug, classFolder) {
   const todoParents = [];
   if (classFolder && classFolder !== parentDir) todoParents.push(classFolder);
   todoParents.push(path.join(parentDir, "todos"));
@@ -141,7 +152,7 @@ function collectChildren(stubs, parentDir, parentId, parentSlug, classFolder) {
       if (!todoPath) continue;
       seenTodos.add(id);
       stubs.push(
-        collectTodo({
+        await collectTodo({
           slug: `${parentSlug}--${id}`,
           parentEdge: { type: "part_of", to: parentId },
           dirPath: path.join(dir, child),
@@ -158,7 +169,7 @@ function collectChildren(stubs, parentDir, parentId, parentSlug, classFolder) {
       if (!datePath) continue;
       seenDates.add(id);
       stubs.push(
-        collectDate({
+        await collectDate({
           slug: `${parentSlug}--${id}`,
           parentEdge: { type: "part_of", to: parentId },
           dirPath: path.join(dir, child),
@@ -169,14 +180,14 @@ function collectChildren(stubs, parentDir, parentId, parentSlug, classFolder) {
   }
 }
 
-function collect() {
+async function collect() {
   const stubs = [];
   /** @type {Map<string, { slug: string, dirPath: string, source: string, cls: object }>} */
   const classes = new Map();
 
   for (const slug of listDirs(path.join(EDU_ROOT, "classes"))) {
     const dirPath = path.join(EDU_ROOT, "classes", slug);
-    const cls = readJson(path.join(dirPath, "class.json"));
+    const cls = await readJson(path.join(dirPath, "class.json"));
     if (!cls) continue;
     classes.set(slug, {
       slug,
@@ -187,7 +198,7 @@ function collect() {
     });
   }
 
-  const meta = readJson(path.join(EDU_ROOT, "meta.json")) || {};
+  const meta = (await readJson(path.join(EDU_ROOT, "meta.json"))) || {};
   const gradeDir = gradeDirFromMeta(meta);
   if (gradeDir && fs.existsSync(gradeDir)) {
     let names = [];
@@ -207,7 +218,7 @@ function collect() {
         }
       }
       for (const dirPath of objectDirs) {
-        const cls = readJson(path.join(dirPath, "class.json"));
+        const cls = await readJson(path.join(dirPath, "class.json"));
         if (!cls) continue;
         const slug = String(cls.id || "").trim();
         if (!slug) continue;
@@ -237,12 +248,12 @@ function collect() {
         fields: { period: periodField, trimester: cls.trimester ?? null },
       }),
     );
-    collectChildren(stubs, dirPath, `education/classes/${slug}`, slug, classFolder);
+    await collectChildren(stubs, dirPath, `education/classes/${slug}`, slug, classFolder);
   }
 
   for (const slug of listDirs(path.join(EDU_ROOT, "projects"))) {
     const dirPath = path.join(EDU_ROOT, "projects", slug);
-    const project = readJson(path.join(dirPath, "project.json"));
+    const project = await readJson(path.join(dirPath, "project.json"));
     if (!project) continue;
     stubs.push(
       stub({
@@ -253,12 +264,12 @@ function collect() {
         fields: { order: project.order ?? null },
       }),
     );
-    collectChildren(stubs, dirPath, `education/projects/${slug}`, slug);
+    await collectChildren(stubs, dirPath, `education/projects/${slug}`, slug);
   }
 
   for (const slug of listDirs(path.join(EDU_ROOT, "todos"))) {
     stubs.push(
-      collectTodo({
+      await collectTodo({
         slug,
         parentEdge: null,
         dirPath: path.join(EDU_ROOT, "todos", slug),
@@ -269,7 +280,7 @@ function collect() {
 
   for (const slug of listDirs(path.join(EDU_ROOT, "dates"))) {
     stubs.push(
-      collectDate({
+      await collectDate({
         slug,
         parentEdge: null,
         dirPath: path.join(EDU_ROOT, "dates", slug),
@@ -281,9 +292,9 @@ function collect() {
   return stubs.filter(Boolean);
 }
 
-function main() {
+async function main() {
   const dryRun = process.argv.includes("--dry-run");
-  const stubs = collect();
+  const stubs = await collect();
   for (const w of warnings) console.warn(`warning: ${w}`);
 
   const counts = {};
@@ -306,4 +317,7 @@ function main() {
   console.log(`wrote ${stubs.length} education mirror stubs:`, counts);
 }
 
-main();
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

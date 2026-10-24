@@ -5,7 +5,7 @@
  */
 
 import { timingSafeEqual, randomUUID } from "node:crypto";
-import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalizeEmail } from "./identity.js";
@@ -23,6 +23,11 @@ const CHANNEL_LABEL = { Teams: "teams", iMessage: "iMessage", WhatsApp: "WhatsAp
 
 /** @type {Promise<void>} */
 let writeChain = Promise.resolve();
+
+/** @type {{ key: string, clumps: object[] | null }} */
+let builtCache = { key: "", clumps: null };
+/** @type {{ key: string, promise: Promise<{ clumps: object[] }> } | null} */
+let builtFlight = null;
 
 /**
  * @param {string|null|undefined} email
@@ -965,16 +970,161 @@ export async function resolveRange(query, now = Date.now()) {
   return { from: new Date(to - 30 * DAY_MS).toISOString(), to: new Date(to).toISOString(), range: "30d" };
 }
 
+async function fileStamp(path) {
+  try {
+    const info = await stat(path);
+    return info.mtimeMs + ":" + info.size;
+  } catch (err) {
+    if (err && /** @type {{ code?: string }} */ (err).code === "ENOENT") return "0:0";
+    throw err;
+  }
+}
+
+/**
+ * Built clumps stay in memory until rows or the local index change.
+ * Rebuilding from the jsonl is a few seconds, and filter clicks must not pay it.
+ */
+async function loadBuiltClumps() {
+  const { localIndexForReport } = await import("./usage-local.js");
+  const local = await localIndexForReport();
+  const key = (await fileStamp(USAGE_ROWS_PATH)) + ":" + (await fileStamp(join(USAGE_DIR, "local-index.json")));
+  if (builtCache.key === key && builtCache.clumps) return { clumps: builtCache.clumps };
+  if (builtFlight && builtFlight.key === key) return builtFlight.promise;
+  const promise = (async () => {
+    const clumps = buildClumps(await readRows(USAGE_ROWS_PATH), local);
+    builtCache = { key, clumps };
+    return { clumps };
+  })();
+  builtFlight = { key, promise };
+  try {
+    return await promise;
+  } finally {
+    if (builtFlight && builtFlight.promise === promise) builtFlight = null;
+  }
+}
+
+/**
+ * Compact events for the browser. Field order is the client contract.
+ * [time, person, repo, kind, model, thread, label, input, output, cacheRead, cacheWrite, cents]
+ * @param {object[]} clumps
+ */
+export function packUsageEvents(clumps) {
+  const dict = { person: [], repo: [], kind: [], model: [], thread: [], label: [] };
+  /** @type {Record<string, Map<string, number>>} */
+  const index = {
+    person: new Map(),
+    repo: new Map(),
+    kind: new Map(),
+    model: new Map(),
+    thread: new Map(),
+    label: new Map(),
+  };
+  const idOf = (key, value) => {
+    const text = String(value || "");
+    const map = index[key];
+    let id = map.get(text);
+    if (id == null) {
+      id = dict[key].length;
+      dict[key].push(text);
+      map.set(text, id);
+    }
+    return id;
+  };
+  const events = clumps.map((row) => {
+    const tokens = tokensFromUsage(row.tokens);
+    return [
+      Date.parse(row.at || "") || 0,
+      idOf("person", row.person || "Other"),
+      idOf("repo", row.repo || "Other"),
+      idOf("kind", row.kind || "other"),
+      idOf("model", row.model || "unknown"),
+      idOf("thread", row.threadId || row.id || ""),
+      idOf("label", agentTypeLabel(row)),
+      tokens.input || 0,
+      tokens.output || 0,
+      tokens.cacheRead || 0,
+      tokens.cacheWrite || 0,
+      num(row.chargedCents),
+    ];
+  });
+  return { dict, events };
+}
+
+/**
+ * @param {{ dict: Record<string, string[]>, events: number[][] }} packed
+ */
+export function unpackUsageEvents(packed) {
+  const dict = packed.dict;
+  return packed.events.map((event) => ({
+    at: new Date(event[0] || 0).toISOString(),
+    person: dict.person[event[1]] || "Other",
+    repo: dict.repo[event[2]] || "Other",
+    kind: dict.kind[event[3]] || "other",
+    model: dict.model[event[4]] || "unknown",
+    threadId: dict.thread[event[5]] || "",
+    label: dict.label[event[6]] || "agent",
+    tokens: {
+      input: event[7] || 0,
+      output: event[8] || 0,
+      cacheRead: event[9] || 0,
+      cacheWrite: event[10] || 0,
+      reasoning: 0,
+    },
+    chargedCents: event[11] || 0,
+  }));
+}
+
+/**
+ * One payload covers billing period, 7 days, and 30 days.
+ * The page filters it locally.
+ * @param {number} [now]
+ */
+export async function usageIndex(now = Date.now()) {
+  const { clumps } = await loadBuiltClumps();
+  const period = await resolveRange({ range: "period" }, now);
+  const week = await resolveRange({ range: "7d" }, now);
+  const month = await resolveRange({ range: "30d" }, now);
+  const from = Math.min(Date.parse(period.from), Date.parse(month.from));
+  /** @type {object[]} */
+  const ranged = [];
+  for (const row of clumps) {
+    const t = Date.parse(row.at || "");
+    if (Number.isNaN(t) || t < from || t > now) continue;
+    ranged.push(row);
+  }
+  const packed = packUsageEvents(ranged);
+  return {
+    ok: true,
+    bounds: {
+      period: { from: period.from, to: period.to },
+      "7d": { from: week.from, to: week.to },
+      "30d": { from: month.from, to: month.to },
+    },
+    plan: await readPlan(),
+    dict: packed.dict,
+    events: packed.events,
+  };
+}
+
 /**
  * @param {object} query
  */
 export async function usageReport(query) {
   const bounds = await resolveRange(query);
-  const rows = await readRows(USAGE_ROWS_PATH);
-  const { localIndexForReport } = await import("./usage-local.js");
-  const built = buildClumps(rows, await localIndexForReport());
+  const { clumps: built } = await loadBuiltClumps();
   const ranged = filterClumps(built, { from: bounds.from, to: bounds.to });
   const clumps = filterClumps(ranged, query);
+  const offset = Math.max(0, Number(query.offset) || 0);
+  const limit = Math.min(200, Math.max(1, Number(query.limit) || 40));
+  const threadOnly = String(query.threadId || query.thread || "").trim() && String(query.group || "") !== "thread";
+  if (threadOnly) {
+    return {
+      ok: true,
+      ...bounds,
+      total: clumps.length,
+      prompts: clumps.slice(offset, offset + limit).map(publicClump),
+    };
+  }
   const summary = summarizeClumps(clumps);
   summary.byPerson = summarizeClumps(filterClumps(ranged, { ...query, person: "" })).byPerson;
   summary.byModel = summarizeClumps(filterClumps(ranged, { ...query, model: "" })).byModel;
@@ -988,8 +1138,6 @@ export async function usageReport(query) {
   };
   summary.plan = await readPlan();
   const group = String(query.group || "");
-  const offset = Math.max(0, Number(query.offset) || 0);
-  const limit = Math.min(200, Math.max(1, Number(query.limit) || 40));
 
   if (group === "thread") {
     /** @type {Map<string, object>} */
