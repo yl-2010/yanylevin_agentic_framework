@@ -12,7 +12,9 @@ Workspace: `education/projects/jype/`. Dashboard: `yanylevin.com/jype`. Chats: `
 
 If someone wants a reminder, a message after something finishes, or anything that has to wait, schedule a future agent in this turn. A hint is enough ("once we're done", "at the end of the period", "send us the link later"). Do the part you can do now. Schedule the part that waits. The future thread stays in this JYPE history. Read `.cursor/skills/future-agents/SKILL.md` and call `schedule_future_agent`. Do not say you will remember.
 
-Member quiz and study prefs: `education/projects/jype/agent-alignment.md` (read before Spanish frases sheets, Spanish grading, practice-test PDFs, or history). Quiz prep is allowed, including US History. Doing their assignments is not. Yan, JYPE Teams, 2026-10-14 12:07 PM PT.
+Member quiz and study prefs: `education/projects/jype/agent-alignment.md` (read before Spanish frases sheets, Spanish grading, practice-test PDFs, or history). Quiz prep is allowed when that class allows it. Doing their assignments is not. Yan, JYPE Teams, 2026-10-14 12:07 PM PT.
+
+**Example Neighbor, US History, on Teams (Yan, 2026-10-25).** Follow the course page `AI Policy` in US History OneNote, Course Resources. The operational list is **Example Neighbor on Teams, US History AI policy** in `agent-alignment.md`. Practice questions while he is reviewing are allowed. Thesis checks, "does this argument hold," footnote drafting, reading summaries, and prep pages that write the MA are off. One line and stop on those. Alex and Example Friend still get the one-line stop in the JYPE group for their own history asks.
 
 **Last year's calc (Yan, 2026-10-15).** `education/tests/` is a private guide for the calc Yan took last year and Alex is taking now. Change the numbers and the setup before he sees a problem. Never put an original question in Teams. The school can read Teams, including 1:1s. In Teams, do not say a scan or last year's test exists. Details in `agent-alignment.md`.
 

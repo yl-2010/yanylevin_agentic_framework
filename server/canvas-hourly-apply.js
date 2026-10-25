@@ -466,6 +466,10 @@ export async function applyCanvasHourlyTodos(opts = {}) {
   const log = [];
   /** @type {string[]} */
   const errors = [];
+  /** @type {string[]} */
+  const createdIds = [];
+  /** @type {string[]} */
+  const skippedIds = [];
 
   /** @type {Map<string, { todos: Awaited<ReturnType<typeof listTodoDirs>>, indexes: ReturnType<typeof buildTodoIndexes> }>} */
   const todosByClass = new Map();
@@ -520,6 +524,7 @@ export async function applyCanvasHourlyTodos(opts = {}) {
       };
       if (looksDeleted(candidate, deletedTodos)) {
         skipped += 1;
+        skippedIds.push(String(assignment.id));
         continue;
       }
       const yogaHide = classId === "pe-yoga" ? yogaShouldHide(desired.name, desired.tag, null) : undefined;
@@ -565,6 +570,7 @@ export async function applyCanvasHourlyTodos(opts = {}) {
           jsonPath,
         });
         created += 1;
+        createdIds.push(String(assignment.id));
         log.push(`create ${classId} ${folderId} canvas ${assignment.id}`);
         continue;
       }
@@ -626,6 +632,8 @@ export async function applyCanvasHourlyTodos(opts = {}) {
     created,
     updated,
     skipped,
+    createdIds,
+    skippedIds,
     assignments: assignments.length,
     log,
     errors,

@@ -15,16 +15,16 @@ disable-model-invocation: true
 
 EPS Canvas is `https://canvas.instructure.com`. A student API token lives in `server/.env` (`CANVAS_ACCESS_TOKEN`). Never print or commit the token.
 
-This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how dashboard classes line up with Canvas courses, then write education todos/dates. Nightly model: **grok-4.7 xhigh** (reasoning_effort=xhigh, fast=false, context=256k). A new Canvas assignment starts **composer-2.5** (fast=false). The :00 watch itself does not start a model.
+This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how dashboard classes line up with Canvas courses, then write education todos/dates. Nightly model: **grok-4.7 xhigh** (reasoning_effort=xhigh, fast=false, context=256k). Express polls Canvas about every 30 seconds and creates a new todo in code. That poll does not start a model. A new assignment then starts **composer-2.5** (fast=false) only to attach OneNote pages and files for that assignment.
 
 ## When to run
 
 - **Page open (Express, not you):** `/api/education/data?live=1` fetches submissions, planner complete, and grades for mapped courses and overlays `done` + `canvasWork` in the API. That does **not** write `todo.json`. You still never persist completion.
 - **Checkoff (Express, not you):** Yan checking off a Canvas-linked todo writes a planner override (`marked_complete`) so Canvas To-Do matches. Local-only todos stay local. You still never POST planner overrides.
 - **Submit (you, only when Yan says submit / turn in / upload this to Canvas):** identify the assignment, rename+store the chat file on OneDrive if he attached one, then `canvas-files.js submit` (file, `--text` / `--text-file`, or `--url`). Save / put this in / handle the file never submits. Ask only if the assignment is actually unclear.
-- **Watch (:00):** Express fetches mapped courses at **:00** in the briefing timezone, except the 01:00 nightly window. No model. It updates due, name, tag, and links on todos that already exist, downloads teacher files, and writes `seen-assignment-ids.json` plus `last-hourly-sync.json`. A missing seen file is filled from the current snapshot and does not start Composer.
-- **New assignment:** Composer runs only when that fetch has an assignment id that is not in `seen-assignment-ids.json`. The prompt lists those assignments. Create those todos only.
-- **Nightly:** Express runs the full fetch + this skill at **01:00** (`nightlyAgentsLocalTime` in `education/you@example.com/daily-briefing/meta.json`). Same slot as location compose/enrichment. Context synthesis is later (02:30). Daily briefing is 06:00. **Re-read todos the daytime agent created and fix mistakes.** Also review due and title updates the watch applied in code. Fold new teacher comments into class/todo `CONTEXT.md`. Then Express pulls teacher files. On success the nightly run marks the snapshot assignment ids seen, so the 02:00 watch does not create them again.
+- **Watch (about every 30 seconds):** Express fetches mapped courses, except the 01:00 nightly window (00:50 to 01:20). No model on a quiet poll. It writes the snapshot only when an assignment was added or its title, due, link, or teacher files changed. Due and title updates on todos that already exist happen in code. A missing `seen-assignment-ids.json` is filled from the current snapshot and does not start Composer. A quiet poll does not commit.
+- **New assignment:** The same poll creates the todo immediately, downloads teacher files, then starts Composer. The prompt lists only those new assignments. The todo already exists. Do not create a second one.
+- **Nightly:** Express runs the full fetch + this skill at **01:00** (`nightlyAgentsLocalTime` in `education/you@example.com/daily-briefing/meta.json`). Same slot as location compose/enrichment. Context synthesis is later (02:30). Daily briefing is 06:00. **Re-read todos the daytime watch created and fix mistakes.** Also review due and title updates the watch applied in code. Fold new teacher comments into class/todo `CONTEXT.md`. Run both OneNote passes across the class. Then Express pulls teacher files. On success the nightly run marks the snapshot assignment ids seen, so the watch does not create them again.
 - **Manual (Personal Agent):** Yan says sync / pull / update Canvas. First fetch, then apply this skill **in this turn** (full nightly rules, including class map). Do not spawn a nested Cursor agent. After writes, Express pull still runs on the next hourly/fetch; you may also `canvas-files.js pull`.
 
 ```bash
@@ -39,7 +39,7 @@ node --env-file=server/.env server/canvas-files.js store --src <path> --class ph
 node --env-file=server/.env server/canvas-files.js pull
 ```
 
-To run the background Grok job instead: `node --env-file=server/.env server/canvas-sync.js --force` from the repo root. The :00 watch, including a Composer run when an assignment id is new: `node --env-file=server/.env server/canvas-sync.js --hourly`.
+To run the background Grok job instead: `node --env-file=server/.env server/canvas-sync.js --force` from the repo root. One watch poll, which starts Composer only when an assignment id is new: `node --env-file=server/.env server/canvas-sync.js --hourly`.
 
 If `.canvas/snapshot.json` is missing and the fetch CLI fails, say Canvas is not configured (token / network). Do not invent assignments.
 
@@ -56,8 +56,9 @@ education/you@example.com/.canvas/
   seen-comment-ids.json # Express marks after a successful nightly agent
   course-map.json       # Canvas course id → education class folder id (you maintain this on nightly; the new-assignment pass must not edit it)
   last-agent-sync.json  # written by the nightly runner, not by you
-  last-hourly-sync.json # written by the :00 watch
-  seen-assignment-ids.json # assignment ids already handled; a new id starts Composer
+  last-hourly-sync.json # written when the watch creates or updates something
+  seen-assignment-ids.json # assignment ids already handled; a new id creates a todo, then starts Composer
+  pending-link-ids.json # new todos whose OneNote and file links are not done yet
   planner-overrides.json # Express: Canvas planner override ids after a checkoff
 
 OneDrive <gradeFolder>/<onedriveFolder>/.education/
@@ -74,7 +75,15 @@ Dashboard schema: `.cursor/skills/personal-agent/education-dashboard.md`.
 
 ## New assignment pass (Composer)
 
-When the runner says new assignment: the prompt lists the new assignments. Create a todo for each of those only. **Do not** open `snapshot.json`. **Do not** update other todos. **Do not** map new classes, **do not** create class folders, **do not** edit `course-map.json`, **do not** mine syllabi, **do not** fold comments/pages/modules/files. Same Adv Calc HW due shift, Data Science number/stat visual due (2026-10-06 13:50, canvasId 40073385), American Lit Venn due (2026-10-26 08:30, canvasId 40432088), Day 12 problem set due (2026-10-27 09:55, canvasId 40440347), yoga `hiddenFromHome`, tagging, and deleted.md rules. Read `deleted.md` before creating. Skip a row that looks deleted.
+Express already created the todo and downloaded teacher files. Do not create a second todo. Do not change name, tag, due, done, or `canvasFiles`.
+
+When the runner says new assignment: the prompt lists the new assignments. For each one, only that assignment.
+
+- Open that class notebook. Link OneNote pages that apply to this assignment. If the Canvas description names a Content Library page, that page applies. Do not walk every page against every other todo.
+- Do not run pass 1 or pass 2. Do not rewrite `onenote-seen.json`. Those are nightly.
+- Look at sibling todos in the same class. If Yan would open one of those files or OneNote pages while doing this assignment, add `linkedFiles` on this todo only. Do not add pointers on the siblings.
+
+Do not open `snapshot.json`. Do not map new classes, do not edit `course-map.json`, do not mine syllabi, do not fold comments, pages, modules, or course files.
 
 ## Map courses first (nightly / manual only)
 
@@ -205,6 +214,8 @@ Seen page ids live in `education/you@example.com/.canvas/onenote-seen.json`:
 
 That file is a memory of pages already considered. If it is missing, nothing has been considered. Pass 1 is not empty. Also look at todos created or due on or after 2026-10-08 that still have no OneNote site. After you write the file, later nights use the normal two passes. Leave a todo alone when no page applies.
 
+Pass 1 and pass 2 are nightly and manual sync only. The new-assignment agent does not run them.
+
 Pass 1, new pages. A page id that is not in `onenote-seen.json` is new. For each new page, look at every todo in that class. Any tag, any due date. Link the page on each todo it applies to.
 
 Pass 2, todos. Take every todo created tonight, and every todo whose `dueDate` is today through 14 days out in the sync timezone. Done or not. Any tag. For each of those, look through that class notebook for pages that apply, including pages already in `onenote-seen.json`. Link every page that applies.
@@ -231,11 +242,11 @@ Tag does not matter here either. Prep for another assignment in the class counts
 
 Write the pointer on the todo that needs the doc. A shared draft, outline, or problem set counts. An unrelated worksheet does not. Drop a pointer when the file is gone or this todo no longer uses that doc. Do not move or copy the file. Do not edit `canvasFiles`. A linked OneNote page does not replace sites you already wrote on this todo. If the page applies here, pass 1 or pass 2 already wrote the site. `pageId` on `linkedFiles` is only the extra button when the site stays on the other todo.
 
-Teacher files Express downloads after you finish are not on disk yet. Link those on the next night. The new-assignment pass does not write `linkedFiles`.
+On the nightly pass, teacher files Express downloads after you finish are not on disk yet. Link those on the next night. The new-assignment agent writes `linkedFiles` only on the new todo, and only after Express has downloaded that assignment's files.
 
 ## Nightly review of the daytime watch
 
-Read `last-hourly-sync.json`. The :00 watch updates existing todos in code and starts Composer only for assignment ids that were not in `seen-assignment-ids.json`. Walk mapped class todos against the **full** snapshot. Fix wrong tags, `HW:` prefixes left on names, Adv Calc HW dues pulled back to Canvas time, the American Lit Venn due pulled back to 2026-10-20, yoga CW `hiddenFromHome`, missing `canvasId`/`canvasLink`, duplicates, and course-map drift. Then do the usual full map (new junior-year courses may have appeared). Then fold `comments-new.md` into class/todo `CONTEXT.md` as above.
+Read `last-hourly-sync.json`. The watch creates new todos in code and starts Composer only to link that assignment. Walk mapped class todos against the **full** snapshot. Fix wrong tags, `HW:` prefixes left on names, Adv Calc HW dues pulled back to Canvas time, the American Lit Venn due pulled back to 2026-10-20, yoga CW `hiddenFromHome`, missing `canvasId`/`canvasLink`, duplicates, and course-map drift. Then do the usual full map (new junior-year courses may have appeared). Then fold `comments-new.md` into class/todo `CONTEXT.md` as above.
 
 ## After writes
 

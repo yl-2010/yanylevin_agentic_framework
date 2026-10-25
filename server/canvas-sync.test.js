@@ -22,6 +22,9 @@ import {
   buildCanvasNewAssignmentPrompt,
   newCanvasAssignments,
   normalizeAssignmentIds,
+  nextCanvasWatchAt,
+  canvasWatchChanged,
+  CANVAS_WATCH_INTERVAL_MS,
   shouldSkipCanvasHourly,
   nextCanvasHourlyAt,
   canvasHourKey,
@@ -332,6 +335,32 @@ describe("nextCanvasHourlyAt", () => {
   });
 });
 
+describe("nextCanvasWatchAt", () => {
+  it("polls again in 30 seconds", () => {
+    const meta = { timezone: "America/Los_Angeles", nightlyAgentsLocalTime: "01:00" };
+    const now = new Date("2026-09-14T16:10:00.000Z");
+    const when = nextCanvasWatchAt(meta, now);
+    assert.equal(when.getTime() - now.getTime(), CANVAS_WATCH_INTERVAL_MS);
+  });
+
+  it("waits out the 01:00 nightly window", () => {
+    const meta = { timezone: "America/Los_Angeles", nightlyAgentsLocalTime: "01:00" };
+    const when = nextCanvasWatchAt(meta, new Date("2026-09-14T07:55:00.000Z"));
+    assert.equal(shouldSkipCanvasHourly(meta, when), false);
+    assert.ok(when.getTime() > new Date("2026-09-14T08:20:00.000Z").getTime());
+  });
+});
+
+describe("canvasWatchChanged", () => {
+  it("ignores score changes and notices a new assignment", () => {
+    const prev = [{ id: 1, title: "HW 1", dueDate: "2026-10-01", dueTime: "13:50", htmlUrl: "https://x/1", pointsPossible: 5, types: ["online_upload"], score: 1 }];
+    const scored = [{ ...prev[0], score: 4, workflowState: "graded" }];
+    assert.equal(canvasWatchChanged(prev, scored), false);
+    assert.equal(canvasWatchChanged(prev, [...prev, { id: 2, title: "HW 2" }]), true);
+    assert.equal(canvasWatchChanged(prev, [{ ...prev[0], dueDate: "2026-10-02" }]), true);
+  });
+});
+
 describe("canvasHourKey", () => {
   it("is a date plus hour in the briefing timezone", () => {
     const key = canvasHourKey(
@@ -561,16 +590,17 @@ describe("buildCanvasNewAssignmentPrompt", () => {
     });
     assert.match(prompt, /new assignment pass/);
     assert.match(prompt, /40440347/);
+    assert.match(prompt, /already created the todo/);
     assert.match(prompt, /Do not open snapshot\.json/);
-    assert.match(prompt, /Do not update existing todos/);
+    assert.match(prompt, /Do not run OneNote pass 1 or pass 2/);
+    assert.match(prompt, /Do not rewrite onenote-seen\.json/);
+    assert.match(prompt, /this todo only/);
     assert.match(prompt, /Do not look for new classes/);
     assert.match(prompt, /Do not edit course-map\.json/);
-    assert.match(prompt, /NEVER write done/);
     assert.match(prompt, /Do not fold Canvas comments/);
     assert.match(prompt, /Do not run link-todos/);
-    assert.match(prompt, /Do not edit linkedFiles/);
+    assert.equal(/Create todos only/.test(prompt), false);
     assert.equal(/For every snapshot assignment/.test(prompt), false);
-    assert.equal(/deleted\.md rows follow/.test(prompt), false);
   });
 });
 

@@ -63,6 +63,9 @@ export const CANVAS_HOURLY_MODEL_SPEC = {
   params: [{ id: "fast", value: "false" }],
 };
 
+/** How often the watch asks Canvas for new assignments. Not a model run. */
+export const CANVAS_WATCH_INTERVAL_MS = 30_000;
+
 export const LIVE_TIMEOUT_MS = 12_000;
 export const LIVE_MIN_INTERVAL_MS = 10_000;
 
@@ -434,6 +437,54 @@ export function nextCanvasHourlyAt(meta, now = new Date()) {
     cursor = new Date(cursor.getTime() + 60 * 60 * 1000);
   }
   return cursor;
+}
+
+export function nextCanvasWatchAt(meta, now = new Date()) {
+  let cursor = new Date(now.getTime() + CANVAS_WATCH_INTERVAL_MS);
+  for (let i = 0; i < 90; i++) {
+    if (!shouldSkipCanvasHourly(meta, cursor)) return cursor;
+    cursor = new Date(cursor.getTime() + 60 * 1000);
+  }
+  return cursor;
+}
+
+export function canvasAssignmentWatchKey(assignment) {
+  const types = Array.isArray(assignment?.types) ? assignment.types.join(",") : "";
+  const fileIds = Array.isArray(assignment?.files)
+    ? assignment.files.map((file) => file?.id ?? "").join(",")
+    : "";
+  return [
+    assignment?.title || "",
+    assignment?.dueDate || "",
+    assignment?.dueTime || "",
+    assignment?.htmlUrl || "",
+    assignment?.pointsPossible ?? "",
+    types,
+    fileIds,
+  ].join("\u001f");
+}
+
+/**
+ * True when an assignment was added, removed, or its title, due, link,
+ * points, types, or teacher files changed. Scores and planner checkoffs
+ * are ignored so a quiet poll does not rewrite the snapshot.
+ */
+export function canvasWatchChanged(prevAssignments, nextAssignments) {
+  const prev = new Map();
+  for (const row of prevAssignments || []) {
+    if (row?.id == null) continue;
+    prev.set(String(row.id), canvasAssignmentWatchKey(row));
+  }
+  const next = [];
+  for (const row of nextAssignments || []) {
+    if (row?.id == null) continue;
+    next.push(row);
+  }
+  if (prev.size !== next.length) return true;
+  for (const row of next) {
+    if (prev.get(String(row.id)) !== canvasAssignmentWatchKey(row)) return true;
+  }
+  return false;
 }
 
 export function canvasHourKey(meta, now = new Date()) {
@@ -1541,15 +1592,15 @@ export function buildCanvasNewAssignmentPrompt({
 }) {
   const briefs = (assignments || []).map(canvasAssignmentBrief);
   return [
-    `Follow ${SKILL_PATH} (new assignment pass). Create todos only for the Canvas assignments listed below.`,
+    `Follow ${SKILL_PATH} (new assignment pass). Express already created the todo. Do not create another one.`,
     "Yan only (you@example.com). Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} hour ${hourKey} (timezone ${timezone}).`,
-    `Course map: ${CANVAS_REL}/course-map.json. Read education/${YAN_EMAIL}/deleted.md before you create. Skip a row that looks like a deleted todo. Judgement, not exact clocks.`,
-    "Do not open snapshot.json. Do not walk other assignments. Do not update existing todos. Do not look for new classes. Do not create class folders. Do not edit course-map.json. Do not mine syllabi or invent dates.",
-    "Do not fold Canvas comments, pages, modules, or course files. Do not run link-todos. Do not link OneNote pages. Do not edit linkedFiles.",
-    "For each assignment below, create one class todo: canvasId, canvasLink, tag, name without a CW/HW/QA/MA prefix, dueDate/dueTime, and a short description. Same Adv Calc HW due shift, Data Science number/stat visual due (2026-10-06 13:50, canvasId 40073385), American Lit Venn due (2026-10-26 08:30, canvasId 40432088), Day 12 problem set due (2026-10-27 09:55, canvasId 40440347), and yoga hiddenFromHome rules.",
-    "NEVER write done or completedAt from Canvas. Do not POST to Canvas. Do not delete todos. Do not recreate a deleted.md row. Preserve finderHidden when it is already set.",
-    "Leave canvasFiles on .todo.json alone. Express downloads teacher attachments into the OneDrive todo folder after you finish. Spanish 4 pasted decoration images (image-<uuid>, image.png) are not downloaded.",
+    `Course map: ${CANVAS_REL}/course-map.json.`,
+    "Do not open snapshot.json. Do not walk other assignments. Do not change name, tag, dueDate, dueTime, done, completedAt, or canvasFiles. Do not look for new classes. Do not edit course-map.json.",
+    "Do not fold Canvas comments, pages, modules, or course files. Do not run link-todos. Do not run OneNote pass 1 or pass 2. Do not rewrite onenote-seen.json. Those passes are nightly.",
+    "For each assignment below, and only that assignment: open its class notebook and link OneNote pages that apply to it. If the description names a Content Library page, that page applies. Then look at sibling todos in the same class. If Yan would open one of those files or pages while doing this assignment, add linkedFiles on this todo only.",
+    "Do not check whether a page also applies to other todos. Do not add sites or linkedFiles on any other todo.",
+    "Leave canvasFiles alone. Express already downloaded teacher attachments. Spanish 4 pasted decoration images (image-<uuid>, image.png) are not links.",
     "New assignments:",
     JSON.stringify(briefs, null, 2),
   ]
@@ -1558,6 +1609,9 @@ export function buildCanvasNewAssignmentPrompt({
 }
 
 const SEEN_ASSIGNMENTS = "seen-assignment-ids.json";
+const PENDING_LINKS = "pending-link-ids.json";
+/** Canvas ids whose link agent is already running in this process. */
+const linkAgentInFlight = new Set();
 
 async function readSeenAssignmentIds(dir) {
   try {
@@ -1583,24 +1637,118 @@ async function writeSeenAssignmentIds(dir, ids) {
   );
 }
 
-async function applyExistingCanvasTodos() {
+async function readPendingLinkIds(dir) {
+  try {
+    const raw = JSON.parse(
+      await readFile(join(dir || canvasDir(), PENDING_LINKS), "utf8")
+    );
+    return normalizeAssignmentIds(Array.isArray(raw?.ids) ? raw.ids : []);
+  } catch {
+    return [];
+  }
+}
+
+async function writePendingLinkIds(dir, ids) {
+  const unique = normalizeAssignmentIds(ids);
+  await writeFile(
+    join(dir || canvasDir(), PENDING_LINKS),
+    `${JSON.stringify({ at: new Date().toISOString(), ids: unique }, null, 2)}\n`,
+    "utf8"
+  );
+}
+
+async function writeSnapshotFiles(dir, snapshot) {
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    join(dir, "snapshot.json"),
+    `${JSON.stringify(snapshot, null, 2)}\n`,
+    "utf8"
+  );
+  await writeFile(
+    join(dir, "assignments.md"),
+    formatCanvasAssignmentsMarkdown(snapshot),
+    "utf8"
+  );
+}
+
+async function applyCanvasTodos({ skipCreate }) {
   try {
     const { applyCanvasHourlyTodos } = await import("./canvas-hourly-apply.js");
-    const result = await applyCanvasHourlyTodos({ skipCreate: true });
-    if (result?.updated) {
-      console.log(`[canvas-watch] updated ${result.updated} existing todos`);
-    }
-    if (result?.errors?.length) {
-      console.error(
-        "[canvas-watch] apply",
-        result.errors.slice(0, 5).join("; ")
+    const result = await applyCanvasHourlyTodos({ skipCreate });
+    if (result?.updated || result?.created) {
+      console.log(
+        `[canvas-watch] created=${result.created || 0} updated=${result.updated || 0}`
       );
     }
-    return result || { updated: 0 };
+    if (result?.errors?.length) {
+      console.error("[canvas-watch] apply", result.errors.slice(0, 5).join("; "));
+    }
+    return result || { updated: 0, created: 0, createdIds: [], skippedIds: [] };
   } catch (err) {
     console.error("[canvas-watch] apply failed", err);
-    return { ok: false, updated: 0, errors: [err instanceof Error ? err.message : String(err)] };
+    return {
+      ok: false,
+      updated: 0,
+      created: 0,
+      createdIds: [],
+      skippedIds: [],
+      errors: [err instanceof Error ? err.message : String(err)],
+    };
   }
+}
+
+function startCanvasLinkAgent({ dir, dateKey, hourKey, timezone, assignments }) {
+  const rows = (assignments || []).filter((row) => row?.id != null);
+  const ids = rows.map((row) => String(row.id)).filter((id) => !linkAgentInFlight.has(id));
+  if (!ids.length) return;
+  for (const id of ids) linkAgentInFlight.add(id);
+  const chosen = rows.filter((row) => ids.includes(String(row.id)));
+  console.log(`[canvas-assignment] link agent ${hourKey} ids=${ids.join(",")}`);
+  void (async () => {
+    try {
+      await reloadCursorApiKeyFromEnv();
+      const apiKey = requireCursorApiKey();
+      const model = await resolveModelSelection(apiKey, CANVAS_HOURLY_MODEL_SPEC);
+      const prompt = buildCanvasNewAssignmentPrompt({
+        dateKey,
+        hourKey,
+        timezone,
+        assignments: chosen,
+      });
+      const { result, transientFailed, usedFallback } = await promptWithAuthRetry({
+        prefix: "canvas-assignment",
+        prompt,
+        model,
+        cwd: ROOT,
+      });
+      if (usedFallback) {
+        console.warn("[canvas-assignment] used auto after composer retries");
+      }
+      if (transientFailed) {
+        console.error(
+          `[canvas-assignment] link agent failed ${hourKey} status=${result?.status || "error"}`
+        );
+        return;
+      }
+      const done = new Set(ids);
+      const left = (await readPendingLinkIds(dir)).filter((id) => !done.has(id));
+      await writePendingLinkIds(dir, left);
+      await writeLastHourlySync(dir, {
+        dateKey,
+        hourKey,
+        at: new Date().toISOString(),
+        status: result?.status || "finished",
+        model: model.id,
+        newAssignments: ids.length,
+        newIds: ids,
+      });
+      console.log(`[canvas-assignment] link agent finished ${hourKey} ids=${ids.join(",")}`);
+    } catch (err) {
+      console.error("[canvas-assignment] link agent failed", err);
+    } finally {
+      for (const id of ids) linkAgentInFlight.delete(id);
+    }
+  })();
 }
 
 export async function getLiveCanvasSnapshot({ force = false } = {}) {
@@ -1949,15 +2097,6 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
     return { ok: true, skipped: true, reason: "nightly-window", dateKey, hourKey };
   }
   const dir = canvasDir();
-  if (!force) {
-    const last = await readLastHourlySync(dir);
-    if (last?.hourKey === hourKey) {
-      console.log(`[canvas-hourly] skip ${hourKey}: already ran`);
-      hourlyLaterAuthRetry.clear();
-      return { ok: true, skipped: true, reason: "already-hourly", dateKey, hourKey };
-    }
-  }
-
   const handle = await acquireLock();
   if (!handle) {
     console.log(`[canvas-hourly] skip ${hourKey}: in-flight lock`);
@@ -1978,10 +2117,12 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
       return { ok: true, skipped: true, reason: "no-course-map", dateKey, hourKey };
     }
 
+    const previous = await readCanvasSnapshot(dir);
     const fetched = await fetchCanvasSnapshot({
       timeZone: timezone,
       light: true,
       mappedOnly: true,
+      persist: false,
     });
     if (!fetched.ok) return fetched;
     if (!fetched.courses) {
@@ -1997,11 +2138,12 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
 
     const assignments = fetched.snapshot?.assignments || [];
     const seen = await readSeenAssignmentIds(dir);
-    const fresh = seen == null ? [] : newCanvasAssignments(seen, assignments);
-    const applied = await applyExistingCanvasTodos();
+    const pending = await readPendingLinkIds(dir);
     const canvasPaths = [`education/${YAN_EMAIL}/.canvas`];
 
     if (seen == null) {
+      await writeSnapshotFiles(dir, fetched.snapshot);
+      const applied = await applyCanvasTodos({ skipCreate: true });
       await writeSeenAssignmentIds(
         dir,
         assignments.map((row) => row.id)
@@ -2037,109 +2179,85 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
       };
     }
 
-    if (!fresh.length) {
-      await writeSeenAssignmentIds(
-        dir,
-        assignments.map((row) => row.id)
+    const fresh = newCanvasAssignments(seen, assignments);
+    const changed = canvasWatchChanged(previous?.assignments, assignments);
+    if (!changed && !fresh.length) {
+      const retry = assignments.filter(
+        (row) => pending.includes(String(row.id)) && !linkAgentInFlight.has(String(row.id))
       );
-      const files = await pullCanvasAssignmentFiles(fetched.snapshot);
-      console.log(
-        `[canvas-watch] no new assignments ${hourKey} assignments=${assignments.length} updated=${applied.updated || 0}`
-      );
-      await writeLastHourlySync(dir, {
-        dateKey,
-        hourKey,
-        at: new Date().toISOString(),
-        status: "skipped",
-        reason: "no-new-assignments",
-        assignments: assignments.length,
-        newAssignments: 0,
-        updated: applied.updated || 0,
-      });
-      hourlyLaterAuthRetry.clear();
-      await gitAddCommitPush({
-        paths: canvasPaths,
-        message: `education: ${hourKey} canvas watch`,
-      });
+      if (retry.length) {
+        startCanvasLinkAgent({ dir, dateKey, hourKey, timezone, assignments: retry });
+      }
       return {
         ok: true,
         skipped: true,
-        reason: "no-new-assignments",
+        reason: "unchanged",
         dateKey,
         hourKey,
         assignments: assignments.length,
-        updated: applied.updated || 0,
-        files,
       };
     }
 
-    await reloadCursorApiKeyFromEnv();
-    const apiKey = requireCursorApiKey();
-    const model = await resolveModelSelection(apiKey, CANVAS_HOURLY_MODEL_SPEC);
-    console.log(
-      `[canvas-assignment] agent ${hourKey} tz=${timezone} model=${model.id} new=${fresh.length} assignments=${assignments.length}`
+    await writeSnapshotFiles(dir, fetched.snapshot);
+    const applied = await applyCanvasTodos({ skipCreate: fresh.length === 0 });
+    const created = new Set((applied.createdIds || []).map((id) => String(id)));
+    const skippedDeleted = new Set((applied.skippedIds || []).map((id) => String(id)));
+    const failedFresh = fresh.filter(
+      (row) => !created.has(String(row.id)) && !skippedDeleted.has(String(row.id))
     );
-
-    const prompt = buildCanvasNewAssignmentPrompt({
-      dateKey,
-      hourKey,
-      timezone,
-      assignments: fresh,
-    });
-    const { result, authFailed, capacityFailed, transientFailed, usedFallback } =
-      await promptWithAuthRetry({
-        prefix: "canvas-assignment",
-        prompt,
-        model,
-        cwd: ROOT,
-      });
-
-    if (usedFallback) {
-      console.warn("[canvas-assignment] used auto after composer retries");
-    }
-    if (transientFailed) {
-      hourlyLaterAuthRetry.schedule(hourKey);
-      return {
-        ok: false,
-        dateKey,
-        hourKey,
-        status: result?.status || "error",
-        reason: authFailed ? "auth" : capacityFailed ? "capacity" : "error",
-        courses: fetched.courses,
-        assignments: fetched.assignments,
-        newAssignments: fresh.length,
-      };
-    }
-
-    hourlyLaterAuthRetry.clear();
+    const failedIds = new Set(failedFresh.map((row) => String(row.id)));
     await writeSeenAssignmentIds(
       dir,
-      assignments.map((row) => row.id)
+      assignments.map((row) => row.id).filter((id) => !failedIds.has(String(id)))
     );
-    const files = await pullCanvasAssignmentFiles(fetched.snapshot);
+
+    const createdRows = fresh.filter((row) => created.has(String(row.id)));
+    let files = null;
+    if (createdRows.length || changed) {
+      files = await pullCanvasAssignmentFiles(fetched.snapshot);
+    }
+    if (createdRows.length) {
+      const pendingNext = new Set(pending);
+      for (const row of createdRows) pendingNext.add(String(row.id));
+      await writePendingLinkIds(dir, [...pendingNext]);
+      console.log(
+        `[canvas-watch] new todos ${createdRows.map((row) => row.id).join(",")}`
+      );
+      startCanvasLinkAgent({
+        dir,
+        dateKey,
+        hourKey,
+        timezone,
+        assignments: createdRows,
+      });
+    }
+
     await writeLastHourlySync(dir, {
       dateKey,
       hourKey,
       at: new Date().toISOString(),
-      status: result?.status || "finished",
-      model: model.id,
+      status: createdRows.length ? "linking" : "updated",
       assignments: assignments.length,
-      newAssignments: fresh.length,
-      newIds: fresh.map((row) => row.id),
+      newAssignments: createdRows.length,
+      newIds: createdRows.map((row) => row.id),
       updated: applied.updated || 0,
     });
+    hourlyLaterAuthRetry.clear();
     await gitAddCommitPush({
       paths: canvasPaths,
-      message: `education: ${hourKey} canvas assignment`,
+      message: createdRows.length
+        ? `education: ${hourKey} canvas assignment`
+        : `education: ${hourKey} canvas watch`,
     });
     return {
       ok: true,
       dateKey,
       hourKey,
-      status: result?.status || "finished",
+      status: createdRows.length ? "linking" : "updated",
       courses: fetched.courses,
       assignments: fetched.assignments,
-      newAssignments: fresh.length,
+      newAssignments: createdRows.length,
+      updated: applied.updated || 0,
       files,
     };
   } finally {
@@ -2210,35 +2328,36 @@ function armTimer(meta, result = null) {
   }, capped);
 }
 
-function armHourlyTimer(meta, result = null) {
+function armHourlyTimer(meta, result = null, opts = {}) {
   if (hourlyTimer) clearTimeout(hourlyTimer);
-  const when =
-    result?.reason === "in-flight"
-      ? new Date(Date.now() + CANVAS_LOCK_RETRY_MS)
-      : nextCanvasHourlyAt(meta);
-  const delay = Math.max(1000, when.getTime() - Date.now());
+  const delay = result?.reason === "in-flight"
+    ? 15_000
+    : opts.delayMs
+      ? opts.delayMs
+      : Math.max(1000, nextCanvasWatchAt(meta).getTime() - Date.now());
   const capped = Math.min(delay, 3 * 60 * 60 * 1000);
-  const label = result?.reason === "in-flight" ? "retry" : "next agent";
-  console.log(
-    `[canvas-hourly] ${label} ${when.toISOString()} (in ${Math.round(capped / 60000)} min)`
-  );
+  if (capped > CANVAS_WATCH_INTERVAL_MS + 5000) {
+    console.log(
+      `[canvas-watch] next poll in ${Math.round(capped / 1000)}s`
+    );
+  }
   hourlyTimer = setTimeout(() => {
     runCanvasHourlySync({ force: false })
       .then((next) => {
         readMeta()
           .then((m) => armHourlyTimer(m, next))
           .catch((err) => {
-            console.error("[canvas-hourly] reschedule failed", err);
-            hourlyTimer = setTimeout(() => startCanvasHourlyScheduler(), 60 * 60 * 1000);
+            console.error("[canvas-watch] reschedule failed", err);
+            hourlyTimer = setTimeout(() => startCanvasHourlyScheduler(), 60 * 1000);
           });
       })
       .catch((err) => {
-        console.error("[canvas-hourly] scheduled run failed", err);
+        console.error("[canvas-watch] scheduled run failed", err);
         readMeta()
           .then((m) => armHourlyTimer(m))
           .catch((armErr) => {
-            console.error("[canvas-hourly] reschedule failed", armErr);
-            hourlyTimer = setTimeout(() => startCanvasHourlyScheduler(), 60 * 60 * 1000);
+            console.error("[canvas-watch] reschedule failed", armErr);
+            hourlyTimer = setTimeout(() => startCanvasHourlyScheduler(), 60 * 1000);
           });
       });
   }, capped);
@@ -2249,7 +2368,7 @@ export function startCanvasHourlyScheduler() {
   if (!configured) return;
   readMeta()
     .then((meta) => {
-      armHourlyTimer(meta);
+      armHourlyTimer(meta, null, { delayMs: 5000 });
     })
     .catch((err) => {
       console.error("[canvas-hourly] scheduler start failed", err);
