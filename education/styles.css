@@ -2349,12 +2349,11 @@ html[data-resolved-theme="light"] .yan-chat-history-row::before {
   margin-right: -0.35rem;
 }
 .yan-chat-history-dot.is-working {
-  background: rgb(var(--chat-pulse-rgb));
-  animation: yan-chat-dot-pulse 2.8s ease-in-out infinite;
+  animation: yan-chat-dot-pulse 1.15s ease-in-out infinite;
 }
 @keyframes yan-chat-dot-pulse {
-  0%, 100% { opacity: 0.72; }
-  50% { opacity: 0.22; }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
 }
 @media (prefers-reduced-motion: reduce) {
   .yan-chat-history-dot.is-working { animation: none; }
