@@ -1837,7 +1837,8 @@ a.edu-score {
   --chat-orange-rgb: 253, 88, 2;
   --chat-clear-rgb: var(--lg-tint-rgb);
   --chat-clear-opacity: var(--lg-tint-opacity);
-  --chat-busy-opacity: 0.42;
+  --chat-pulse-rgb: 255, 196, 158;
+  --chat-pulse-opacity: 0.28;
   --pill-w: var(--chat-circle);
   --pill-left: calc(100vw - var(--chat-pad) - var(--chat-circle));
   /* Clears the pill's corner curve (radius is half the short pill) with a little air. */
@@ -1847,16 +1848,19 @@ a.edu-score {
 @media (prefers-color-scheme: dark) {
   html:not([data-resolved-theme="light"]) .yan-chat {
     --chat-orange: #f87a28; --chat-orange-rgb: 248, 122, 40;
-    --chat-busy-opacity: 0.4;
+    --chat-pulse-rgb: 255, 208, 176;
+    --chat-pulse-opacity: 0.22;
   }
 }
 html[data-resolved-theme="dark"] .yan-chat {
   --chat-orange: #f87a28; --chat-orange-rgb: 248, 122, 40;
-  --chat-busy-opacity: 0.4;
+  --chat-pulse-rgb: 255, 208, 176;
+  --chat-pulse-opacity: 0.22;
 }
 html[data-resolved-theme="light"] .yan-chat {
   --chat-orange: #fd5802; --chat-orange-rgb: 253, 88, 2;
-  --chat-busy-opacity: 0.42;
+  --chat-pulse-rgb: 255, 196, 158;
+  --chat-pulse-opacity: 0.28;
 }
 .yan-chat.is-open {
   --pill-w: min(calc(var(--chat-circle) * 6), calc(100vw - (var(--chat-pad) * 2)));
@@ -2345,11 +2349,12 @@ html[data-resolved-theme="light"] .yan-chat-history-row::before {
   margin-right: -0.35rem;
 }
 .yan-chat-history-dot.is-working {
-  animation: yan-chat-dot-pulse 1.15s ease-in-out infinite;
+  background: rgb(var(--chat-pulse-rgb));
+  animation: yan-chat-dot-pulse 2.8s ease-in-out infinite;
 }
 @keyframes yan-chat-dot-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.25; }
+  0%, 100% { opacity: 0.72; }
+  50% { opacity: 0.22; }
 }
 @media (prefers-reduced-motion: reduce) {
   .yan-chat-history-dot.is-working { animation: none; }
@@ -2627,13 +2632,13 @@ a.yan-chat-widget {
   initial-value: 0;
 }
 .yan-chat.is-busy .yan-chat-pill {
-  animation: yan-chat-glass-pulse 1.2s ease-in-out infinite;
+  animation: yan-chat-glass-pulse 2.8s ease-in-out infinite;
 }
 .yan-chat.is-busy .yan-chat-pill::before,
 .yan-chat.is-busy .yan-chat-send::before {
   background-color: color-mix(
     in srgb,
-    rgba(var(--chat-orange-rgb), var(--chat-busy-opacity)) calc(var(--chat-busy) * 100%),
+    rgba(var(--chat-pulse-rgb), var(--chat-pulse-opacity)) calc(var(--chat-busy) * 100%),
     rgba(var(--chat-clear-rgb), var(--chat-clear-opacity))
   );
 }
