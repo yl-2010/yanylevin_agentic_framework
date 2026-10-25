@@ -1835,6 +1835,9 @@ a.edu-score {
   --chat-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --chat-orange: #fd5802;
   --chat-orange-rgb: 253, 88, 2;
+  --chat-clear-rgb: var(--lg-tint-rgb);
+  --chat-clear-opacity: var(--lg-tint-opacity);
+  --chat-busy-opacity: 0.42;
   --pill-w: var(--chat-circle);
   --pill-left: calc(100vw - var(--chat-pad) - var(--chat-circle));
   /* Clears the pill's corner curve (radius is half the short pill) with a little air. */
@@ -1844,13 +1847,16 @@ a.edu-score {
 @media (prefers-color-scheme: dark) {
   html:not([data-resolved-theme="light"]) .yan-chat {
     --chat-orange: #f87a28; --chat-orange-rgb: 248, 122, 40;
+    --chat-busy-opacity: 0.4;
   }
 }
 html[data-resolved-theme="dark"] .yan-chat {
   --chat-orange: #f87a28; --chat-orange-rgb: 248, 122, 40;
+  --chat-busy-opacity: 0.4;
 }
 html[data-resolved-theme="light"] .yan-chat {
   --chat-orange: #fd5802; --chat-orange-rgb: 253, 88, 2;
+  --chat-busy-opacity: 0.42;
 }
 .yan-chat.is-open {
   --pill-w: min(calc(var(--chat-circle) * 6), calc(100vw - (var(--chat-pad) * 2)));
@@ -2615,18 +2621,31 @@ a.yan-chat-widget {
   flex: none;
   color: var(--chat-orange);
 }
-.yan-chat.is-busy .yan-chat-pill {
-  animation: yan-chat-pulse 1.2s ease-in-out infinite;
+@property --chat-busy {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
 }
-@keyframes yan-chat-pulse {
-  0%, 100% { box-shadow: 0 6px var(--lg-outer-shadow-blur) var(--lg-outer-shadow); }
-  50% {
-    box-shadow:
-      0 6px var(--lg-outer-shadow-blur) var(--lg-outer-shadow),
-      0 0 0 4px rgba(var(--chat-orange-rgb), 0.22);
-  }
+.yan-chat.is-busy .yan-chat-pill {
+  animation: yan-chat-glass-pulse 1.2s ease-in-out infinite;
+}
+.yan-chat.is-busy .yan-chat-pill::before,
+.yan-chat.is-busy .yan-chat-send::before {
+  background-color: color-mix(
+    in srgb,
+    rgba(var(--chat-orange-rgb), var(--chat-busy-opacity)) calc(var(--chat-busy) * 100%),
+    rgba(var(--chat-clear-rgb), var(--chat-clear-opacity))
+  );
+}
+@keyframes yan-chat-glass-pulse {
+  0%, 100% { --chat-busy: 0; }
+  50% { --chat-busy: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .yan-chat.is-busy .yan-chat-pill::before,
+  .yan-chat.is-busy .yan-chat-send::before {
+    background-color: rgba(var(--lg-tint-rgb), var(--lg-tint-opacity));
+  }
   .yan-chat-pill.corner, .yan-chat-panel, .yan-chat-launcher, .yan-chat-close, .yan-chat-form, .yan-chat-send {
     transition-duration: 0.01ms !important; animation: none !important;
   }
