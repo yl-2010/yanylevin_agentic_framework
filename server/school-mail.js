@@ -359,6 +359,9 @@ async function captureToken(opts) {
   const context = await launchChrome(opts);
   try {
     const pending = waitForMailToken(context, waitMs);
+    // Navigation can outlast this timer. A handler has to be attached now,
+    // or the timeout rejects with nobody listening and Node exits.
+    pending.catch(() => {});
     const page = context.pages()[0] || (await context.newPage());
     await page.goto(OWA_URL, { waitUntil: "domcontentloaded", timeout: 60_000 });
     const token = await pending;

@@ -929,6 +929,9 @@ async function captureToken(opts) {
   const context = await launchChrome(opts);
   try {
     const pending = waitForTeamsTokens(context, waitMs);
+    // Navigation can outlast this timer. A handler has to be attached now,
+    // or the timeout rejects with nobody listening and Node exits.
+    pending.catch(() => {});
     const page = context.pages()[0] || (await context.newPage());
     try {
       await page.goto(TEAMS_WEB_URL, {

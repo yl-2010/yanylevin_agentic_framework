@@ -589,6 +589,9 @@ async function captureToken(opts) {
   try {
     const page = context.pages()[0] || (await context.newPage());
     const pending = waitForNotesToken(context, waitMs);
+    // Navigation can outlast this timer. A handler has to be attached now,
+    // or the timeout rejects with nobody listening and Node exits.
+    pending.catch(() => {});
     void driveLogin(context, ac.signal);
     try {
       await page.goto(GRAPH_EXPLORER_URL, {
