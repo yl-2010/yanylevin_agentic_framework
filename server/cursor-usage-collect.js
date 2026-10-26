@@ -10,7 +10,7 @@ import { homedir, hostname } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { refreshLocalIndex } from "./usage-local.js";
-import { billingSnapshotsToSend } from "./usage-log.js";
+import { billingSnapshotsToSend, desktopKind } from "./usage-log.js";
 
 const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const STATE_PATH = join(ROOT, "data", "usage", "collector-state.json");
@@ -209,7 +209,7 @@ async function scanDesktop(db, state, folders, person) {
     const gitPath = meta.trackedGitRepos?.[0]?.repoPath || folders.get(header.workspaceId) || "";
     const repo = repoFromPath(gitPath) || "Other";
     const mode = header.isSubagent ? "subagent" : String(meta.unifiedMode || "agent");
-    const kind = mode === "agent" ? "cursor-desktop" : mode;
+    const kind = header.isSubagent ? "subagent" : desktopKind(mode);
     const parentComposerId = parents.get(String(header.composerId)) || "";
     const prefix = `bubbleId:${header.composerId}:`;
     const bubbles = db

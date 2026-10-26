@@ -42,20 +42,22 @@ export function personFromEmail(email) {
   return "Other";
 }
 
+/** Cursor Desktop agent, ask, and plan. Older rows stored these as agent, chat, and plan. */
+const DESKTOP_MODES = new Set(["agent", "chat", "plan", "ask"]);
+
+export function desktopKind(kind) {
+  const value = String(kind ?? "agent").trim() || "agent";
+  return DESKTOP_MODES.has(value) ? "cursor-desktop" : value;
+}
+
 /**
  * Collapsed thread name. Scheduled jobs stay the kind ("life state", "canvas hourly").
  * A chat turn named in the transcript is the person and channel ("Example Neighbor teams").
  * @param {{ kind?: string, prompt?: string }} input
  */
-/** Cursor Desktop agent mode. Older rows stored this as "agent". */
-export function desktopKind(kind) {
-  const value = String(kind ?? "agent").trim() || "agent";
-  return value === "agent" ? "cursor-desktop" : value;
-}
-
 export function agentTypeLabel(input) {
   const raw = String(input?.kind || "agent").trim() || "agent";
-  const kind = raw === "agent" ? "cursor-desktop" : raw;
+  const kind = desktopKind(raw);
   if (CHAT_KINDS.has(raw) || CHAT_KINDS.has(kind)) {
     const called = String(input?.prompt || "").match(
       /Called by ([A-Za-z]+)(?: \([^)]*\))? on (Teams|iMessage|WhatsApp)/

@@ -198,7 +198,10 @@ describe("usage clumps", () => {
 
   it("names a collapsed thread by agent type, not the prompt", () => {
     assert.equal(agentTypeLabel({ kind: "agent", prompt: "plan a site" }), "cursor desktop");
+    assert.equal(agentTypeLabel({ kind: "chat", prompt: "what does this do" }), "cursor desktop");
+    assert.equal(agentTypeLabel({ kind: "plan", prompt: "plan a site" }), "cursor desktop");
     assert.equal(agentTypeLabel({ kind: "cursor-desktop", prompt: "plan a site" }), "cursor desktop");
+    assert.equal(agentTypeLabel({ kind: "personal-chat", prompt: "due friday" }), "personal chat");
     assert.equal(agentTypeLabel({ kind: "life-state", prompt: "Follow the life-state skill." }), "life state");
     assert.equal(
       agentTypeLabel({
