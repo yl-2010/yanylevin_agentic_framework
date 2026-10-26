@@ -7,6 +7,7 @@ import {
   appendAgentAction,
   ensureHomeSeeds,
   isDashboardAction,
+  isFolderChange,
   lightsActionSummary,
   readAgentActions,
   vacuumSeedRows,
@@ -95,6 +96,13 @@ describe("agent action log", () => {
       assert.equal(isDashboardAction("calendar", "nightly-actions"), false);
       assert.equal(isDashboardAction("calendar", "calendar-on-demand"), false);
       assert.equal(isDashboardAction("mail", "nightly-actions"), true);
+      assert.equal(isDashboardAction("mail", "nightly-actions", "Sent mail to Alex"), true);
+      assert.equal(isFolderChange("Filed Google data-sharing notices into Security"), true);
+      assert.equal(
+        isDashboardAction("mail", "nightly-actions", "Filed Google data-sharing notices into Security"),
+        false
+      );
+      assert.equal(isFolderChange("Sent mail to Alex"), false);
       const dropped = await appendAgentAction(
         {
           agent: "jype",
@@ -153,6 +161,26 @@ describe("agent action log", () => {
         })}\n`,
         "utf8"
       );
+      await appendFile(
+        path,
+        `${JSON.stringify({
+          at: "2026-10-11T10:00:47.854Z",
+          agent: "nightly-actions",
+          kind: "mail",
+          summary: "Filed Google data-sharing notices into Security",
+        })}\n`,
+        "utf8"
+      );
+      const filed = await appendAgentAction(
+        {
+          at: "2026-10-12T10:00:00.000Z",
+          agent: "nightly-actions",
+          kind: "mail",
+          summary: "Moved college spam into Colleges",
+        },
+        { path }
+      );
+      assert.equal(filed, null);
       const nightly = await appendAgentAction(
         {
           at: "2026-10-04T10:00:00.000Z",

@@ -1,6 +1,7 @@
 /**
  * Append-only log of side effects Yan would not already see.
- * Mail, education dates, lights, and the vacuum belong here.
+ * Mail sends, education dates, lights, and the vacuum belong here.
+ * Moving a message into a folder does not.
  * Teams and iMessage sends do not. Those already show in the chat.
  * Calendar writes do not, including nightly ones. Those already show on the calendar.
  * File stays on the Mac. data/agent-actions.jsonl is gitignored.
@@ -25,12 +26,27 @@ const HIDDEN_KINDS = new Set(["teams", "imessage", "calendar"]);
 const HIDDEN_AGENTS = new Set(["calendar-on-demand"]);
 
 /**
+ * Filing into Colleges or Security is a folder change. A send is not.
+ * @param {string} summary
+ */
+export function isFolderChange(summary) {
+  const text = String(summary || "").replace(/\s+/g, " ").trim();
+  if (!text) return false;
+  if (/^filed\b/i.test(text)) return true;
+  if (/\b(into|to) (the )?(security|colleges)( folder| mailbox)?$/i.test(text)) return true;
+  if (/^(moved|sorted)\b/i.test(text) && /\b(folder|mailbox|into)\b/i.test(text)) return true;
+  return false;
+}
+
+/**
  * @param {string} kind
  * @param {string} [agent]
+ * @param {string} [summary]
  */
-export function isDashboardAction(kind, agent = "") {
+export function isDashboardAction(kind, agent = "", summary = "") {
   if (HIDDEN_KINDS.has(String(kind || "").trim())) return false;
   if (HIDDEN_AGENTS.has(String(agent || "").trim())) return false;
+  if (isFolderChange(summary)) return false;
   return true;
 }
 
@@ -91,7 +107,7 @@ export async function appendAgentAction(entry, opts = {}) {
     .trim();
   const at = entry?.at ? String(entry.at) : new Date().toISOString();
   if (!agent || !kind || !summary) return null;
-  if (!isDashboardAction(kind, agent)) return null;
+  if (!isDashboardAction(kind, agent, summary)) return null;
   if (Number.isNaN(Date.parse(at))) return null;
   const id = String(entry?.id || "").trim();
   if (id && (await actionIdExists(path, id))) return null;
@@ -236,7 +252,7 @@ export async function readAgentActions(opts = {}) {
     try {
       const row = JSON.parse(trimmed);
       if (!row?.summary || !row?.at) continue;
-      if (!isDashboardAction(row.kind, row.agent)) continue;
+      if (!isDashboardAction(row.kind, row.agent, row.summary)) continue;
       entries.push(publicEntry(row));
     } catch {
       /* skip a torn line */
