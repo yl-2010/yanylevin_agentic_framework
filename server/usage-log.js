@@ -1,7 +1,8 @@
 /**
  * Cursor usage clumps. One user prompt is one row.
- * Billing events that never join a prompt or a local transcript stay person Other, repo Other.
- * Files stay on the Mac under data/usage/. Gitignored.
+ * Billing with no prompt and no local transcript is Alex's Cursor desktop
+ * on this same account. Kind is cursor-desktop. Repo stays Other until his
+ * machine reports the folder. Files stay on the Mac under data/usage/. Gitignored.
  */
 
 import { timingSafeEqual, randomUUID } from "node:crypto";
@@ -861,9 +862,9 @@ function billingOnlyClump(bill) {
     id: bill.id,
     source: "billing",
     at: bill.at || "",
-    person: "Other",
+    person: "Alex",
     repo: "Other",
-    kind: "other",
+    kind: "cursor-desktop",
     model: bill.model || "",
     modelConfig: null,
     prompt: "",
@@ -1136,6 +1137,7 @@ export function packUsageEvents(clumps) {
       tokens.cacheRead || 0,
       tokens.cacheWrite || 0,
       num(row.chargedCents),
+      tokens.reasoning || 0,
     ];
   });
   return { dict, events };
@@ -1159,7 +1161,7 @@ export function unpackUsageEvents(packed) {
       output: event[8] || 0,
       cacheRead: event[9] || 0,
       cacheWrite: event[10] || 0,
-      reasoning: 0,
+      reasoning: event[12] || 0,
     },
     chargedCents: event[11] || 0,
   }));

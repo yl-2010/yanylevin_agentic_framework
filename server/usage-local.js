@@ -1,7 +1,8 @@
 /**
  * Tags billing rows from Cursor agent transcripts on this Mac.
  * The transcript folder name is the billing conversation id.
- * A row with no local transcript stays Other.
+ * A row with no local transcript is not tagged here.
+ * usage-log.js labels that billing as Alex, cursor-desktop.
  */
 
 import { open, readdir, readFile, stat, writeFile, mkdir } from "node:fs/promises";

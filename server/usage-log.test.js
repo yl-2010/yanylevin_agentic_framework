@@ -15,7 +15,7 @@ describe("usage clumps", () => {
     assert.equal(kindFromPrefix("test"), "unspecified");
   });
 
-  it("keeps an SDK prompt and does not also show its billing event as Other", () => {
+  it("keeps an SDK prompt and tags unmatched billing as Alex cursor desktop", () => {
     const clumps = buildClumps([
       {
         id: "sdk:req-1",
@@ -58,8 +58,9 @@ describe("usage clumps", () => {
     assert.equal(teams.repo, "yanylevin-agents");
     assert.equal(teams.tokens.cacheRead, 9);
     assert.equal(teams.tokens.cacheWrite, 2);
-    const other = clumps.find((row) => row.person === "Other");
-    assert.equal(other.repo, "Other");
+    const other = clumps.find((row) => row.repo === "Other");
+    assert.equal(other.person, "Alex");
+    assert.equal(other.kind, "cursor-desktop");
     assert.equal(other.prompt, "");
     assert.equal(other.tokens.input, 50);
     assert.equal(other.chargedCents, 12.5);
@@ -145,7 +146,7 @@ describe("usage clumps", () => {
     assert.equal(grown.changed[0].chargedCents, 540);
   });
 
-  it("tags a local transcript and keeps off-machine billing as Other", () => {
+  it("tags a local transcript and attributes off-machine billing to Alex", () => {
     const index = new Map([
       ["agent-1", { person: "Alex", repo: "yanylevin-agents", kind: "jype-agent", prompt: "what is due" }],
     ]);
@@ -192,8 +193,9 @@ describe("usage clumps", () => {
     assert.equal(jype.tokens.input, 15);
     assert.equal(jype.tokens.cacheRead, 4);
     assert.equal(jype.chargedCents, 5);
-    const other = clumps.find((row) => row.person === "Other");
-    assert.equal(other.repo, "Other");
+    const other = clumps.find((row) => row.repo === "Other");
+    assert.equal(other.person, "Alex");
+    assert.equal(other.kind, "cursor-desktop");
     assert.equal(other.prompt, "");
   });
 
@@ -251,6 +253,26 @@ describe("usage clumps", () => {
     assert.equal(right.byModel[0].name, left.byModel[0].name);
     assert.equal(back[0].label, agentTypeLabel(clumps[0]));
     assert.equal(back[0].threadId, "comp");
+  });
+
+  it("keeps reasoning tokens in the packed index", () => {
+    const packed = packUsageEvents([
+      {
+        at: "2026-10-20T18:00:00.000Z",
+        person: "Yan",
+        repo: "yanylevin",
+        kind: "cursor-desktop",
+        model: "grok-4.7-high",
+        threadId: "t",
+        tokens: { input: 10, output: 2, cacheRead: 4, cacheWrite: 1, reasoning: 3 },
+        chargedCents: 1.25,
+      },
+    ]);
+    const back = unpackUsageEvents(packed);
+    assert.equal(back[0].tokens.reasoning, 3);
+    assert.equal(back[0].tokens.input, 10);
+    assert.equal(back[0].tokens.output, 2);
+    assert.equal(back[0].chargedCents, 1.25);
   });
 
   it("keeps a poller-logged JYPE turn on jype agent, and leaves that bill off other jobs", () => {
