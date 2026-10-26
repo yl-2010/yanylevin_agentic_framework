@@ -1,7 +1,7 @@
 /**
  * Append-only log of side effects Yan would not already see.
- * Mail sends, new education dates, lights, and the vacuum belong here.
- * A small update to a date that already exists does not.
+ * Mail sends, lights, and the vacuum belong here.
+ * Education dashboard writes do not. Dates, todos, and projects already show on /education.
  * Moving a message into a folder does not.
  * Teams and iMessage sends do not. Those already show in the chat.
  * Calendar writes do not, including nightly ones. Those already show on the calendar.
@@ -40,27 +40,16 @@ export function isFolderChange(summary) {
 }
 
 /**
- * "Updated fall parent-teacher conferences" is a tweak to a date already on
- * the education dashboard. A new date ("Added ...") still counts.
- * @param {string} kind
- * @param {string} summary
- */
-export function isSmallUpdate(kind, summary) {
-  const text = String(summary || "").replace(/\s+/g, " ").trim();
-  if (String(kind || "").trim() !== "education-date") return false;
-  return /^updated\b/i.test(text);
-}
-
-/**
  * @param {string} kind
  * @param {string} [agent]
  * @param {string} [summary]
  */
 export function isDashboardAction(kind, agent = "", summary = "") {
-  if (HIDDEN_KINDS.has(String(kind || "").trim())) return false;
+  const id = String(kind || "").trim();
+  if (HIDDEN_KINDS.has(id)) return false;
+  if (id.startsWith("education-")) return false;
   if (HIDDEN_AGENTS.has(String(agent || "").trim())) return false;
   if (isFolderChange(summary)) return false;
-  if (isSmallUpdate(kind, summary)) return false;
   return true;
 }
 

@@ -8,7 +8,6 @@ import {
   ensureHomeSeeds,
   isDashboardAction,
   isFolderChange,
-  isSmallUpdate,
   lightsActionSummary,
   readAgentActions,
   vacuumSeedRows,
@@ -104,12 +103,12 @@ describe("agent action log", () => {
         false
       );
       assert.equal(isFolderChange("Sent mail to Alex"), false);
-      assert.equal(isSmallUpdate("education-date", "Updated fall parent-teacher conferences"), true);
+      assert.equal(isDashboardAction("education-date", "nightly-actions", "Added Fall orientation"), false);
       assert.equal(
         isDashboardAction("education-date", "nightly-actions", "Updated fall parent-teacher conferences"),
         false
       );
-      assert.equal(isDashboardAction("education-date", "nightly-actions", "Added Fall orientation"), true);
+      assert.equal(isDashboardAction("education-todo", "nightly-actions", "Added Register for AP tests"), false);
       const dropped = await appendAgentAction(
         {
           agent: "jype",
@@ -188,16 +187,16 @@ describe("agent action log", () => {
         })}\n`,
         "utf8"
       );
-      const updatedDate = await appendAgentAction(
+      const addedDate = await appendAgentAction(
         {
           at: "2026-10-24T10:00:00.000Z",
           agent: "nightly-actions",
           kind: "education-date",
-          summary: "Updated Fall parent-student-teacher conferences",
+          summary: "Added Fall orientation",
         },
         { path }
       );
-      assert.equal(updatedDate, null);
+      assert.equal(addedDate, null);
       const filed = await appendAgentAction(
         {
           at: "2026-10-12T10:00:00.000Z",
