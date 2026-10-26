@@ -1,8 +1,8 @@
 /**
  * Append-only log of side effects Yan would not already see.
- * Nightly calendar writes, mail, education dates, lights, and the vacuum belong here.
+ * Mail, education dates, lights, and the vacuum belong here.
  * Teams and iMessage sends do not. Those already show in the chat.
- * Calendar-on-demand writes do not. Those already show on the calendar.
+ * Calendar writes do not, including nightly ones. Those already show on the calendar.
  * File stays on the Mac. data/agent-actions.jsonl is gitignored.
  */
 
@@ -21,7 +21,7 @@ const AGENT_LABELS = {
 };
 
 /** Already visible in Teams, Messages, or on the calendar. The Actions rail skips these. */
-const CHAT_KINDS = new Set(["teams", "imessage"]);
+const HIDDEN_KINDS = new Set(["teams", "imessage", "calendar"]);
 const HIDDEN_AGENTS = new Set(["calendar-on-demand"]);
 
 /**
@@ -29,7 +29,7 @@ const HIDDEN_AGENTS = new Set(["calendar-on-demand"]);
  * @param {string} [agent]
  */
 export function isDashboardAction(kind, agent = "") {
-  if (CHAT_KINDS.has(String(kind || "").trim())) return false;
+  if (HIDDEN_KINDS.has(String(kind || "").trim())) return false;
   if (HIDDEN_AGENTS.has(String(agent || "").trim())) return false;
   return true;
 }

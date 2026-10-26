@@ -240,7 +240,7 @@ describe("calendar delete memory", () => {
 });
 
 describe("calendar --via action log", () => {
-  it("strips --via and records a background create", async () => {
+  it("strips --via and skips calendar cards", async () => {
     const split = splitVia([
       "create",
       "--title",
@@ -267,13 +267,13 @@ describe("calendar --via action log", () => {
         path,
       });
       assert.equal(dropped, null);
-      const row = await logCalendarCommand({
+      const nightly = await logCalendarCommand({
         via: "nightly-actions",
         cmd: "create",
         event: { title: "Dinner Friday", calendar: "Home", id: "ev-1" },
         path,
       });
-      assert.equal(row.summary, "Added Dinner Friday on Home");
+      assert.equal(nightly, null);
       const skipped = await logCalendarCommand({
         via: "",
         cmd: "create",
@@ -287,10 +287,8 @@ describe("calendar --via action log", () => {
         event: { title: "Dinner Friday", calendar: "Home", id: "ev-1" },
         path,
       });
-      assert.equal(updated.summary, "Updated Dinner Friday on Home");
-      const raw = await readFile(path, "utf8");
-      assert.equal(raw.trim().split("\n").length, 2);
-      assert.equal(raw.includes("Nope"), false);
+      assert.equal(updated, null);
+      await assert.rejects(readFile(path, "utf8"));
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
