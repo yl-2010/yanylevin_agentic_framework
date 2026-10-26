@@ -299,7 +299,7 @@
         <svg viewBox="0 0 252 252" aria-hidden="true"><path fill="currentColor" d="${YL_PATH}"/></svg>
       </a>
       <a class="corner social-orb dock-dash squircle" data-liquid-glass="squircle" data-filter-id="lg-dock-dash" href="/dashboard/" aria-label="Dashboard" draggable="false">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3.4 4.1h5c.7 0 1.2.5 1.2 1.2v13.4c0 .7-.5 1.2-1.2 1.2h-5c-.7 0-1.2-.5-1.2-1.2V5.3c0-.7.5-1.2 1.2-1.2Zm7.6 0h9.6c.7 0 1.2.5 1.2 1.2v5.4c0 .7-.5 1.2-1.2 1.2h-9.6c-.7 0-1.2-.5-1.2-1.2V5.3c0-.7.5-1.2 1.2-1.2Zm0 9h9.6c.7 0 1.2.5 1.2 1.2v4.4c0 .7-.5 1.2-1.2 1.2h-9.6c-.7 0-1.2-.5-1.2-1.2v-4.4c0-.7.5-1.2 1.2-1.2Z"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><rect x="2.2" y="3" width="4.4" height="18" rx="1.15"/><rect x="10" y="3" width="11.8" height="7.3" rx="1.15"/><rect x="10" y="13.7" width="11.8" height="7.3" rx="1.15"/></g></svg>
       </a>`;
     document.body.appendChild(dock);
 
