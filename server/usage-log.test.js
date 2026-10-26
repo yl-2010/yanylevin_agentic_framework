@@ -253,7 +253,7 @@ describe("usage clumps", () => {
     assert.equal(back[0].threadId, "comp");
   });
 
-  it("files a Teams JYPE turn under jype agent, and leaves that bill off other jobs", () => {
+  it("keeps a poller-logged JYPE turn on jype agent, and leaves that bill off other jobs", () => {
     const index = new Map([
       ["agent-jype", { person: "Example Neighbor", repo: "yanylevin-agents", kind: "jype-agent", prompt: "You are the JYPE agent" }],
     ]);
@@ -267,7 +267,7 @@ describe("usage clumps", () => {
           endedAt: "2026-10-25T18:00:00.000Z",
           person: "Example Neighbor",
           repo: "yanylevin-agents",
-          kind: "teams-agent",
+          kind: "jype-agent",
           prompt: "From Example Neighbor on Teams:\n\n@agent hello",
           threadId: "chat-9",
           requestId: "req-j",
@@ -317,6 +317,46 @@ describe("usage clumps", () => {
     assert.equal(jypeCents, 55);
     assert.equal(calendar.chargedCents, 0);
     assert.equal(clumps.some((row) => row.kind === "teams-agent"), false);
+    assert.equal(clumps.find((row) => row.id === "sdk:teams").person, "Example Neighbor");
+  });
+
+  it("does not relabel a logged Teams run from the JYPE transcript", () => {
+    const index = new Map([
+      ["agent-jype", { person: "Example Neighbor", repo: "yanylevin-agents", kind: "jype-agent", prompt: "You are the JYPE agent" }],
+    ]);
+    const clumps = buildClumps(
+      [
+        {
+          id: "sdk:teams",
+          source: "sdk",
+          at: "2026-10-25T18:00:00.000Z",
+          startedAt: "2026-10-25T17:59:00.000Z",
+          endedAt: "2026-10-25T18:00:00.000Z",
+          person: "Alex",
+          repo: "yanylevin-agents",
+          kind: "teams-agent",
+          prompt: "From Alex on Teams:\n\n@agent hello",
+          threadId: "chat-9",
+          requestId: "req-j",
+          tokens: tokensFromUsage({ inputTokens: 100, outputTokens: 20 }),
+        },
+        {
+          id: "bill:j",
+          source: "billing",
+          at: "2026-10-25T17:59:30.000Z",
+          usageEventId: "req-j",
+          conversationId: "agent-jype",
+          model: "composer-2.5",
+          chargedCents: 40,
+          tokens: tokensFromUsage({ inputTokens: 100, outputTokens: 20 }),
+        },
+      ],
+      index
+    );
+    const logged = clumps.find((row) => row.id === "sdk:teams");
+    assert.equal(logged.kind, "teams-agent");
+    assert.equal(logged.person, "Alex");
+    assert.equal(logged.chargedCents, 40);
   });
 
   it("keeps a Teams DM on teams agent when the transcript is the Personal Agent prompt", () => {

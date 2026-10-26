@@ -51,6 +51,8 @@ import {
   deliverTeamsFinalReply,
   channelProgressKind,
   channelSendToolResult,
+  usageKind,
+  usagePerson,
   dropRejectedChatGuid,
   nextOutboundAction,
   outboundResumePrompt,
@@ -59,6 +61,33 @@ import {
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const YAN = "you@example.com";
+
+describe("usage labels", () => {
+  it("records JYPE from the workspace, and the sender from the poller", () => {
+    const session = {
+      workspace: "jype",
+      teamsOrigin: { chat: "1" },
+      guestCaller: { displayName: "Example Neighbor" },
+      email: YAN,
+    };
+    assert.equal(usageKind(session), "jype-agent");
+    assert.equal(usagePerson(session), "Example Neighbor");
+  });
+
+  it("records a Teams DM as teams agent for the person who sent it", () => {
+    const session = {
+      teamsOrigin: { chat: "1" },
+      guestCaller: { displayName: "Alex" },
+      email: YAN,
+    };
+    assert.equal(usageKind(session), "teams-agent");
+    assert.equal(usagePerson(session), "Alex");
+  });
+
+  it("records a scheduled kickoff as a future agent before the workspace", () => {
+    assert.equal(usageKind({ workspace: "jype" }, { scheduledKickoff: true }), "future-agent");
+  });
+});
 
 describe("Personal Agent models", () => {
   it("uses grok-4.7 high with Fast off for text and attachments", () => {

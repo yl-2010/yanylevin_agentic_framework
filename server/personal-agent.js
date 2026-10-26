@@ -190,19 +190,20 @@ function sessionWorkspace(session) {
   return normalizeJypeWorkspace(session?.workspace);
 }
 
-function usagePerson(session) {
+export function usagePerson(session) {
   if (session?.usagePerson) return String(session.usagePerson).trim();
   const guest = session?.guestCaller?.displayName;
   if (guest) return String(guest).trim();
   return personFromEmail(session?.email);
 }
 
-function usageKind(session, opts) {
+/** Channel and person come from the poller that started the turn, not from the prompt text. */
+export function usageKind(session, opts) {
   if (opts?.scheduledKickoff) return "future-agent";
+  if (sessionWorkspace(session) === "jype") return "jype-agent";
   if (session?.teamsOrigin) return "teams-agent";
   if (session?.imessageOrigin) return "imessage-agent";
   if (session?.whatsappOrigin) return "whatsapp-agent";
-  if (sessionWorkspace(session) === "jype") return "jype-chat";
   return "personal-chat";
 }
 

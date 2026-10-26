@@ -54,11 +54,13 @@ export function desktopKind(kind) {
 
 /**
  * One name for the same nightly job. Older SDK rows say "synthesis".
+ * JYPE site chats used to log as jype-chat. Same workspace as jype-agent.
  * @param {string|null|undefined} kind
  */
 export function canonicalKind(kind) {
   const value = desktopKind(kind);
   if (value === "synthesis") return "context-synthesis";
+  if (value === "jype-chat") return "jype-agent";
   return value;
 }
 
@@ -549,7 +551,7 @@ export function buildClumps(rows, local = null) {
   for (const prompt of sdk) {
     const matched = matchSdkBilling(prompt, billing, explained, index);
     for (const bill of matched) explained.add(bill.id);
-    clumps.push(toClump({ ...prompt, kind: kindForMatch(prompt.kind, matched, index) }, matched));
+    clumps.push(toClump({ ...prompt, kind: canonicalKind(prompt.kind) }, matched));
   }
   const desktop = prompts.filter((p) => p.source === "desktop");
   const desktopMatches = matchDesktopGroups(desktop, billing, byEvent, explained);
@@ -629,25 +631,6 @@ function localAgentKind(local, conversationId) {
   if (!kind || kind === "cursor-desktop" || kind === "other" || kind === "unspecified") return "";
   if (CHANNEL_KINDS.has(kind)) return "";
   return kind;
-}
-
-/**
- * Teams and iMessage logs are the pipe. JYPE and the other named jobs
- * replace that label. The shared Personal Agent prompt does not.
- * @param {string} kind
- * @param {object[]} matched
- * @param {Map<string, { kind?: string }>|null} local
- */
-function kindForMatch(kind, matched, local) {
-  const base = canonicalKind(kind);
-  if (!CHANNEL_KINDS.has(base)) return base;
-  const owners = new Set();
-  for (const bill of matched || []) {
-    const owner = localAgentKind(local, bill?.conversationId);
-    if (owner && owner !== "personal-agent") owners.add(owner);
-  }
-  if (owners.size === 1) return [...owners][0];
-  return base;
 }
 
 function matchSdkBilling(prompt, billing, explained, local = null) {
