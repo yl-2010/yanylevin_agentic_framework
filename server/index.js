@@ -49,6 +49,10 @@ import {
   revealOpenEducationObject,
   syncOnedriveObjectVisibility,
 } from "./education-onedrive-visibility.js";
+import {
+  onOnedriveSnapshotWrote,
+  startOnedriveSnapshotLoop,
+} from "./education-onedrive-snapshot.js";
 import { startHealthTakeawaysScheduler } from "./health-takeaways-agent.js";
 import { startLocationBrainScheduler } from "./location-brain-agent.js";
 import { startHealthBrainScheduler } from "./health-brain-agent.js";
@@ -764,11 +768,10 @@ async function educationDataTree(email) {
 
 app.get("/api/education/data", requireEducationUser, async (req, res) => {
   try {
-    try {
-      await revealOpenEducationObject(req.user.email, req.query || {});
-    } catch (err) {
+    // Finder reveal writes OneDrive. Do not make the page wait on it.
+    revealOpenEducationObject(req.user.email, req.query || {}).catch((err) => {
       console.error("[onedrive-reveal]", err);
-    }
+    });
     const tree = await educationDataTree(req.user.email);
     // Finder hide/show walks the same CloudStorage files. Not on every poll.
     scheduleOnedriveVisibility(req.user.email);
@@ -1590,5 +1593,9 @@ app.use((_req, res) => {
   startSchoolMailCalendarScheduler();
   startTeamsChannelCalendarScheduler();
   startHeadlinesWipeScheduler();
+  onOnedriveSnapshotWrote((email) => {
+    educationTreeCache.delete(canonicalizeEmail(email));
+  });
+  startOnedriveSnapshotLoop(YAN_EMAIL);
 });
 

@@ -25,6 +25,7 @@ import {
   zonedLocalToUtc,
 } from "./daily-briefing-agent.js";
 import { listClassEntriesForRoot, scheduleTodayKey } from "./education-data.js";
+import { scheduleOnedriveSnapshotRefresh } from "./education-onedrive-snapshot.js";
 import { formatDeletedBlock, loadDeletedMarkdown } from "./education-match.js";
 import { gitAddCommitPush } from "./git-publish.js";
 import { attachCanvasComments, attachCanvasOverlay, canvasAssignmentIdFromLink } from "./canvas-grades.js";
@@ -2144,6 +2145,7 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
     if (seen == null) {
       await writeSnapshotFiles(dir, fetched.snapshot);
       const applied = await applyCanvasTodos({ skipCreate: true });
+      scheduleOnedriveSnapshotRefresh(YAN_EMAIL);
       await writeSeenAssignmentIds(
         dir,
         assignments.map((row) => row.id)
@@ -2200,6 +2202,7 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
 
     await writeSnapshotFiles(dir, fetched.snapshot);
     const applied = await applyCanvasTodos({ skipCreate: fresh.length === 0 });
+    scheduleOnedriveSnapshotRefresh(YAN_EMAIL);
     const created = new Set((applied.createdIds || []).map((id) => String(id)));
     const skippedDeleted = new Set((applied.skippedIds || []).map((id) => String(id)));
     const failedFresh = fresh.filter(

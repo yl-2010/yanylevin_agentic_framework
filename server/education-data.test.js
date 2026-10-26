@@ -19,6 +19,7 @@ import {
   isMeetingHighlighted,
   activeMeetingAt,
   partitionClassTodos,
+  publishClassRows,
   siteFilesFromProps,
   loadClassScopedObjects,
   resolveLinkedTodoFile,
@@ -32,6 +33,43 @@ const {
   encodeEducationFileQueryValue,
   decodeEducationFileQueryValue,
 } = require("../education/file-query.js");
+
+describe("publishClassRows", () => {
+  it("strips snapshot fields and keeps the todo the page renders", () => {
+    const { classes } = publishClassRows(
+      [
+        {
+          id: "physics",
+          props: { name: "Physics", trimester: "year", period: "H" },
+          onedriveFolder: "H. Physics",
+          todos: [
+            {
+              id: "hw-1",
+              name: "Displacement",
+              done: false,
+              _raw: { name: "Displacement", done: false },
+              _jsonPath: "/Users/you/Library/CloudStorage/todo.json",
+            },
+          ],
+          dates: [],
+          files: [{ name: "notes.pdf", kind: "file" }],
+        },
+      ],
+      {
+        includeFixtures: true,
+        schedule: {},
+        todayKey: "2026-10-25",
+        panelKeys: [],
+      }
+    );
+    assert.equal(classes.length, 1);
+    assert.equal(classes[0].todos[0].name, "Displacement");
+    assert.equal(classes[0].todos[0]._raw, undefined);
+    assert.equal(classes[0].todos[0]._jsonPath, undefined);
+    assert.equal(classes[0].onedriveFolder, "H. Physics");
+    assert.equal(classes[0].files[0].name, "notes.pdf");
+  });
+});
 
 describe("education file query", () => {
   const id = "HW Sep 24 STUDY GUIDE QA #1 ESCRITO AUDITIVO GUÍA DE ESTUDIO Otoño 2026";

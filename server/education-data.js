@@ -3,16 +3,28 @@
  * Roots: education/<email>/ under the repo.
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createReadStream } from "node:fs";
 import { createRequire } from "node:module";
 import { readdir, readFile, writeFile, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  isCloudStoragePath,
   isTransientCloudError,
   runCloudStorageIo,
   withCloudRetry,
 } from "./cloud-storage-io.js";
+import {
+  findSnapshotTodo,
+  mergeClassRows,
+  patchSnapshotTodo,
+  readOnedriveSnapshot,
+  registerOnedriveSnapshotBuilder,
+  scheduleOnedriveSnapshotRefresh,
+  snapshotIsStale,
+  writeOnedriveSnapshot,
+} from "./education-onedrive-snapshot.js";
 import { gitAddCommitPush } from "./git-publish.js";
 import { attachCanvasOverlay } from "./canvas-grades.js";
 import {
@@ -42,6 +54,12 @@ import {
 import { JYPE_ROOT_REL, normalizeJypeWorkspace } from "./jype.js";
 
 const require = createRequire(import.meta.url);
+const cloudMissStore = new AsyncLocalStorage();
+
+function noteCloudReadMiss() {
+  const box = cloudMissStore.getStore();
+  if (box) box.misses += 1;
+}
 const { decodeEducationFileQueryValue } = require("../education/file-query.js");
 
 const FILE_QUERY_KEYS = ["scope", "id", "classId", "projectId", "name", "source", "path"];
@@ -858,6 +876,7 @@ async function readJsonFile(path) {
     return JSON.parse(raw);
   } catch (err) {
     if (err && (err.code === "ENOENT" || err instanceof SyntaxError)) return null;
+    if (isCloudStoragePath(path)) noteCloudReadMiss();
     throw err;
   }
 }
@@ -1525,6 +1544,7 @@ async function loadObjectFolder(
     projectId = null,
     officeOpen = {},
     keepObjectDir = false,
+    keepRaw = false,
   } = {}
 ) {
   const ids = await listDirs(parentDir);
@@ -1585,6 +1605,10 @@ async function loadObjectFolder(
       fileOpts.bottomNames
     );
     if (keepObjectDir) item._objectDir = objectDir;
+    if (keepRaw) {
+      item._raw = props;
+      item._jsonPath = jsonPath;
+    }
     out.push(item);
   }
   return out;
@@ -2040,16 +2064,30 @@ export async function resolveNowScheduleContext(email, now = new Date(), opts = 
     String(schedule.source || "").trim() ||
     "education/2026-27 Weekly Class Schedule.pdf";
 
-  const classEntries = await listClassEntriesForRoot(root);
+  let provided = Array.isArray(opts.classes) ? opts.classes : null;
+  if (!provided) {
+    const snap = await readOnedriveSnapshot(email);
+    if (snap?.sourceClasses?.length) provided = snap.sourceClasses;
+  }
   /** @type {object[]} */
   const classes = [];
-  for (const entry of classEntries) {
-    const props = await readJsonFile(join(entry.objectDir, "class.json"));
-    if (!props || typeof props !== "object") continue;
-    const cls = { id: entry.id, ...props };
-    if (isFixture(cls)) continue;
-    if (!isClassActiveOnDate(cls, clock.dateKey, schedule)) continue;
-    classes.push(cls);
+  if (provided) {
+    for (const cls of provided) {
+      if (!cls || typeof cls !== "object") continue;
+      if (isFixture(cls)) continue;
+      if (!isClassActiveOnDate(cls, clock.dateKey, schedule)) continue;
+      classes.push(cls);
+    }
+  } else {
+    const classEntries = await listClassEntriesForRoot(root);
+    for (const entry of classEntries) {
+      const props = await readJsonFile(join(entry.objectDir, "class.json"));
+      if (!props || typeof props !== "object") continue;
+      const cls = { id: entry.id, ...props };
+      if (isFixture(cls)) continue;
+      if (!isClassActiveOnDate(cls, clock.dateKey, schedule)) continue;
+      classes.push(cls);
+    }
   }
 
   const allowedIds = new Set(classes.map((c) => c.id));
@@ -2226,53 +2264,36 @@ export function partitionClassTodos(todos) {
   return { home, classOnly };
 }
 
-/**
- * @param {string} email
- * @param {{ includeFixtures?: boolean }} [opts]
- *   When false (default), strip fixture + out-of-season classes for the web UI
- *   and omit trimester fields. Agents still read on-disk trees directly.
- */
-export async function readEducationTree(email, opts = {}) {
-  // One walk holds the CloudStorage queue so Finder hide/show cannot
-  // interleave and deadlock the File Provider mid-read.
-  return runCloudStorageIo(() => loadEducationTree(email, opts));
+function clonePublicTodo(todo) {
+  if (!todo || typeof todo !== "object") return todo;
+  const { _raw, _jsonPath, _objectDir, ...rest } = todo;
+  if (Array.isArray(rest.files)) {
+    rest.files = rest.files.map((file) => ({ ...file }));
+  }
+  return rest;
 }
 
-async function loadEducationTree(email, { includeFixtures = false, workspace = "" } = {}) {
-  const root = userEducationRoot(email, { workspace });
-  const meta = (await readJsonFile(join(root, "meta.json"))) || {};
-  const schedule = (await readJsonFile(join(root, "schedule.json"))) || {};
-  const todayKey = scheduleTodayKey(schedule);
-  const panelKeys = includeFixtures ? [] : uiPanelDateKeys(schedule, todayKey);
-  const officeOpen = officeOpenOptsFromMeta(meta);
-
-  const todos = await loadObjectFolder(join(root, "todos"), "todo", {
-    includeFixtures,
-    officeOpen,
-  });
-  const dates = await loadObjectFolder(join(root, "dates"), "date", {
-    includeFixtures,
-    officeOpen,
-  });
-
-  const classEntries = await listClassEntriesForRoot(root);
+/**
+ * Turn stored class rows into the web tree. Safe to run on every request.
+ * Strips `_raw` and `_jsonPath`, which stay on the snapshot for writes.
+ * @param {object[]} rows
+ * @param {{ includeFixtures?: boolean, schedule?: object, todayKey?: string, panelKeys?: string[] }} [opts]
+ */
+export function publishClassRows(
+  rows,
+  { includeFixtures = false, schedule = {}, todayKey = "", panelKeys = [] } = {}
+) {
   /** @type {object[]} */
   const classes = [];
   /** @type {Record<string, string[]>} */
   const activeClassIdsByDate = {};
-  const gradeDir = gradeDirFromMeta(meta);
-  const driveFolderNames = gradeDir
-    ? await listOnedriveFolderNames(gradeDir, { includeHidden: true })
-    : [];
-
-  for (const entry of classEntries) {
-    const classId = entry.id;
-    const classDir = entry.objectDir;
-    const props = await readClassProps(classDir);
-    if (!props || typeof props !== "object") continue;
-    const cls = { id: classId, ...props };
+  /** @type {object[]} */
+  const sourceClasses = [];
+  for (const row of rows || []) {
+    if (!row?.id) continue;
+    const cls = { id: row.id, ...(row.props || {}) };
     if (!includeFixtures && isFixture(cls)) continue;
-
+    sourceClasses.push(cls);
     const activeToday = includeFixtures
       ? true
       : isClassInSeasonToday(cls, todayKey, schedule);
@@ -2280,16 +2301,57 @@ async function loadEducationTree(email, { includeFixtures = false, workspace = "
       ? []
       : panelKeys.filter((k) => isClassActiveOnDate(cls, k, schedule));
     if (!includeFixtures && !activeToday && panelDates.length === 0) continue;
-
     for (const k of panelDates) {
       if (!activeClassIdsByDate[k]) activeClassIdsByDate[k] = [];
-      activeClassIdsByDate[k].push(classId);
+      activeClassIdsByDate[k].push(row.id);
     }
+    const todos = (row.todos || []).map(clonePublicTodo);
+    const { home, classOnly } = partitionClassTodos(todos);
+    const published = includeFixtures ? cls : publicClassProps(cls, todayKey, schedule);
+    /** @type {Record<string, unknown>} */
+    const classRow = {
+      ...published,
+      files: (row.files || []).map((file) => ({ ...file })),
+      todos: activeToday ? home : [],
+      dates: activeToday ? (row.dates || []).map((date) => ({ ...date })) : [],
+    };
+    if (activeToday && classOnly.length) classRow.classOnlyTodos = classOnly;
+    if (row.onedriveFolder) classRow.onedriveFolder = row.onedriveFolder;
+    classes.push(classRow);
+  }
+  if (!includeFixtures) {
+    pruneFreePeriodsWhenOccupied(activeClassIdsByDate, classes, schedule);
+  }
+  return { classes, activeClassIdsByDate, sourceClasses };
+}
+
+/**
+ * @param {string} root
+ * @param {{ includeFixtures?: boolean, officeOpen?: object, gradeDir?: string|null, driveFolderNames?: string[] }} opts
+ */
+async function collectClassRows(root, { includeFixtures, officeOpen, gradeDir, driveFolderNames }) {
+  const classEntries = await listClassEntriesForRoot(root);
+  if (gradeDir && !classEntries.some((entry) => entry.source === "onedrive")) {
+    noteCloudReadMiss();
+  }
+  /** @type {object[]} */
+  const rows = [];
+  /** @type {object[]} */
+  const sourceClasses = [];
+  for (const entry of classEntries) {
+    const classId = entry.id;
+    const classDir = entry.objectDir;
+    const props = await readClassProps(classDir);
+    if (!props || typeof props !== "object") continue;
+    const cls = { id: classId, ...props };
+    if (!includeFixtures && isFixture(cls)) continue;
+    sourceClasses.push(cls);
 
     const classTodos = await loadClassScopedObjects(entry, "todo", {
       includeFixtures,
       classId,
       officeOpen,
+      keepRaw: true,
     });
     const classDates = await loadClassScopedObjects(entry, "date", {
       includeFixtures,
@@ -2314,35 +2376,115 @@ async function loadEducationTree(email, { includeFixtures = false, workspace = "
         ...officeOpen,
       });
     }
-    const classFiles = pinContextFileOrder(
+    const files = pinContextFileOrder(
       [...siteFilesFromProps(props), ...mergeContextFileLists(eduFiles, driveFiles)],
       fileOpts.topNames,
       fileOpts.bottomNames
     );
+    rows.push({
+      id: classId,
+      props,
+      todos: classTodos,
+      dates: classDates,
+      files,
+      onedriveFolder: driveFolder || null,
+    });
+  }
+  return { rows, sourceClasses };
+}
 
-    const published = includeFixtures
-      ? cls
-      : publicClassProps(cls, todayKey, schedule);
-    const { home: homeTodos, classOnly: classOnlyTodos } =
-      partitionClassTodos(classTodos);
-    /** @type {Record<string, unknown>} */
-    const classRow = {
-      ...published,
-      files: classFiles,
-      // Todos/dates only when the class is in season for today.
-      todos: activeToday ? homeTodos : [],
-      dates: activeToday ? classDates : [],
-    };
-    if (activeToday && classOnlyTodos.length) {
-      classRow.classOnlyTodos = classOnlyTodos;
+/**
+ * @param {string} email
+ * @param {{ includeFixtures?: boolean, workspace?: string }} [opts]
+ *   When false (default), strip fixture + out-of-season classes for the web UI
+ *   and omit trimester fields. Agents still read on-disk trees directly.
+ */
+export async function readEducationTree(email, opts = {}) {
+  const workspace = normalizeJypeWorkspace(opts.workspace);
+  if (!opts.includeFixtures && !workspace) {
+    const root = userEducationRoot(email, opts);
+    const meta = (await readJsonFile(join(root, "meta.json"))) || {};
+    if (gradeDirFromMeta(meta)) {
+      const snap = await readOnedriveSnapshot(email);
+      if (snap?.rows?.length) {
+        if (snapshotIsStale(snap)) scheduleOnedriveSnapshotRefresh(email);
+        return loadEducationTree(email, {
+          ...opts,
+          classRows: snap.rows,
+          sourceClasses: snap.sourceClasses,
+        });
+      }
+      // No local copy yet. Do not block the page on OneDrive.
+      scheduleOnedriveSnapshotRefresh(email);
+      return loadEducationTree(email, { ...opts, skipOnedriveClasses: true });
     }
-    if (driveFolder) classRow.onedriveFolder = driveFolder;
-    classes.push(classRow);
+  }
+  // One walk holds the CloudStorage queue so Finder hide/show cannot
+  // interleave and deadlock the File Provider mid-read.
+  return runCloudStorageIo(() => loadEducationTree(email, opts));
+}
+
+async function loadEducationTree(
+  email,
+  {
+    includeFixtures = false,
+    workspace = "",
+    classRows = null,
+    sourceClasses: sourceClassesOpt = null,
+    skipOnedriveClasses = false,
+    captureClassRows = null,
+  } = {}
+) {
+  const root = userEducationRoot(email, { workspace });
+  const meta = (await readJsonFile(join(root, "meta.json"))) || {};
+  const schedule = (await readJsonFile(join(root, "schedule.json"))) || {};
+  const todayKey = scheduleTodayKey(schedule);
+  const panelKeys = includeFixtures ? [] : uiPanelDateKeys(schedule, todayKey);
+  const officeOpen = officeOpenOptsFromMeta(meta);
+
+  const todos = await loadObjectFolder(join(root, "todos"), "todo", {
+    includeFixtures,
+    officeOpen,
+  });
+  const dates = await loadObjectFolder(join(root, "dates"), "date", {
+    includeFixtures,
+    officeOpen,
+  });
+
+  /** @type {object[]|null} */
+  let rows = null;
+  /** @type {object[]|null} */
+  let walkedSource = null;
+  if (Array.isArray(classRows)) {
+    rows = classRows;
+  } else if (!skipOnedriveClasses) {
+    const gradeDir = gradeDirFromMeta(meta);
+    const driveFolderNames = gradeDir
+      ? await listOnedriveFolderNames(gradeDir, { includeHidden: true })
+      : [];
+    const collected = await collectClassRows(root, {
+      includeFixtures,
+      officeOpen,
+      gradeDir,
+      driveFolderNames,
+    });
+    rows = collected.rows;
+    walkedSource = collected.sourceClasses;
+    if (typeof captureClassRows === "function") captureClassRows(collected);
   }
 
-  if (!includeFixtures) {
-    pruneFreePeriodsWhenOccupied(activeClassIdsByDate, classes, schedule);
-  }
+  const published = publishClassRows(rows || [], {
+    includeFixtures,
+    schedule,
+    todayKey,
+    panelKeys,
+  });
+  const classes = published.classes;
+  const activeClassIdsByDate = published.activeClassIdsByDate;
+  const sourceClasses =
+    Array.isArray(sourceClassesOpt) && sourceClassesOpt.length
+      ? sourceClassesOpt
+      : walkedSource || published.sourceClasses;
 
   const projectIds = await listDirs(join(root, "projects"));
   /** @type {object[]} */
@@ -2407,7 +2549,11 @@ async function loadEducationTree(email, { includeFixtures = false, workspace = "
   let nowContext = null;
   if (!includeFixtures) {
     try {
-      nowContext = await resolveNowScheduleContext(email, new Date(), { workspace });
+      nowContext = await resolveNowScheduleContext(email, new Date(), {
+        workspace,
+        schedule,
+        classes: sourceClasses,
+      });
     } catch (err) {
       console.error("[education-data] nowContext", err);
     }
@@ -2475,6 +2621,25 @@ export async function findTodo(
   const scopedProject =
     projectId == null || projectId === "" ? null : isSafeObjectId(projectId);
   if (projectId != null && projectId !== "" && !scopedProject) return null;
+
+  if (!scopedProject) {
+    const snapHit = await findSnapshotTodo(email, scopedClass, id);
+    if (snapHit?.jsonPath && snapHit.raw) {
+      try {
+        const st = await stat(snapHit.jsonPath);
+        if (st.isFile()) {
+          return {
+            path: snapHit.jsonPath,
+            props: { ...snapHit.raw },
+            classId: snapHit.classId,
+            projectId: null,
+          };
+        }
+      } catch {
+        /* Folder was renamed. Fall through and search disk. */
+      }
+    }
+  }
 
   /** @type {string[]} */
   const candidates = [];
@@ -2573,7 +2738,16 @@ export async function setTodoDone(
   } else {
     delete next.completedAt;
   }
-  await writeFile(found.path, JSON.stringify(next, null, 2) + "\n", "utf8");
+  await withCloudRetry(found.path, () =>
+    writeFile(found.path, JSON.stringify(next, null, 2) + "\n", "utf8")
+  );
+  if (found.classId) {
+    patchSnapshotTodo(email, {
+      classId: found.classId,
+      todoId,
+      raw: next,
+    }).catch((err) => console.error("[onedrive-snapshot] patch", err));
+  }
   queueOnedriveVisibility(email);
 
   const rel = found.path.startsWith(ROOT + "/")
@@ -2704,7 +2878,16 @@ export async function setCapsuleVote(
   }
   capsules[idx] = { ...capsules[idx], vote: nextVote };
   const next = { ...found.props, capsules };
-  await writeFile(found.path, JSON.stringify(next, null, 2) + "\n", "utf8");
+  await withCloudRetry(found.path, () =>
+    writeFile(found.path, JSON.stringify(next, null, 2) + "\n", "utf8")
+  );
+  if (found.classId) {
+    patchSnapshotTodo(email, {
+      classId: found.classId,
+      todoId,
+      raw: next,
+    }).catch((err) => console.error("[onedrive-snapshot] patch", err));
+  }
 
   const rel = found.path.startsWith(ROOT + "/")
     ? found.path.slice(ROOT.length + 1)
@@ -2740,3 +2923,52 @@ function queueOnedriveVisibility(email) {
     .then((m) => m.syncOnedriveObjectVisibility(email))
     .catch((err) => console.error("[onedrive-visibility]", err));
 }
+
+/**
+ * Walk OneDrive and publish a local class snapshot.
+ * Page loads do not call this. A failed read keeps the previous row.
+ * @param {string} email
+ */
+export async function rebuildOnedriveSnapshot(email) {
+  const started = Date.now();
+  const box = { misses: 0 };
+  /** @type {{ rows: object[], sourceClasses: object[] }|null} */
+  let captured = null;
+  console.log("[onedrive-snapshot] refresh start");
+  await cloudMissStore.run(box, () =>
+    runCloudStorageIo(() =>
+      loadEducationTree(email, {
+        captureClassRows(payload) {
+          captured = payload;
+        },
+      })
+    )
+  );
+  if (!captured) {
+    console.error("[onedrive-snapshot] refresh produced no class rows");
+    return { ok: false, misses: box.misses };
+  }
+  const prev = await readOnedriveSnapshot(email);
+  const incomplete = box.misses > 0;
+  const rows = mergeClassRows(prev?.rows, captured.rows, { incomplete });
+  const sourceClasses = mergeClassRows(prev?.sourceClasses, captured.sourceClasses, {
+    incomplete,
+  }).map((row) => {
+    if (!row || typeof row !== "object") return row;
+    const { todos, dates, files, ...rest } = row;
+    return rest;
+  });
+  await writeOnedriveSnapshot(email, {
+    at: Date.now(),
+    rows,
+    sourceClasses,
+    incomplete,
+  });
+  const ms = Date.now() - started;
+  console.log(
+    `[onedrive-snapshot] refresh ${ms}ms classes=${rows.length} misses=${box.misses} incomplete=${incomplete}`
+  );
+  return { ok: true, ms, classes: rows.length, misses: box.misses, incomplete };
+}
+
+registerOnedriveSnapshotBuilder(rebuildOnedriveSnapshot);
