@@ -45,6 +45,8 @@
   --corner-orb: 120px;
   --corner-orb-gap: 0.75rem;
   --google-size: 270px;
+  --social-size: 50px;
+  --social-gap: 0.55rem;
 }
 
 @property --lg-read-blur {
@@ -421,9 +423,19 @@ html[data-resolved-theme="dark"] .edu-check.lg-refraction::after {
   color: inherit;
   appearance: none;
   -webkit-appearance: none;
+  min-width: 0;
+  min-height: 0;
   transition:
     transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1),
+    width 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+    height 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-radius 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
     box-shadow 0.4s var(--ease);
+}
+
+.c-tr.is-docked {
+  width: var(--social-size);
+  height: var(--social-size);
 }
 
 /* Canvas link orb — same scale as theme orb; bottom aligns with title text in detail header */
@@ -484,10 +496,44 @@ html[data-resolved-theme="dark"] .edu-check.lg-refraction::after {
   height: 46%;
 }
 
+/* Logged-in app dock. Same glass squares as the public site socials,
+   turned so the elbow sits in the bottom-left corner.
+   [usage]
+   [home] [dashboard] */
+.app-dock[hidden] {
+  display: none !important;
+}
+
+.social-orb {
+  width: var(--social-size);
+  height: var(--social-size);
+}
+
+.social-orb svg {
+  width: 50%;
+  height: 50%;
+}
+
+.dock-usage {
+  bottom: calc(var(--corner-pad) + var(--social-size) + var(--social-gap));
+  left: var(--corner-pad);
+}
+
+.dock-home {
+  bottom: var(--corner-pad);
+  left: var(--corner-pad);
+}
+
+.dock-dash {
+  bottom: var(--corner-pad);
+  left: calc(var(--corner-pad) + var(--social-size) + var(--social-gap));
+}
+
 @media (max-width: 900px) {
   :root {
     --corner-orb: 96px;
     --google-size: 216px;
+    --social-size: 40px;
   }
 }
 
@@ -495,6 +541,7 @@ html[data-resolved-theme="dark"] .edu-check.lg-refraction::after {
   :root {
     --corner-orb: 80px;
     --google-size: 180px;
+    --social-size: 33px;
   }
 }
 
@@ -546,7 +593,8 @@ html[data-resolved-theme="dark"] .edu-check.lg-refraction::after {
 .edu-app {
   width: min(56rem, calc(100% - 2rem));
   margin: 0 auto;
-  padding: clamp(7.5rem, 14vh, 9rem) 0 8rem;
+  padding: clamp(7.5rem, 14vh, 9rem) 0
+    max(8rem, calc(var(--corner-pad) + (var(--social-size) * 2) + var(--social-gap) + 1.75rem));
 }
 
 .edu-hero {

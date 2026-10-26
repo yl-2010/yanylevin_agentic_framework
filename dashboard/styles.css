@@ -9,7 +9,8 @@
   --dash-blur-bleed: var(--dash-shadow-pad);
   display: block;
   place-items: unset;
-  padding: calc(var(--corner-pad) + 132px) 0 clamp(2.5rem, 6vw, 4rem);
+  padding: calc(var(--corner-pad) + 132px) 0
+    calc(var(--corner-pad) + (var(--social-size, 50px) * 2) + var(--social-gap, 0.55rem) + 1.75rem);
   width: 100%;
   min-height: 100vh;
 }
