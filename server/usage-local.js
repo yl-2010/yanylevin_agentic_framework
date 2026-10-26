@@ -55,7 +55,7 @@ let refreshedAt = 0;
  */
 export function classifyLocalPrompt(text, repo, fallbackPerson = "Yan") {
   const raw = String(text || "");
-  let kind = "agent";
+  let kind = "cursor-desktop";
   let agent = false;
   for (const [pattern, name] of AGENT_RULES) {
     if (pattern.test(raw)) {

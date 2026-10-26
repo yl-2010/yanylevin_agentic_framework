@@ -10,6 +10,7 @@ import { homedir, hostname } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { refreshLocalIndex } from "./usage-local.js";
+import { billingSnapshotsToSend } from "./usage-log.js";
 
 const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const STATE_PATH = join(ROOT, "data", "usage", "collector-state.json");
@@ -26,6 +27,8 @@ const BILLING_URL = "https://api2.cursor.sh/aiserver.v1.DashboardService/GetFilt
 const USAGE_URL = "https://api2.cursor.sh/auth/usage";
 const PLAN_URL = "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage";
 const BACKFILL_MS = 45 * 24 * 60 * 60 * 1000;
+/** A run's usage event keeps its start timestamp while the totals fill in. */
+const BILLING_REFRESH_MS = 3 * 60 * 60 * 1000;
 const COMPOSERS_PER_TICK = 25;
 
 function isStudio() {
@@ -205,7 +208,8 @@ async function scanDesktop(db, state, folders, person) {
     const meta = parseJson(header.value) || {};
     const gitPath = meta.trackedGitRepos?.[0]?.repoPath || folders.get(header.workspaceId) || "";
     const repo = repoFromPath(gitPath) || "Other";
-    const kind = header.isSubagent ? "subagent" : String(meta.unifiedMode || "agent");
+    const mode = header.isSubagent ? "subagent" : String(meta.unifiedMode || "agent");
+    const kind = mode === "agent" ? "cursor-desktop" : mode;
     const parentComposerId = parents.get(String(header.composerId)) || "";
     const prefix = `bubbleId:${header.composerId}:`;
     const bubbles = db
@@ -342,10 +346,12 @@ async function pullBilling(state, person, db) {
     return;
   }
 
-  const start = Math.max(0, Number(state.billingUntil || now) - 60 * 60 * 1000);
+  const until = Number(state.billingUntil) || 0;
+  const refreshSince = now - BILLING_REFRESH_MS;
+  const start = Math.max(0, Math.min(until || refreshSince, refreshSince));
   /** @type {object[]} */
-  const fresh = [];
-  for (let page = 1; page <= 8; page++) {
+  const batch = [];
+  for (let page = 1; page <= 80; page++) {
     const data = await billingPage(headers, start, now, page);
     const evs = data.usageEventsDisplay || [];
     if (!evs.length) break;
@@ -353,26 +359,29 @@ async function pullBilling(state, person, db) {
     for (const ev of evs) {
       const row = billingRow(ev);
       if (!row) continue;
-      if (Number(row.timestamp) <= Number(state.billingUntil || 0)) {
+      if (Number(row.timestamp) < start) {
         older += 1;
         continue;
       }
-      fresh.push(row);
+      batch.push(row);
     }
-    if (older === evs.length) break;
+    if (older === evs.length || evs.length < 100) break;
   }
-  if (!fresh.length) {
+  const { changed, seen } = billingSnapshotsToSend(batch, state.billingSeen || {});
+  const newest = batch.reduce((max, row) => Math.max(max, Number(row.timestamp) || 0), until);
+  if (!changed.length) {
     if (periodStart || plan) await post({ machine: machineName(), person, billing: [], periodStart, plan });
+    state.billingUntil = newest;
+    state.billingSeen = seen;
+    await writeState(state);
     return;
   }
-  const ok = await post({ machine: machineName(), person, billing: fresh, periodStart, plan });
+  const ok = await post({ machine: machineName(), person, billing: changed, periodStart, plan });
   if (!ok) return;
-  state.billingUntil = fresh.reduce(
-    (max, row) => Math.max(max, Number(row.timestamp) || 0),
-    Number(state.billingUntil) || 0
-  );
+  state.billingUntil = newest;
+  state.billingSeen = seen;
   await writeState(state);
-  console.log(`[usage-collect] billing new=${fresh.length}`);
+  console.log(`[usage-collect] billing refresh=${changed.length}`);
 }
 
 async function pullPlan(headers) {

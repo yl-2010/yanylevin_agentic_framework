@@ -18,7 +18,7 @@ export const USAGE_META_PATH = join(USAGE_DIR, "meta.json");
 const PROMPT_STORE_MAX = 80_000;
 const PROMPT_API_MAX = 8_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
-const CHAT_KINDS = new Set(["jype-agent", "personal-agent", "agent", "teams-agent"]);
+const CHAT_KINDS = new Set(["jype-agent", "personal-agent", "agent", "cursor-desktop", "teams-agent"]);
 const CHANNEL_LABEL = { Teams: "teams", iMessage: "iMessage", WhatsApp: "WhatsApp" };
 
 /** @type {Promise<void>} */
@@ -47,9 +47,16 @@ export function personFromEmail(email) {
  * A chat turn named in the transcript is the person and channel ("Example Neighbor teams").
  * @param {{ kind?: string, prompt?: string }} input
  */
+/** Cursor Desktop agent mode. Older rows stored this as "agent". */
+export function desktopKind(kind) {
+  const value = String(kind ?? "agent").trim() || "agent";
+  return value === "agent" ? "cursor-desktop" : value;
+}
+
 export function agentTypeLabel(input) {
-  const kind = String(input?.kind || "agent").trim() || "agent";
-  if (CHAT_KINDS.has(kind)) {
+  const raw = String(input?.kind || "agent").trim() || "agent";
+  const kind = raw === "agent" ? "cursor-desktop" : raw;
+  if (CHAT_KINDS.has(raw) || CHAT_KINDS.has(kind)) {
     const called = String(input?.prompt || "").match(
       /Called by ([A-Za-z]+)(?: \([^)]*\))? on (Teams|iMessage|WhatsApp)/
     );
@@ -89,7 +96,7 @@ function applyThreadLabel(thread, row) {
 export function threadLabelFromRows(rows) {
   const thread = { label: "", labelAt: 0 };
   for (const row of rows) applyThreadLabel(thread, row);
-  return thread.label || "agent";
+  return thread.label || "cursor desktop";
 }
 
 export function kindFromPrefix(prefix) {
@@ -192,6 +199,43 @@ export function addTokens(a, b) {
 export function tokenSum(tokens) {
   const t = tokens || emptyTokens();
   return (t.input || 0) + (t.output || 0) + (t.cacheRead || 0) + (t.cacheWrite || 0);
+}
+
+/**
+ * Cursor updates a usage event in place after the run finishes.
+ * The timestamp stays at the start, so a later poll has to notice
+ * the token and cents change itself.
+ * @param {object} row
+ */
+export function billingSnapshotKey(row) {
+  const tokens = tokensFromUsage(row?.tokenUsage || row?.tokens);
+  return [
+    tokens.input,
+    tokens.output,
+    tokens.cacheRead,
+    tokens.cacheWrite,
+    tokens.reasoning,
+    Math.round(num(row?.chargedCents) * 10000),
+  ].join(":");
+}
+
+/**
+ * @param {object[]} rows
+ * @param {Record<string, string>} [seen]
+ */
+export function billingSnapshotsToSend(rows, seen = {}) {
+  /** @type {Record<string, string>} */
+  const next = {};
+  /** @type {object[]} */
+  const changed = [];
+  for (const row of rows) {
+    const id = String(row?.usageEventId || "").trim();
+    if (!id) continue;
+    const key = billingSnapshotKey(row);
+    next[id] = key;
+    if (seen[id] !== key) changed.push(row);
+  }
+  return { changed, seen: next };
 }
 
 /**
@@ -367,7 +411,7 @@ export async function ingestUsageBatch(body) {
       composerUpdatedAt: isoOrEmpty(raw.composerUpdatedAt),
       person,
       repo: clip(raw.repo || "Other", 120) || "Other",
-      kind: clip(raw.kind || "agent", 80) || "agent",
+      kind: clip(desktopKind(raw.kind), 80) || "cursor-desktop",
       model: described.model || clip(raw.modelName || "", 120),
       modelConfig: described.modelConfig,
       prompt: clip(raw.prompt || "", PROMPT_STORE_MAX),
@@ -415,7 +459,7 @@ export async function ingestUsageBatch(body) {
       const prior = existing.get(row.id);
       if (
         prior &&
-        tokenSum(prior.tokens) === tokenSum(row.tokens) &&
+        billingSnapshotKey(prior) === billingSnapshotKey(row) &&
         String(prior.parentComposerId || "") === String(row.parentComposerId || "")
       ) {
         continue;
@@ -524,7 +568,7 @@ export function buildClumps(rows, local = null) {
           at: list.map((bill) => bill.at).sort().at(-1) || "",
           person: hit.person || "Yan",
           repo: hit.repo || "Other",
-          kind: hit.kind || "agent",
+          kind: desktopKind(hit.kind),
           model: dominantModel(list),
           prompt: hit.prompt || "",
           threadId: conv,
@@ -702,7 +746,7 @@ function toClump(prompt, matched) {
     at: prompt.at || prompt.composerUpdatedAt || prompt.startedAt || "",
     person: prompt.person || "Other",
     repo: prompt.repo || "Other",
-    kind: prompt.kind || "",
+    kind: prompt.kind ? desktopKind(prompt.kind) : "",
     model,
     modelConfig: prompt.modelConfig || null,
     prompt: prompt.prompt || "",
@@ -1062,7 +1106,7 @@ export function unpackUsageEvents(packed) {
     kind: dict.kind[event[3]] || "other",
     model: dict.model[event[4]] || "unknown",
     threadId: dict.thread[event[5]] || "",
-    label: dict.label[event[6]] || "agent",
+    label: dict.label[event[6]] || "cursor desktop",
     tokens: {
       input: event[7] || 0,
       output: event[8] || 0,

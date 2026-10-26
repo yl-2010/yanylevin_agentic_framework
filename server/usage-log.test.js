@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { agentTypeLabel, buildClumps, filterClumps, kindFromPrefix, packUsageEvents, personFromEmail, summarizeClumps, threadLabelFromRows, tokensFromUsage, unpackUsageEvents } from "./usage-log.js";
+import { agentTypeLabel, billingSnapshotsToSend, buildClumps, filterClumps, kindFromPrefix, packUsageEvents, personFromEmail, summarizeClumps, threadLabelFromRows, tokensFromUsage, unpackUsageEvents } from "./usage-log.js";
 import { classifyLocalPrompt, projectRepo } from "./usage-local.js";
 
 describe("usage clumps", () => {
@@ -124,6 +124,26 @@ describe("usage clumps", () => {
     assert.equal(clumps.some((row) => row.prompt === "still here"), true);
   });
 
+  it("sends a billing event again when Cursor fills in the totals", () => {
+    const early = {
+      usageEventId: "run-1",
+      tokenUsage: { inputTokens: 80, outputTokens: 10, cacheReadTokens: 20 },
+      chargedCents: 1.5,
+    };
+    const done = {
+      usageEventId: "run-1",
+      tokenUsage: { inputTokens: 200000, outputTokens: 60000, cacheReadTokens: 9000000 },
+      chargedCents: 540,
+    };
+    const first = billingSnapshotsToSend([early], {});
+    assert.equal(first.changed.length, 1);
+    const again = billingSnapshotsToSend([early], first.seen);
+    assert.equal(again.changed.length, 0);
+    const grown = billingSnapshotsToSend([done], first.seen);
+    assert.equal(grown.changed.length, 1);
+    assert.equal(grown.changed[0].chargedCents, 540);
+  });
+
   it("tags a local transcript and keeps off-machine billing as Other", () => {
     const index = new Map([
       ["agent-1", { person: "Alex", repo: "yanylevin-agents", kind: "jype-agent", prompt: "what is due" }],
@@ -177,6 +197,8 @@ describe("usage clumps", () => {
   });
 
   it("names a collapsed thread by agent type, not the prompt", () => {
+    assert.equal(agentTypeLabel({ kind: "agent", prompt: "plan a site" }), "cursor desktop");
+    assert.equal(agentTypeLabel({ kind: "cursor-desktop", prompt: "plan a site" }), "cursor desktop");
     assert.equal(agentTypeLabel({ kind: "life-state", prompt: "Follow the life-state skill." }), "life state");
     assert.equal(
       agentTypeLabel({
@@ -247,7 +269,7 @@ describe("usage clumps", () => {
     assert.equal(caller.person, "Example Friend");
     const desk = classifyLocalPrompt("<user_query>plan a site</user_query>", "sockethr");
     assert.equal(desk.repo, "sockethr");
-    assert.equal(desk.kind, "agent");
+    assert.equal(desk.kind, "cursor-desktop");
     assert.equal(desk.prompt, "plan a site");
     const home = "/Users/yanlevin";
     const known = new Set([
