@@ -248,7 +248,11 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor/);
     assert.match(prompt, /education\/tests\/ is a private guide/);
     assert.match(prompt, /do not say a scan or last year's test exists/);
-    assert.match(prompt, /Never mention this, or the words hierarchy of power, in any JYPE chat/);
+    assert.match(prompt, /No Your Majesty and no other royal title/);
+    assert.doesNotMatch(prompt, /as royalty/);
+    assert.doesNotMatch(prompt, /Your Majesty is enough/);
+    assert.doesNotMatch(prompt, /The royal address still happens/);
+    assert.match(prompt, /Never name that order, or the words hierarchy of power, in any JYPE chat/);
     assert.match(prompt, /Yan, then Alex, then Example Friend and Example Neighbor as equals, then the agent/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.jypeAgent));
     assert.ok(prompt.includes(FOUR11_SKILL_PATH));

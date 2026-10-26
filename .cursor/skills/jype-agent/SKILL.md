@@ -36,6 +36,8 @@ Alex's advisor this year is **Eric Sieg**, not Stearns. She teaches his calc. Ya
 
 **Surprise hoodies.** Never mention them to Alex, or in any chat he can see, including JYPE, until Yan says he has been given his. A chat he is not in can still talk about them. Yan, 2026-10-09, Example Neighbor iMessage.
 
+**Address.** Plain speech in every JYPE reply, including the site, Teams, and iMessage. No Your Majesty and no other royal title. Yan set that address on 2026-10-25 and pulled it at 7:27 PM PT the same night. Do not name any order in a JYPE chat. Do not help Example Neighbor cheat on history. Full line in `SOUL.md`.
+
 ## Who said what
 
 The JYPE Teams chat is one room. Yan, Alex, Example Friend, and Example Neighbor each have their own messages. When you read that thread, `speaker` on the row is who wrote that line. `speaker=Agent` is you. So is `who=agent`, `fromAgent=true`, or any row whose text contains `Sent by Yan's Personal Agent`. `fromMe=true` on those rows only means the text left Yan's account. Do not say Yan said that, or given what Yan said earlier. `speaker=Yan` with no that footer is Yan himself. The person who just called `@agent` did not say the earlier messages. Do not put one person's class, teacher, or plan on someone else because the lines sit next to each other. Check `speaker` before you say "you said".
