@@ -1927,7 +1927,7 @@ export function systemPrompt(email, opts = {}) {
  * Sanitize optional client UI context (web route / iOS client tag).
  * @param {unknown} raw
  */
-function normalizeUiContext(raw) {
+export function normalizeUiContext(raw) {
   if (!raw || typeof raw !== "object") return null;
   const src = /** @type {Record<string, unknown>} */ (raw);
   /** @type {Record<string, unknown>} */
@@ -1958,6 +1958,8 @@ function normalizeUiContext(raw) {
   str("capsuleBody", 4000);
   str("capsuleCitations", 2500);
   str("title", 200);
+  str("site", 24);
+  str("screen", 4000);
   if (typeof src.done === "boolean") out.done = src.done;
   if (typeof src.freePeriod === "boolean") out.freePeriod = src.freePeriod;
   const phoneLocation = parseLocationPayload(src.phoneLocation);
@@ -2108,6 +2110,15 @@ export function formatLiveContextBlock(nowContext, uiContext, appendix = "") {
         );
       }
       if (uiContext.dateId) lines.push(`- dateId: ${uiContext.dateId}`);
+    } else if (view === "usage" || view === "dashboard") {
+      lines.push(
+        `- Called from the ${view} site. Same Personal Agent and the same chat history as education. This turn was started from ${view}.`
+      );
+      const screen = String(uiContext.screen || "").trim();
+      if (screen) {
+        lines.push("- What is on screen:");
+        lines.push(screen);
+      }
     } else if (view) {
       lines.push(`- view: ${view}`);
     }

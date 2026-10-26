@@ -20,6 +20,7 @@ import {
   EMPTY_TURN_REPLY,
   guestTurnModelSpec,
   formatLiveContextBlock,
+  normalizeUiContext,
   buildYanLiveAppendix,
   isTruthyFlag,
   resolveIncomingTurnMode,
@@ -348,6 +349,45 @@ describe("Personal Agent live context", () => {
     assert.doesNotMatch(block, /Today's meetings:/);
     assert.doesNotMatch(block, /English/);
     assert.match(block, /class-schedule\/SKILL\.md/);
+  });
+
+  it("tells a usage or dashboard turn where it started and what is on screen", () => {
+    const usage = formatLiveContextBlock(null, {
+      client: "web",
+      path: "/usage/",
+      view: "usage",
+      site: "usage",
+      screen: "Range: Last 7 days\nFilters: person Yan",
+    });
+    assert.match(usage, /Called from the usage site/);
+    assert.match(usage, /same chat history as education/);
+    assert.match(usage, /Range: Last 7 days/);
+    assert.match(usage, /Filters: person Yan/);
+    assert.doesNotMatch(usage, /education-dashboard skill/);
+
+    const dash = formatLiveContextBlock(null, {
+      client: "web",
+      path: "/dashboard/",
+      view: "dashboard",
+      screen: "Actions:\n- Canvas sync",
+    });
+    assert.match(dash, /Called from the dashboard site/);
+    assert.match(dash, /Canvas sync/);
+    assert.doesNotMatch(dash, /Before creating or editing dashboard objects/);
+  });
+
+  it("keeps usage screen text and drops unknown fields", () => {
+    const ctx = normalizeUiContext({
+      client: "web",
+      view: "usage",
+      site: "usage",
+      screen: "Metric: tokens",
+      secret: "nope",
+    });
+    assert.equal(ctx.view, "usage");
+    assert.equal(ctx.site, "usage");
+    assert.equal(ctx.screen, "Metric: tokens");
+    assert.equal(ctx.secret, undefined);
   });
 
   it("appends a Yan calendar/canvas appendix when provided", () => {

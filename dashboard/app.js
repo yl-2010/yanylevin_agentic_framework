@@ -15,6 +15,58 @@
   let futureKey = "";
   let futurePoll = null;
   const agentsEl = document.getElementById("dash-agents");
+  let userEmail = "";
+  const shown = { actions: [], future: [], chats: [] };
+
+  function clipLine(value, max) {
+    const text = String(value || "").replace(/\s+/g, " ").trim();
+    if (text.length <= max) return text;
+    return text.slice(0, max - 1) + "…";
+  }
+
+  function dashboardScreen() {
+    const lines = ["Dashboard rails currently on screen."];
+    lines.push("Agent graph:");
+    for (const band of AGENT_BANDS) {
+      const names = band.items
+        .filter((item) => item.name)
+        .map((item) => item.name + (item.optional ? " (can skip)" : ""))
+        .join(", ");
+      if (names) lines.push(`- ${band.time}: ${names}`);
+    }
+    lines.push("Actions:");
+    if (!shown.actions.length) lines.push("- none");
+    for (const entry of shown.actions.slice(0, 12)) {
+      lines.push(
+        `- ${shortWhen(entry)} ${entry.agentName || entry.agent || ""}: ${clipLine(entry.summary, 180)}`
+      );
+    }
+    lines.push("Scheduled agents:");
+    if (!shown.future.length) lines.push("- none");
+    for (const entry of shown.future.slice(0, 12)) {
+      const when = entry.status === "running" ? "Running" : entry.when || "";
+      lines.push(
+        `- ${when} ${entry.workspaceLabel || ""}: ${clipLine(entry.prompt || entry.title, 180)}`
+      );
+    }
+    lines.push("Chat log:");
+    if (!shown.chats.length) lines.push("- none");
+    for (const entry of shown.chats.slice(0, 8)) {
+      lines.push(`- ${shortWhen(entry)} user: ${clipLine(entry.user, 160)}`);
+      if (entry.assistant) lines.push(`  assistant: ${clipLine(entry.assistant, 160)}`);
+    }
+    return lines.join("\n").slice(0, 3500);
+  }
+
+  window.__eduUserEmail = () => userEmail;
+  window.__eduUiContext = () => ({
+    client: "web",
+    path: window.location.pathname + window.location.search,
+    view: "dashboard",
+    site: "dashboard",
+    title: "Dashboard",
+    screen: dashboardScreen(),
+  });
 
   const AGENT_BANDS = [
     {
@@ -407,8 +459,9 @@
   }
 
   function renderChats(entries) {
+    shown.chats = Array.isArray(entries) ? entries : [];
     if (!listEl) return;
-    listEl.innerHTML = entries.map(renderChatEntry).join("");
+    listEl.innerHTML = shown.chats.map(renderChatEntry).join("");
     resetRailScroll(listEl);
     queueMicrotask(() => window.reinitLiquidGlass?.());
   }
@@ -487,6 +540,7 @@
   }
 
   function renderFutureAgents(entries, resetScroll) {
+    shown.future = Array.isArray(entries) ? entries : [];
     if (!futureEl) return;
     const key = entries
       .map((entry) => `${entry.sessionId || ""}:${entry.status || ""}:${entry.runAt || ""}`)
@@ -504,6 +558,7 @@
   }
 
   function renderActions(entries) {
+    shown.actions = Array.isArray(entries) ? entries : [];
     if (!actionsEl) return;
     const rows = entries.length
       ? entries.map(renderActionEntry)
@@ -639,6 +694,7 @@
         return;
       }
       if (data.access === "full") {
+        userEmail = String(data.email || "").trim().toLowerCase();
         show("full");
         renderAgents();
         await ensureLoginRecorded();
