@@ -14,16 +14,16 @@ const PROJECTS = join(homedir(), ".cursor", "projects");
 const INDEX_PATH = join(USAGE_DIR, "local-index.json");
 const PROMPT_MAX = 6000;
 const READ_MAX = 80_000;
-const TAG_VERSION = 2;
+const TAG_VERSION = 4;
 
 const AGENT_RULES = [
   [/life-state skill/i, "life-state"],
   [/short chat list title/i, "chat-title"],
   [/JYPE agent/i, "jype-agent"],
+  [/Personal Agent for yanylevin/i, "personal-agent"],
   [/brain extraction/i, "brain-extract"],
   [/calendar-on-demand/i, "calendar-on-demand"],
   [/personal-canvas/i, "canvas-hourly"],
-  [/Personal Agent for yanylevin/i, "personal-agent"],
   [/location-history skill/i, "location-compose"],
   [/health-takeaways skill/i, "health-takeaways"],
   [/home-agent skill/i, "home-agent"],
@@ -74,6 +74,12 @@ export function classifyLocalPrompt(text, repo, fallbackPerson = "Yan") {
     }
   }
   if (!person || person === "Other") person = fallbackPerson || "Yan";
+  if (kind === "canvas-hourly" || kind === "canvas-nightly") person = "Yan";
+  if (kind === "personal-agent") {
+    if (/\bon Teams:/i.test(raw)) kind = "teams-agent";
+    else if (/\bon iMessage:/i.test(raw)) kind = "imessage-agent";
+    else if (/\bon WhatsApp:/i.test(raw)) kind = "whatsapp-agent";
+  }
   return {
     person,
     repo: agent ? "yanylevin-agents" : repo || "Other",

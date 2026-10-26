@@ -8,6 +8,7 @@ import { timingSafeEqual, randomUUID } from "node:crypto";
 import { appendFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { chatTitlesForSessions } from "./education-chat-history.js";
 import { canonicalizeEmail } from "./identity.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -19,6 +20,7 @@ const PROMPT_STORE_MAX = 80_000;
 const PROMPT_API_MAX = 8_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CHAT_KINDS = new Set(["jype-agent", "personal-agent", "agent", "cursor-desktop", "teams-agent"]);
+const CHANNEL_KINDS = new Set(["teams-agent", "imessage-agent", "personal-chat", "jype-chat", "whatsapp-agent"]);
 const CHANNEL_LABEL = { Teams: "teams", iMessage: "iMessage", WhatsApp: "WhatsApp" };
 
 /** @type {Promise<void>} */
@@ -48,6 +50,16 @@ const DESKTOP_MODES = new Set(["agent", "chat", "plan", "ask"]);
 export function desktopKind(kind) {
   const value = String(kind ?? "agent").trim() || "agent";
   return DESKTOP_MODES.has(value) ? "cursor-desktop" : value;
+}
+
+/**
+ * One name for the same nightly job. Older SDK rows say "synthesis".
+ * @param {string|null|undefined} kind
+ */
+export function canonicalKind(kind) {
+  const value = desktopKind(kind);
+  if (value === "synthesis") return "context-synthesis";
+  return value;
 }
 
 /**
@@ -110,7 +122,9 @@ export function kindFromPrefix(prefix) {
   if (p === "location-history") return "location-compose";
   if (p === "canvas-sync") return "canvas-nightly";
   if (p === "brain-extraction") return "brain-extract";
-  if (p === "people-enrich" || p === "people-bootstrap") return "context-synthesis";
+  if (p === "people-enrich" || p === "people-bootstrap" || p === "synthesis" || p === "context-synthesis") {
+    return "context-synthesis";
+  }
   return p;
 }
 
@@ -527,14 +541,15 @@ export function buildClumps(rows, local = null) {
 
   /** @type {object[]} */
   const clumps = [];
+  const index = local instanceof Map ? local : new Map();
   const sdk = prompts
     .filter((p) => p.source === "sdk")
     .map((prompt) => ({ ...prompt, tokens: splitCacheFromInput(prompt.tokens) }))
     .sort((a, b) => Date.parse(a.startedAt || a.at) - Date.parse(b.startedAt || b.at));
   for (const prompt of sdk) {
-    const matched = matchSdkBilling(prompt, billing, explained);
+    const matched = matchSdkBilling(prompt, billing, explained, index);
     for (const bill of matched) explained.add(bill.id);
-    clumps.push(toClump(prompt, matched));
+    clumps.push(toClump({ ...prompt, kind: kindForMatch(prompt.kind, matched, index) }, matched));
   }
   const desktop = prompts.filter((p) => p.source === "desktop");
   const desktopMatches = matchDesktopGroups(desktop, billing, byEvent, explained);
@@ -546,7 +561,6 @@ export function buildClumps(rows, local = null) {
   const folded = foldSubagents(clumps);
   clumps.length = 0;
   clumps.push(...folded);
-  const index = local instanceof Map ? local : new Map();
   /** @type {Map<string, object[]>} */
   const localGroups = new Map();
   for (const bill of billing) {
@@ -570,7 +584,7 @@ export function buildClumps(rows, local = null) {
           at: list.map((bill) => bill.at).sort().at(-1) || "",
           person: hit.person || "Yan",
           repo: hit.repo || "Other",
-          kind: desktopKind(hit.kind),
+          kind: canonicalKind(hit.kind),
           model: dominantModel(list),
           prompt: hit.prompt || "",
           threadId: conv,
@@ -589,7 +603,54 @@ export function buildClumps(rows, local = null) {
  * @param {object[]} billing
  * @param {Set<string>} explained
  */
-function matchSdkBilling(prompt, billing, explained) {
+/**
+ * A transcript already named this run. A channel log (Teams, iMessage)
+ * can wear that name. A different job cannot take the bill.
+ * @param {object} bill
+ * @param {object} prompt
+ * @param {Map<string, { kind?: string }>|null} local
+ */
+function billingOwnedElsewhere(bill, prompt, local) {
+  const owner = localAgentKind(local, bill?.conversationId);
+  if (!owner) return false;
+  const promptKind = canonicalKind(prompt?.kind);
+  if (!promptKind || owner === promptKind) return false;
+  return !CHANNEL_KINDS.has(promptKind);
+}
+
+/**
+ * @param {Map<string, { kind?: string }>|null} local
+ * @param {string} conversationId
+ */
+function localAgentKind(local, conversationId) {
+  if (!local?.get) return "";
+  const hit = local.get(String(conversationId || ""));
+  const kind = canonicalKind(hit?.kind || "");
+  if (!kind || kind === "cursor-desktop" || kind === "other" || kind === "unspecified") return "";
+  if (CHANNEL_KINDS.has(kind)) return "";
+  return kind;
+}
+
+/**
+ * Teams and iMessage logs are the pipe. JYPE and the other named jobs
+ * replace that label. The shared Personal Agent prompt does not.
+ * @param {string} kind
+ * @param {object[]} matched
+ * @param {Map<string, { kind?: string }>|null} local
+ */
+function kindForMatch(kind, matched, local) {
+  const base = canonicalKind(kind);
+  if (!CHANNEL_KINDS.has(base)) return base;
+  const owners = new Set();
+  for (const bill of matched || []) {
+    const owner = localAgentKind(local, bill?.conversationId);
+    if (owner && owner !== "personal-agent") owners.add(owner);
+  }
+  if (owners.size === 1) return [...owners][0];
+  return base;
+}
+
+function matchSdkBilling(prompt, billing, explained, local = null) {
   /** @type {object[]} */
   const direct = [];
   for (const key of [prompt.requestId, prompt.runId]) {
@@ -604,6 +665,7 @@ function matchSdkBilling(prompt, billing, explained) {
   if (Number.isNaN(start) || Number.isNaN(end)) return [];
   const window = billing
     .filter((b) => !explained.has(b.id))
+    .filter((b) => !billingOwnedElsewhere(b, prompt, local))
     .filter((b) => {
       const t = Date.parse(b.at);
       return t >= start && t <= end;
@@ -748,7 +810,7 @@ function toClump(prompt, matched) {
     at: prompt.at || prompt.composerUpdatedAt || prompt.startedAt || "",
     person: prompt.person || "Other",
     repo: prompt.repo || "Other",
-    kind: prompt.kind ? desktopKind(prompt.kind) : "",
+    kind: prompt.kind ? canonicalKind(prompt.kind) : "",
     model,
     modelConfig: prompt.modelConfig || null,
     prompt: prompt.prompt || "",
@@ -1139,6 +1201,17 @@ export async function usageIndex(now = Date.now()) {
     ranged.push(row);
   }
   const packed = packUsageEvents(ranged);
+  /** @type {Record<string, string>} */
+  let titles = {};
+  try {
+    const ids = [];
+    for (const row of ranged) {
+      if (row.threadId) ids.push(row.threadId);
+    }
+    titles = await chatTitlesForSessions(ids);
+  } catch (err) {
+    console.error("[usage] chat titles", err);
+  }
   return {
     ok: true,
     bounds: {
@@ -1149,6 +1222,7 @@ export async function usageIndex(now = Date.now()) {
     plan: await readPlan(),
     dict: packed.dict,
     events: packed.events,
+    titles,
   };
 }
 

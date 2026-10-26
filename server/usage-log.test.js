@@ -11,6 +11,7 @@ describe("usage clumps", () => {
     assert.equal(personFromEmail("friend@example.com"), "Example Friend");
     assert.equal(kindFromPrefix("location-history"), "location-compose");
     assert.equal(kindFromPrefix("daily-briefing-news"), "daily-briefing");
+    assert.equal(kindFromPrefix("synthesis"), "context-synthesis");
     assert.equal(kindFromPrefix("test"), "unspecified");
   });
 
@@ -252,6 +253,131 @@ describe("usage clumps", () => {
     assert.equal(back[0].threadId, "comp");
   });
 
+  it("files a Teams JYPE turn under jype agent, and leaves that bill off other jobs", () => {
+    const index = new Map([
+      ["agent-jype", { person: "Example Neighbor", repo: "yanylevin-agents", kind: "jype-agent", prompt: "You are the JYPE agent" }],
+    ]);
+    const clumps = buildClumps(
+      [
+        {
+          id: "sdk:teams",
+          source: "sdk",
+          at: "2026-10-25T18:00:00.000Z",
+          startedAt: "2026-10-25T17:59:00.000Z",
+          endedAt: "2026-10-25T18:00:00.000Z",
+          person: "Example Neighbor",
+          repo: "yanylevin-agents",
+          kind: "teams-agent",
+          prompt: "From Example Neighbor on Teams:\n\n@agent hello",
+          threadId: "chat-9",
+          requestId: "req-j",
+          tokens: tokensFromUsage({ inputTokens: 100, outputTokens: 20 }),
+        },
+        {
+          id: "bill:j",
+          source: "billing",
+          at: "2026-10-25T17:59:30.000Z",
+          usageEventId: "req-j",
+          conversationId: "agent-jype",
+          model: "composer-2.5",
+          chargedCents: 40,
+          tokens: tokensFromUsage({ inputTokens: 100, outputTokens: 20, cacheReadTokens: 5 }),
+        },
+        {
+          id: "bill:j2",
+          source: "billing",
+          at: "2026-10-25T17:59:40.000Z",
+          usageEventId: "other-j",
+          conversationId: "agent-jype",
+          model: "composer-2.5",
+          chargedCents: 15,
+          tokens: tokensFromUsage({ inputTokens: 100, outputTokens: 10 }),
+        },
+        {
+          id: "sdk:cal",
+          source: "sdk",
+          at: "2026-10-25T18:00:10.000Z",
+          startedAt: "2026-10-25T17:59:00.000Z",
+          endedAt: "2026-10-25T18:00:10.000Z",
+          person: "Yan",
+          repo: "yanylevin-agents",
+          kind: "calendar-on-demand",
+          prompt: "calendar",
+          threadId: "cal",
+          requestId: "req-cal",
+          tokens: tokensFromUsage({ inputTokens: 100, outputTokens: 10 }),
+        },
+      ],
+      index
+    );
+    const jypeCents = clumps
+      .filter((row) => row.kind === "jype-agent")
+      .reduce((sum, row) => sum + row.chargedCents, 0);
+    const calendar = clumps.find((row) => row.kind === "calendar-on-demand");
+    assert.equal(jypeCents, 55);
+    assert.equal(calendar.chargedCents, 0);
+    assert.equal(clumps.some((row) => row.kind === "teams-agent"), false);
+  });
+
+  it("keeps a Teams DM on teams agent when the transcript is the Personal Agent prompt", () => {
+    const index = new Map([
+      ["agent-dm", { person: "Alex", repo: "yanylevin-agents", kind: "personal-agent", prompt: "You are the Personal Agent" }],
+    ]);
+    const clumps = buildClumps(
+      [
+        {
+          id: "sdk:dm",
+          source: "sdk",
+          at: "2026-10-25T20:00:00.000Z",
+          startedAt: "2026-10-25T19:59:00.000Z",
+          endedAt: "2026-10-25T20:00:00.000Z",
+          person: "Alex",
+          repo: "yanylevin-agents",
+          kind: "teams-agent",
+          prompt: "From Alex on Teams:\n\n@agent hello",
+          threadId: "dm-1",
+          requestId: "req-dm",
+          tokens: tokensFromUsage({ inputTokens: 80, outputTokens: 10 }),
+        },
+        {
+          id: "bill:dm",
+          source: "billing",
+          at: "2026-10-25T19:59:20.000Z",
+          usageEventId: "req-dm",
+          conversationId: "agent-dm",
+          model: "grok-4.7-high",
+          chargedCents: 12,
+          tokens: tokensFromUsage({ inputTokens: 80, outputTokens: 10 }),
+        },
+      ],
+      index
+    );
+    assert.equal(clumps.length, 1);
+    assert.equal(clumps[0].kind, "teams-agent");
+    assert.equal(clumps[0].person, "Alex");
+    assert.equal(clumps[0].chargedCents, 12);
+  });
+
+  it("calls the nightly synthesis pass context synthesis", () => {
+    const clumps = buildClumps([
+      {
+        id: "sdk:syn",
+        source: "sdk",
+        at: "2026-10-25T09:30:00.000Z",
+        startedAt: "2026-10-25T09:00:00.000Z",
+        endedAt: "2026-10-25T09:30:00.000Z",
+        person: "Yan",
+        repo: "yanylevin-agents",
+        kind: "synthesis",
+        prompt: "phase 3",
+        threadId: "syn",
+        requestId: "req-syn",
+        tokens: tokensFromUsage({ inputTokens: 50, outputTokens: 10 }),
+      },
+    ]);
+    assert.equal(clumps[0].kind, "context-synthesis");
+  });
+
   it("reads agent kind, caller, and repo from a local prompt", () => {
     const life = classifyLocalPrompt(
       "<timestamp>x</timestamp>\n<user_query>Follow the life-state skill (.cursor/skills/life-state/SKILL.md).\nRun it.</user_query>",
@@ -265,6 +391,24 @@ describe("usage clumps", () => {
     assert.equal(jype.person, "Alex");
     assert.equal(jype.kind, "jype-agent");
     assert.equal(jype.repo, "yanylevin-agents");
+    const personal = classifyLocalPrompt(
+      "You are the Personal Agent for yanylevin.com.\n- Canvas: .cursor/skills/personal-canvas/SKILL.md\nWhat is due",
+      "yanylevin"
+    );
+    assert.equal(personal.kind, "personal-agent");
+    assert.equal(personal.person, "Yan");
+    const teams = classifyLocalPrompt(
+      "You are the Personal Agent for yanylevin.com.\nFrom Alex on Teams:\nhello",
+      "yanylevin"
+    );
+    assert.equal(teams.kind, "teams-agent");
+    assert.equal(teams.person, "Alex");
+    const canvas = classifyLocalPrompt(
+      "Follow .cursor/skills/personal-canvas/SKILL.md.\nFrom Alex on Teams:\nhello",
+      "yanylevin"
+    );
+    assert.equal(canvas.kind, "canvas-hourly");
+    assert.equal(canvas.person, "Yan");
     const title = classifyLocalPrompt("Reply with only a short chat list title for this first user message.\nMessage:\nsend a sticker", "yanylevin");
     assert.equal(title.kind, "chat-title");
     assert.equal(title.prompt, "send a sticker");

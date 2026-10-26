@@ -4,7 +4,7 @@
  * expire with the in-memory session; these markdown files do not.
  */
 
-import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, open, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalizeEmail } from "./identity.js";
@@ -501,6 +501,76 @@ export function formatChatHistoryHint(opts) {
 function resolveRoot(root) {
   const explicit = String(root || "").trim();
   return explicit || ROOT;
+}
+
+const CHAT_TITLE_HEAD_BYTES = 2048;
+
+/**
+ * Title line from the top of a chat file. Messages stay unread.
+ * @param {string} abs
+ */
+async function readChatTitleHead(abs) {
+  const fh = await open(abs, "r");
+  try {
+    const buf = Buffer.alloc(CHAT_TITLE_HEAD_BYTES);
+    const { bytesRead } = await fh.read(buf, 0, CHAT_TITLE_HEAD_BYTES, 0);
+    return parseChatHistoryMeta(buf.slice(0, bytesRead).toString("utf8")).title;
+  } finally {
+    await fh.close();
+  }
+}
+
+/**
+ * Stored chat titles for session ids that already have one.
+ * Personal Agent, @agent, and JYPE files. Empty titles are left out.
+ * @param {Iterable<string>} sessionIds
+ * @param {string} [root]
+ * @returns {Promise<Record<string, string>>}
+ */
+export async function chatTitlesForSessions(sessionIds, root = ROOT) {
+  /** @type {Set<string>} */
+  const wanted = new Set();
+  for (const id of sessionIds || []) {
+    const sid = sanitizeSessionId(id);
+    if (sid) wanted.add(sid);
+  }
+  /** @type {Record<string, string>} */
+  const titles = {};
+  if (!wanted.size) return titles;
+  const edu = join(resolveRoot(root), "education");
+  /** @type {string[]} */
+  const dirs = [];
+  let entries = [];
+  try {
+    entries = await readdir(edu, { withFileTypes: true });
+  } catch {
+    entries = [];
+  }
+  for (const ent of entries) {
+    if (!ent.isDirectory() || !ent.name.includes("@")) continue;
+    dirs.push(join(edu, ent.name, CHAT_HISTORY_DIRNAME));
+  }
+  dirs.push(join(edu, "projects", "jype", CHAT_HISTORY_DIRNAME));
+  for (const dir of dirs) {
+    let names = [];
+    try {
+      names = await readdir(dir);
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      if (!name.endsWith(".md")) continue;
+      const sessionId = sanitizeSessionId(name.slice(0, -3));
+      if (!sessionId || !wanted.has(sessionId) || titles[sessionId]) continue;
+      try {
+        const title = await readChatTitleHead(join(dir, name));
+        if (title) titles[sessionId] = title;
+      } catch {
+        /* unreadable chat */
+      }
+    }
+  }
+  return titles;
 }
 
 /**

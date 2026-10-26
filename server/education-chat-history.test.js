@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
   chatHistoryDirRel,
+  chatTitlesForSessions,
   chatHistoryFileRel,
   chatHistoryGroup,
   chatHistoryIsUnread,
@@ -1038,5 +1039,56 @@ describe("grouping", () => {
       chatHistoryGroup("2026-09-15T06:30:00.000Z", evening, tz).label,
       "Yesterday"
     );
+  });
+});
+
+describe("chat titles for usage threads", () => {
+  it("returns stored titles for the requested sessions only", async () => {
+    const root = await mkdtemp(join(tmpdir(), "chat-titles-"));
+    const personal = join(root, "education/preview@example.com/.chat-history");
+    const jype = join(root, "education/projects/jype/.chat-history");
+    await mkdir(personal, { recursive: true });
+    await mkdir(jype, { recursive: true });
+    const personalId = "session-abc1";
+    const jypeId = "jype-session1";
+    const skippedId = "session-skip";
+    await writeFile(
+      join(personal, `${personalId}.md`),
+      formatChatHistoryMarkdown({
+        email: "preview@example.com",
+        sessionId: personalId,
+        title: "Cafe hunt near Juanita",
+        messages: [{ role: "user", content: "coffee nearby", at: "2026-10-26T07:16:00.000Z" }],
+      })
+    );
+    await writeFile(
+      join(personal, `${skippedId}.md`),
+      formatChatHistoryMarkdown({
+        email: "preview@example.com",
+        sessionId: skippedId,
+        title: "Should stay out",
+        messages: [{ role: "user", content: "nope", at: "2026-10-26T07:16:00.000Z" }],
+      })
+    );
+    await writeFile(
+      join(jype, `${jypeId}.md`),
+      formatChatHistoryMarkdown({
+        email: "preview@example.com",
+        sessionId: jypeId,
+        workspace: "jype",
+        title: "Rugby flight",
+        messages: [{ role: "user", content: "book it", at: "2026-10-26T07:16:00.000Z" }],
+      })
+    );
+    await writeFile(join(personal, "session-empty.md"), "session: session-empty\n");
+    try {
+      const titles = await chatTitlesForSessions([personalId, jypeId, "session-empty", "missing12"], root);
+      assert.deepEqual(titles, {
+        [personalId]: "Cafe hunt near Juanita",
+        [jypeId]: "Rugby flight",
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
