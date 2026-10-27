@@ -104,7 +104,7 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
     lines.push(
       `Read the surrounding thread before answering: ${threadCmd} (school Teams skill).`,
       speakerLine,
-      "school-teams.js cannot attach a file. When the job is to get a PDF or other file into this Teams chat, open the Teams app and attach it with computer use (personal-computer skill). Do not paste a file path into the chat. Do not email it instead. School Outlook still cannot send. An images field on a message has no pixels. Open that chat in the Teams app and look.",
+      "school-teams.js cannot attach a file. When the job is to get a PDF or other file into this Teams chat, open the Teams app and attach it with Cursor computer use (personal-computer skill). That step uses this turn's model. Do not run server/computer-use.js. Do not paste a file path into the chat. Do not email it instead. School Outlook still cannot send. An images field on a message has no pixels. Open that chat in the Teams app and look.",
       "The app and website thread is a normal Personal Agent chat.",
       `Write the final bubble as the text that should land in that Teams chat. Markdown is fine, same as the app bubble (bold, italic, lists, links, headings, code). Use it. A list, bold on the key fact, or a short heading when several points would otherwise sit in one paragraph. The server converts it to Teams HTML so desktop and mobile keep newlines and formatting. Teams does not render KaTeX. Write equations in plain words, not $$. No HTML tags, no @agent. The app and website keep that final bubble as the end of the turn (the answer or what you did). Do not write Sent on Teams. Do not add ${footerPhrase}. The server appends that footer on the Teams message only, never in the app or website thread.`,
       "Keep the reply that lands in this chat short. A few sentences, or a short list. Answer and stop. Write at length only when they asked for a lot of text, such as an essay, a full explanation, or a drafted message. A study guide or plan still goes on a page. This chat gets the URL and one line.",
@@ -120,7 +120,7 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
       "Post to that Teams chat only when this message asks you to tell that chat, reply there, or send something those people should see. A follow-up on the same topic, typed here, stays here. The group already got the first reply.",
       `If this message is about what was said in that Teams chat, read it first: ${threadCmd} (school Teams skill).`,
       speakerLine,
-      "school-teams.js cannot attach a file. When they ask you to get a PDF or other file to someone on Teams, open the Teams app and attach it with computer use (personal-computer skill). Do not paste a file path into Teams. Do not email it instead. School Outlook still cannot send. An images field on a message has no pixels. Open that chat in the Teams app and look."
+      "school-teams.js cannot attach a file. When they ask you to get a PDF or other file to someone on Teams, open the Teams app and attach it with Cursor computer use (personal-computer skill). That step uses this turn's model. Do not run server/computer-use.js. Do not paste a file path into Teams. Do not email it instead. School Outlook still cannot send. An images field on a message has no pixels. Open that chat in the Teams app and look."
     );
   }
   return lines.join("\n");

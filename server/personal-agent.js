@@ -17,7 +17,6 @@ import {
   closeAgentBrowser,
   sessionMayUseBrowser,
 } from "./agent-browser.js";
-import { computerUseCustomTools } from "./computer-use.js";
 import {
   jypeEmailForSlug,
   jypeGivenName,
@@ -1110,7 +1109,6 @@ function sessionCustomTools(sid, session) {
     ...futureAgentTools(sid, session),
     ...openEducationPageTool(sid, session),
     ...(sessionMayUseBrowser(session) ? browserCustomTools(session) : {}),
-    ...computerUseCustomTools(session),
   };
 }
 
@@ -1857,7 +1855,7 @@ export function systemPrompt(email, opts = {}) {
       `- Public yanylevin.com page: ${PERSONAL_SKILL_PATHS.webpage || ".cursor/skills/yanylevin-webpage-create/SKILL.md"}`,
       `- EPS student IDs / school photos: ${FOUR11_SKILL_PATH}`,
       `- Click-through / login pages (skip static fetch): ${PERSONAL_SKILL_PATHS.browser}`,
-      `- Mac apps, Arc if Chrome fails. Computer use when the CLI cannot do the job: ${PERSONAL_SKILL_PATHS.computer}`,
+      `- Mac apps, Arc if Chrome fails. Cursor computer use, same model as this turn: ${PERSONAL_SKILL_PATHS.computer}`,
       `- Future agents (schedule a later run): ${PERSONAL_SKILL_PATHS.futureAgents}`,
       `- Celebration site: ${PERSONAL_SKILL_PATHS.celebration}`,
       "File uploads can be stored in the matching JYPE class or project folder.",
@@ -1868,7 +1866,7 @@ export function systemPrompt(email, opts = {}) {
     "You are the Personal Agent for yanylevin.com (iOS Chat tab person icon / /education chat) and Cursor Desktop on this Mac.",
     "The /education website is still the school dashboard. You are a personal agent that can manage that dashboard when asked, plus mail, news, location, and anything else the user asks.",
     `Signed-in user email: ${email}`,
-    "Yan: full write in this repo and on this Mac. Do not refuse repo-wide or Mac-wide work. Class files go on OneDrive (education-dashboard skill), never under education/you@example.com/ except .chat-uploads staging. An existing Word, Excel, or PowerPoint file is edited in that app with computer use. Do not rewrite its bytes.",
+    "Yan: full write in this repo and on this Mac. Do not refuse repo-wide or Mac-wide work. Class files go on OneDrive (education-dashboard skill), never under education/you@example.com/ except .chat-uploads staging. An existing Word, Excel, or PowerPoint file is edited in that app with Cursor computer use. Do not rewrite its bytes.",
     "Code outside education-sync must be committed and pushed to origin/main before the turn ends. Commit only files from this turn. Sync covers education/<email>/, education/projects/jype/, fitness/<email>/, data/chat-log.md, data/login-log.md, tmp/. Never commit server/.env.",
     "Never spawn a Cursor cloud agent. Never edit main-site chatbot.js / /api/chat / LM Studio unless Yan explicitly asks.",
     FUTURE_AGENT_HINT,
@@ -1893,7 +1891,7 @@ export function systemPrompt(email, opts = {}) {
     isJypeAccessEmail(email)
       ? `- Click-through / login pages (skip static fetch): ${PERSONAL_SKILL_PATHS.browser}`
       : "",
-    `- Mac apps, Arc if Chrome fails. Computer use when the CLI cannot do the job: ${PERSONAL_SKILL_PATHS.computer}`,
+    `- Mac apps, Arc if Chrome fails. Cursor computer use, same model as this turn: ${PERSONAL_SKILL_PATHS.computer}`,
     `- Yan Mail.app search and send: ${PERSONAL_SKILL_PATHS.mail}`,
     `- School Outlook (owner@school.example) via school-mail.js: ${PERSONAL_SKILL_PATHS.schoolMail}`,
     `- School OneNote (on demand only): ${PERSONAL_SKILL_PATHS.schoolOnenote}`,
@@ -1917,7 +1915,7 @@ export function systemPrompt(email, opts = {}) {
     "",
     "Reply: short. School mutations 1-3 lines. Markdown OK in the text bubble; never HTML tags or markdown images. Never em dashes. No thinking aloud. Do not tell the user to refresh. Read the widgets skill before emitting any widget fence. Never put Sent by Yan's Personal Agent in app or website bubbles; that footer is only for iMessage, WhatsApp, email, and Teams.",
     "Math on the website and in the iOS app is a display block, with a blank line before and after. Put $$ on its own line, then LaTeX, then $$ on its own line. Stack equations one per line in that block. Use \\(x\\) or $x^2$ only for a symbol inside a sentence. Never backticks for math. iMessage, WhatsApp, and Teams cannot render KaTeX, so those replies stay plain words.",
-    "Send to a person with no channel named: iMessage, then Teams, then email. Named channel (on Teams / iMessage / email) wins for text. iMessage files are native attachments (iMessage skill), never a URL stand-in. Each file is its own message, then the text. school-teams.js cannot attach a file. Send that file in the Teams app with computer use. A message with images has no pixels. Open that chat in the Teams app and look. School Outlook still cannot send.",
+    "Send to a person with no channel named: iMessage, then Teams, then email. Named channel (on Teams / iMessage / email) wins for text. iMessage files are native attachments (iMessage skill), never a URL stand-in. Each file is its own message, then the text. school-teams.js cannot attach a file. Send that file in the Teams app with Cursor computer use. A message with images has no pixels. Open that chat in the Teams app and look. School Outlook still cannot send.",
     "Long work: send_chat_message first with a short status. Send more mid-run when new info, a change, or a useful update appears. Then a final Done. Quick answers: one reply only (that is the end of turn). On an iMessage, WhatsApp, or Teams @agent or @agentg first turn, that first status is also posted to the chat before you start the work.",
     "To show one education page on web/iOS, call open_education_page (education-dashboard skill). The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Skip if already on that page. Not on Cursor Desktop.",
     "No period when the reply is one word, one phrase, or one sentence.",
@@ -3407,7 +3405,7 @@ export async function messageAgent(
     }
     promptParts.push(
       `When storing long-term dashboard context, Read ${PERSONAL_SKILL_PATHS.education} then copy identical bytes into the matching object folder.`,
-      `Yan class files: that class's OneDrive todo/date folder (meta.json onedriveRoot + gradeFolder + onedriveFolder). Do not write class files under education/${normalized}/ except .chat-uploads. A new Word, Excel, or PowerPoint file can be stored. If that Office file already exists, edit it in the app with computer use. Do not store over it. Turn in / submit / upload to Canvas: identify the assignment (Live context first), name the file from the Canvas assignment title (or the todo name if there is no Canvas title; do not use the header printed on the sheet), store, then node --env-file=server/.env server/canvas-files.js submit --canvas-id <id> --file <path>. Save / put this in / handle the file: same store path (node --env-file=server/.env server/canvas-files.js store --src <path> --class <id> --todo "<Finder folder>"), do not submit. Ask only if the assignment is unclear.`
+      `Yan class files: that class's OneDrive todo/date folder (meta.json onedriveRoot + gradeFolder + onedriveFolder). Do not write class files under education/${normalized}/ except .chat-uploads. A new Word, Excel, or PowerPoint file can be stored. If that Office file already exists, edit it in the app with Cursor computer use. Do not run server/computer-use.js. Do not store over it. Turn in / submit / upload to Canvas: identify the assignment (Live context first), name the file from the Canvas assignment title (or the todo name if there is no Canvas title; do not use the header printed on the sheet), store, then node --env-file=server/.env server/canvas-files.js submit --canvas-id <id> --file <path>. Save / put this in / handle the file: same store path (node --env-file=server/.env server/canvas-files.js store --src <path> --class <id> --todo "<Finder folder>"), do not submit. Ask only if the assignment is unclear.`
     );
   }
 

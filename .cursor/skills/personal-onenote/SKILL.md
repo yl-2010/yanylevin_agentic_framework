@@ -80,7 +80,7 @@ Output is JSON. Use `id` from pages when reading a body. Summarize.
 Do not print tokens. Do not dump huge HTML (`page` already returns text;
 `--html` only if you must see markup).
 
-Reads stay on these commands. If the job is a change this CLI cannot make, do that part in the OneNote app with computer use (`.cursor/skills/personal-computer/SKILL.md`). Do not open the app first.
+Reads stay on these commands. If the job is a change this CLI cannot make, do that part in the OneNote app with Cursor computer use (`.cursor/skills/personal-computer/SKILL.md`). That step uses this turn's model. Do not run `server/computer-use.js`. Do not open the app first.
 
 **Ink (written HW).** Graph HTML comments say `InkNode is not supported` and
 `page` text will look empty. That is not a dead end. Fetch the page with

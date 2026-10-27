@@ -1,44 +1,24 @@
 ---
 name: personal-computer
 description: >-
-  Drive Mac apps from the Personal Agent with the accessibility tree.
-  Websites still start in the dedicated Chrome. Use Arc only when that
-  Chrome cannot render the page or is not signed in. Other skills come
-  first. Computer use is for the part those skills cannot do.
+  Drive Mac apps with Cursor's built-in computer use. Websites still
+  start in the dedicated Chrome. Use Arc only when that Chrome cannot
+  render the page or is not signed in. Other skills come first. Computer
+  use is for the part those skills cannot do.
 disable-model-invocation: true
 ---
 
 # Mac apps
 
-The helper is `server/computer-use.js`. It reads an app's accessibility tree and posts clicks and keystrokes to that app. A background action leaves the real cursor where it is and leaves the current Space where it is. An app on another desktop stays on that desktop.
+Use Cursor's built-in computer use. `server/computer-use.js` is off. Do not run it.
 
-Launch a closed app with `open -gj -a AppName`, then use this helper. `open -a` without `-gj`, `activate`, and System Events keystrokes switch desktops on their own. Come forward through this helper instead.
-
-Express, iOS, web, and `@agent` get tools: `list_apps`, `get_app_state`, `click`, `type_text`, `press_key`, `scroll`, `drag`, `set_value`, `perform_secondary_action`, `select_text`, `restore_front`.
-
-Cursor Desktop does not get those tools. Use the CLI. Do not use `cursor-computer-use`.
-
-```bash
-node server/computer-use.js apps
-node server/computer-use.js state "TextEdit"
-node server/computer-use.js click 2
-node server/computer-use.js set 2 --value "hello"
-node server/computer-use.js restore
-```
-
-## How to work
+If that work runs as its own step, the model is inherit. That is the same model as this turn, Grok or Composer, whichever this chat already has. Do not pick a different one.
 
 Use the skill for that app first. Teams, iMessage, Mail, OneNote, Calendar, Home, Canvas, and the other personal skills already have a command. Computer use is for the part that command cannot do. A Teams file the CLI cannot attach, a Teams image with no pixels, an OneNote change the CLI cannot make, an existing Word, Excel, or PowerPoint file. Do the rest with the skill.
 
-Stay in the background when the control will take the action there. `get_app_state`, then act on the element number. `set_value` when the line says settable. Screenshot pixels when the tree has no control. Origin is the top-left of that image. Read the tree again after the action.
+Stay on one app in the background. The real cursor stays where it is. Read the accessibility tree, then act on the element. Set the value when the line says settable. Use screenshot pixels when the tree has no control.
 
-When a background action cannot land, pass `foreground` true. That makes the app the active window, switches to its Space, and moves the real cursor. Finish the part that needed the main window. Then `restore_front`. That puts back the app that was in front.
-
-```bash
-node server/computer-use.js state "Messages" --foreground
-node server/computer-use.js click --x 40 --y 80 --pid 815 --foreground
-node server/computer-use.js restore
-```
+Take the whole display only when the user asked. That moves the real cursor. Release it when that part is done. Spotlight, Notification Center, and menu extras are not available.
 
 ## Who
 
@@ -50,7 +30,7 @@ Do not wipe macOS system files (`/System` and other OS-owned paths). Do not down
 
 ## Websites
 
-Start in the dedicated Chrome from the personal-browser skill. If that page will not render, or the site is not signed in there, open Arc and finish the same site with these tools. Do not open Arc first. Do not quit Arc, and do not `killall` any browser.
+Start in the dedicated Chrome from the personal-browser skill. If that page will not render, or the site is not signed in there, open Arc and finish the same site with Cursor computer use. Do not open Arc first. Do not quit Arc, and do not `killall` any browser.
 
 ## Reply
 

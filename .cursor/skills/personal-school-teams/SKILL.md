@@ -99,7 +99,7 @@ run directed it.
 
 `school-teams.js send` is text. `--text` is the whole CLI send. A link is fine when the file is already a URL.
 
-A PDF, photo, or other file still goes in that Teams chat. The CLI cannot attach it, so open the Teams app and attach the file with computer use (`.cursor/skills/personal-computer/SKILL.md`). Do not paste a file path into the chat. Do not switch the file to email because the CLI has no attachment. School Outlook still cannot send. A class channel or a big group is not a file drop. Attaching a file is the same judgment as other computer use, and it is not for a guest dumping files into a grade chat. A row with `images` is the same kind of gap. The CLI has no pixels, so look at the picture in the Teams app.
+A PDF, photo, or other file still goes in that Teams chat. The CLI cannot attach it, so open the Teams app and attach the file with Cursor computer use (`.cursor/skills/personal-computer/SKILL.md`). That step uses this turn's model. Do not run `server/computer-use.js`. Do not paste a file path into the chat. Do not switch the file to email because the CLI has no attachment. School Outlook still cannot send. A class channel or a big group is not a file drop. Attaching a file is the same judgment as other computer use, and it is not for a guest dumping files into a grade chat. A row with `images` is the same kind of gap. The CLI has no pixels, so look at the picture in the Teams app.
 
 `--text` is markdown (or plain text). The CLI converts it to Teams HTML
 (`RichText/Html`) so desktop keeps newlines and bold/lists/links. Do not

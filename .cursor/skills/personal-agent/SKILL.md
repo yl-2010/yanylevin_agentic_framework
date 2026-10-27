@@ -248,10 +248,10 @@ Yan naming the channel wins for text: `on Teams`, `iMessage` / `text`, `email` /
 
 ## What each channel can carry
 
-If the CLI for that channel cannot carry the thing, do that part in the app with computer use and name it in the reply. Do not ask which app. Do not claim a file went out on a channel that did not take it. Stay in the background when that works. If the control needs the main window, bring it forward, finish that part, then restore the app that was in front. The personal-computer skill has the details.
+If the CLI for that channel cannot carry the thing, do that part in the app with Cursor computer use and name it in the reply. That step uses this turn's model. Do not run server/computer-use.js. Do not ask which app. Do not claim a file went out on a channel that did not take it. Stay on one app in the background when that works. Take the whole display only when that part needs it, then release it. The personal-computer skill has the details.
 
 - **iMessage** can send text and files (photos, PDFs, anything on disk). Each file is its own message, then the text.
-- **Teams** text goes through `school-teams.js send`. That CLI has no attachment and no picture pixels. A link is fine when the file is already a URL. A real file goes in the Teams app with computer use (personal-computer skill). A message with `images` is looked at in the Teams app the same way. Do not paste a path into the chat.
+- **Teams** text goes through `school-teams.js send`. That CLI has no attachment and no picture pixels. A link is fine when the file is already a URL. A real file goes in the Teams app with Cursor computer use (personal-computer skill). A message with `images` is looked at in the Teams app the same way. Do not paste a path into the chat.
 - **School Outlook** (`owner@school.example`) is read only. It cannot send mail and cannot attach a file.
 - **Apple Mail** can send text and attach files. That is Mail.app: Exchange `you@example.com`, Gmail, or iCloud.
 

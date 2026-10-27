@@ -907,6 +907,17 @@ export async function disposeCursorAgent(agent) {
   await disposeAgentHandle(agent);
 }
 
+/** Built-in computer use. Model follows the parent turn (Grok or Composer). */
+const COMPUTER_USE_AGENT = {
+  computerUse: {
+    description:
+      "Drive one Mac app with Cursor computer use when a command cannot click, type, or see the window. server/computer-use.js is off.",
+    prompt:
+      "Use Cursor computer use only. Do not run server/computer-use.js. Stay on one app in the background. Take the whole display only if the parent said the user asked for that, then release it. Report what changed.",
+    model: "inherit",
+  },
+};
+
 /**
  * @param {{ model: { id: string, params?: { id: string, value: string }[] }, cwd: string }} opts
  */
@@ -918,6 +929,7 @@ export async function createLocalCursorAgent({ model, cwd }) {
     apiKey,
     model,
     local: { cwd },
+    agents: COMPUTER_USE_AGENT,
   });
   liveLocalAgents.add(agent);
   return agent;

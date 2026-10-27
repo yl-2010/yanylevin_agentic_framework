@@ -7,4 +7,4 @@ alwaysApply: true
 
 A new `.doc`, `.docx`, `.xls`, `.xlsx`, `.ppt`, or `.pptx` can be created and then copied into OneDrive.
 
-If that file already exists, edit it in Word, Excel, or PowerPoint with computer use (`server/computer-use.js`, or the personal-computer skill). Save from the app. Do not rewrite the bytes with Write, Python, `textutil`, or by unzipping the file. `textutil -convert txt` is a read. `canvas-files.js store` refuses an overwrite of an existing Office file. Canvas pull of a teacher file stays a sync.
+If that file already exists, edit it in Word, Excel, or PowerPoint with Cursor computer use (personal-computer skill). Save from the app. Do not run `server/computer-use.js`. Do not rewrite the bytes with Write, Python, `textutil`, or by unzipping the file. `textutil -convert txt` is a read. `canvas-files.js store` refuses an overwrite of an existing Office file. Canvas pull of a teacher file stays a sync.

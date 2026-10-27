@@ -635,14 +635,8 @@ export async function runComputerUse(argv) {
 
 const isCli = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isCli) {
-  runComputerUse(process.argv.slice(2))
-    .then((result) => {
-      if (result?.text) process.stdout.write(`${result.text}\n`);
-      else process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-      process.exit(result?.ok === false ? 1 : 0);
-    })
-    .catch((err) => {
-      console.error(err instanceof Error ? err.message : err);
-      process.exit(1);
-    });
+  console.error(
+    "server/computer-use.js is off. Use Cursor computer use. That step uses this turn's model."
+  );
+  process.exit(1);
 }

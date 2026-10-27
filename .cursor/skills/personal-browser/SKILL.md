@@ -15,9 +15,10 @@ Not Yan's daily tabs. Chrome **quits when the turn ends**. Cookies stay
 on disk so the next login can reuse them.
 
 This Chrome is the default. If the page will not render, or the site is not
-signed in here, switch to Arc with computer use. Arc is the browser Yan
+signed in here, switch to Arc with Cursor computer use. Arc is the browser Yan
 actually uses, so the login is usually already there. Read
-`.cursor/skills/personal-computer/SKILL.md`. Do not open Arc first. Do not
+`.cursor/skills/personal-computer/SKILL.md`. That step uses this turn's model.
+Do not run `server/computer-use.js`. Do not open Arc first. Do not
 quit Arc.
 
 **Who:** Yan, and anyone in JYPE, including JYPE `@agent`. Other guests: do not

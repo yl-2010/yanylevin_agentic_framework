@@ -227,7 +227,7 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /iMessage, then Teams, then email/);
     assert.match(prompt, /native attachments/);
     assert.match(prompt, /school-teams\.js cannot attach a file/);
-    assert.match(prompt, /Teams app with computer use/);
+    assert.match(prompt, /Teams app with Cursor computer use/);
     assert.match(prompt, /images has no pixels/);
     assert.match(prompt, /existing Word, Excel, or PowerPoint/);
     assert.match(prompt, /School Outlook still cannot send/);
