@@ -292,14 +292,14 @@
     dock.setAttribute("aria-label", "Sites");
     dock.hidden = true;
     dock.innerHTML = `
-      <a class="corner social-orb dock-usage squircle" data-liquid-glass="squircle" data-filter-id="lg-dock-usage" href="/usage/" aria-label="Usage" draggable="false">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 13.2c0-.7.5-1.2 1.2-1.2h1.6c.7 0 1.2.5 1.2 1.2v6.1c0 .7-.5 1.2-1.2 1.2H5.2c-.7 0-1.2-.5-1.2-1.2v-6.1Zm6-8.4c0-.7.5-1.2 1.2-1.2h1.6c.7 0 1.2.5 1.2 1.2v14.5c0 .7-.5 1.2-1.2 1.2h-1.6c-.7 0-1.2-.5-1.2-1.2V4.8Zm6 4.2c0-.7.5-1.2 1.2-1.2h1.6c.7 0 1.2.5 1.2 1.2v10.3c0 .7-.5 1.2-1.2 1.2h-1.6c-.7 0-1.2-.5-1.2-1.2V9Z"/></svg>
+      <a class="corner social-orb dock-usage squircle" data-liquid-glass="squircle" data-filter-id="lg-dock-usage" href="/usage/" aria-label="Usage">
+        <svg viewBox="0 0 24 24" aria-hidden="true" draggable="false"><path fill="currentColor" d="M4 13.2c0-.7.5-1.2 1.2-1.2h1.6c.7 0 1.2.5 1.2 1.2v6.1c0 .7-.5 1.2-1.2 1.2H5.2c-.7 0-1.2-.5-1.2-1.2v-6.1Zm6-8.4c0-.7.5-1.2 1.2-1.2h1.6c.7 0 1.2.5 1.2 1.2v14.5c0 .7-.5 1.2-1.2 1.2h-1.6c-.7 0-1.2-.5-1.2-1.2V4.8Zm6 4.2c0-.7.5-1.2 1.2-1.2h1.6c.7 0 1.2.5 1.2 1.2v10.3c0 .7-.5 1.2-1.2 1.2h-1.6c-.7 0-1.2-.5-1.2-1.2V9Z"/></svg>
       </a>
-      <a class="corner social-orb dock-home squircle" data-liquid-glass="squircle" data-filter-id="lg-dock-home" href="/" aria-label="Yan Levin" draggable="false">
-        <svg viewBox="0 0 252 252" aria-hidden="true"><path fill="currentColor" d="${YL_PATH}"/></svg>
+      <a class="corner social-orb dock-home squircle" data-liquid-glass="squircle" data-filter-id="lg-dock-home" href="/" aria-label="Yan Levin">
+        <svg viewBox="0 0 252 252" aria-hidden="true" draggable="false"><path fill="currentColor" d="${YL_PATH}"/></svg>
       </a>
-      <a class="corner social-orb dock-dash squircle" data-liquid-glass="squircle" data-filter-id="lg-dock-dash" href="/dashboard/" aria-label="Dashboard" draggable="false">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><rect x="2.2" y="3" width="4.4" height="18" rx="1.15"/><rect x="10" y="3" width="11.8" height="7.3" rx="1.15"/><rect x="10" y="13.7" width="11.8" height="7.3" rx="1.15"/></g></svg>
+      <a class="corner social-orb dock-dash squircle" data-liquid-glass="squircle" data-filter-id="lg-dock-dash" href="/dashboard/" aria-label="Dashboard">
+        <svg viewBox="0 0 24 24" aria-hidden="true" draggable="false"><g fill="currentColor"><rect x="2.2" y="3" width="4.4" height="18" rx="1.15"/><rect x="10" y="3" width="11.8" height="7.3" rx="1.15"/><rect x="10" y="13.7" width="11.8" height="7.3" rx="1.15"/></g></svg>
       </a>`;
     document.body.appendChild(dock);
 
