@@ -296,9 +296,27 @@
   function show(name) {
     Object.keys(stages).forEach((key) => {
       const el = stages[key];
-      if (!el) return;
+      if (!el || key === "loading") return;
       el.hidden = key !== name;
     });
+    const loading = stages.loading;
+    if (name === "loading") {
+      if (loading) {
+        loading.classList.remove("is-leaving");
+        loading.hidden = false;
+      }
+    } else if (loading && !loading.hidden && typeof window.ylHideLoader === "function") {
+      window.ylHideLoader();
+    } else if (loading) {
+      loading.hidden = true;
+    }
+    if (name === "full" && appEl && !didEntrance) {
+      didEntrance = true;
+      appEl.classList.add("is-settled");
+      void appEl.offsetWidth;
+      appEl.classList.remove("is-settled");
+      window.setTimeout(() => appEl.classList.add("is-settled"), 1100);
+    }
     queueMicrotask(() => window.reinitLiquidGlass?.());
   }
 
@@ -3373,9 +3391,11 @@
     }
     const keepX = window.scrollX;
     const keepY = window.scrollY;
-    if (didEntrance) appEl.classList.add("is-settled");
+    const stageHidden = !stages.full || stages.full.hidden;
+    if (didEntrance || stageHidden) appEl.classList.add("is-settled");
     else {
       appEl.classList.remove("is-settled");
+      didEntrance = true;
       window.setTimeout(() => appEl.classList.add("is-settled"), 1100);
     }
 
@@ -3388,7 +3408,6 @@
     else if (route.view === "case") renderCase();
     else renderHome();
 
-    didEntrance = true;
     applyScroll(scroll, keepX, keepY);
     syncDocumentTitle();
     queueMicrotask(() => window.reinitLiquidGlass?.());
@@ -4097,7 +4116,6 @@
         return;
       }
       if (CFG.title) document.title = CFG.title;
-      show("full");
       bindAppClicks();
       await fetchData();
       maybeTouchProjectOpened();
@@ -4106,6 +4124,7 @@
       if (window.location.pathname === BASE) {
         navigate(spaHome(), { replace: true, scroll: "keep" });
       }
+      show("full");
     } catch (err) {
       console.error("[edu boot]", err);
       if (!signedIn) {

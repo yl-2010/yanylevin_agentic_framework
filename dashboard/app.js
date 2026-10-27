@@ -362,9 +362,20 @@
   function show(name) {
     Object.keys(stages).forEach((key) => {
       const el = stages[key];
-      if (!el) return;
+      if (!el || key === "loading") return;
       el.hidden = key !== name;
     });
+    const loading = stages.loading;
+    if (name === "loading") {
+      if (loading) {
+        loading.classList.remove("is-leaving");
+        loading.hidden = false;
+      }
+    } else if (loading && !loading.hidden && typeof window.ylHideLoader === "function") {
+      window.ylHideLoader();
+    } else if (loading) {
+      loading.hidden = true;
+    }
     queueMicrotask(() => window.reinitLiquidGlass?.());
   }
 
@@ -695,10 +706,13 @@
       }
       if (data.access === "full") {
         userEmail = String(data.email || "").trim().toLowerCase();
-        show("full");
-        renderAgents();
-        await ensureLoginRecorded();
-        await loadOnce();
+        try {
+          renderAgents();
+          await ensureLoginRecorded();
+          await loadOnce();
+        } finally {
+          show("full");
+        }
         if (futurePoll) clearInterval(futurePoll);
         futurePoll = setInterval(() => {
           fetchFutureAgents()

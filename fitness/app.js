@@ -94,8 +94,19 @@
 
   function showStage(name) {
     for (const [k, el] of Object.entries(stages)) {
-      if (!el) continue;
+      if (!el || k === "loading") continue;
       el.hidden = k !== name;
+    }
+    const loading = stages.loading;
+    if (name === "loading") {
+      if (loading) {
+        loading.classList.remove("is-leaving");
+        loading.hidden = false;
+      }
+    } else if (loading && !loading.hidden && typeof window.ylHideLoader === "function") {
+      window.ylHideLoader();
+    } else if (loading) {
+      loading.hidden = true;
     }
   }
 
