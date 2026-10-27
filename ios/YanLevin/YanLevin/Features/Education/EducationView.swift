@@ -17,6 +17,8 @@ struct EducationView: View {
     @State private var todoTypeFilters: Set<String> = EducationTodoFilter.load()
     @State private var datesExpanded = false
     @State private var dateFilters: Set<String> = EducationDateFilter.load()
+    /// Home comments: collapsed shows the 3 newest inside the fresh window.
+    @State private var homeCommentsExpanded = false
     /// Bumped to cancel/restart SSE + polling (same effect as leaving the tab).
     @State private var liveSessionID = 0
 
@@ -188,6 +190,7 @@ struct EducationView: View {
                     } else {
                         scheduleAndDatesPanels
                         projectsPanel
+                        homeCommentsPanel
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -212,6 +215,7 @@ struct EducationView: View {
                 todoPanel
                 scheduleAndDatesPanels
                 projectsPanel
+                homeCommentsPanel
                 completedPanel
             }
         }
@@ -245,6 +249,46 @@ struct EducationView: View {
 
         if sections.count > 1 {
             dayPanel(sections[1])
+        }
+    }
+
+    @ViewBuilder
+    private var homeCommentsPanel: some View {
+        let all = homeCommentEntries
+        if !all.isEmpty {
+            EducationCommentsBox(
+                entries: homeCommentsExpanded ? all : Array(all.prefix(3)),
+                expandable: true,
+                expanded: homeCommentsExpanded,
+                onToggle: {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        homeCommentsExpanded.toggle()
+                    }
+                },
+                use24Hour: use24Hour
+            )
+        }
+    }
+
+    private var homeCommentEntries: [EducationCommentEntry] {
+        let schedule = store.tree?.schedule
+        let now = Date()
+        return allTodos.flatMap { todo in
+            (todo.canvasComments ?? []).compactMap { comment -> EducationCommentEntry? in
+                let text = comment.comment.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else { return nil }
+                guard let posted = EducationCommentWhen.date(from: comment.createdAt) else { return nil }
+                guard EducationScheduleHelper.homeCommentIsFresh(
+                    postedAt: posted,
+                    schedule: schedule,
+                    now: now
+                ) else { return nil }
+                return EducationCommentEntry(comment: comment, todo: todo)
+            }
+        }
+        .sorted { a, b in
+            if a.createdAt != b.createdAt { return a.createdAt > b.createdAt }
+            return a.id > b.id
         }
     }
 
@@ -2415,6 +2459,7 @@ private enum EducationFilterChrome {
 
 private struct EducationCommentEntry: Identifiable {
     let id: Int
+    let listKey: String
     let createdAt: String
     let text: String
     let todo: EducationTodo?
@@ -2422,6 +2467,7 @@ private struct EducationCommentEntry: Identifiable {
 
     init(comment: EducationCanvasComment, todo: EducationTodo?, canvasURL: URL? = nil) {
         id = comment.id
+        listKey = "\(todo?.id ?? "")-\(comment.id)"
         createdAt = comment.createdAt
         text = comment.comment
         self.todo = todo
@@ -2437,6 +2483,12 @@ private enum EducationCommentWhen {
                 if a.createdAt != b.createdAt { return a.createdAt > b.createdAt }
                 return a.id > b.id
             }
+    }
+
+    static func date(from iso: String) -> Date? {
+        let trimmed = iso.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return parse(trimmed)
     }
 
     static func format(_ iso: String, use24Hour: Bool) -> String {
@@ -2504,7 +2556,7 @@ private struct EducationCommentsBox: View {
             }
 
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                ForEach(Array(entries.enumerated()), id: \.element.listKey) { index, entry in
                     if index > 0 {
                         EducationTodoDaySeparator()
                     }

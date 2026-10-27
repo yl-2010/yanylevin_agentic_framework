@@ -76,7 +76,7 @@ node server/school-onenote.js page "<id>"
 node server/school-onenote.js search "colonial map"
 ```
 
-Output is JSON. Use `id` from pages when reading a body. Summarize.
+Output is JSON. Use `id` from pages when reading a body. Each page includes `level` when OneNote sends it. Level 0 is a top page. A higher number is indented under the page above it. Summarize.
 Do not print tokens. Do not dump huge HTML (`page` already returns text;
 `--html` only if you must see markup).
 

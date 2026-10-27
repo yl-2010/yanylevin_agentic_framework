@@ -1423,6 +1423,112 @@ function siblingTodo(todo, link, byId, byCanvas) {
   return null;
 }
 
+const ONENOTE_MORE_PATH = "onenote-more";
+
+function isOneNoteFileTile(file) {
+  return /^onenote:/i.test(String(file?.officeUri || "").trim());
+}
+
+function isOneNoteMoreFolder(file) {
+  return (
+    file?.kind === "folder" &&
+    String(file?.path || "") === ONENOTE_MORE_PATH &&
+    Array.isArray(file.files)
+  );
+}
+
+function flattenOneNoteMoreFolders(files) {
+  const out = [];
+  for (const file of files) {
+    if (isOneNoteMoreFolder(file)) {
+      out.push(...file.files);
+      continue;
+    }
+    out.push(file);
+  }
+  return out;
+}
+
+function sameFileList(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+function oneNoteSiteByUrl(todo) {
+  const sites = Array.isArray(todo?.sites) ? todo.sites : [];
+  const byUrl = new Map();
+  for (const site of sites) {
+    if (!site || (site.oneNote !== "personal" && site.oneNote !== "content-library")) {
+      continue;
+    }
+    const key = String(site.url || site.href || "").trim().toLowerCase();
+    if (key && !byUrl.has(key)) byUrl.set(key, site);
+  }
+  return byUrl;
+}
+
+function moreOneNoteFolderName(count) {
+  return count === 1 ? "1 more OneNote page" : `${count} more OneNote pages`;
+}
+
+/**
+ * Show one OneNote link. The rest sit in the file-folder expander.
+ * A missing main flag is a display guess. This does not write the todo.
+ * @param {object} todo
+ */
+export function collapseExtraOneNoteFiles(todo) {
+  if (!todo || typeof todo !== "object" || !Array.isArray(todo.files)) return todo;
+  const flat = flattenOneNoteMoreFolders(todo.files);
+  const indexes = [];
+  for (let i = 0; i < flat.length; i++) {
+    if (isOneNoteFileTile(flat[i])) indexes.push(i);
+  }
+  if (indexes.length < 2) {
+    if (!sameFileList(todo.files, flat)) todo.files = flat;
+    return todo;
+  }
+  const byUrl = oneNoteSiteByUrl(todo);
+  const siteFor = (tile) => {
+    const key = String(tile?.url || tile?.webUrl || "").trim().toLowerCase();
+    return key ? byUrl.get(key) || null : null;
+  };
+  const own = indexes.filter((i) => siteFor(flat[i]));
+  const candidates = own.length ? own : indexes;
+  const todoName = String(todo.name || "").trim().toLowerCase();
+  let mainIndex = candidates.find((i) => siteFor(flat[i])?.main === true);
+  if (mainIndex === undefined && todoName) {
+    mainIndex = candidates.find(
+      (i) => String(flat[i]?.name || "").trim().toLowerCase() === todoName
+    );
+  }
+  if (mainIndex === undefined) {
+    mainIndex = candidates.find((i) => siteFor(flat[i])?.oneNote === "personal");
+  }
+  if (mainIndex === undefined) mainIndex = candidates[0];
+
+  const extraSet = new Set(indexes.filter((i) => i !== mainIndex));
+  const extras = [];
+  const next = [];
+  for (let i = 0; i < flat.length; i++) {
+    if (extraSet.has(i)) {
+      extras.push(flat[i]);
+      continue;
+    }
+    next.push(flat[i]);
+  }
+  const mainPos = next.indexOf(flat[mainIndex]);
+  next.splice(mainPos + 1, 0, {
+    name: moreOneNoteFolderName(extras.length),
+    kind: "folder",
+    source: "site",
+    path: ONENOTE_MORE_PATH,
+    files: extras,
+  });
+  todo.files = next;
+  return todo;
+}
+
 /**
  * Append file and OneNote tiles from `linkedFiles`. Own files stay first.
  * A missing file or page is omitted. `_objectDir` is removed before return.
@@ -1526,6 +1632,7 @@ export async function applyTodoFileLinks(todos, officeOpen = {}) {
         }
       }
       if (linked.length) todo.files = [...(todo.files || []), ...linked];
+      collapseExtraOneNoteFiles(todo);
     }
   } finally {
     for (const todo of list) {
@@ -1609,6 +1716,7 @@ async function loadObjectFolder(
       item._raw = props;
       item._jsonPath = jsonPath;
     }
+    if (kind === "todo") collapseExtraOneNoteFiles(item);
     out.push(item);
   }
   return out;
@@ -2270,6 +2378,8 @@ function clonePublicTodo(todo) {
   if (Array.isArray(rest.files)) {
     rest.files = rest.files.map((file) => ({ ...file }));
   }
+  // Group here too, so a snapshot built before this still collapses on the way out.
+  collapseExtraOneNoteFiles(rest);
   return rest;
 }
 

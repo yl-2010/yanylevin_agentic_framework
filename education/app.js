@@ -285,6 +285,8 @@
   let datesExpanded = false;
   /** Class comments panel: collapsed shows the 3 newest. */
   let classCommentsExpanded = false;
+  /** Home comments panel: same collapse, only the fresh window. */
+  let homeCommentsExpanded = false;
   /** TODO panel: web starts fully expanded; collapsed shows 6 and hides type filters. */
   let todoExpanded = true;
   /** Completed panel: starts expanded; collapsed shows 6. No type filters of its own. */
@@ -758,6 +760,44 @@
     };
   }
 
+  /** Calendar parts in the schedule timezone (school days are Pacific dates). */
+  function zonedParts(date, timeZone) {
+    const tz = String(timeZone || "").trim();
+    if (!tz) return todayParts(date);
+    try {
+      const bag = {};
+      new Intl.DateTimeFormat("en-US", {
+        timeZone: tz,
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        weekday: "short",
+        hourCycle: "h23",
+      })
+        .formatToParts(date)
+        .forEach((part) => {
+          if (part.type !== "literal") bag[part.type] = part.value;
+        });
+      const weekday = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[
+        bag.weekday
+      ];
+      const y = Number(bag.year);
+      const m = Number(bag.month);
+      const day = Number(bag.day);
+      if (
+        !Number.isFinite(y) ||
+        !Number.isFinite(m) ||
+        !Number.isFinite(day) ||
+        weekday == null
+      ) {
+        return todayParts(date);
+      }
+      return { y, m, day, weekday, minutes: 0 };
+    } catch {
+      return todayParts(date);
+    }
+  }
+
   function ymd(y, m, d) {
     return `${y}-${pad2(m)}-${pad2(d)}`;
   }
@@ -959,7 +999,10 @@
     </div>`;
   }
 
-  function commentsPanelHtml(rows, { filterId, expandable = false, expanded = false } = {}) {
+  function commentsPanelHtml(
+    rows,
+    { filterId, expandable = false, expanded = false, expandAttr = "" } = {}
+  ) {
     const list = (Array.isArray(rows) ? rows : []).filter((row) =>
       String(row?.comment || "").trim()
     );
@@ -979,9 +1022,11 @@
       })
       .join("");
     const titleHtml = expandable
-      ? `<button type="button" class="edu-comments-toggle" data-comments-expand aria-expanded="${
-          expanded ? "true" : "false"
-        }" aria-label="${expanded ? "Collapse comments" : "Expand comments"}">Comments</button>`
+      ? `<button type="button" class="edu-comments-toggle" ${
+          expandAttr || "data-comments-expand"
+        } aria-expanded="${expanded ? "true" : "false"}" aria-label="${
+          expanded ? "Collapse comments" : "Expand comments"
+        }">Comments</button>`
       : "";
     return panelHtml("Comments", body, {
       extraClass: expandable
@@ -1021,6 +1066,64 @@
       filterId: "lg-edu-class-comments",
       expandable: true,
       expanded: classCommentsExpanded,
+    });
+  }
+
+  /**
+   * A day has school when the schedule would put blocks on it.
+   * Weekends, closed dates, and weekdays with no periods stay off.
+   */
+  function dayHasScheduleBlocks(parts, schedule) {
+    const override = dayOverride(parts, schedule);
+    const slots = Array.isArray(override?.slots)
+      ? override.slots
+      : Array.isArray(override?.meetings)
+        ? override.meetings
+        : null;
+    if (slots) {
+      return slots.some((slot) => String(slot?.period || "").trim());
+    }
+    return periodsForDay(parts, schedule).length > 0;
+  }
+
+  function commentPostedOnSchoolDay(iso, schedule) {
+    const ms = Date.parse(String(iso || ""));
+    if (!Number.isFinite(ms)) return false;
+    const parts = zonedParts(new Date(ms), schedule?.timezone);
+    return isSchoolDay(parts, schedule) && dayHasScheduleBlocks(parts, schedule);
+  }
+
+  /** School-day comments last 24h. Any day without blocks lasts 48h. */
+  function homeCommentStillVisible(iso, schedule, nowMs = Date.now()) {
+    const ms = Date.parse(String(iso || ""));
+    if (!Number.isFinite(ms)) return false;
+    const hours = commentPostedOnSchoolDay(iso, schedule) ? 24 : 48;
+    return nowMs - ms < hours * 60 * 60 * 1000;
+  }
+
+  function homeCommentsHtml() {
+    const schedule = tree?.schedule || {};
+    const rows = [];
+    flattenTodos(tree, { includeHiddenFromHome: true }).forEach((t) => {
+      const comments = Array.isArray(t.canvasComments) ? t.canvasComments : [];
+      const tag = todoTagKey(t);
+      comments.forEach((row) => {
+        const text = String(row?.comment || "").trim();
+        if (!text || !homeCommentStillVisible(row?.createdAt, schedule)) return;
+        rows.push({
+          ...row,
+          comment: text,
+          href: todoHref(t),
+          canvasLink: t.canvasLink || "",
+          todoNameHtml: taggedNameHtml(tag, t.name || t.id),
+        });
+      });
+    });
+    return commentsPanelHtml(rows, {
+      filterId: "lg-edu-home-comments",
+      expandable: true,
+      expanded: homeCommentsExpanded,
+      expandAttr: "data-home-comments-expand",
     });
   }
 
@@ -2328,9 +2431,41 @@
     return `${owner.scope || ""}:${owner.id || ""}:${owner.classId || ""}:${path}`;
   }
 
+  function isOneNoteLinkTile(file) {
+    return /^onenote:/i.test(String(file?.officeUri || "").trim());
+  }
+
+  function isOneNoteMoreFolder(file) {
+    return (
+      String(file?.kind || "") === "folder" &&
+      String(file?.path || "") === "onenote-more"
+    );
+  }
+
+  function folderBodyHtml(file, owner, filterId, childPrefix, pair) {
+    const name = String(file?.name || "").trim();
+    const key = folderKey(owner, file);
+    const open = expandedFolders.has(key);
+    const children = filesHtml(file.files, owner, {
+      pair,
+      filterPrefix: childPrefix,
+    });
+    return `<button type="button" class="edu-file-tile edu-file-folder" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
+      filterId
+    )}" data-edu-folder="${escapeHtml(key)}" aria-expanded="${
+      open ? "true" : "false"
+    }" title="${escapeHtml(name)}"><span class="edu-file-name">${escapeHtml(
+      name
+    )}</span></button>
+        <div class="edu-file-folder-children"${open ? "" : " hidden"}>${
+      children || `<p class="edu-empty">Empty folder</p>`
+    }</div>`;
+  }
+
   /**
    * Liquid-glass file tiles (API order: filesTop, then newest mtime, then filesBottom).
    * Folders expand in place; they do not navigate away.
+   * A main OneNote link followed by the onenote-more folder stacks in one full-width wrap.
    * @param {{ name: string, kind?: string, source?: string, path?: string, files?: object[] }[]|null|undefined} files
    * @param {{ scope: string, id?: string, classId?: string, projectId?: string }} owner
    * @param {{ pair?: boolean, filterPrefix?: string }} [opts]
@@ -2338,32 +2473,53 @@
   function filesHtml(files, owner, { pair = false, filterPrefix = "lg-edu-file" } = {}) {
     const list = Array.isArray(files) ? files : [];
     if (!list.length) return "";
+    let skipNext = false;
     const tiles = list
       .map((f, i) => {
+        if (skipNext) {
+          skipNext = false;
+          return "";
+        }
         const name = String(f?.name || "").trim();
         if (!name) return "";
         const filterId = `${filterPrefix}-${i}`;
+        const next = list[i + 1];
+        if (
+          isOneNoteLinkTile(f) &&
+          isOneNoteMoreFolder(next) &&
+          String(next?.name || "").trim()
+        ) {
+          skipNext = true;
+          const href = String(f.url || f.webUrl || "").trim();
+          const officeUri = String(f.officeUri || "").trim();
+          const officeAttr = officeUri
+            ? ` data-edu-office="${escapeHtml(officeUri)}"`
+            : "";
+          const link = `<a class="edu-file-tile" href="${escapeHtml(
+            href
+          )}" target="_blank" rel="noopener noreferrer"${officeAttr} data-liquid-glass="rounded" data-filter-id="${escapeHtml(
+            filterId
+          )}" title="${escapeHtml(name)}"><span class="edu-file-name">${escapeHtml(
+            name
+          )}</span></a>`;
+          const folder = folderBodyHtml(
+            next,
+            owner,
+            `${filterPrefix}-${i + 1}`,
+            `${filterPrefix}-dir-${i + 1}`,
+            pair
+          );
+          return `<div class="edu-file-folder-wrap">${link}${folder}</div>`;
+        }
         const isFolder = String(f?.kind || "") === "folder";
         if (isFolder) {
-          const key = folderKey(owner, f);
-          const open = expandedFolders.has(key);
-          const childPrefix = `${filterPrefix}-dir-${i}`;
-          const children = filesHtml(f.files, owner, {
-            pair,
-            filterPrefix: childPrefix,
-          });
-          return `<div class="edu-file-folder-wrap">
-        <button type="button" class="edu-file-tile edu-file-folder" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
-          filterId
-        )}" data-edu-folder="${escapeHtml(key)}" aria-expanded="${
-            open ? "true" : "false"
-          }" title="${escapeHtml(name)}"><span class="edu-file-name">${escapeHtml(
-            name
-          )}</span></button>
-        <div class="edu-file-folder-children"${open ? "" : " hidden"}>${
-            children || `<p class="edu-empty">Empty folder</p>`
-          }</div>
-      </div>`;
+          return `<div class="edu-file-folder-wrap">${folderBodyHtml(
+            f,
+            owner,
+            filterId,
+            `${filterPrefix}-dir-${i}`,
+            pair
+          )}</div>`;
         }
         const qs = contextFileQuery({
           ...owner,
@@ -2582,12 +2738,13 @@
     } else if (CFG.staticClasses) {
       rightCol = `${staticClasses}${projectsPanel}${casesPanel}${datesPanel}`;
     } else {
+      const commentsPanel = homeCommentsHtml();
       rightCol =
         day1 || day2
-          ? `${day1}${casesPanel}${datesPanel}${day2}${projectsPanel}`
+          ? `${day1}${casesPanel}${datesPanel}${day2}${projectsPanel}${commentsPanel}`
           : `${panelHtml("Classes", `<p class="edu-empty">No school days</p>`, {
               filterId: "lg-edu-classes",
-            })}${casesPanel}${datesPanel}${projectsPanel}`;
+            })}${casesPanel}${datesPanel}${projectsPanel}${commentsPanel}`;
     }
 
     appEl.innerHTML = `
@@ -3706,6 +3863,14 @@
         return;
       }
 
+      const homeCommentsToggle = t.closest?.("[data-home-comments-expand]");
+      if (homeCommentsToggle) {
+        event.preventDefault();
+        homeCommentsExpanded = !homeCommentsExpanded;
+        render();
+        return;
+      }
+
       const commentsToggle = t.closest?.("[data-comments-expand]");
       if (commentsToggle) {
         event.preventDefault();
@@ -3948,7 +4113,10 @@
         return;
       }
       const loading = document.getElementById("stage-loading");
-      if (loading) loading.textContent = "Couldn't load your classes. Refresh the page.";
+      if (loading) {
+        loading.textContent = "Couldn't load your classes. Refresh the page.";
+        loading.setAttribute("aria-busy", "false");
+      }
       show("loading");
     }
   }

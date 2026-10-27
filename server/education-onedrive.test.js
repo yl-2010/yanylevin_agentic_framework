@@ -502,6 +502,17 @@ describe("url tiles", () => {
       "url"
     );
     assert.equal(
+      urlTileFromObject({
+        name: "problem set",
+        url: "https://example.com/p",
+        clientUrl: "onenote:https://example.com/p",
+        oneNote: "personal",
+        pageId: "p1",
+        main: true,
+      })?.kind,
+      "url"
+    );
+    assert.equal(
       urlTileFromInternetShortcut(
         "[InternetShortcut]\nURL=https://yanylevin.com/notes/\n",
         "notes"

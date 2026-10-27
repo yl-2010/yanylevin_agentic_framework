@@ -19,7 +19,7 @@
     <title>Dashboard</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" media="(prefers-color-scheme: light)" />
     <link rel="icon" href="/favicon-dark.svg" type="image/svg+xml" media="(prefers-color-scheme: dark)" />
-    <link rel="stylesheet" href="/education/styles.css?v=dock1" />
+    <link rel="stylesheet" href="/education/styles.css?v=lg-load-2" />
     <link rel="stylesheet" href="/dashboard/styles.css?v=dock1" />
   </head>
   <body>
@@ -42,7 +42,24 @@
       draggable="false"
     ></button>
 
-    <div id="stage-loading" class="stage stage-loading" aria-live="polite">…</div>
+    <div id="stage-loading" class="stage stage-loading" role="status" aria-live="polite" aria-busy="true">
+      <p class="lg-loader-label">Loading</p>
+      <div class="lg-loader" aria-hidden="true">
+        <div class="lg-loader-track"></div>
+        <div class="lg-loader-halo"></div>
+        <div class="lg-loader-halo lg-loader-halo-b"></div>
+        <div class="lg-loader-lens" data-liquid-glass="circle" data-filter-id="lg-loader">
+          <div class="lg-loader-well">
+            <span class="lg-loader-liquid"></span>
+            <span class="lg-loader-liquid lg-loader-liquid-b"></span>
+            <span class="lg-loader-caustic"></span>
+            <span class="lg-loader-sheen"></span>
+            <span class="lg-loader-glint"></span>
+          </div>
+          <span class="lg-loader-highlight"></span>
+        </div>
+      </div>
+    </div>
 
     <div id="stage-login" class="stage" hidden>
       <a

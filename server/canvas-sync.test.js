@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { computeDue } from "./canvas-hourly-apply.js";
 import {
   canvasDueSoonCount,
   courseScores,
@@ -532,8 +533,13 @@ describe("buildCanvasSyncPrompt", () => {
     assert.match(prompt, /classes\/lit\/todos\/essay/);
     assert.match(prompt, /last-hourly-sync/);
     assert.match(prompt, /Fix mistakes/);
+    assert.match(prompt, /40440348/);
+    assert.match(prompt, /2026-10-29 12:25/);
     assert.match(prompt, /comments-new\.md/);
     assert.match(prompt, /pages\.md/);
+    assert.match(prompt, /40291676/);
+    assert.match(prompt, /40291677/);
+    assert.match(prompt, /2026-11-20 10:30/);
     assert.match(prompt, /Tag does not matter/);
     assert.match(prompt, /Pass 1:/);
     assert.match(prompt, /Pass 2:/);
@@ -547,6 +553,7 @@ describe("buildCanvasSyncPrompt", () => {
     assert.equal(/signed out or a notebook fails/.test(prompt), false);
     assert.match(prompt, /Do not run link-todos/);
     assert.match(prompt, /oneNote content-library/);
+    assert.match(prompt, /Set main true on exactly one OneNote site/);
     assert.match(prompt, /add linkedFiles on this todo/);
     assert.match(prompt, /Do not copy the file/);
   });
@@ -644,5 +651,14 @@ describe("applyPlannerOverrides", () => {
     ]);
     assert.equal(assignments[0].plannerComplete, false);
     assert.equal(assignments[0].plannerOverrideId, "9");
+  });
+});
+
+describe("computeDue", () => {
+  it("keeps the physics symposium on the period H final", () => {
+    assert.deepEqual(
+      computeDue({ id: 40291677, dueDate: "", dueTime: "" }, "physics", null, null),
+      { dueDate: "2026-11-20", dueTime: "10:30" }
+    );
   });
 });

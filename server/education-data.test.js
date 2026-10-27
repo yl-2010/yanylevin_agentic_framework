@@ -21,6 +21,7 @@ import {
   partitionClassTodos,
   publishClassRows,
   siteFilesFromProps,
+  collapseExtraOneNoteFiles,
   loadClassScopedObjects,
   resolveLinkedTodoFile,
   stripTodoTagPrefix,
@@ -68,6 +69,67 @@ describe("publishClassRows", () => {
     assert.equal(classes[0].todos[0]._jsonPath, undefined);
     assert.equal(classes[0].onedriveFolder, "H. Physics");
     assert.equal(classes[0].files[0].name, "notes.pdf");
+  });
+
+  it("collapses extra OneNote pages on a stored class todo", () => {
+    const { classes } = publishClassRows(
+      [
+        {
+          id: "physics",
+          props: { name: "Physics", trimester: "year", period: "H" },
+          todos: [
+            {
+              id: "hw-1",
+              name: "Displacement",
+              done: false,
+              sites: [
+                {
+                  name: "Displacement",
+                  url: "https://example.com/p1",
+                  oneNote: "personal",
+                  main: true,
+                },
+                {
+                  name: "Content Library: motion",
+                  url: "https://example.com/p2",
+                  oneNote: "content-library",
+                },
+              ],
+              files: [
+                {
+                  name: "Displacement",
+                  kind: "url",
+                  url: "https://example.com/p1",
+                  webUrl: "https://example.com/p1",
+                  officeUri: "onenote:https://example.com/p1",
+                },
+                {
+                  name: "Content Library: motion",
+                  kind: "url",
+                  url: "https://example.com/p2",
+                  webUrl: "https://example.com/p2",
+                  officeUri: "onenote:https://example.com/p2",
+                },
+              ],
+            },
+          ],
+          dates: [],
+          files: [],
+        },
+      ],
+      {
+        includeFixtures: true,
+        schedule: {},
+        todayKey: "2026-10-25",
+        panelKeys: [],
+      }
+    );
+    const files = classes[0].todos[0].files;
+    assert.deepEqual(
+      files.map((file) => file.name),
+      ["Displacement", "1 more OneNote page"]
+    );
+    assert.equal(files[1].files[0].name, "Content Library: motion");
   });
 });
 
@@ -380,6 +442,153 @@ describe("siteFilesFromProps", () => {
   });
 });
 
+function oneNoteTile(name, url) {
+  return {
+    name,
+    kind: "url",
+    source: "site",
+    url,
+    webUrl: url,
+    webViewUrl: url,
+    officeUri: `onenote:${url}`,
+  };
+}
+
+describe("collapseExtraOneNoteFiles", () => {
+  it("keeps the marked page open and folds the other OneNote page", () => {
+    const todo = {
+      name: "Day 1 problem set",
+      sites: [
+        {
+          name: "Day 1 problem set",
+          url: "https://example.com/p1",
+          oneNote: "personal",
+          pageId: "p1",
+        },
+        {
+          name: "Content Library: Day 1",
+          url: "https://example.com/p2",
+          oneNote: "content-library",
+          pageId: "p2",
+          main: true,
+        },
+      ],
+      files: [
+        {
+          name: "Study guide",
+          kind: "url",
+          source: "site",
+          url: "https://yanylevin.com/g/",
+          webUrl: "https://yanylevin.com/g/",
+          webViewUrl: "https://yanylevin.com/g/",
+        },
+        oneNoteTile("Day 1 problem set", "https://example.com/p1"),
+        oneNoteTile("Content Library: Day 1", "https://example.com/p2"),
+        { name: "worksheet.pdf", kind: "file", source: "education" },
+      ],
+    };
+    collapseExtraOneNoteFiles(todo);
+    assert.deepEqual(
+      todo.files.map((file) => file.name),
+      ["Study guide", "Content Library: Day 1", "1 more OneNote page", "worksheet.pdf"]
+    );
+    const folder = todo.files[2];
+    assert.equal(folder.kind, "folder");
+    assert.equal(folder.path, "onenote-more");
+    assert.equal(folder.files[0].name, "Day 1 problem set");
+    assert.equal(folder.files[0].officeUri, "onenote:https://example.com/p1");
+    assert.equal(todo.sites[0].main, undefined);
+    assert.equal(todo.sites[1].main, true);
+  });
+
+  it("uses the todo name, then the personal page, when nothing is marked", () => {
+    const named = {
+      name: "Day 1 problem set",
+      sites: [
+        {
+          name: "Content Library: Day 1",
+          url: "https://example.com/p2",
+          oneNote: "content-library",
+        },
+        {
+          name: "Day 1 problem set",
+          url: "https://example.com/p1",
+          oneNote: "personal",
+        },
+      ],
+      files: [
+        oneNoteTile("Content Library: Day 1", "https://example.com/p2"),
+        oneNoteTile("Day 1 problem set", "https://example.com/p1"),
+      ],
+    };
+    collapseExtraOneNoteFiles(named);
+    assert.equal(named.files[0].name, "Day 1 problem set");
+    assert.equal(named.files[1].files[0].name, "Content Library: Day 1");
+    assert.equal(named.sites[1].main, undefined);
+
+    const personal = {
+      name: "Quiz",
+      sites: [
+        {
+          name: "Content Library: notes",
+          url: "https://example.com/c",
+          oneNote: "content-library",
+        },
+        {
+          name: "Yan's notes",
+          url: "https://example.com/y",
+          oneNote: "personal",
+        },
+      ],
+      files: [
+        oneNoteTile("Content Library: notes", "https://example.com/c"),
+        oneNoteTile("Yan's notes", "https://example.com/y"),
+      ],
+    };
+    collapseExtraOneNoteFiles(personal);
+    assert.equal(personal.files[0].name, "Yan's notes");
+    assert.equal(personal.files[1].name, "1 more OneNote page");
+  });
+
+  it("leaves a single OneNote page as a link", () => {
+    const todo = {
+      name: "Quiz",
+      sites: [
+        { name: "Quiz", url: "https://example.com/p", oneNote: "personal" },
+      ],
+      files: [
+        oneNoteTile("Quiz", "https://example.com/p"),
+        { name: "a.pdf", kind: "file" },
+      ],
+    };
+    const before = todo.files;
+    collapseExtraOneNoteFiles(todo);
+    assert.equal(todo.files, before);
+    assert.equal(todo.files.some((file) => file.kind === "folder"), false);
+  });
+
+  it("keeps a sibling OneNote page collapsed when this todo has its own", () => {
+    const todo = {
+      name: "Prep",
+      sites: [
+        {
+          name: "essay notes",
+          url: "https://example.com/p1",
+          oneNote: "personal",
+          pageId: "p1",
+        },
+      ],
+      files: [
+        oneNoteTile("essay notes", "https://example.com/p1"),
+        oneNoteTile("Content Library: prep", "https://example.com/p2"),
+      ],
+    };
+    collapseExtraOneNoteFiles(todo);
+    assert.equal(todo.files[0].name, "essay notes");
+    assert.equal(todo.files[1].files[0].name, "Content Library: prep");
+  });
+});
+
 describe("listContextFiles url tiles", () => {
   it("treats link json and .url shortcuts as kind url", async () => {
     const dir = await mkdtemp(join(tmpdir(), "edu-url-"));
@@ -534,9 +743,12 @@ describe("linkedFiles", () => {
     const secret = cw.files.find((f) => f.name === "secret.docx");
     assert.equal(secret.officeUri, `ms-word:ofe|u|${secret.webUrl}`);
     assert.match(secret.officeUri, /^ms-word:ofe\|u\|/);
-    const prepPage = cw.files.find((f) => f.name === "Content Library: prep");
+    const folder = cw.files.find((f) => f.path === "onenote-more");
+    const prepPage = folder?.files?.find((f) => f.name === "Content Library: prep");
+    assert.equal(folder.name, "1 more OneNote page");
     assert.equal(prepPage.kind, "url");
     assert.equal(prepPage.officeUri, "onenote:https://example.com/p2");
+    assert.equal(cw.files.some((f) => f.name === "Content Library: prep"), false);
     assert.equal(cw.files.some((f) => f.name === "gone"), false);
     const pdf = cw.files.find((f) => f.name === "prep.pdf");
     assert.equal(pdf.kind, "file");

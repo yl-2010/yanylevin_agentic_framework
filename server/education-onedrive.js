@@ -87,6 +87,7 @@ const URL_TILE_KEYS = new Set([
   "onenoteclienturl",
   "pageid",
   "onenote",
+  "main",
 ]);
 
 /**

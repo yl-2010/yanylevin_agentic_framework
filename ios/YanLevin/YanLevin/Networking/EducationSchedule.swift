@@ -459,6 +459,47 @@ enum EducationScheduleHelper {
         return true
     }
 
+    /// Home dashboard window. 24h when that calendar day has schedule blocks, otherwise 48h.
+    static func homeCommentIsFresh(
+        postedAt: Date,
+        schedule: EducationSchedule?,
+        now: Date = Date()
+    ) -> Bool {
+        let hours: TimeInterval = postedOnSchoolDay(postedAt, schedule: schedule) ? 24 : 48
+        return now.timeIntervalSince(postedAt) < hours * 3600
+    }
+
+    static func postedOnSchoolDay(_ date: Date, schedule: EducationSchedule?) -> Bool {
+        guard let schedule else { return false }
+        let p = zonedYMD(date, schedule: schedule)
+        let query = ScheduleQuery(schedule: schedule)
+        guard isSchoolDay(p, query: query) else { return false }
+        return dayHasBlocks(p, schedule: schedule)
+    }
+
+    private static func zonedYMD(_ date: Date, schedule: EducationSchedule) -> YMD {
+        var cal = Calendar(identifier: .gregorian)
+        if let id = schedule.timezone, let tz = TimeZone(identifier: id) {
+            cal.timeZone = tz
+        }
+        return YMD(
+            y: cal.component(.year, from: date),
+            m: cal.component(.month, from: date),
+            day: cal.component(.day, from: date),
+            weekday: cal.component(.weekday, from: date) - 1
+        )
+    }
+
+    /// Override slots replace the weekday rotation. Empty slots mean that day has no school.
+    private static func dayHasBlocks(_ p: YMD, schedule: EducationSchedule) -> Bool {
+        if let override = dayOverride(p, schedule: schedule), let slots = override.slots {
+            return slots.contains {
+                !($0.period ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+        }
+        return !periodsForDay(p, schedule: schedule).isEmpty
+    }
+
     private static func nextSchoolDay(from: YMD, query: ScheduleQuery, skipToday: Bool) -> YMD? {
         var cur = skipToday ? addDays(from, 1) : from
         for _ in 0..<120 {

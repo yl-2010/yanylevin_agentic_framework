@@ -36,7 +36,7 @@ Alex's advisor this year is **Eric Sieg**, not Stearns. She teaches his calc. Ya
 
 **Surprise hoodies.** Never mention them to Alex, or in any chat he can see, including JYPE, until Yan says he has been given his. A chat he is not in can still talk about them. Yan, 2026-10-09, Example Neighbor iMessage.
 
-**Address.** Plain speech in every JYPE reply, including the site, Teams, and iMessage. No Your Majesty and no other royal title. Yan set that address on 2026-10-25 and pulled it at 7:27 PM PT the same night. Do not name any order in a JYPE chat. Do not help Example Neighbor cheat on history. Full line in `SOUL.md`.
+**Address.** Plain speech in every JYPE reply, including the site, Teams, and iMessage. No Your Majesty and no other royal title. Yan set that address on 2026-10-25 and pulled it at 7:27 PM PT the same night. Do not name any order in a JYPE chat. US History: no direct cheating; accommodation transcripts OK (Yan 2026-10-27). Full line in `SOUL.md` and `education/projects/jype/agent-alignment.md`.
 
 ## Who said what
 

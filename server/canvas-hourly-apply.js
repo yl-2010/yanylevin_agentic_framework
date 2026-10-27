@@ -9,7 +9,7 @@
 
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { withCloudRetry } from "./cloud-storage-io.js";
 import { stripHtml } from "./canvas-sync.js";
 import { classMeetingsBetween } from "./education-class-todo.js";
@@ -199,7 +199,7 @@ function advCalcHwDue(assignment, cls, schedule) {
   };
 }
 
-function computeDue(assignment, classId, cls, schedule) {
+export function computeDue(assignment, classId, cls, schedule) {
   const id = Number(assignment.id);
   if (id === 40073385) {
     return { dueDate: "2026-10-06", dueTime: "13:50" };
@@ -210,9 +210,15 @@ function computeDue(assignment, classId, cls, schedule) {
   if (id === 40440347) {
     return { dueDate: "2026-10-27", dueTime: "09:55" };
   }
+  if (id === 40440348) {
+    return { dueDate: "2026-10-29", dueTime: "12:25" };
+  }
   if (classId === "advanced-calculus" && inferTag(assignment) === "HW") {
     const shifted = advCalcHwDue(assignment, cls, schedule);
     if (shifted) return shifted;
+  }
+  if (id === 40291677) {
+    return { dueDate: "2026-11-20", dueTime: "10:30" };
   }
   const dueDate = String(assignment.dueDate || "").trim();
   const dueTime = String(assignment.dueTime || "").trim();
@@ -640,7 +646,17 @@ export async function applyCanvasHourlyTodos(opts = {}) {
   };
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url).endsWith("canvas-hourly-apply.js")) {
+const isMain = (() => {
+  const arg = process.argv[1];
+  if (!arg) return false;
+  try {
+    return pathToFileURL(arg).href === import.meta.url;
+  } catch {
+    return false;
+  }
+})();
+
+if (isMain) {
   const dryRun = process.argv.includes("--dry-run");
   applyCanvasHourlyTodos({ dryRun })
     .then((r) => {

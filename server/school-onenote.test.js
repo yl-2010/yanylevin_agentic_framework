@@ -150,6 +150,15 @@ describe("school-onenote urls and shapes", () => {
     });
     assert.equal(page.webUrl, "https://example.com/p");
     assert.equal(page.clientUrl, "onenote:https://example.com/p");
+    assert.equal(page.level, undefined);
+    const indented = normalizePage({
+      id: "1-y",
+      title: "part 2",
+      level: 1,
+      links: { oneNoteWebUrl: { href: "https://example.com/c" } },
+    });
+    assert.equal(indented.level, 1);
+    assert.equal(normalizePage({ id: "1-z", title: "top", level: 0 }).level, 0);
   });
 
   it("builds Graph notebook and page URLs", () => {

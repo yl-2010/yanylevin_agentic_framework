@@ -321,7 +321,7 @@ export function normalizePage(raw) {
   const parent = raw?.parentSection || {};
   const links = raw?.links || {};
   const webUrl = String(links.oneNoteWebUrl?.href || "").trim();
-  return {
+  const page = {
     id: String(raw?.id || "").trim(),
     title: String(raw?.title || "(untitled)").trim(),
     modified: String(raw?.lastModifiedDateTime || raw?.createdDateTime || "").trim(),
@@ -329,6 +329,9 @@ export function normalizePage(raw) {
     webUrl,
     clientUrl: oneNoteClientUrl(webUrl, links),
   };
+  const level = Number(raw?.level);
+  if (Number.isInteger(level) && level >= 0) page.level = level;
+  return page;
 }
 
 export function sectionPath(section) {
