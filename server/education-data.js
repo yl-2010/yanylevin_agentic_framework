@@ -1468,8 +1468,8 @@ function oneNoteSiteByUrl(todo) {
   return byUrl;
 }
 
-function moreOneNoteFolderName(count) {
-  return count === 1 ? "1 more OneNote page" : `${count} more OneNote pages`;
+function moreOneNoteFolderName() {
+  return "Extra OneNote Pages";
 }
 
 /**
@@ -1519,7 +1519,7 @@ export function collapseExtraOneNoteFiles(todo) {
   }
   const mainPos = next.indexOf(flat[mainIndex]);
   next.splice(mainPos + 1, 0, {
-    name: moreOneNoteFolderName(extras.length),
+    name: moreOneNoteFolderName(),
     kind: "folder",
     source: "site",
     path: ONENOTE_MORE_PATH,

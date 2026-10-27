@@ -127,7 +127,7 @@ describe("publishClassRows", () => {
     const files = classes[0].todos[0].files;
     assert.deepEqual(
       files.map((file) => file.name),
-      ["Displacement", "1 more OneNote page"]
+      ["Displacement", "Extra OneNote Pages"]
     );
     assert.equal(files[1].files[0].name, "Content Library: motion");
   });
@@ -490,7 +490,7 @@ describe("collapseExtraOneNoteFiles", () => {
     collapseExtraOneNoteFiles(todo);
     assert.deepEqual(
       todo.files.map((file) => file.name),
-      ["Study guide", "Content Library: Day 1", "1 more OneNote page", "worksheet.pdf"]
+      ["Study guide", "Content Library: Day 1", "Extra OneNote Pages", "worksheet.pdf"]
     );
     const folder = todo.files[2];
     assert.equal(folder.kind, "folder");
@@ -547,7 +547,7 @@ describe("collapseExtraOneNoteFiles", () => {
     };
     collapseExtraOneNoteFiles(personal);
     assert.equal(personal.files[0].name, "Yan's notes");
-    assert.equal(personal.files[1].name, "1 more OneNote page");
+    assert.equal(personal.files[1].name, "Extra OneNote Pages");
   });
 
   it("leaves a single OneNote page as a link", () => {
@@ -745,7 +745,7 @@ describe("linkedFiles", () => {
     assert.match(secret.officeUri, /^ms-word:ofe\|u\|/);
     const folder = cw.files.find((f) => f.path === "onenote-more");
     const prepPage = folder?.files?.find((f) => f.name === "Content Library: prep");
-    assert.equal(folder.name, "1 more OneNote page");
+    assert.equal(folder.name, "Extra OneNote Pages");
     assert.equal(prepPage.kind, "url");
     assert.equal(prepPage.officeUri, "onenote:https://example.com/p2");
     assert.equal(cw.files.some((f) => f.name === "Content Library: prep"), false);
