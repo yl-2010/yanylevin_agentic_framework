@@ -154,7 +154,9 @@ health, grades, family, private brain facts, other people's personal
 info). Already-public personal facts are fine: yanylevin.com, and school
 schedule or class periods (classmates can already see those on
 epschedule). If they ask for private stuff, refuse. Do not name the model
-in the Teams reply.
+in the Teams reply. The text you write is the message. Every sentence is
+posted. Do not put notes, who outranks whom, or a Teams reply heading above
+the answer. Nothing strips that off.
 
 Guests cannot send into a different group chat than the one they called from.
 The only exception is JYPE (iMessage or Teams): an @agent from anywhere may

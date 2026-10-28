@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, writeFile, utimes, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile, utimes, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
@@ -24,6 +24,9 @@ import {
   collapseExtraOneNoteFiles,
   loadClassScopedObjects,
   resolveLinkedTodoFile,
+  appendProjectFileLinks,
+  resolveProjectLinkedFile,
+  parseLinkedFiles,
   stripTodoTagPrefix,
   uiPanelDateKeys,
   publicDebateCase,
@@ -770,6 +773,74 @@ describe("linkedFiles", () => {
   });
 });
 
+describe("project file links", () => {
+  /** @type {string} */
+  let root;
+
+  it("shows the project pdf on the todo and does not copy it", async () => {
+    root = await mkdtemp(join(tmpdir(), "edu-project-link-"));
+    const projectDir = join(root, "projects", "yanylevin");
+    const todoDir = join(root, "todos", "submit-stripe-app");
+    await mkdir(projectDir, { recursive: true });
+    await mkdir(todoDir, { recursive: true });
+    await writeFile(join(projectDir, "Resume October 2026.pdf"), "pdf");
+    await writeFile(
+      join(todoDir, "todo.json"),
+      JSON.stringify({
+        name: "Submit Stripe app",
+        linkedFiles: [
+          { project: "yanylevin", name: "Resume October 2026.pdf" },
+          { project: "../x", name: "Resume October 2026.pdf" },
+          { project: "yanylevin", name: "missing.pdf" },
+        ],
+      })
+    );
+    const parsed = parseLinkedFiles([
+      { project: "yanylevin", name: "Resume October 2026.pdf" },
+      { project: "../x", name: "Resume October 2026.pdf" },
+    ]);
+    assert.deepEqual(parsed, [
+      {
+        name: "Resume October 2026.pdf",
+        pageId: "",
+        todo: "",
+        canvasId: "",
+        project: "yanylevin",
+      },
+    ]);
+    const todos = [
+      {
+        id: "submit-stripe-app",
+        linkedFiles: [
+          { project: "yanylevin", name: "Resume October 2026.pdf" },
+          { project: "yanylevin", name: "missing.pdf" },
+        ],
+        files: [{ name: "Stripe cover letter.pdf", kind: "file", size: 1 }],
+      },
+    ];
+    await appendProjectFileLinks(todos, root);
+    assert.deepEqual(
+      todos[0].files.map((file) => file.name),
+      ["Stripe cover letter.pdf", "Resume October 2026.pdf"]
+    );
+    assert.equal(todos[0].files[1].kind, "file");
+    assert.equal(todos[0].files[1].size, 3);
+    await assert.rejects(stat(join(todoDir, "Resume October 2026.pdf")));
+    const resolved = await resolveProjectLinkedFile(
+      root,
+      todoDir,
+      "Resume October 2026.pdf"
+    );
+    assert.equal(resolved.path, join(projectDir, "Resume October 2026.pdf"));
+    const gone = await resolveProjectLinkedFile(root, todoDir, "missing.pdf");
+    assert.equal(gone, null);
+  });
+
+  it("cleanup", async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+});
+
 describe("sortEducationProjects", () => {
   it("parses projectsTop names lowercase and skips paths", () => {
     assert.deepEqual(
@@ -962,6 +1033,18 @@ describe("stripTodoTagPrefix", () => {
     assert.equal(stripTodoTagPrefix("CW: Presentation"), "Presentation");
     assert.equal(stripTodoTagPrefix("QA: Constitution Quiz"), "Constitution Quiz");
     assert.equal(stripTodoTagPrefix("MA: Final Exam"), "Final Exam");
+    assert.equal(
+      stripTodoTagPrefix("CW/HW: Comparing Motion Diagrams"),
+      "Comparing Motion Diagrams"
+    );
+    assert.equal(
+      stripTodoTagPrefix("CW - ML fundamental classification"),
+      "ML fundamental classification"
+    );
+    assert.equal(
+      stripTodoTagPrefix("[CW] Aggregation & Penguin"),
+      "Aggregation & Penguin"
+    );
   });
 
   it("keeps the rest after a tag plus space", () => {

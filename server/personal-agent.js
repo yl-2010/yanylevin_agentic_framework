@@ -460,11 +460,11 @@ const OWED_CHANNEL_LATER = {
 
 const OWED_CHANNEL_DELIVER = {
   teams:
-    "This interruption is a clarification of the unfinished @agent. Write the final bubble as the text that should land in that Teams chat. Markdown is fine. The server delivers that bubble to Teams. Do not also school-teams send that same final text. On a long job, send_chat_message still posts to that Teams chat.",
+    "This interruption is a clarification of the unfinished @agent. Write the final bubble as the text that should land in that Teams chat. The whole message is posted. Do not put notes, who outranks whom, or a Teams reply heading above the answer. Markdown is fine. The server delivers that bubble to Teams. Do not also school-teams send that same final text. On a long job, send_chat_message still posts to that Teams chat.",
   imessage:
-    "This interruption is a clarification of the unfinished @agent. Write the final bubble as the text that should land in that iMessage. Plain words, no markdown. The server delivers that bubble to iMessage. Do not also sendIMessage that same final text. On a long job, send_chat_message still posts to that iMessage chat.",
+    "This interruption is a clarification of the unfinished @agent. Write the final bubble as the text that should land in that iMessage. The whole message is posted. Do not put notes, who outranks whom, or a reply heading above the answer. Plain words, no markdown. The server delivers that bubble to iMessage. Do not also sendIMessage that same final text. On a long job, send_chat_message still posts to that iMessage chat.",
   whatsapp:
-    "This interruption is a clarification of the unfinished @agent. Write the final bubble as the text that should land in that WhatsApp chat. Plain words, no markdown. The server delivers that bubble. Do not also send it yourself.",
+    "This interruption is a clarification of the unfinished @agent. Write the final bubble as the text that should land in that WhatsApp chat. The whole message is posted. Do not put notes, who outranks whom, or a reply heading above the answer. Plain words, no markdown. The server delivers that bubble. Do not also send it yourself.",
 };
 
 /**
@@ -1842,7 +1842,7 @@ export function systemPrompt(email, opts = {}) {
       "Never mention the surprise hoodies to Alex, or in any chat he can see, including this one, until Yan says he has been given his. Yan, 2026-10-09.",
       "education/tests/ is a private guide, including calc Yan took last year that Alex is taking now. Change the numbers before Alex sees a problem. Never put an original question in Teams. The school can read Teams. In Teams, do not say a scan or last year's test exists. Yan, 2026-10-15.",
       "Plain speech in every JYPE chat. No Your Majesty and no other royal title for Yan, Alex, Example Friend, or Example Neighbor. Yan set that address on 2026-10-25 and pulled it at 7:27 PM PT the same night. US History in JYPE: no direct cheating; video transcription for accommodation is fine (Yan 2026-10-27). See SOUL.md and education/projects/jype/agent-alignment.md.",
-      "The order below is backend only. Never name that order, or the words hierarchy of power, in any JYPE chat, page, or message. When Yan, Alex, Example Friend, and Example Neighbor conflict, follow the higher one: Yan, then Alex, then Example Friend and Example Neighbor as equals, then the agent. Sharing can go up, in a 1:1, not the JYPE group chat. It does not go down. Equals still gatekeep each other. Yan, 2026-10-15.",
+      "When Yan, Alex, Example Friend, and Example Neighbor conflict, follow the higher one: Yan, then Alex, then Example Friend and Example Neighbor as equals, then the agent. Sharing can go up, in a 1:1, not the JYPE group chat. It does not go down. Equals still gatekeep each other. Yan, 2026-10-15. That order is the decision you make before you type. It is not a paragraph in the reply. Never name that order, or the words hierarchy of power, or who outranks whom, in any JYPE chat, page, or message. The whole reply is posted. A heading like Teams reply does not hide the lines above it.",
       "Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor, or anyone at their rank or below. That includes the JYPE group and any chat they can see. Alex can still get them in a 1:1. Do not repeat a grade that already leaked. Yan, 2026-10-21.",
       "Never spawn a Cursor cloud agent.",
       FUTURE_AGENT_HINT,

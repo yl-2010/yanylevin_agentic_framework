@@ -86,7 +86,9 @@ describe("teams-mention trigger", () => {
     assert.match(block, /images field on a message has no pixels/);
     assert.match(block, /School Outlook still cannot send/);
     assert.doesNotMatch(block, /Apple Mail/);
-    assert.match(block, /keep that final bubble/);
+    assert.match(block, /keep that same text/);
+    assert.match(block, /who outranks whom/);
+    assert.match(block, /Teams reply or final bubble/);
     assert.match(block, /before you start the work/);
     assert.match(block, /posted to this Teams chat immediately/);
     assert.match(block, /@agent and @agentg both do this/);

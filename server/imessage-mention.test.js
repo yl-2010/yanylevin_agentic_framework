@@ -208,7 +208,9 @@ describe("imessage-mention", () => {
     assert.match(block, /does not render markdown/);
     assert.match(block, /server appends that footer on the iMessage only/);
     assert.match(block, /server delivers your final bubble/);
-    assert.match(block, /keep that final bubble/);
+    assert.match(block, /keep that same text/);
+    assert.match(block, /who outranks whom/);
+    assert.match(block, /iMessage reply or final bubble/);
     assert.match(block, /full Personal Agent turn/);
     assert.match(block, /attachToReply/);
     assert.match(block, /native iMessage files/);

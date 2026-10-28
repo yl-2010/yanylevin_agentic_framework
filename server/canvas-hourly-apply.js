@@ -95,6 +95,8 @@ function minutesToHm(minutes) {
 function parseTagFromTitle(title) {
   const raw = String(title || "").trim();
   if (COMBINED_TAG.test(raw)) return "CW";
+  const bracket = raw.match(/^\[(CW|HW|QA|MA)\]/i);
+  if (bracket) return bracket[1].toUpperCase();
   const m = raw.match(TODO_TAG_PREFIX);
   if (m) return m[1].toUpperCase();
   return "";

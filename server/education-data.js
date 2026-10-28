@@ -701,12 +701,17 @@ export async function resolveContextFile(email, opts) {
     return resolveLinkedTodoFile(classFolderForLinks, id, fileName);
   };
 
+  const projectLinkedFile = async () => {
+    if (scope !== "todo" || !folder) return null;
+    return resolveProjectLinkedFile(root, folder, fileName);
+  };
+
   let st;
   try {
     st = await stat(absFile);
   } catch (err) {
     if (err?.code === "ENOENT") {
-      const linked = await linkedTodoFile();
+      const linked = (await linkedTodoFile()) || (await projectLinkedFile());
       if (linked) return linked;
       if (scope === "class" && id) {
         try {
@@ -727,7 +732,7 @@ export async function resolveContextFile(email, opts) {
     throw err;
   }
   if (!st.isFile()) {
-    const linked = await linkedTodoFile();
+    const linked = (await linkedTodoFile()) || (await projectLinkedFile());
     if (linked) return linked;
     if (scope === "class" && id) {
       try {
@@ -1234,11 +1239,15 @@ async function fileCreatedAtIso(filePath) {
 }
 
 /** Leading CW/HW/QA/MA on Canvas titles. Tag lives on `tag`; UI paints it separately. */
-const TODO_TAG_PREFIX = /^(CW|HW|QA|MA)(?:\s*:\s*|\s+)/i;
+const TODO_TAG_PREFIX = /^(?:CW\s*\/\s*HW|(?:CW|HW|QA|MA))(?:\s*:\s*|\s+)/i;
 
 export function stripTodoTagPrefix(name) {
   const raw = String(name || "").trim();
-  const stripped = raw.replace(TODO_TAG_PREFIX, "").trim();
+  const stripped = raw
+    .replace(/^\[(CW|HW|QA|MA)\]\s*/i, "")
+    .replace(TODO_TAG_PREFIX, "")
+    .replace(/^[-–]\s+/, "")
+    .trim();
   return stripped || raw;
 }
 
@@ -1253,15 +1262,17 @@ function pathInside(parent, child) {
 }
 
 /**
- * Pointers on `.todo.json` `linkedFiles`. Same class only.
- * `name` is one file in the other todo's folder. `pageId` is a OneNote site
- * already stored on that todo. `canvasId` wins over the Finder folder id.
+ * Pointers on `.todo.json` `linkedFiles`.
+ * `name` plus `todo` / `canvasId` is a file in another todo of the same class.
+ * `pageId` is a OneNote site already stored on that todo. `canvasId` wins
+ * over the Finder folder id.
+ * `name` plus `project` is a file in that project's folder. Bytes stay there.
  * @param {unknown} raw
- * @returns {{ name: string, pageId: string, todo: string, canvasId: string }[]}
+ * @returns {{ name: string, pageId: string, todo: string, canvasId: string, project: string }[]}
  */
 export function parseLinkedFiles(raw) {
   if (!Array.isArray(raw)) return [];
-  /** @type {{ name: string, pageId: string, todo: string, canvasId: string }[]} */
+  /** @type {{ name: string, pageId: string, todo: string, canvasId: string, project: string }[]} */
   const out = [];
   for (const entry of raw) {
     if (!entry || typeof entry !== "object") continue;
@@ -1271,7 +1282,8 @@ export function parseLinkedFiles(raw) {
       "";
     let canvasId = String(entry.canvasId ?? "").trim();
     if (canvasId.length > 80 || /[\\/\0]/.test(canvasId)) canvasId = "";
-    if (!todo && !canvasId) continue;
+    const project = objectDirId(entry.project) || "";
+    if (!todo && !canvasId && !project) continue;
     const pageId = String(entry.pageId || "").trim();
     const pageOk =
       pageId &&
@@ -1280,8 +1292,15 @@ export function parseLinkedFiles(raw) {
       !pageId.includes("\\") &&
       !pageId.includes("\0");
     const name = isSafeContextFileName(entry.name);
-    if (pageOk) out.push({ name: "", pageId, todo, canvasId });
-    if (name) out.push({ name, pageId: "", todo, canvasId });
+    if (pageOk && (todo || canvasId)) {
+      out.push({ name: "", pageId, todo, canvasId, project: "" });
+    }
+    if (name && (todo || canvasId)) {
+      out.push({ name, pageId: "", todo, canvasId, project: "" });
+    }
+    if (name && project) {
+      out.push({ name, pageId: "", todo: "", canvasId: "", project });
+    }
   }
   return out;
 }
@@ -1352,6 +1371,96 @@ async function findSiblingTodoDir(classFolder, link, currentDir) {
     if (hit && resolve(hit) !== current) return hit;
   }
   return null;
+}
+
+/**
+ * File named on this todo's `linkedFiles` that lives in a project folder.
+ * Bytes stay in `projects/<id>/`. Returns null when the pointer or file is gone.
+ * @param {string} root
+ * @param {string} todoFolder
+ * @param {string} fileName
+ * @returns {Promise<{ path: string, name: string, size: number, mtime: string }|null>}
+ */
+export async function resolveProjectLinkedFile(root, todoFolder, fileName) {
+  const name = isSafeContextFileName(fileName);
+  if (!root || !todoFolder || !name) return null;
+  const jsonPath = await resolveBookkeepingFile(todoFolder, "todo.json");
+  if (!jsonPath) return null;
+  const props = await readJsonFile(jsonPath);
+  const links = parseLinkedFiles(props?.linkedFiles).filter(
+    (link) => link.project && link.name.toLowerCase() === name.toLowerCase()
+  );
+  const absRoot = resolve(root);
+  for (const link of links) {
+    const projectDir = resolve(join(absRoot, "projects", link.project));
+    if (!pathInside(absRoot, projectDir)) continue;
+    const absFile = resolve(join(projectDir, link.name));
+    if (!pathInside(projectDir, absFile)) continue;
+    try {
+      const st = await stat(absFile);
+      if (!st.isFile()) continue;
+      return {
+        path: absFile,
+        name: link.name,
+        size: st.size,
+        mtime: new Date(st.mtimeMs).toISOString(),
+      };
+    } catch {
+      /* try the next pointer */
+    }
+  }
+  return null;
+}
+
+/**
+ * Append project-folder files named on `linkedFiles`. Own files stay first.
+ * A missing file is omitted. Nothing is copied.
+ * @param {object[]} todos
+ * @param {string} root
+ */
+export async function appendProjectFileLinks(todos, root) {
+  const list = Array.isArray(todos) ? todos : [];
+  if (!root) return list;
+  const absRoot = resolve(root);
+  for (const todo of list) {
+    if (!todo || typeof todo !== "object") continue;
+    const links = parseLinkedFiles(todo.linkedFiles).filter(
+      (link) => link.project && link.name
+    );
+    if (!links.length) continue;
+    /** @type {Set<string>} */
+    const own = new Set();
+    for (const file of Array.isArray(todo.files) ? todo.files : []) {
+      if (String(file?.kind || "file") !== "file") continue;
+      own.add(String(file?.name || "").toLowerCase());
+    }
+    /** @type {object[]} */
+    const linked = [];
+    for (const link of links) {
+      const key = link.name.toLowerCase();
+      if (own.has(key)) continue;
+      const projectDir = resolve(join(absRoot, "projects", link.project));
+      if (!pathInside(absRoot, projectDir)) continue;
+      const absFile = resolve(join(projectDir, link.name));
+      if (!pathInside(projectDir, absFile)) continue;
+      try {
+        const st = await stat(absFile);
+        if (!st.isFile()) continue;
+        linked.push({
+          name: link.name,
+          size: st.size,
+          mtime: new Date(st.mtimeMs).toISOString(),
+          kind: "file",
+          source: "education",
+        });
+        own.add(key);
+      } catch {
+        /* pointer whose file is gone */
+      }
+    }
+    if (linked.length) todo.files = [...(todo.files || []), ...linked];
+  }
+  return list;
 }
 
 /**
@@ -2655,6 +2764,16 @@ async function loadEducationTree(
       openedAt,
     }
   );
+  await appendProjectFileLinks(todos, root);
+  for (const project of sortedProjects) {
+    await appendProjectFileLinks(project.todos, root);
+  }
+  for (const row of classes) {
+    await appendProjectFileLinks(row.todos, root);
+    if (Array.isArray(row.classOnlyTodos)) {
+      await appendProjectFileLinks(row.classOnlyTodos, root);
+    }
+  }
 
   let nowContext = null;
   if (!includeFixtures) {
