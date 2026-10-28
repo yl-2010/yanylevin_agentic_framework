@@ -1,11 +1,12 @@
 /**
  * Cursor usage clumps. One user prompt is one row.
- * Billing with no prompt and no local transcript is Alex's Cursor desktop
- * on this same account. Kind is cursor-desktop. Repo stays Other until his
- * machine reports the folder. Files stay on the Mac under data/usage/. Gitignored.
+ * Billing that neither the Studio nor the MacBook can trace (no prompt, no
+ * transcript on either machine) is Alex. He no longer runs a collector,
+ * so kind is cursor-desktop and repo is Other. Files stay on the Mac under
+ * data/usage/. Gitignored.
  */
 
-import { timingSafeEqual, randomUUID } from "node:crypto";
+import { createHash, timingSafeEqual, randomUUID } from "node:crypto";
 import { appendFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,10 +28,13 @@ const CHANNEL_LABEL = { Teams: "teams", iMessage: "iMessage", WhatsApp: "WhatsAp
 /** @type {Promise<void>} */
 let writeChain = Promise.resolve();
 
-/** @type {{ key: string, clumps: object[] | null }} */
-let builtCache = { key: "", clumps: null };
-/** @type {{ key: string, promise: Promise<{ clumps: object[] }> } | null} */
+/** @type {{ key: string, clumps: object[] | null, billedAt: string }} */
+let builtCache = { key: "", clumps: null, billedAt: "" };
+/** @type {{ key: string, promise: Promise<{ clumps: object[], billedAt: string }> } | null} */
 let builtFlight = null;
+/** Dedupe signatures by row id, valid while the jsonl stamp matches. */
+/** @type {{ stamp: string, sigs: Map<string, string> } | null} */
+let knownRows = null;
 
 /**
  * @param {string|null|undefined} email
@@ -340,11 +344,39 @@ function latestById(rows) {
 }
 
 /**
+ * A re-sent row only earns a new line when this changes.
  * @param {object} row
  */
-async function appendRow(row) {
+function rowSignature(row) {
+  if (row?.source === "transcript") {
+    const text = [row.person, row.repo, row.kind, row.prompt].map((v) => String(v || "")).join("\u0001");
+    return "tx:" + createHash("sha1").update(text).digest("base64");
+  }
+  return billingSnapshotKey(row) + "|" + String(row?.parentComposerId || "");
+}
+
+async function knownRowSigs() {
+  const stamp = await fileStamp(USAGE_ROWS_PATH);
+  if (knownRows && knownRows.stamp === stamp) return knownRows.sigs;
+  /** @type {Map<string, string>} */
+  const sigs = new Map();
+  for (const row of await readRows(USAGE_ROWS_PATH)) {
+    if (row?.id) sigs.set(String(row.id), rowSignature(row));
+  }
+  knownRows = { stamp, sigs };
+  return sigs;
+}
+
+/**
+ * @param {object[]} rows
+ */
+async function appendRows(rows) {
+  if (!rows.length) return;
+  const sigs = await knownRowSigs();
   await mkdir(USAGE_DIR, { recursive: true });
-  await appendFile(USAGE_ROWS_PATH, `${JSON.stringify(row)}\n`, "utf8");
+  await appendFile(USAGE_ROWS_PATH, `${rows.map((row) => JSON.stringify(row)).join("\n")}\n`, "utf8");
+  for (const row of rows) sigs.set(String(row.id), rowSignature(row));
+  knownRows = { stamp: await fileStamp(USAGE_ROWS_PATH), sigs };
 }
 
 /**
@@ -392,9 +424,8 @@ export async function logSdkResult(input) {
     tokens,
   };
   await enqueue(async () => {
-    const existing = await readRows(USAGE_ROWS_PATH);
-    if (existing.some((r) => r.id === id && r.source === "sdk")) return;
-    await appendRow(row);
+    if ((await knownRowSigs()).has(id)) return;
+    await appendRows([row]);
   });
 }
 
@@ -404,7 +435,10 @@ export async function logSdkResult(input) {
  *   person?: string,
  *   prompts?: object[],
  *   billing?: object[],
+ *   transcripts?: object[],
  *   periodStart?: string,
+ *   plan?: object,
+ *   billingOk?: boolean,
  * }} body
  */
 export async function ingestUsageBatch(body) {
@@ -412,6 +446,8 @@ export async function ingestUsageBatch(body) {
   const person = String(body?.person || "Yan").trim().slice(0, 80) || "Yan";
   const prompts = Array.isArray(body?.prompts) ? body.prompts : [];
   const billing = Array.isArray(body?.billing) ? body.billing : [];
+  const transcripts = Array.isArray(body?.transcripts) ? body.transcripts : [];
+  const now = new Date().toISOString();
   /** @type {object[]} */
   const rows = [];
 
@@ -465,44 +501,66 @@ export async function ingestUsageBatch(body) {
     });
   }
 
+  for (const raw of transcripts) {
+    if (!raw || typeof raw !== "object" || !machine) continue;
+    const conversationId = String(raw.conversationId || "").trim().slice(0, 120);
+    if (!conversationId) continue;
+    rows.push({
+      id: `tx:${machine}:${conversationId}`,
+      source: "transcript",
+      at: isoOrEmpty(raw.at) || now,
+      conversationId,
+      machine,
+      person: clip(raw.person || person, 80) || person,
+      repo: clip(raw.repo || "Other", 120) || "Other",
+      kind: clip(raw.kind || "cursor-desktop", 80) || "cursor-desktop",
+      prompt: clip(raw.prompt || "", PROMPT_STORE_MAX),
+    });
+  }
+
   let wrote = 0;
   await enqueue(async () => {
-    const existing = new Map();
-    for (const prior of await readRows(USAGE_ROWS_PATH)) {
-      if (prior?.id) existing.set(prior.id, prior);
+    if (rows.length) {
+      const sigs = await knownRowSigs();
+      /** @type {Map<string, string>} */
+      const batch = new Map();
+      /** @type {object[]} */
+      const fresh = [];
+      for (const row of rows) {
+        const sig = rowSignature(row);
+        if ((batch.get(row.id) ?? sigs.get(row.id)) === sig) continue;
+        batch.set(row.id, sig);
+        fresh.push(row);
+      }
+      await appendRows(fresh);
+      wrote = fresh.length;
+    }
+    const periodStart = isoOrEmpty(body?.periodStart);
+    const plan = planFromBody(body?.plan);
+    if (!machine && !periodStart && !plan) return;
+    const meta = await readMeta();
+    if (periodStart) meta.periodStart = periodStart;
+    if (plan) meta.plan = plan;
+    if (machine) {
+      const collectors = meta.collectors && typeof meta.collectors === "object" ? meta.collectors : {};
+      const seen = { ...(collectors[machine] || {}), at: now };
+      if (body?.billingOk || plan || billing.length) seen.billingAt = now;
+      collectors[machine] = seen;
+      meta.collectors = collectors;
     }
     await mkdir(USAGE_DIR, { recursive: true });
-    /** @type {string[]} */
-    const lines = [];
-    for (const row of rows) {
-      const prior = existing.get(row.id);
-      if (
-        prior &&
-        billingSnapshotKey(prior) === billingSnapshotKey(row) &&
-        String(prior.parentComposerId || "") === String(row.parentComposerId || "")
-      ) {
-        continue;
-      }
-      existing.set(row.id, row);
-      lines.push(JSON.stringify(row));
-      wrote += 1;
-    }
-    if (lines.length) await appendFile(USAGE_ROWS_PATH, `${lines.join("\n")}\n`, "utf8");
-    if (body?.periodStart || body?.plan) {
-      let meta = {};
-      try {
-        meta = JSON.parse(await readFile(USAGE_META_PATH, "utf8"));
-      } catch {
-        meta = {};
-      }
-      const periodStart = isoOrEmpty(body.periodStart);
-      if (periodStart) meta.periodStart = periodStart;
-      const plan = planFromBody(body.plan);
-      if (plan) meta.plan = plan;
-      if (periodStart || plan) await writeFile(USAGE_META_PATH, `${JSON.stringify(meta)}\n`, "utf8");
-    }
+    await writeFile(USAGE_META_PATH, `${JSON.stringify(meta)}\n`, "utf8");
   });
   return { ok: true, wrote };
+}
+
+async function readMeta() {
+  try {
+    const meta = JSON.parse(await readFile(USAGE_META_PATH, "utf8"));
+    return meta && typeof meta === "object" ? meta : {};
+  } catch {
+    return {};
+  }
 }
 
 /**
@@ -536,26 +594,22 @@ export function buildClumps(rows, local = null) {
   const prompts = all.filter((r) => r.source === "sdk" || r.source === "desktop");
   /** @type {Set<string>} */
   const explained = new Set();
-  /** @type {Map<string, object>} */
-  const byEvent = new Map();
-  for (const bill of billing) {
-    if (bill.usageEventId) byEvent.set(bill.usageEventId, bill);
-  }
 
   /** @type {object[]} */
   const clumps = [];
-  const index = local instanceof Map ? local : new Map();
+  const index = transcriptIndex(all, local);
+  const bills = indexBilling(billing, index);
   const sdk = prompts
     .filter((p) => p.source === "sdk")
     .map((prompt) => ({ ...prompt, tokens: splitCacheFromInput(prompt.tokens) }))
     .sort((a, b) => Date.parse(a.startedAt || a.at) - Date.parse(b.startedAt || b.at));
   for (const prompt of sdk) {
-    const matched = matchSdkBilling(prompt, billing, explained, index);
+    const matched = matchSdkBilling(prompt, bills, explained);
     for (const bill of matched) explained.add(bill.id);
     clumps.push(toClump({ ...prompt, kind: canonicalKind(prompt.kind) }, matched));
   }
   const desktop = prompts.filter((p) => p.source === "desktop");
-  const desktopMatches = matchDesktopGroups(desktop, billing, byEvent, explained);
+  const desktopMatches = matchDesktopGroups(desktop, bills, explained);
   for (const prompt of desktop) {
     const matched = desktopMatches.get(prompt.id) || [];
     for (const bill of matched) explained.add(bill.id);
@@ -591,6 +645,7 @@ export function buildClumps(rows, local = null) {
           model: dominantModel(list),
           prompt: hit.prompt || "",
           threadId: conv,
+          machine: hit.machine || "",
           tokens: emptyTokens(),
         },
         list
@@ -602,21 +657,89 @@ export function buildClumps(rows, local = null) {
 }
 
 /**
- * @param {object} prompt
- * @param {object[]} billing
- * @param {Set<string>} explained
+ * Transcripts the MacBook reported, with this Studio's own index on top.
+ * @param {object[]} rows
+ * @param {Map<string, object>|null} local
  */
+function transcriptIndex(rows, local) {
+  const own = local instanceof Map ? local : new Map();
+  const remote = rows.filter((row) => row.source === "transcript" && row.conversationId);
+  if (!remote.length) return own;
+  /** @type {Map<string, object>} */
+  const index = new Map();
+  for (const row of remote) {
+    index.set(String(row.conversationId), {
+      person: row.person,
+      repo: row.repo,
+      kind: row.kind,
+      prompt: row.prompt,
+      machine: row.machine,
+    });
+  }
+  for (const [id, hit] of own) index.set(id, hit);
+  return index;
+}
+
+/**
+ * @typedef {{
+ *   byEvent: Map<string, object>,
+ *   byConv: Map<string, object[]>,
+ *   timed: { bill: object, t: number, owner: string }[],
+ *   times: number[],
+ * }} BillingIndex
+ */
+
+/**
+ * Billing sorted by time once, so each run only scans its own window.
+ * @param {object[]} billing
+ * @param {Map<string, { kind?: string }>} local
+ * @returns {BillingIndex}
+ */
+function indexBilling(billing, local) {
+  /** @type {Map<string, object>} */
+  const byEvent = new Map();
+  /** @type {Map<string, object[]>} */
+  const byConv = new Map();
+  /** @type {{ bill: object, t: number, owner: string }[]} */
+  const timed = [];
+  for (const bill of billing) {
+    if (bill.usageEventId) byEvent.set(bill.usageEventId, bill);
+    const conv = String(bill.conversationId || "");
+    if (conv) {
+      const list = byConv.get(conv) || [];
+      list.push(bill);
+      byConv.set(conv, list);
+    }
+    const t = Date.parse(bill.at);
+    if (!Number.isNaN(t)) timed.push({ bill, t, owner: localAgentKind(local, conv) });
+  }
+  timed.sort((a, b) => a.t - b.t);
+  return { byEvent, byConv, timed, times: timed.map((row) => row.t) };
+}
+
+/**
+ * @param {number[]} sorted
+ * @param {number} value
+ */
+function lowerBound(sorted, value) {
+  let lo = 0;
+  let hi = sorted.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (sorted[mid] < value) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
 /**
  * A transcript already named this run. A channel log (Teams, iMessage)
  * can wear that name. A different job cannot take the bill.
- * @param {object} bill
- * @param {object} prompt
- * @param {Map<string, { kind?: string }>|null} local
+ * @param {string} owner
+ * @param {string} promptKind
  */
-function billingOwnedElsewhere(bill, prompt, local) {
-  const owner = localAgentKind(local, bill?.conversationId);
+function billingOwnedElsewhere(owner, promptKind) {
   if (!owner) return false;
-  const promptKind = canonicalKind(prompt?.kind);
   if (!promptKind || owner === promptKind) return false;
   return !CHANNEL_KINDS.has(promptKind);
 }
@@ -634,27 +757,32 @@ function localAgentKind(local, conversationId) {
   return kind;
 }
 
-function matchSdkBilling(prompt, billing, explained, local = null) {
+/**
+ * @param {object} prompt
+ * @param {BillingIndex} bills
+ * @param {Set<string>} explained
+ */
+function matchSdkBilling(prompt, bills, explained) {
   /** @type {object[]} */
   const direct = [];
   for (const key of [prompt.requestId, prompt.runId]) {
     if (!key) continue;
-    const hit = billing.find((b) => b.usageEventId === key && !explained.has(b.id));
-    if (hit) direct.push(hit);
+    const hit = bills.byEvent.get(key);
+    if (hit && !explained.has(hit.id)) direct.push(hit);
   }
   if (direct.length) return direct;
 
   const start = Date.parse(prompt.startedAt || prompt.at) - 5000;
   const end = Date.parse(prompt.endedAt || prompt.at) + 20_000;
   if (Number.isNaN(start) || Number.isNaN(end)) return [];
-  const window = billing
-    .filter((b) => !explained.has(b.id))
-    .filter((b) => !billingOwnedElsewhere(b, prompt, local))
-    .filter((b) => {
-      const t = Date.parse(b.at);
-      return t >= start && t <= end;
-    })
-    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  const promptKind = canonicalKind(prompt?.kind);
+  /** @type {object[]} */
+  const window = [];
+  for (let i = lowerBound(bills.times, start); i < bills.timed.length && bills.timed[i].t <= end; i++) {
+    const { bill, owner } = bills.timed[i];
+    if (explained.has(bill.id) || billingOwnedElsewhere(owner, promptKind)) continue;
+    window.push(bill);
+  }
   if (!window.length) return [];
 
   const want = prompt.tokens?.input || 0;
@@ -681,11 +809,10 @@ function matchSdkBilling(prompt, billing, explained, local = null) {
  * usageUuid hits stick to that prompt. The rest go by time window,
  * or in order when the bubbles have no clock.
  * @param {object[]} desktops
- * @param {object[]} billing
- * @param {Map<string, object>} byEvent
+ * @param {BillingIndex} bills
  * @param {Set<string>} explained
  */
-function matchDesktopGroups(desktops, billing, byEvent, explained) {
+function matchDesktopGroups(desktops, bills, explained) {
   /** @type {Map<string, object[]>} */
   const out = new Map();
   /** @type {Map<string, object[]>} */
@@ -703,15 +830,14 @@ function matchDesktopGroups(desktops, billing, byEvent, explained) {
     const claimed = new Set();
     for (const prompt of prompts) {
       for (const id of prompt.usageUuids || []) {
-        const bill = byEvent.get(id);
+        const bill = bills.byEvent.get(id);
         if (!bill || explained.has(bill.id) || claimed.has(bill.id)) continue;
         out.get(prompt.id).push(bill);
         claimed.add(bill.id);
       }
     }
     const conv = String(prompts[0].composerId || "");
-    const pool = billing
-      .filter((b) => b.conversationId && b.conversationId === conv)
+    const pool = (bills.byConv.get(conv) || [])
       .filter((b) => !explained.has(b.id) && !claimed.has(b.id))
       .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
     if (!pool.length) continue;
@@ -1080,12 +1206,17 @@ async function loadBuiltClumps() {
   const { localIndexForReport } = await import("./usage-local.js");
   const local = await localIndexForReport();
   const key = (await fileStamp(USAGE_ROWS_PATH)) + ":" + (await fileStamp(join(USAGE_DIR, "local-index.json")));
-  if (builtCache.key === key && builtCache.clumps) return { clumps: builtCache.clumps };
+  if (builtCache.key === key && builtCache.clumps) return { clumps: builtCache.clumps, billedAt: builtCache.billedAt };
   if (builtFlight && builtFlight.key === key) return builtFlight.promise;
   const promise = (async () => {
-    const clumps = buildClumps(await readRows(USAGE_ROWS_PATH), local);
-    builtCache = { key, clumps };
-    return { clumps };
+    const rows = await readRows(USAGE_ROWS_PATH);
+    let billedAt = "";
+    for (const row of rows) {
+      if (row?.source === "billing" && String(row.at || "") > billedAt) billedAt = String(row.at);
+    }
+    const clumps = buildClumps(rows, local);
+    builtCache = { key, clumps, billedAt };
+    return { clumps, billedAt };
   })();
   builtFlight = { key, promise };
   try {
@@ -1173,7 +1304,7 @@ export function unpackUsageEvents(packed) {
  * @param {number} [now]
  */
 export async function usageIndex(now = Date.now()) {
-  const { clumps } = await loadBuiltClumps();
+  const { clumps, billedAt } = await loadBuiltClumps();
   const period = await resolveRange({ range: "period" }, now);
   const week = await resolveRange({ range: "7d" }, now);
   const month = await resolveRange({ range: "30d" }, now);
@@ -1205,10 +1336,30 @@ export async function usageIndex(now = Date.now()) {
       "30d": { from: month.from, to: month.to },
     },
     plan: await readPlan(),
+    sync: await readSync(billedAt),
     dict: packed.dict,
     events: packed.events,
     titles,
   };
+}
+
+/**
+ * When each collector last checked in, and the newest billing event on file.
+ * @param {string} billedAt
+ */
+async function readSync(billedAt) {
+  const meta = await readMeta();
+  /** @type {Record<string, { at: string, billingAt?: string }>} */
+  const collectors = {};
+  const raw = meta.collectors && typeof meta.collectors === "object" ? meta.collectors : {};
+  for (const [machine, seen] of Object.entries(raw)) {
+    const at = isoOrEmpty(seen?.at);
+    if (!at) continue;
+    collectors[machine] = { at };
+    const billingAt = isoOrEmpty(seen?.billingAt);
+    if (billingAt) collectors[machine].billingAt = billingAt;
+  }
+  return { billedAt: billedAt || "", collectors };
 }
 
 /**

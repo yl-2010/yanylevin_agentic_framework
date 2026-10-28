@@ -1,8 +1,8 @@
 /**
  * Tags billing rows from Cursor agent transcripts on this Mac.
  * The transcript folder name is the billing conversation id.
- * A row with no local transcript is not tagged here.
- * usage-log.js labels that billing as Alex, cursor-desktop.
+ * The MacBook collector posts its own transcript tags to the Studio.
+ * Billing that neither Mac can tag is Alex, cursor-desktop (usage-log.js).
  */
 
 import { open, readdir, readFile, stat, writeFile, mkdir } from "node:fs/promises";
@@ -11,7 +11,7 @@ import { homedir } from "node:os";
 import { existsSync } from "node:fs";
 import { personFromEmail, USAGE_DIR, USAGE_ROWS_PATH } from "./usage-log.js";
 
-const PROJECTS = join(homedir(), ".cursor", "projects");
+export const PROJECTS = join(homedir(), ".cursor", "projects");
 const INDEX_PATH = join(USAGE_DIR, "local-index.json");
 const PROMPT_MAX = 6000;
 const READ_MAX = 80_000;
@@ -155,9 +155,10 @@ export function projectRepo(folderName, home = homedir(), exists = existsSync) {
 }
 
 /**
+ * First user message of a transcript jsonl.
  * @param {string} path
  */
-async function readHead(path) {
+export async function readHead(path) {
   const fh = await open(path, "r");
   try {
     const buf = Buffer.alloc(READ_MAX);

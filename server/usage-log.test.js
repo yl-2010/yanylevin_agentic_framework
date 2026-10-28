@@ -67,6 +67,41 @@ describe("usage clumps", () => {
     assert.equal(summarizeClumps(clumps).cents, 12.5);
   });
 
+  it("gives billing to a MacBook transcript, lets the Studio index win, and leaves the rest to Alex", () => {
+    const transcript = (conv, person, repo) => ({
+      id: `tx:macbook:${conv}`,
+      source: "transcript",
+      at: "2026-10-27T18:00:00.000Z",
+      conversationId: conv,
+      machine: "macbook",
+      person,
+      repo,
+      kind: "cursor-desktop",
+      prompt: `prompt ${conv}`,
+    });
+    const owned = (id, conv) => ({ ...bill(id, "2026-10-27T18:01:00.000Z", 30), conversationId: conv });
+    const local = new Map([["both", { person: "Yan", repo: "studio-repo", kind: "cursor-desktop", prompt: "studio" }]]);
+    const clumps = buildClumps(
+      [
+        transcript("laptop", "Yan", "laptop-repo"),
+        transcript("both", "Yan", "laptop-repo"),
+        owned("e-laptop", "laptop"),
+        owned("e-both", "both"),
+        owned("e-nobody", "unknown-conv"),
+      ],
+      local
+    );
+    assert.equal(clumps.length, 3);
+    const laptop = clumps.find((row) => row.threadId === "laptop");
+    assert.equal(laptop.person, "Yan");
+    assert.equal(laptop.repo, "laptop-repo");
+    assert.equal(laptop.machine, "macbook");
+    assert.equal(clumps.find((row) => row.threadId === "both").repo, "studio-repo");
+    const nobody = clumps.find((row) => row.threadId === "unknown-conv");
+    assert.equal(nobody.person, "Alex");
+    assert.equal(nobody.kind, "cursor-desktop");
+  });
+
   it("splits one desktop thread across prompts and can filter", () => {
     const clumps = buildClumps([
       desktop("a", 0, "2026-10-20T18:00:00.000Z"),
