@@ -500,12 +500,24 @@ describe("usage clumps", () => {
     );
     assert.equal(teams.kind, "teams-agent");
     assert.equal(teams.person, "Alex");
-    const canvas = classifyLocalPrompt(
-      "Follow .cursor/skills/personal-canvas/SKILL.md.\nFrom Alex on Teams:\nhello",
+    const hourly = classifyLocalPrompt(
+      "Follow .cursor/skills/personal-canvas/SKILL.md (hourly pass). Sync Canvas todos into already mapped classes only.",
       "yanylevin"
     );
-    assert.equal(canvas.kind, "canvas-hourly");
-    assert.equal(canvas.person, "Yan");
+    assert.equal(hourly.kind, "canvas-hourly");
+    assert.equal(hourly.person, "Yan");
+    const nightly = classifyLocalPrompt(
+      "Follow .cursor/skills/personal-canvas/SKILL.md. Sync Canvas into Yan's education dashboard.",
+      "yanylevin"
+    );
+    assert.equal(nightly.kind, "canvas-nightly");
+    assert.equal(nightly.person, "Yan");
+    const assignment = classifyLocalPrompt(
+      "Follow .cursor/skills/personal-canvas/SKILL.md (new assignment pass). Express already created the todo.",
+      "yanylevin"
+    );
+    assert.equal(assignment.kind, "canvas-assignment");
+    assert.equal(assignment.person, "Yan");
     const title = classifyLocalPrompt("Reply with only a short chat list title for this first user message.\nMessage:\nsend a sticker", "yanylevin");
     assert.equal(title.kind, "chat-title");
     assert.equal(title.prompt, "send a sticker");
