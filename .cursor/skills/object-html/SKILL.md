@@ -65,14 +65,14 @@ Light (`:root`) from quotes.html. Dark from errores.html. The `--accent` and `--
   --bg: #e8edf2;
   --fg: #14181d;
   --muted: #5a6470;
-  --accent: #1b7d8a;
+  --accent: #d9620b;
   --card: rgba(255, 255, 255, 0.72);
   --line: rgba(20, 24, 29, 0.12);
   --bad: #b42318;
   --bad-bg: rgba(180, 35, 24, 0.12);
   --good: #0f7a45;
   --good-bg: rgba(15, 122, 69, 0.12);
-  --ok: #1b7d8a;
+  --ok: #d9620b;
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
@@ -80,28 +80,28 @@ Light (`:root`) from quotes.html. Dark from errores.html. The `--accent` and `--
     --bg: #12161b;
     --fg: #e8edf2;
     --muted: #9aa3ad;
-    --accent: #71c4c2;
+    --accent: #f28c38;
     --card: rgba(28, 34, 41, 0.88);
     --line: rgba(232, 237, 242, 0.1);
     --bad: #ff7a72;
     --bad-bg: rgba(255, 122, 114, 0.16);
     --good: #5dcc8a;
     --good-bg: rgba(93, 204, 138, 0.14);
-    --ok: #71c4c2;
+    --ok: #f28c38;
   }
 }
 html[data-resolved-theme="dark"] {
   --bg: #12161b;
   --fg: #e8edf2;
   --muted: #9aa3ad;
-  --accent: #71c4c2;
+  --accent: #f28c38;
   --card: rgba(28, 34, 41, 0.88);
   --line: rgba(232, 237, 242, 0.1);
   --bad: #ff7a72;
   --bad-bg: rgba(255, 122, 114, 0.16);
   --good: #5dcc8a;
   --good-bg: rgba(93, 204, 138, 0.14);
-  --ok: #71c4c2;
+  --ok: #f28c38;
 }
 ```
 <!-- brand:end -->

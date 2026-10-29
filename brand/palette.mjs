@@ -35,7 +35,7 @@
 
 import original from "./themes/original.mjs";
 
-export const ACTIVE_THEME = "original";
+export const ACTIVE_THEME = "halloween";
 
 function merge(base, over) {
   if (!over || typeof over !== "object" || Array.isArray(over)) return over ?? base;

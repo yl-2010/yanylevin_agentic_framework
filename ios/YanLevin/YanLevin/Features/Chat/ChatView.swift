@@ -1358,7 +1358,7 @@ struct ChatView: View {
             Image(systemName: "arrow.up")
                 .font(.system(size: 15, weight: .bold))
                 .symbolRenderingMode(.monochrome)
-                .foregroundStyle(.white)
+                .foregroundStyle(YLTheme.chatSendGlyph(colorScheme, palette: palette))
                 .frame(
                     width: IMessageComposer.sendWidth,
                     height: IMessageComposer.sendHeight

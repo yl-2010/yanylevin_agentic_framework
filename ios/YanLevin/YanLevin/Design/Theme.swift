@@ -89,6 +89,21 @@ enum YLTheme {
         }
     }
 
+    /// Arrow on the solid send fill. A light gray fill needs a dark glyph.
+    static func chatSendGlyph(_ scheme: ColorScheme, palette: YLPalette = .standard) -> Color {
+        prefersDarkGlyph(chatSend(scheme, palette: palette)) ? .black : .white
+    }
+
+    private static func prefersDarkGlyph(_ color: Color) -> Bool {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard UIColor(color).getRed(&r, green: &g, blue: &b, alpha: &a) else { return false }
+        func lin(_ c: CGFloat) -> CGFloat {
+            c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        let y = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+        return y > 0.45
+    }
+
     /// Soft diagonal wash matching the site (`linear-gradient(165deg, bg-0, bg-1)`).
     static func pageFill(_ scheme: ColorScheme, palette: YLPalette = .standard) -> LinearGradient {
         LinearGradient(
