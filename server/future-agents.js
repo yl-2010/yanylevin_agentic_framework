@@ -186,7 +186,7 @@ export function formatScheduledSystemBlock(record, opts = {}) {
         ? kickoff
           ? `This run answers in the WhatsApp chat ${target}. The server posts your final reply there. send_chat_message posts there too while you work. Do not send that same final text yourself.`
           : `The scheduled run was tied to WhatsApp chat ${target}. A later message typed in the app stays in the app unless this message asks you to send there.`
-        : "The WhatsApp agent is off. This run stays in the app and website chat. Do not send to WhatsApp."
+        : "This run stays in the app and website chat. Do not send it out."
     );
   } else if (kind === "imessage" && (origin.to || origin.chatGuid)) {
     const target = origin.chatGuid || origin.to;

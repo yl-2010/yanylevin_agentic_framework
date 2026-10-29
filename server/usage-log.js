@@ -23,7 +23,7 @@ const PROMPT_API_MAX = 8_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CHAT_KINDS = new Set(["jype-agent", "personal-agent", "agent", "cursor-desktop", "teams-agent"]);
 const CHANNEL_KINDS = new Set(["teams-agent", "imessage-agent", "personal-chat", "jype-chat", "whatsapp-agent"]);
-const CHANNEL_LABEL = { Teams: "teams", iMessage: "iMessage", WhatsApp: "WhatsApp" };
+const CHANNEL_LABEL = { Teams: "teams", iMessage: "iMessage" };
 
 /** @type {Promise<void>} */
 let writeChain = Promise.resolve();
@@ -69,6 +69,38 @@ export function canonicalKind(kind) {
   return value;
 }
 
+/** Usage page name. The WhatsApp agent is off, so it does not get its own row. */
+export function visibleKind(kind) {
+  const value = canonicalKind(kind);
+  return value === "whatsapp-agent" ? "personal-agent" : value;
+}
+
+/**
+ * Drop WhatsApp-agent lines from a prompt shown on the usage page.
+ * @param {string} text
+ */
+export function hideWhatsAppAgentPrompt(text) {
+  const lines = String(text || "")
+    .split("\n")
+    .filter((line) => !/whatsapp/i.test(line));
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/**
+ * Chat titles that name the WhatsApp agent stay off the usage page.
+ * @param {Record<string, string>|null|undefined} titles
+ */
+export function scrubWhatsAppAgentTitles(titles) {
+  /** @type {Record<string, string>} */
+  const out = {};
+  for (const [key, value] of Object.entries(titles || {})) {
+    const text = String(value || "");
+    if (/whatsapp/i.test(text) && /(agent|poller|@agent)/i.test(text)) continue;
+    out[key] = text;
+  }
+  return out;
+}
+
 /**
  * Collapsed thread name. Scheduled jobs stay the kind ("life state", "canvas hourly").
  * A chat turn named in the transcript is the person and channel ("Example Neighbor teams").
@@ -76,10 +108,10 @@ export function canonicalKind(kind) {
  */
 export function agentTypeLabel(input) {
   const raw = String(input?.kind || "agent").trim() || "agent";
-  const kind = desktopKind(raw);
-  if (CHAT_KINDS.has(raw) || CHAT_KINDS.has(kind)) {
+  const kind = visibleKind(raw);
+  if (CHAT_KINDS.has(raw) || CHAT_KINDS.has(kind) || CHAT_KINDS.has(desktopKind(raw))) {
     const called = String(input?.prompt || "").match(
-      /Called by ([A-Za-z]+)(?: \([^)]*\))? on (Teams|iMessage|WhatsApp)/
+      /Called by ([A-Za-z]+)(?: \([^)]*\))? on (Teams|iMessage)/
     );
     if (called) return called[1] + " " + (CHANNEL_LABEL[called[2]] || called[2].toLowerCase());
   }
@@ -87,7 +119,7 @@ export function agentTypeLabel(input) {
 }
 
 function personChannelLabel(label) {
-  return / (teams|iMessage|WhatsApp)$/.test(String(label || ""));
+  return / (teams|iMessage)$/.test(String(label || ""));
 }
 
 /**
@@ -1073,7 +1105,7 @@ export function summarizeClumps(clumps) {
     addMap(byPerson, row.person || "Other", tokens, rowCents);
     addMap(byModel, row.model || "unknown", tokens, rowCents);
     addMap(byRepo, row.repo || "Other", tokens, rowCents);
-    addMap(byKind, row.kind || "other", tokens, rowCents);
+    addMap(byKind, visibleKind(row.kind) || "other", tokens, rowCents);
     const day = pacificDay(row.at);
     if (!day) continue;
     const weight = tokenSum(tokens);
@@ -1259,7 +1291,7 @@ export function packUsageEvents(clumps) {
       Date.parse(row.at || "") || 0,
       idOf("person", row.person || "Other"),
       idOf("repo", row.repo || "Other"),
-      idOf("kind", row.kind || "other"),
+      idOf("kind", visibleKind(row.kind) || "other"),
       idOf("model", row.model || "unknown"),
       idOf("thread", row.threadId || row.id || ""),
       idOf("label", agentTypeLabel(row)),
@@ -1324,7 +1356,7 @@ export async function usageIndex(now = Date.now()) {
     for (const row of ranged) {
       if (row.threadId) ids.push(row.threadId);
     }
-    titles = await chatTitlesForSessions(ids);
+    titles = scrubWhatsAppAgentTitles(await chatTitlesForSessions(ids));
   } catch (err) {
     console.error("[usage] chat titles", err);
   }
@@ -1390,7 +1422,9 @@ export async function usageReport(query) {
     person: facetNames(ranged, "person"),
     model: facetNames(ranged, "model"),
     repo: facetNames(ranged, "repo"),
-    kind: facetNames(ranged, "kind"),
+    kind: [...new Set(facetNames(ranged, "kind").map((name) => visibleKind(name)))].sort((a, b) =>
+      a.localeCompare(b)
+    ),
   };
   summary.plan = await readPlan();
   const group = String(query.group || "");
@@ -1406,7 +1440,7 @@ export async function usageReport(query) {
           threadId: key,
           person: row.person,
           repo: row.repo,
-          kind: row.kind,
+          kind: visibleKind(row.kind),
           model: row.model,
           at: row.at,
           count: 1,
@@ -1425,7 +1459,7 @@ export async function usageReport(query) {
       if (Date.parse(row.at) > Date.parse(prev.at)) {
         prev.at = row.at;
         prev.model = row.model || prev.model;
-        prev.kind = row.kind || prev.kind;
+        prev.kind = visibleKind(row.kind) || prev.kind;
         prev.person = row.person || prev.person;
       }
       applyThreadLabel(prev, row);
@@ -1464,13 +1498,13 @@ function facetNames(rows, key) {
 }
 
 function publicClump(row) {
-  const prompt = String(row.prompt || "");
+  const prompt = hideWhatsAppAgentPrompt(String(row.prompt || ""));
   return {
     id: row.id,
     at: row.at,
     person: row.person,
     repo: row.repo,
-    kind: row.kind,
+    kind: visibleKind(row.kind),
     model: row.model,
     modelConfig: row.modelConfig,
     threadId: row.threadId,
@@ -1497,8 +1531,8 @@ function publicThread(row) {
     threadId: row.threadId,
     person: row.person,
     repo: row.repo,
-    kind: row.kind,
-    label: row.label || agentTypeLabel(row),
+    kind: visibleKind(row.kind),
+    label: row.label && !/whatsapp/i.test(row.label) ? row.label : agentTypeLabel(row),
     model: row.model,
     at: row.at,
     count: row.count,

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { agentTypeLabel, billingSnapshotsToSend, buildClumps, filterClumps, kindFromPrefix, packUsageEvents, personFromEmail, summarizeClumps, threadLabelFromRows, tokensFromUsage, unpackUsageEvents } from "./usage-log.js";
+import { agentTypeLabel, billingSnapshotsToSend, buildClumps, filterClumps, hideWhatsAppAgentPrompt, kindFromPrefix, packUsageEvents, personFromEmail, scrubWhatsAppAgentTitles, summarizeClumps, threadLabelFromRows, tokensFromUsage, unpackUsageEvents, visibleKind } from "./usage-log.js";
 import { classifyLocalPrompt, projectRepo } from "./usage-local.js";
 
 describe("usage clumps", () => {
@@ -270,6 +270,19 @@ describe("usage clumps", () => {
       ]),
       "Example Neighbor teams"
     );
+    assert.equal(visibleKind("whatsapp-agent"), "personal-agent");
+    assert.equal(
+      agentTypeLabel({
+        kind: "whatsapp-agent",
+        prompt: "Called by Alex (not Yan) on WhatsApp. hello",
+      }),
+      "personal agent"
+    );
+    const shown = hideWhatsAppAgentPrompt("From Alex on WhatsApp:\n\n@agent hi\nCalled by Alex on WhatsApp.");
+    assert.equal(shown, "@agent hi");
+    assert.deepEqual(scrubWhatsAppAgentTitles({ a: "Yan: WhatsApp agent still talking", b: "calc homework" }), {
+      b: "calc homework",
+    });
   });
 
   it("packs clumps without changing the totals", () => {
