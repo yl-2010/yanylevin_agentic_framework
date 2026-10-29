@@ -52,6 +52,8 @@
       saveTimer: 0,
       /** Date.now() of the last server ack, so an older GET cannot clear it. */
       draftTouchedAt: 0,
+      /** True after a keystroke or file add. Draft sync must not treat that as a refill. */
+      userEdited: false,
     };
   }
 
@@ -124,6 +126,19 @@
   const pendingRows = new Map();
   /** @type {Map<string, Promise<void>>} */
   const draftSaves = new Map();
+  /**
+   * Draft ids whose server copy must not refill a composer. Set when a send
+   * starts, because the box is cleared before the server deletes the draft.
+   * A list refresh in that gap was putting the text back. A long draft save
+   * makes the gap long enough to hit every time. A focused field then ignored
+   * the later refresh that saw the delete.
+   * @type {Map<string, { sends: number, until: number }>}
+   */
+  const blockedDrafts = new Map();
+  /** Longer than GET /agent/chats, so a list request already in flight still loses. */
+  const DRAFT_BLOCK_GRACE_MS = 35_000;
+  /** Composer currently receiving a programmatic draft, so `input` does not count as typing. */
+  let applyingComposer = null;
   /** Set when the Mac API has no drafts routes. Composers then stay local. */
   let draftsApiMissing = false;
   let launcherTimer = 0;
@@ -274,8 +289,42 @@
     lastDrafts = lastDrafts.filter((d) => d.id !== id);
   }
 
-  function draftOnServer(id) {
-    return Boolean(id) && lastDrafts.some((d) => d.id === id);
+  function blockDraft(id) {
+    if (!id) return;
+    const prev = blockedDrafts.get(id);
+    blockedDrafts.set(id, { sends: (prev?.sends || 0) + 1, until: 0 });
+  }
+
+  function draftIsBlocked(id) {
+    if (!id) return false;
+    const row = blockedDrafts.get(id);
+    if (!row) return false;
+    if (row.sends > 0) return true;
+    if (row.until > Date.now()) return true;
+    blockedDrafts.delete(id);
+    return false;
+  }
+
+  /** Send failed. The draft should be allowed back into the box. */
+  function releaseDraftBlock(id) {
+    if (id) blockedDrafts.delete(id);
+  }
+
+  /** Send accepted. Keep dropping stale list responses for a bit. */
+  function finishDraftBlock(id) {
+    const row = id ? blockedDrafts.get(id) : null;
+    if (!row) return;
+    row.sends = Math.max(0, row.sends - 1);
+    if (row.sends > 0) return;
+    row.until = Date.now() + DRAFT_BLOCK_GRACE_MS;
+  }
+
+  /** A user kept typing into this draft during the send. Keep that server echo. */
+  function composerHoldsDraftText(id, text) {
+    const next = String(text || "");
+    return composers.some(
+      (c) => c.draftId === id && c.userEdited && String(c.input?.value || "") === next
+    );
   }
 
   /** Express answers unknown routes with a 404 page, not { ok }. */
@@ -323,26 +372,33 @@
    * @param {object} draft
    */
   function applyDraftToComposer(composer, draft) {
-    window.clearTimeout(composer.saveTimer);
-    composer.saveTimer = 0;
-    composer.dirty = false;
-    composer.draftId = String(draft.id);
-    composer.draftSessionId = draft.sessionId ? String(draft.sessionId) : null;
-    composer.draftUpdated = String(draft.updated || "");
-    if (composer.input) composer.input.value = String(draft.text || "");
-    composer.pendingFiles = (Array.isArray(draft.files) ? draft.files : [])
-      .filter((f) => f && f.id)
-      .map((f) => ({
-        id: localFileId(),
-        file: null,
-        name: String(f.name || "file"),
-        mimeType: String(f.mimeType || "application/octet-stream"),
-        size: Number(f.size) || 0,
-        serverId: String(f.id),
-        uploading: false,
-      }));
-    renderChips(composer);
-    syncComposerSize(composer);
+    if (draftIsBlocked(draft?.id)) return;
+    applyingComposer = composer;
+    try {
+      window.clearTimeout(composer.saveTimer);
+      composer.saveTimer = 0;
+      composer.dirty = false;
+      composer.userEdited = false;
+      composer.draftId = String(draft.id);
+      composer.draftSessionId = draft.sessionId ? String(draft.sessionId) : null;
+      composer.draftUpdated = String(draft.updated || "");
+      if (composer.input) composer.input.value = String(draft.text || "");
+      composer.pendingFiles = (Array.isArray(draft.files) ? draft.files : [])
+        .filter((f) => f && f.id)
+        .map((f) => ({
+          id: localFileId(),
+          file: null,
+          name: String(f.name || "file"),
+          mimeType: String(f.mimeType || "application/octet-stream"),
+          size: Number(f.size) || 0,
+          serverId: String(f.id),
+          uploading: false,
+        }));
+      renderChips(composer);
+      syncComposerSize(composer);
+    } finally {
+      if (applyingComposer === composer) applyingComposer = null;
+    }
   }
 
   function clearComposerUi(composer) {
@@ -353,6 +409,7 @@
     }
     renderChips(composer);
     syncComposerSize(composer);
+    composer.userEdited = false;
   }
 
   function unbindComposerDraft(composer) {
@@ -386,8 +443,13 @@
           return;
         }
         if (!res.ok) throw new Error(data?.error || `draft save failed (${res.status})`);
-        if (data?.draft) upsertLocalDraft(data.draft);
-        else removeLocalDraft(id);
+        if (data?.draft) {
+          // The save that was already in flight when Send was clicked echoes the
+          // message we just cleared. Do not put that text back on the draft list.
+          if (!(draftIsBlocked(id) && !composerHoldsDraftText(id, data.draft.text))) {
+            upsertLocalDraft(data.draft);
+          }
+        } else removeLocalDraft(id);
         for (const composer of composers) {
           if (composer.draftId === id) composer.draftTouchedAt = Date.now();
         }
@@ -452,9 +514,14 @@
   }
 
   function onComposerEdit(composer) {
-    if (draftsApiMissing) return;
+    if (applyingComposer === composer) return;
+    if (draftsApiMissing) {
+      composer.userEdited = true;
+      return;
+    }
     const text = String(composer.input?.value || "");
     if (!composer.draftId && !text && !composer.pendingFiles.length) return;
+    composer.userEdited = true;
     if (!ensureComposerDraft(composer)) return;
     composer.dirty = true;
     window.clearTimeout(composer.saveTimer);
@@ -633,6 +700,7 @@
         serverId: "",
         uploading: false,
       };
+      composer.userEdited = true;
       composer.pendingFiles.push(item);
       added.push(item);
       pendingTotal += file.size;
@@ -1327,9 +1395,17 @@
   /** Pull remote draft edits into idle composers; last write wins by `updated`. */
   function syncComposersFromDrafts(fetchStartedAt) {
     for (const composer of composers) {
+      const blocked = draftIsBlocked(composer.draftId);
+      // A send already took this text. Wipe a refill even if the field is focused.
+      if (blocked && !composer.userEdited) {
+        unbindComposerDraft(composer);
+        clearComposerUi(composer);
+        continue;
+      }
       if (composerBusy(composer)) continue;
       if (composer.draftTouchedAt > fetchStartedAt) continue;
       if (composer.draftId) {
+        if (blocked) continue;
         const remote = lastDrafts.find((d) => d.id === composer.draftId);
         if (!remote) {
           // Sent or cleared on another device.
@@ -1345,7 +1421,7 @@
       if (composer.role !== "thread" || !sessionId) continue;
       if (String(composer.input?.value || "") || composer.pendingFiles.length) continue;
       const saved = lastDrafts.find((d) => d.id === `s-${sessionId}`);
-      if (saved) applyDraftToComposer(composer, saved);
+      if (saved && !draftIsBlocked(saved.id)) applyDraftToComposer(composer, saved);
     }
   }
 
@@ -1371,7 +1447,7 @@
       if (!res.ok) throw new Error(data.error || `chats failed (${res.status})`);
       lastChats = Array.isArray(data.chats) ? data.chats : [];
       if (Array.isArray(data.drafts)) {
-        lastDrafts = data.drafts.filter(validDraft);
+        lastDrafts = data.drafts.filter((d) => validDraft(d) && !draftIsBlocked(d.id));
         syncComposersFromDrafts(startedAt);
       }
       historyLoaded = true;
@@ -1466,7 +1542,7 @@
     if (!sessionId || composer.draftId) return;
     if (String(composer.input?.value || "") || composer.pendingFiles.length) return;
     const saved = lastDrafts.find((d) => d.id === `s-${sessionId}`);
-    if (saved) applyDraftToComposer(composer, saved);
+    if (saved && !draftIsBlocked(saved.id)) applyDraftToComposer(composer, saved);
   }
 
   /** Leave the current thread view without stopping its run. */
@@ -2236,7 +2312,8 @@
     const draftId = composer.draftId;
     const draftSessionId = composer.draftSessionId;
     const saveInFlight = draftId ? draftSaves.get(draftId) : null;
-
+    // Clear the local copy now. The server copy lives until this POST is
+    // accepted, and list refreshes in between must not refill the box.
     if (fresh && (messages.length || sending)) {
       viewGen += 1;
       stopPolling();
@@ -2319,8 +2396,26 @@
       if (draftId && text) onComposerEdit(target);
     };
 
+    const reclaimSentComposer = () => {
+      if (!draftId || !text) return;
+      for (const c of composers) {
+        if (c.userEdited) continue;
+        if (String(c.input?.value || "").trim() !== text) continue;
+        if (c.draftId && c.draftId !== draftId) continue;
+        unbindComposerDraft(c);
+        clearComposerUi(c);
+      }
+    };
+
     let accepted = false;
     try {
+      if (draftId) {
+        // The box is already clear. The server copy lives until this POST is
+        // accepted, and list refreshes in between must not refill it.
+        blockDraft(draftId);
+        removeLocalDraft(draftId);
+        renderHistoryList();
+      }
       const waitUploads = Promise.all([
         saveInFlight ? saveInFlight.catch(() => {}) : null,
         ...items.map((f) => (f.upload ? f.upload.catch(() => {}) : null)),
@@ -2331,9 +2426,9 @@
       const attachments = await Promise.all(fallback.map((f) => fileToAttachment(f.file)));
       /** @type {Record<string, unknown>} */
       const body = { sessionId: sid, message: text };
-      const sendDraft =
-        Boolean(draftId) && (draftOnServer(draftId) || items.some((f) => f.serverId));
-      if (sendDraft) body.draftId = draftId;
+      // Always name the draft. It was dropped from the local list at send
+      // time, so "is it on the server" would miss one whose save just landed.
+      if (draftId) body.draftId = draftId;
       if (attachments.length) body.attachments = attachments;
       if (interrupt) body.interrupt = true;
       try {
@@ -2387,8 +2482,9 @@
         return;
       }
       accepted = true;
-      // The server deleted the draft when it took the message.
-      if (sendDraft) removeLocalDraft(String(draftId));
+      if (draftId) finishDraftBlock(draftId);
+      // A refresh during the POST can put the saved draft back in the box.
+      reclaimSentComposer();
       const row = rowId ? pendingRows.get(rowId) : null;
       if (row) {
         row.pending = false;
@@ -2434,6 +2530,8 @@
       );
       setState("panel", { skipFocus: true });
     } finally {
+      if (draftId && !accepted) releaseDraftBlock(draftId);
+      else if (accepted) reclaimSentComposer();
       const focus = !threadCol.hidden ? threadComposer : historyComposer;
       if (focus.input && state() !== "closed") {
         focus.input.focus({ preventScroll: true });
