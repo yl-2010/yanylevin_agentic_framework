@@ -45,6 +45,23 @@ enum YLComposerInput {
         _ = clearTextInDescendants(of: responder)
     }
 
+    /// Shift+Return. Insert at the caret and leave the field focused.
+    /// An ignored Return is what moves focus out of a vertical `TextField`.
+    @discardableResult
+    static func insertNewlineAtCaret(preferring field: UIView? = nil) -> Bool {
+        if let field, insertNewline(in: field) { return true }
+        guard let responder = firstResponderView() else { return false }
+        if insertNewline(in: responder) { return true }
+        var ancestor: UIView? = responder.superview
+        var hops = 0
+        while let view = ancestor, hops < 8 {
+            if insertNewline(in: view) { return true }
+            ancestor = view.superview
+            hops += 1
+        }
+        return false
+    }
+
     private static func firstResponderView() -> UIView? {
         for scene in UIApplication.shared.connectedScenes {
             guard let windowScene = scene as? UIWindowScene else { continue }
@@ -61,6 +78,13 @@ enum YLComposerInput {
             if let found = findFirstResponder(in: sub) { return found }
         }
         return nil
+    }
+
+    @discardableResult
+    private static func insertNewline(in view: UIView) -> Bool {
+        guard let input = view as? UIKeyInput else { return false }
+        input.insertText("\n")
+        return true
     }
 
     @discardableResult
@@ -121,9 +145,14 @@ private struct YLHardwareReturnModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onKeyPress(keys: [.return], phases: .down) { press in
-                // Shift+Return, and Return confirming marked text, stay in the field.
-                if YLHardwareReturnDispatch.passThroughReturn || press.modifiers.contains(.shift) {
+                // Return confirming marked text stays with the IME.
+                if YLHardwareReturnDispatch.passThroughReturn {
                     return .ignored
+                }
+                // Ignored Shift+Return submits the field and focus leaves it.
+                if press.modifiers.contains(.shift) {
+                    YLHardwareReturnDispatch.insertShiftNewline()
+                    return .handled
                 }
                 fire()
                 return .handled
@@ -295,8 +324,17 @@ extension UIView {
 /// On-screen Return never shows up here.
 private enum YLHardwareReturnDispatch {
     static var installed = false
-    /// Shift+Return, or Return while IME text is marked. `onKeyPress` must not send.
+    /// Return while IME text is marked. `onKeyPress` must not send.
     static var passThroughReturn = false
+    /// Shift+Return already inserted its newline this turn. The press hook and `onKeyPress` both see the key.
+    static var insertedShiftNewline = false
+
+    static func insertShiftNewline(into field: UIView? = nil) {
+        if insertedShiftNewline { return }
+        guard YLComposerInput.insertNewlineAtCaret(preferring: field) else { return }
+        insertedShiftNewline = true
+        DispatchQueue.main.async { insertedShiftNewline = false }
+    }
 
     static func install() {
         guard !installed else { return }
@@ -316,11 +354,14 @@ private enum YLHardwareReturnDispatch {
         guard ylIsHardwareReturn(key) else { return false }
         guard let field = focusedComposerField(), field.ylHardwareReturn != nil else { return false }
         let composing = (field as? UITextInput)?.markedTextRange != nil
-        let shift = key.modifierFlags.contains(.shift)
-        if composing || shift {
+        if composing {
             passThroughReturn = true
             DispatchQueue.main.async { passThroughReturn = false }
             return false
+        }
+        if key.modifierFlags.contains(.shift) {
+            insertShiftNewline(into: field)
+            return true
         }
         return field.ylHardwareReturn?(false) ?? false
     }
