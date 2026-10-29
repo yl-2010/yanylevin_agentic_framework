@@ -248,12 +248,9 @@ struct ChatView: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         LazyVStack(alignment: .leading, spacing: 12) {
-                            if messages.isEmpty {
-                                ChatEmptyState(
-                                    usesEducation: usesEducation,
-                                    colorScheme: colorScheme
-                                )
-                                .equatable()
+                            if messages.isEmpty && !usesEducation {
+                                ChatEmptyState(colorScheme: colorScheme)
+                                    .equatable()
                             }
                             ForEach(chatRows) { row in
                                 switch row {
@@ -1892,15 +1889,10 @@ private extension View {
 }
 
 private struct ChatEmptyState: View, Equatable {
-    let usesEducation: Bool
     let colorScheme: ColorScheme
 
     var body: some View {
-        Text(
-            usesEducation
-                ? "Ask your personal agent about classes, todos, schedule, or news."
-                : "Ask about Yan’s work, math, ExampleCo, or school."
-        )
+        Text("Ask about Yan’s work, math, ExampleCo, or school.")
         .font(.headline)
         .foregroundStyle(YLTheme.fg(colorScheme))
         .frame(maxWidth: .infinity, alignment: .leading)
