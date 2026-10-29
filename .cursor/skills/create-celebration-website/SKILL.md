@@ -45,6 +45,12 @@ Pile on motion, color, and toys. Confetti, canvas, click effects, whatever fits 
 
 Copy is specific. Names, the assignment, what actually happened. Apply unslop. `noindex, nofollow` on every page.
 
+Every page loads `/js/vercel-analytics.js?v=1` before `</body>`. It only counts the visit. It does not pull in the site chrome.
+
+```html
+<script src="/js/vercel-analytics.js?v=1"></script>
+```
+
 ## URL
 
 ```bash
