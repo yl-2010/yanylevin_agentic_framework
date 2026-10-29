@@ -1293,10 +1293,16 @@ struct ChatView: View {
             .font(.body)
             .lineLimit(1...8)
             .fixedSize(horizontal: false, vertical: true)
-            // Return inserts a newline (never sends) — the send
-            // button is the only send path. Fitness keeps Return-to-send.
+            // On-screen Return still inserts a newline. A Mac keyboard Return
+            // sends, and Shift+Return inserts a newline, same as the website.
             .submitLabel(.return)
             .focused(focus)
+            .ylHardwareReturn(text: $draft) {
+                guard canSend else { return }
+                if usesEducation, educationStore.isQueueFull { return }
+                YLHaptics.tap()
+                submitComposer()
+            }
             // Send-button insert/remove animation on the parent HStack must not
             // apply to the field — that is what leaves typed text on screen
             // after `draft = ""` while the field is still first responder.

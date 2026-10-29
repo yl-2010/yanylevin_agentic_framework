@@ -1,3 +1,4 @@
+import ObjectiveC
 import SwiftUI
 import UIKit
 
@@ -93,6 +94,275 @@ enum YLComposerInput {
             if clearText(in: sub) || clearTextInDescendants(of: sub) { return true }
         }
         return false
+    }
+}
+
+// MARK: - Hardware Return (Mac keyboard on iPad)
+
+/// Hardware Return sends. Shift+Return inserts a newline.
+/// The on-screen key still inserts a newline, because that path never arrives as a press.
+extension View {
+    func ylHardwareReturn(
+        text: Binding<String>,
+        onReturn: @escaping () -> Void
+    ) -> some View {
+        modifier(YLHardwareReturnModifier(text: text, onReturn: onReturn))
+    }
+}
+
+private struct YLHardwareReturnModifier: ViewModifier {
+    @Binding var text: String
+    var onReturn: () -> Void
+    /// Hardware Return just fired. If the field still grows a blank line, pull it.
+    @State private var eatNewline = false
+    /// Same key can hit both the press hook and `onKeyPress`. The second one bails.
+    @State private var firing = false
+
+    func body(content: Content) -> some View {
+        content
+            .onKeyPress(keys: [.return], phases: .down) { press in
+                // Shift+Return, and Return confirming marked text, stay in the field.
+                if YLHardwareReturnDispatch.passThroughReturn || press.modifiers.contains(.shift) {
+                    return .ignored
+                }
+                fire()
+                return .handled
+            }
+            .onChange(of: text) { _, new in
+                guard eatNewline else { return }
+                guard new == "\n" || new == "\r" || new == "\r\n" else { return }
+                text = ""
+                YLComposerInput.clearFocusedText()
+            }
+            .background {
+                YLHardwareReturnAnchor { fire() }
+            }
+    }
+
+    private func fire() {
+        if firing { return }
+        firing = true
+        eatNewline = true
+        onReturn()
+        // Newline insertion, when it happens, is in this turn. A later Shift+Return must stick.
+        DispatchQueue.main.async {
+            firing = false
+            eatNewline = false
+        }
+    }
+}
+
+private struct YLHardwareReturnAnchor: UIViewRepresentable {
+    var onReturn: () -> Void
+
+    func makeUIView(context: Context) -> YLHardwareReturnProbe {
+        let view = YLHardwareReturnProbe()
+        view.onReturn = onReturn
+        return view
+    }
+
+    func updateUIView(_ uiView: YLHardwareReturnProbe, context: Context) {
+        uiView.onReturn = onReturn
+        uiView.attach()
+    }
+
+    static func dismantleUIView(_ uiView: YLHardwareReturnProbe, coordinator: ()) {
+        uiView.releaseField()
+    }
+}
+
+private final class YLHardwareReturnProbe: UIView {
+    var onReturn: () -> Void = {}
+    private weak var bound: UIView?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isUserInteractionEnabled = false
+        isAccessibilityElement = false
+        backgroundColor = .clear
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        attach()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        attach()
+    }
+
+    func attach() {
+        let limit = enclosingControllerRoot()
+        var node: UIView? = superview
+        var hops = 0
+        while let current = node, hops < 20 {
+            if let field = ylNearestInputField(in: current) {
+                bind(field)
+                return
+            }
+            if let limit, current === limit { return }
+            node = current.superview
+            hops += 1
+        }
+    }
+
+    /// Accessory host root. Searching past it can grab a text view in the transcript.
+    private func enclosingControllerRoot() -> UIView? {
+        var responder: UIResponder? = self
+        while let current = responder {
+            if let controller = current as? UIViewController {
+                return controller.view
+            }
+            responder = current.next
+        }
+        return nil
+    }
+
+    func releaseField() {
+        guard let field = bound else { return }
+        bound = nil
+        let owner = objc_getAssociatedObject(field, &YLReturnAssoc.owner) as? YLHardwareReturnProbe
+        guard owner == nil || owner === self else { return }
+        field.ylHardwareReturn = nil
+        objc_setAssociatedObject(field, &YLReturnAssoc.owner, nil, .OBJC_ASSOCIATION_ASSIGN)
+    }
+
+    private func bind(_ field: UIView) {
+        if bound !== field {
+            releaseField()
+            bound = field
+            YLHardwareReturnDispatch.install()
+        }
+        objc_setAssociatedObject(field, &YLReturnAssoc.owner, self, .OBJC_ASSOCIATION_ASSIGN)
+        field.ylHardwareReturn = { [weak self] shift in
+            guard let self, !shift else { return false }
+            self.onReturn()
+            return true
+        }
+    }
+
+    deinit {
+        releaseField()
+    }
+}
+
+private func ylNearestInputField(in root: UIView) -> UIView? {
+    if let textView = ylFind(UITextView.self, in: root, depth: 0) { return textView }
+    return ylFind(UITextField.self, in: root, depth: 0)
+}
+
+private func ylFind<T: UIView>(_ type: T.Type, in view: UIView, depth: Int) -> T? {
+    if depth > 24 { return nil }
+    if let match = view as? T { return match }
+    for sub in view.subviews {
+        if let found = ylFind(type, in: sub, depth: depth + 1) { return found }
+    }
+    return nil
+}
+
+private enum YLReturnAssoc {
+    static var handler: UInt8 = 0
+    static var owner: UInt8 = 0
+}
+
+private final class YLReturnHandlerBox: NSObject {
+    var handler: ((Bool) -> Bool)?
+}
+
+extension UIView {
+    fileprivate var ylHardwareReturn: ((Bool) -> Bool)? {
+        get { (objc_getAssociatedObject(self, &YLReturnAssoc.handler) as? YLReturnHandlerBox)?.handler }
+        set {
+            if let handler = newValue {
+                let box = (objc_getAssociatedObject(self, &YLReturnAssoc.handler) as? YLReturnHandlerBox)
+                    ?? YLReturnHandlerBox()
+                box.handler = handler
+                objc_setAssociatedObject(self, &YLReturnAssoc.handler, box, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+            } else {
+                objc_setAssociatedObject(self, &YLReturnAssoc.handler, nil, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+            }
+        }
+    }
+}
+
+/// Sees the key in `sendEvent`, before the field inserts a newline.
+/// On-screen Return never shows up here.
+private enum YLHardwareReturnDispatch {
+    static var installed = false
+    /// Shift+Return, or Return while IME text is marked. `onKeyPress` must not send.
+    static var passThroughReturn = false
+
+    static func install() {
+        guard !installed else { return }
+        let cls: AnyClass = UIWindow.self
+        let original = #selector(UIWindow.sendEvent(_:))
+        let swizzled = #selector(UIWindow.yl_sendEvent(_:))
+        guard let first = class_getInstanceMethod(cls, original),
+              let second = class_getInstanceMethod(cls, swizzled) else { return }
+        method_exchangeImplementations(first, second)
+        installed = true
+    }
+
+    static func consume(_ event: UIEvent) -> Bool {
+        guard let presses = event as? UIPressesEvent else { return false }
+        let began = presses.allPresses.filter { $0.phase == .began }
+        guard began.count == 1, let press = began.first, let key = press.key else { return false }
+        guard ylIsHardwareReturn(key) else { return false }
+        guard let field = focusedComposerField(), field.ylHardwareReturn != nil else { return false }
+        let composing = (field as? UITextInput)?.markedTextRange != nil
+        let shift = key.modifierFlags.contains(.shift)
+        if composing || shift {
+            passThroughReturn = true
+            DispatchQueue.main.async { passThroughReturn = false }
+            return false
+        }
+        return field.ylHardwareReturn?(false) ?? false
+    }
+
+    private static func focusedComposerField() -> UIView? {
+        for scene in UIApplication.shared.connectedScenes {
+            guard let windowScene = scene as? UIWindowScene else { continue }
+            for window in windowScene.windows {
+                guard let responder = ylFindFirstResponder(in: window) else { continue }
+                var node: UIView? = responder
+                while let current = node {
+                    if current.ylHardwareReturn != nil { return current }
+                    node = current.superview
+                }
+            }
+        }
+        return nil
+    }
+}
+
+private func ylIsHardwareReturn(_ key: UIKey) -> Bool {
+    switch key.keyCode {
+    case .keyboardReturnOrEnter, .keypadEnter:
+        return true
+    default:
+        let chars = key.charactersIgnoringModifiers
+        return chars == "\r" || chars == "\n"
+    }
+}
+
+private func ylFindFirstResponder(in view: UIView) -> UIView? {
+    if view.isFirstResponder { return view }
+    for sub in view.subviews {
+        if let found = ylFindFirstResponder(in: sub) { return found }
+    }
+    return nil
+}
+
+extension UIWindow {
+    @objc func yl_sendEvent(_ event: UIEvent) {
+        if YLHardwareReturnDispatch.consume(event) { return }
+        yl_sendEvent(event)
     }
 }
 
