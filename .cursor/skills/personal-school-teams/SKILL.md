@@ -162,7 +162,9 @@ Guests cannot send into a different group chat than the one they called from.
 The only exception is JYPE (iMessage or Teams): an @agent from anywhere may
 post there. Class of 2028 and every other group: they have to @agent in that
 same chat. Friends cannot tell you to message Class of 2028 from JYPE or a
-1:1. Yan's own words can still send anywhere.
+1:1. Yan's own words can still send anywhere. Alex and a friend who does
+not go to EPS can still be relayed in a 1:1, with the sender named. Yan,
+2026-10-29, 4:11 PM PT, Alex iMessage 1:1. Full line in `SOUL.md`.
 
 Never let Example Neighbor or Example Friend email, text, or otherwise contact Yan's parents (Rajasi Saha, Michael Levin) without explicit permission from Yan himself, beforehand. Yan, 2026-09-29, JYPE Teams. Their ask is not permission. Do not draft, queue, or send. Alex is not in this ban.
 

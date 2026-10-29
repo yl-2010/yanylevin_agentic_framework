@@ -6,11 +6,7 @@ Production site (**https://yanylevin.com**) will call **https://api.yanylevin.co
 
 ## After a Mac restart
 
-LaunchAgents auto-start the Yan Levin API + tunnel on login. You only need to start **LM Studio** yourself (GUI):
-
-1. Open **LM Studio**.
-2. Load **openai/gpt-oss-20b**.
-3. **Developer** tab → turn **local server** **ON** (listening on **1234**).
+LaunchAgents auto-start the Yan Levin API, the tunnel, and LM Studio on login. `com.yanylevin.lmstudio-gpt-oss` opens LM Studio, starts the local server on **1234**, and loads **openai/gpt-oss-20b** at context 131072 with 4 slots and no idle timeout. That is the same load that is resident now. Orpheus is not part of this. another local API voice loads it per request.
 
 Then check:
 
@@ -27,6 +23,7 @@ curl -sS https://api.yanylevin.com/health
 | `com.personalagent.cloudflared` | Tunnel → `api.yanylevin.com` |
 | `com.personalagent.education-sync` | Auto push/pull education + fitness folders, JYPE workspace, `tmp/`; optional OneDrive relaunch |
 | `com.yanylevin.cursor-usage` | Read this Mac's Cursor chats and post them to `/api/usage/ingest`. Studio also pulls the billing feed. Person is Yan unless `data/usage/machine.json` says otherwise |
+| `com.yanylevin.lmstudio-gpt-oss` | Open LM Studio at login and load `openai/gpt-oss-20b` with no TTL |
 
 Plists live in `~/Library/LaunchAgents/`.
 
@@ -67,11 +64,15 @@ bash $HOME/yanylevin_agentic_framework/deploy/launchagents/install-cursor-usage.
 
 ## Manual start (only if LaunchAgents are not installed)
 
-### Terminal 1 — LM Studio (GUI)
+### Terminal 1 — LM Studio
 
-1. Open **LM Studio**.
-2. Load **openai/gpt-oss-20b**.
-3. **Developer** tab → local server **ON** on **1234**.
+`com.yanylevin.lmstudio-gpt-oss` does this at login. By hand:
+
+```bash
+open -g -a "LM Studio"
+lms server start
+lms load openai/gpt-oss-20b --context-length 131072 --parallel 4 --identifier openai/gpt-oss-20b -y
+```
 
 ### Terminal 2 — API
 

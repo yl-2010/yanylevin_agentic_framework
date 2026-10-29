@@ -384,6 +384,7 @@ struct EducationCase: Decodable, Identifiable, Hashable {
 struct EducationProject: Decodable, Identifiable, Hashable {
     let id: String
     let name: String?
+    let filter: String?
     let order: Int?
     let detail: String?
     let href: String?
@@ -393,11 +394,16 @@ struct EducationProject: Decodable, Identifiable, Hashable {
     let cases: [EducationCase]?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, order, files, todos, dates, href, cases
+        case id, name, filter, order, files, todos, dates, href, cases
         case detail = "description"
     }
 
     var displayName: String { name ?? id }
+
+    /// Short label on that project's Dates filter circle. Empty means the dot. Not part of the name.
+    var filterLabel: String {
+        (filter ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+    }
 
     var descriptionText: String {
         (detail ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -419,6 +425,7 @@ struct EducationProject: Decodable, Identifiable, Hashable {
         EducationProject(
             id: id,
             name: name,
+            filter: filter,
             order: order,
             detail: detail,
             href: href,

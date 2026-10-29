@@ -1932,24 +1932,31 @@
     ).join("")}</div>`;
   }
 
-  function dateFilterLabel(key) {
-    if (key === "ma") return "MA";
-    if (key === "class") return "class";
-    return "none";
+  function projectFilterLabel(p) {
+    const raw = String(p?.filter || "").trim();
+    if (!raw) return "";
+    return raw.toUpperCase();
   }
 
-  function dateFilterGlyph(key) {
+  function dateFilterLabel(key, looseLabel) {
+    if (key === "ma") return "MA";
+    if (key === "class") return "class";
+    return looseLabel || "none";
+  }
+
+  function dateFilterGlyph(key, looseLabel) {
     if (key === "ma") return "MA";
     if (key === "class") return GRAD_CAP_SVG;
+    if (looseLabel) return escapeHtml(looseLabel);
     return "·";
   }
 
-  function dateFilterBarHtml(keys) {
+  function dateFilterBarHtml(keys, looseLabel) {
     return `<div class="edu-filters" role="group" aria-label="Date filters">${keys
       .map((key) => {
         const on = dateFilter.has(key);
-        const label = dateFilterLabel(key);
-        const glyph = dateFilterGlyph(key);
+        const label = dateFilterLabel(key, looseLabel);
+        const glyph = dateFilterGlyph(key, looseLabel);
         return `<label
           class="edu-filter circle${on ? " is-on" : ""}"
           data-liquid-glass="circle"
@@ -1974,6 +1981,11 @@
       : projectScoped
         ? DATE_FILTERS_PROJECT
         : DATE_FILTERS_HOME;
+    const looseLabel = projectScoped
+      ? projectFilterLabel(
+          (tree?.projects || []).find((p) => p.id === projectId && !isFixture(p))
+        )
+      : "";
     const today = todayKey();
     const upcoming = collectDateItems({ classId, projectId })
       .filter((item) =>
@@ -1990,7 +2002,7 @@
     return panelHtml("Dates", listOrEmpty(visible.map(dateItemRowHtml).join("")), {
       filterId,
       titleHtml,
-      headExtra: CFG.showFilters ? dateFilterBarHtml(keys) : "",
+      headExtra: CFG.showFilters ? dateFilterBarHtml(keys, looseLabel) : "",
     });
   }
 
@@ -3338,7 +3350,8 @@
       const project = (tree.projects || []).find(
         (p) => p.id === route.projectId && !isFixture(p)
       );
-      return (project && (project.name || project.id)) || fallback;
+      if (!project) return fallback;
+      return project.name || project.id || fallback;
     }
     if (route.view === "todo") {
       const t = findTodoById(route.itemId, {

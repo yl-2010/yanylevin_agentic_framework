@@ -292,6 +292,18 @@ struct EducationView: View {
         }
     }
 
+    private func projectRowLabel(_ project: EducationProject) -> some View {
+        HStack(spacing: 10) {
+            Text(project.displayName)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(YLTheme.fg(colorScheme))
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+    }
+
     private var projectsPanel: some View {
         eduPanel(title: "Projects") {
             let projects = store.tree?.projects ?? []
@@ -304,12 +316,7 @@ struct EducationView: View {
                             YLHaptics.tap()
                             educationFocus.enterJype()
                         } label: {
-                            Text(project.displayName)
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(YLTheme.fg(colorScheme))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 8)
-                                .contentShape(Rectangle())
+                            projectRowLabel(project)
                         }
                         .buttonStyle(.plain)
                     } else if project.isDebatePortal {
@@ -317,22 +324,12 @@ struct EducationView: View {
                             YLHaptics.tap()
                             educationFocus.enterDebate()
                         } label: {
-                            Text(project.displayName)
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(YLTheme.fg(colorScheme))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 8)
-                                .contentShape(Rectangle())
+                            projectRowLabel(project)
                         }
                         .buttonStyle(.plain)
                     } else {
                         NavigationLink(value: EducationRoute.projectDetail(project)) {
-                            Text(project.displayName)
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(YLTheme.fg(colorScheme))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 8)
-                                .contentShape(Rectangle())
+                            projectRowLabel(project)
                         }
                         .buttonStyle(.plain)
                         .ylHapticNavigation()
@@ -1418,6 +1415,7 @@ struct ProjectDetailView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ylPalette) private var palette
 
     @State private var todoExpanded = false
     /// Completed starts open. Collapse only after a tap.
@@ -1446,10 +1444,13 @@ struct ProjectDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                Text(liveProject.displayName)
-                    .font(.largeTitle.weight(.bold))
-                    .foregroundStyle(YLTheme.fg(colorScheme))
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(liveProject.displayName)
+                        .font(.largeTitle.weight(.bold))
+                        .foregroundStyle(YLTheme.fg(colorScheme))
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 if !liveProject.descriptionText.isEmpty {
                     YLMarkdownText(source: liveProject.descriptionText)
@@ -1551,6 +1552,7 @@ struct ProjectDetailView: View {
             expanded: datesExpanded,
             dateFilters: dateFilters,
             filterKeys: EducationDateFilter.projectKeys,
+            looseLabel: liveProject.filterLabel.isEmpty ? nil : liveProject.filterLabel,
             use24Hour: use24Hour,
             onToggleExpanded: {
                 withAnimation(.easeInOut(duration: 0.22)) {
@@ -2243,6 +2245,7 @@ private struct EducationDatesPanel: View {
     let expanded: Bool
     let dateFilters: Set<String>
     let filterKeys: [String]
+    var looseLabel: String? = nil
     let use24Hour: Bool
     let onToggleExpanded: () -> Void
     let onToggleFilter: (String) -> Void
@@ -2270,6 +2273,7 @@ private struct EducationDatesPanel: View {
                     EducationDateFilterBar(
                         keys: filterKeys,
                         dateFilters: dateFilters,
+                        looseLabel: looseLabel,
                         onToggle: onToggleFilter
                     )
                 }
@@ -2406,6 +2410,7 @@ private struct EducationTodoFilterBar: View {
 private struct EducationDateFilterBar: View {
     let keys: [String]
     let dateFilters: Set<String>
+    var looseLabel: String? = nil
     let onToggle: (String) -> Void
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.ylPalette) private var palette
@@ -2426,7 +2431,7 @@ private struct EducationDateFilterBar: View {
                             Text("MA")
                                 .font(.system(size: 11, weight: .bold))
                         } else {
-                            Text("·")
+                            Text(looseLabel.flatMap { $0.isEmpty ? nil : $0 } ?? "·")
                                 .font(.system(size: 11, weight: .bold))
                         }
                     }
@@ -2440,7 +2445,7 @@ private struct EducationDateFilterBar: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(
-                    key == "ma" ? "MA" : key == "class" ? "class" : "none"
+                    key == "ma" ? "MA" : key == "class" ? "class" : (looseLabel.flatMap { $0.isEmpty ? nil : $0 } ?? "none")
                 )
                 .accessibilityAddTraits(on ? .isSelected : [])
             }
