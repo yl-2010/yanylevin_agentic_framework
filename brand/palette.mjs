@@ -1,79 +1,63 @@
-// Brand colors for the yanylevin.com apps and the iOS app.
+// Active brand colors for the yanylevin.com apps and the iOS app.
 //
-// Edit a value here, then run `npm run brand`. The script copies these values into
-// education/styles.css, the personal sites that keep their own token block
-// (2026-27-electives, prasham-schedule-options), the iOS theme
-// (ios/YanLevin/YanLevin/Design/BrandPalette.generated.swift), and the object-html
-// skill. Never hand-edit the generated blocks.
+// Every theme starts from brand/themes/original.mjs, the saved original colors.
+// Never edit original.mjs. A seasonal theme is a small file in brand/themes/ that
+// lists only the colors it changes, using the same keys as original.mjs. Example,
+// brand/themes/halloween.mjs:
 //
-// Not covered, on purpose:
-// - The public homepage (index.html). It keeps its own inline colors.
-// - Unique-theme sites (celebrations, hell-week pages, mama-birthday-2026, ...). They pin
-//   their own hex and never follow this file.
-// - Neutrals (page bg, text, muted, glass). Those live in education/styles.css.
+//   export default {
+//     personal: {
+//       accent: { light: "#d9620b", dark: "#f28c38" },
+//       bloomA: { light: "rgba(217, 98, 11, 0.22)", dark: "rgba(242, 140, 56, 0.2)" },
+//       chipTint: { light: "#d9620b", dark: "#f28c38" },
+//       ios: { liveActivity: { light: "#a85a22", dark: "#e3a06a" } },
+//     },
+//     agent: {
+//       accent: { light: "#1a1a1a", dark: "#d4d4d4" },
+//       pulse: { light: "#bdbdbd", dark: "#e6e6e6" },
+//       ios: { liveActivity: { hsb: [0, 0, 0.7] } },
+//     },
+//   };
 //
-// Hex values must be 6-digit lowercase (#rrggbb). js/connecting-orb.js only parses that.
-// Wash values (bloom*, glow) are literal CSS colors, so write them as rgba(...).
+// Each brand's comments in original.mjs say where a color shows up. A theme that changes
+// an accent should usually change its bloom, chip tint, pulse, and Live Activity colors
+// too, or they keep the original look. Changing an accent drops any iOS-only override
+// for it (agent.ios.accentDark), so iOS follows the new value.
+//
+// To switch: set ACTIVE_THEME below to the file name ("halloween"), run `npm run brand`,
+// deploy the web, and rebuild iOS. To go back: set ACTIVE_THEME to "original" and do the
+// same. Keep old theme files so they can come back next year.
+//
+// `npm run brand` copies the merged colors into education/styles.css, the personal sites
+// that keep their own token block (2026-27-electives, prasham-schedule-options), the iOS
+// theme (ios/YanLevin/YanLevin/Design/BrandPalette.generated.swift), and the object-html
+// skill. Never hand-edit those generated blocks.
 
-export default {
-  // Yan Levin personal theme: /education, /fitness, /dashboard, /usage, /privacy,
-  // class pages, personal URL sites, the iOS app tint and widgets.
-  personal: {
-    accent: { light: "#1b7d8a", dark: "#71c4c2" },
-    // Page wash behind the glass. bloomA is the accent-colored one; B and C are the gold and blue.
-    bloomA: { light: "rgba(24, 125, 145, 0.22)", dark: "rgba(58, 150, 152, 0.2)" },
-    bloomB: { light: "rgba(206, 176, 122, 0.16)", dark: "rgba(150, 120, 70, 0.15)" },
-    bloomC: { light: "rgba(70, 120, 200, 0.18)", dark: "rgba(66, 104, 168, 0.17)" },
-    // Selected filter chip glass tint.
-    chipTint: { light: "#1b7d8a", dark: "#71c4c2" },
-    ios: {
-      // Live Activities and Dynamic Island: a dustier version of the accent.
-      liveActivity: { light: "#306d75", dark: "#7eb7b6" },
-    },
-  },
+import original from "./themes/original.mjs";
 
-  // Agent / chat: send button, user bubbles, unread rows, busy beam, chat pulse.
-  // /debate chat always uses this too. Never give debate its own chat color.
-  agent: {
-    accent: { light: "#fd5802", dark: "#f87a28" },
-    // Busy pulse glow behind the chat pill. Also used on /jype (JYPE never overrode it).
-    pulse: { light: "#ffc49e", dark: "#ffd0b0" },
-    pulseOpacity: { light: "0.28", dark: "0.22" },
-    ios: {
-      // iOS dark send button has drifted from the web (#f87a28). Kept so nothing moves.
-      accentDark: "#f46810",
-      // Live Activity agent tint, in HSB (hue degrees, saturation, brightness).
-      liveActivity: { hsb: [25, 0.55, 0.93] },
-    },
-  },
+export const ACTIVE_THEME = "original";
 
-  // JYPE: /jype, JYPE subpages, and class study pages that load /jype/styles.css.
-  // Chat on JYPE pages uses the JYPE accent.
-  jype: {
-    accent: { light: "#c2273a", dark: "#e07a82" },
-    bg0: { light: "#f2e7e8", dark: "#160c0f" },
-    bg1: { light: "#ead6d8", dark: "#1d1114" },
-    bloomA: { light: "rgba(194, 39, 58, 0.28)", dark: "rgba(180, 60, 75, 0.28)" },
-    bloomB: { light: "rgba(210, 90, 80, 0.18)", dark: "rgba(160, 70, 70, 0.16)" },
-    bloomC: { light: "rgba(140, 40, 55, 0.16)", dark: "rgba(100, 35, 50, 0.22)" },
-    glow: { light: "rgba(255, 236, 238, 0.18)", dark: "rgba(236, 188, 192, 0.08)" },
-    // Glass panel tint. Light is plain white like the personal theme.
-    glassTint: { light: "#ffffff", dark: "#1e1012" },
-    // Selected filter chip. Still the personal teal today; set to the accent to make it red.
-    chipTint: { light: "#1b7d8a", dark: "#71c4c2" },
-  },
+function merge(base, over) {
+  if (!over || typeof over !== "object" || Array.isArray(over)) return over ?? base;
+  const out = { ...base };
+  for (const [key, value] of Object.entries(over)) out[key] = merge(base?.[key], value);
+  return out;
+}
 
-  // Debate: /debate. Slate indigo. Chat stays on the agent color.
-  debate: {
-    accent: { light: "#5c6490", dark: "#9a9db8" },
-    bg0: { light: "#e4e6ee", dark: "#12141c" },
-    bg1: { light: "#d8dae6", dark: "#171a24" },
-    bloomA: { light: "rgba(92, 100, 144, 0.26)", dark: "rgba(90, 96, 140, 0.28)" },
-    bloomB: { light: "rgba(120, 126, 168, 0.16)", dark: "rgba(70, 78, 120, 0.16)" },
-    bloomC: { light: "rgba(70, 78, 118, 0.14)", dark: "rgba(40, 46, 72, 0.22)" },
-    glow: { light: "rgba(236, 238, 248, 0.18)", dark: "rgba(186, 190, 214, 0.08)" },
-    glassTint: { light: "#ffffff", dark: "#161824" },
-    // Selected filter chip. Still the personal teal today.
-    chipTint: { light: "#1b7d8a", dark: "#71c4c2" },
-  },
-};
+const overrides =
+  ACTIVE_THEME === "original" ? {} : (await import(`./themes/${ACTIVE_THEME}.mjs`)).default;
+
+const palette = merge(original, overrides);
+
+for (const [brand, tokens] of Object.entries(overrides)) {
+  if (!palette[brand]?.ios) continue;
+  const ios = (palette[brand].ios = { ...palette[brand].ios });
+  for (const key of Object.keys(tokens)) {
+    if (key === "ios") continue;
+    for (const mode of ["Light", "Dark"]) {
+      if (!tokens.ios?.[key + mode]) delete ios[key + mode];
+    }
+  }
+}
+
+export default palette;
