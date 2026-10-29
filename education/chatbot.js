@@ -1849,7 +1849,7 @@
     const canvas = workingEl.querySelector(".yan-chat-working-orb");
     if (!canvas) return;
     if (window.YLOrb && typeof window.YLOrb.mount === "function") {
-      workingOrb = window.YLOrb.mount(canvas, { size: 40 });
+      workingOrb = window.YLOrb.mount(canvas, { size: 48 });
       return;
     }
     if (orbWaiting) return;
@@ -2396,13 +2396,12 @@
         refreshChats().catch(() => {});
         return;
       }
+      // The 202 means the prompt reached the model. Clearing the flag can leave
+      // the fingerprint unchanged, so always re-render to drop the fade.
       delete localMsg.pending;
-      if (Array.isArray(data.messages)) {
-        applyServerMessages(data.messages);
-      } else {
-        renderMessagesDom();
-        persistLocal();
-      }
+      if (Array.isArray(data.messages)) applyServerMessages(data.messages);
+      renderMessagesDom();
+      persistLocal();
       setBusy(true);
       setState("panel", { skipFocus: true });
       refreshChats().catch(() => {});

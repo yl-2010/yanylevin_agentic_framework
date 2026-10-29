@@ -1917,12 +1917,12 @@ private struct ChatOrbBubble: View, Equatable {
     let label: String
     let isWide: Bool
 
-    private static let side: CGFloat = 56
+    private static let side: CGFloat = 60
     private static let cornerRadius: CGFloat = 18
 
     var body: some View {
         HStack {
-            YLTintedOrb(size: 40)
+            YLTintedOrb(size: 48)
                 .frame(width: Self.side, height: Self.side)
                 .contentShape(RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
                 .ylGlassRounded(cornerRadius: Self.cornerRadius, interactive: true, clear: true)

@@ -4,9 +4,9 @@
  * window.YLOrb.mount(canvas, { size? }) -> { destroy() }. Fires `ylorb-ready`
  * on window once set, since chatbot.js (classic script) can run first.
  */
-import { MODE_FRAMES, paintFrame, resolvePreset } from "./vendor/thinking-orbs/engine.es.js";
+import { MODE_FRAMES, paintFrame, resolvePreset } from "./vendor/thinking-orbs/engine.es.js?v=2";
 
-const PRESET_SIZE = 32;
+const PRESET_SIZE = 64;
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 const darkScheme = window.matchMedia("(prefers-color-scheme: dark)");
 

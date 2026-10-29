@@ -11,7 +11,7 @@ struct YLTintedOrb: View {
     @Environment(\.ylPalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private static let tuned: OrbSize = .px20
+    private static let tuned: OrbSize = .px64
     /// ThinkingOrbsKit's reduced-motion instant (`OrbSpec.reducedMotionT`, internal).
     private static let reducedMotionT: Double = 0.6
 

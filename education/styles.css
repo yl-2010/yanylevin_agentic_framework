@@ -2542,15 +2542,15 @@ html[data-resolved-theme="light"] .yan-chat-bubble {
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 56px;
+  width: 60px;
+  height: 60px;
   padding: 0;
   border-radius: 18px;
 }
 .yan-chat-working-orb {
   display: block;
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
 }
 @media (prefers-color-scheme: dark) {
   html:not([data-resolved-theme="light"]) .yan-chat-bubble--user {
