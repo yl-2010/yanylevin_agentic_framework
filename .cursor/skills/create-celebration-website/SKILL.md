@@ -1,9 +1,10 @@
 ---
 name: create-celebration-website
 description: >-
-  Build a large one-off celebration site on yanylevin.com for finishing
-  a book, an MA, a test, or a project. Each site gets its own
-  theme, colors, layout, and pages, with none of the yanylevin or JYPE
+  Build a one-off celebration site on yanylevin.com for finishing
+  a book, an MA, a test, or a project. One strong page, with a
+  couple of extra pages when they earn it. Each site gets its own
+  theme, colors, and layout, with none of the yanylevin or JYPE
   chrome. Deploy it, withhold the URL until the event is over, and
   schedule a future agent to send the link only when a todo, calendar
   end, or bell gives a real clock time. Use when someone asks for a
@@ -19,11 +20,11 @@ Yan and the JYPE agent write the public folder. Alex's personal agent stays insi
 
 ## Size
 
-The Death of a Salesman celebration is the floor. Find it by listing repo-root folders whose names are 24 hex characters and opening the one about that play. Count its pages. Match that spread or go past it. One landing page is too small. A long page split into same-looking chapters is too small.
+One site. The front page carries the celebration. Real copy about this accomplishment, its own layout, and at least one thing you can do on the page. A "coming soon" stub does not count. A long page split into same-looking chapters does not count either.
 
-Every page is finished. Real copy about this accomplishment, its own layout, and at least one thing you can do on the page. A "coming soon" stub does not count. Pages link to each other so you can wander. A front door lists them.
+Add a couple of extra pages only when the idea needs them. A page for a joke, a reading, or something you can play with is enough. Do not pad the folder to match an older site. Extra pages are finished the same way, and they link back to the front.
 
-Open that older folder for scale only. Leave its curtains, receipt, type, and palette there.
+Leave the last celebration's curtains, receipt, type, and palette there. Do not count its pages.
 
 ## Look
 
@@ -38,7 +39,7 @@ Leave these off every page:
 - Breadcrumbs back to Home, Notes, or a class
 - Inter on white, or a purple gradient, as the default look
 
-Each page is its own `index.html` with its own CSS. A shared reset is fine. A shared theme file that makes every page the same card stack is a miss. Different type, different color, different structure, on purpose. Motifs come from the accomplishment. The reading, the shape of the test, the jokes in the chat.
+The front page is `index.html` with its own CSS. An extra page gets its own `index.html` too. A shared reset is fine. A shared theme file that makes every page the same card stack is a miss. If you add a page, change the structure. Motifs come from the accomplishment. The reading, the shape of the test, the jokes in the chat.
 
 Pile on motion, color, and toys. Confetti, canvas, click effects, whatever fits this theme. Put sound behind a button so a phone in class stays quiet. Honor `prefers-reduced-motion`. The page has to work on a phone. Hover cannot be the only way to use it.
 
@@ -92,7 +93,7 @@ The future agent's only job is to send the link. It does not rebuild the site.
 
 ## Ship
 
-Stay on `main`. Commit the new folder and the `vercel.json` redirect. Leave unrelated dirty files unstaged. `git push origin main`, then `npm run deploy:web`. Curl the live URL until it is 200 with your title, and curl two inner pages. Static files. Do not restart Express for the site.
+Stay on `main`. Commit the new folder and the `vercel.json` redirect. Leave unrelated dirty files unstaged. `git push origin main`, then `npm run deploy:web`. Curl the live URL until it is 200 with your title. Curl any extra pages you added. Static files. Do not restart Express for the site.
 
 If `npx vercel whoami` fails, or this machine is not the Mac Studio, say the deploy did not run. Do not pretend the URL is live.
 
@@ -100,9 +101,10 @@ After a future-event deploy, the curl is for you. The reply still omits the URL.
 
 ## Checklist
 
-- [ ] New 24-hex folder, a different one from the salesman site
+- [ ] New 24-hex folder
 - [ ] House CSS, fonts, orbs, and glass left off
-- [ ] Pages differ from each other and from the last celebration
+- [ ] One finished front page. A couple of extra pages only if they earn it
+- [ ] Look differs from the last celebration
 - [ ] Each page has real content and an interaction, and works on a phone
 - [ ] `noindex`, data-URI favicon, reduced motion
 - [ ] `vercel.json` redirect, no `sites[]` tile
