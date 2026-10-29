@@ -34,10 +34,18 @@ private enum YLBeamTiming {
     static let fadeOut: Double = 0.5
 }
 
+/// `.full` matches the web "md" beam. `.compact` is for small chips (history
+/// rows): no outer bloom and a tighter inner glow, so nothing bleeds past the edge.
+enum YLBeamStyle {
+    case full
+    case compact
+}
+
 struct YLBorderBeam: View {
     var cornerRadius: CGFloat
     var active: Bool
     var lineWidth: CGFloat = 1.5
+    var style: YLBeamStyle = .full
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.ylPalette) private var palette
@@ -100,8 +108,8 @@ struct YLBorderBeam: View {
         ZStack {
             // Inner glow (web ::before): wide soft band hugging the inside edge.
             shape
-                .strokeBorder(color, lineWidth: lineWidth * 6)
-                .blur(radius: lineWidth * 3)
+                .strokeBorder(color, lineWidth: lineWidth * (compact ? 3 : 6))
+                .blur(radius: lineWidth * (compact ? 1.5 : 3))
                 .clipShape(shape)
                 .mask(mask)
                 .opacity(dark ? 0.55 : 0.45)
@@ -118,21 +126,31 @@ struct YLBorderBeam: View {
 
             // Bloom: blurred ring bleeding outside the shape. The mask is padded
             // out so the blur is not clipped at the view bounds.
-            shape
-                .stroke(color, lineWidth: lineWidth * 2)
-                .blur(radius: 8)
-                .mask { bloomMask.padding(-bloomPad) }
-                .opacity(dark ? 0.85 : 0.7)
+            if !compact {
+                shape
+                    .stroke(color, lineWidth: lineWidth * 2)
+                    .blur(radius: 8)
+                    .mask { bloomMask.padding(-bloomPad) }
+                    .opacity(dark ? 0.85 : 0.7)
+            }
         }
         .compositingGroup()
+        .clipShape(compact ? AnyShape(shape) : AnyShape(Rectangle().inset(by: -bloomPad)))
     }
+
+    private var compact: Bool { style == .compact }
 }
 
 extension View {
     /// Rotating orange beam around a rounded rect. Purely decorative overlay.
-    func ylBorderBeam(cornerRadius: CGFloat, active: Bool, lineWidth: CGFloat = 1.5) -> some View {
+    func ylBorderBeam(
+        cornerRadius: CGFloat,
+        active: Bool,
+        lineWidth: CGFloat = 1.5,
+        style: YLBeamStyle = .full
+    ) -> some View {
         overlay {
-            YLBorderBeam(cornerRadius: cornerRadius, active: active, lineWidth: lineWidth)
+            YLBorderBeam(cornerRadius: cornerRadius, active: active, lineWidth: lineWidth, style: style)
         }
     }
 }

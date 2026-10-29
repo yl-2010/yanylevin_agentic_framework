@@ -39,8 +39,17 @@ struct YanLevinApp: App {
         WindowGroup {
             ZStack {
                 RootTabView()
-                YLScreenBeam(active: nav.chatWorking && nav.selectedTab == .chat)
+                YLScreenBeam(active: (nav.chatWorking && nav.selectedTab == .chat))
                     .environment(\.ylPalette, educationFocus.isJype ? .jype : .standard)
+                if !AdaptiveLayout.isPad {
+                    YLChatTabGlow(
+                        active: nav.chatWorking || nav.anyChatWorking,
+                        palette: educationFocus.isJype ? .jype : .standard
+                    )
+                    .frame(width: 0, height: 0)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                }
                 if showLaunchCover {
                     AppLoadingScreen()
                         .transition(.opacity)
@@ -91,23 +100,12 @@ private struct YLScreenBeam: View {
     var body: some View {
         GeometryReader { proxy in
             Color.clear
-                .ylBorderBeam(
-                    cornerRadius: Self.cornerRadius(safeArea: proxy.safeAreaInsets),
-                    active: active,
-                    lineWidth: 2.5
-                )
+                .ylBorderBeam(cornerRadius: YLDisplayCorner.radius, active: active, lineWidth: 2.5)
                 .ignoresSafeArea()
         }
         .ignoresSafeArea(.keyboard)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
-
-    /// Approximate display corners without the private `_displayCornerRadius`.
-    /// Face ID iPhones always have a bottom inset (home indicator); home-button
-    /// iPhones have none.
-    private static func cornerRadius(safeArea: EdgeInsets) -> CGFloat {
-        if AdaptiveLayout.isPad { return 18 }
-        return safeArea.bottom > 0 ? 55 : 0
-    }
 }
+

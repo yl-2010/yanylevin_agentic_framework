@@ -444,6 +444,6 @@ private struct ChatHistoryRowChrome<Label: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .ylGlassRounded(cornerRadius: 14, tint: unreadTint, interactive: true)
-            .ylBorderBeam(cornerRadius: 14, active: state == .working)
+            .ylBorderBeam(cornerRadius: 14, active: state == .working, style: .compact)
     }
 }

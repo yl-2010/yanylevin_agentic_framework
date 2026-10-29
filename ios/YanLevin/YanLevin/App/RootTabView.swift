@@ -73,6 +73,8 @@ final class AppNavigationStore: ObservableObject {
     @Published var tabReselectGeneration = 0
     /// The thread open in the Chat tab has an agent turn running. Set by ChatView.
     @Published var chatWorking = false
+    /// Any chat in history has an agent turn running. Set by ChatView.
+    @Published var anyChatWorking = false
 
     func openChat(startNew: Bool = false, sessionId: String? = nil) {
         selectedTab = .chat

@@ -83,6 +83,7 @@
 		ACDFD5656CF7FE57DCD422BA /* OpenAgentChatIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8821DC411CE772F1EBF795CE /* OpenAgentChatIntent.swift */; };
 		AFEE5D756883EFA48D330F94 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3696B966768BE75F409A9700 /* APIClient.swift */; };
 		B1D99F7011A4A4F668A1CFB2 /* AppGroupStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E7DDEA1EF28086A8752029D /* AppGroupStore.swift */; };
+		B3E273F5C1754C37DE4A7B35 /* YLChatTabGlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34402320B943B5B068D9B8C7 /* YLChatTabGlow.swift */; };
 		B40C25FBC305B1121634EE49 /* EducationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29892B1F97CCD28845DB2EEF /* EducationModels.swift */; };
 		B6F580E7F659994D82092817 /* YanLevinApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD7AE7215F57F3740AB87531 /* YanLevinApp.swift */; };
 		BAD466920FBF9FE5E5915CED /* KaTeX_Math-Italic.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 23A8DA167332868C7EA57B06 /* KaTeX_Math-Italic.woff2 */; };
@@ -105,6 +106,7 @@
 		E5D3D404265535523A7F4395 /* KaTeX_Main-Italic.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = AEDA43EEE10F6FB6DAEA7F01 /* KaTeX_Main-Italic.woff2 */; };
 		ED3F577E7DFF1C56B3FD96F7 /* OpenAgentChatIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8821DC411CE772F1EBF795CE /* OpenAgentChatIntent.swift */; };
 		EDBCEE776FEEB42A93437629 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8651995A2DE1EC4290CBBDCC /* Assets.xcassets */; };
+		F42A52E29287660A0A3C1E15 /* YLDisplayCorner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3684BF0E5983154F456DA19C /* YLDisplayCorner.swift */; };
 		F45C99C5519725B12E0C2130 /* YLTintedOrb.swift in Sources */ = {isa = PBXBuildFile; fileRef = B48A79E30C688E32642F479E /* YLTintedOrb.swift */; };
 		F4D7D1D5846E78005F4C7208 /* GymView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832A6558D9C48C7524ACB200 /* GymView.swift */; };
 		F9C7AD0752E69A760C92D4A4 /* KaTeX_Size2-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = E3AE16848FCC140C9B24282B /* KaTeX_Size2-Regular.woff2 */; };
@@ -162,6 +164,8 @@
 		2C0DC0034B12289190CFCF03 /* YanLevin.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = YanLevin.entitlements; sourceTree = "<group>"; };
 		2DEC95CF8756916C4C1611A6 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		311ADB15534A57F1748F1E96 /* YanLevin.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = YanLevin.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		34402320B943B5B068D9B8C7 /* YLChatTabGlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLChatTabGlow.swift; sourceTree = "<group>"; };
+		3684BF0E5983154F456DA19C /* YLDisplayCorner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLDisplayCorner.swift; sourceTree = "<group>"; };
 		3696B966768BE75F409A9700 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		38D22C729456850565C23AF9 /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
 		3BFC5D2A192A99E4F618F79B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -386,6 +390,8 @@
 				C591473A552F86C4D658DD74 /* NaturalWhen.swift */,
 				20592DA9B5602E124F949B98 /* Theme.swift */,
 				1E5ADCA9FF7CDD1B12C2081D /* YLBorderBeam.swift */,
+				34402320B943B5B068D9B8C7 /* YLChatTabGlow.swift */,
+				3684BF0E5983154F456DA19C /* YLDisplayCorner.swift */,
 				DB1CE3B3DB78550077E7BECD /* YLHaptics.swift */,
 				13E6C6E576FBB4F67B006FB4 /* YLHostedFocus.swift */,
 				E41EB89491918E6F0C2E4F19 /* YLKeyboard.swift */,
@@ -665,6 +671,8 @@
 				E0DACB5DB2DB4BB7947801BD /* TabReselectObserver.swift in Sources */,
 				47486BD29572D791F436479F /* Theme.swift in Sources */,
 				FDD4021B84648D43BC4778CE /* YLBorderBeam.swift in Sources */,
+				B3E273F5C1754C37DE4A7B35 /* YLChatTabGlow.swift in Sources */,
+				F42A52E29287660A0A3C1E15 /* YLDisplayCorner.swift in Sources */,
 				D283F05FAC1FF2FF6D883046 /* YLHaptics.swift in Sources */,
 				093950D06486BD77A0BB4EA4 /* YLHostedFocus.swift in Sources */,
 				55E8EB83D402053CEB351A61 /* YLKeyboard.swift in Sources */,
