@@ -1646,6 +1646,7 @@ void main() {
   // Magnetic hover — logo / social / Google orbs follow the pointer slightly.
   // Shares _mx/_my/_bx/_by with page drag code (index.html applyT).
   function applyMagneticT(el) {
+    if (el._lgHold) return;
     const bx = el._bx || 0;
     const by = el._by || 0;
     const mx = el._mx || 0;
@@ -1748,7 +1749,7 @@ void main() {
   function updateMagnetic(el, clientX, clientY) {
     if (cheapGlassOn()) return;
     if (!el || !el._lgMagneticBound) return;
-    if (el._drag) return;
+    if (el._lgHold || el._drag) return;
     const chrome = document.documentElement.classList.contains("lg-chrome");
     if (chrome && document.documentElement.classList.contains("lg-scrolling")) {
       return;
@@ -1857,6 +1858,7 @@ void main() {
       updateMagnetic(el, e.clientX, e.clientY);
     });
     el.addEventListener("pointerdown", () => {
+      if (el._lgHold) return;
       if (!document.documentElement.classList.contains("lg-chrome")) return;
       if (el._drag) return;
       // Rectangles keep concentric bounds — no press squash. Orbs still flex.
@@ -1877,7 +1879,7 @@ void main() {
       applyMagneticT(el);
     });
     el.addEventListener("pointerleave", (e) => {
-      if (el._drag) return;
+      if (el._drag || el._lgHold) return;
       if (e.relatedTarget && el.contains(e.relatedTarget)) return;
       el._mx = 0;
       el._my = 0;
