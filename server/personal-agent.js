@@ -4,7 +4,8 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile, rm } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
+import { copyFile, mkdir, writeFile, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, basename, extname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -174,7 +175,10 @@ const ephemeralHideTimers = new Map();
  * }} EducationNavigate
  */
 
-/** @typedef {{ name: string, mimeType?: string, data: string }} AttachmentInput */
+/** @typedef {{ name: string, mimeType?: string, data?: string, sourcePath?: string, bytes?: number }} AttachmentInput */
+
+/** Bytes already on disk (pre-uploaded draft files). Copied into the session dir. */
+/** @typedef {{ name: string, mimeType?: string, size: number, path: string }} AttachmentSource */
 
 /** @typedef {{ name: string, mimeType: string, relPath: string, absPath: string, bytes: number, isImage: boolean }} StagedFile */
 
@@ -2202,12 +2206,38 @@ function guessMime(mimeType, filename) {
 }
 
 /**
+ * @param {string} name
+ * @param {number} bytes
+ * @param {number} total running total including this file
+ */
+function checkAttachmentSize(name, bytes, total) {
+  if (bytes > MAX_ATTACHMENT_BYTES) {
+    const err = new Error(
+      `attachment ${name} exceeds ${Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024))}MB`
+    );
+    err.status = 400;
+    throw err;
+  }
+  if (total > MAX_TOTAL_ATTACHMENT_BYTES) {
+    const err = new Error(
+      `attachments total size exceeds ${Math.round(MAX_TOTAL_ATTACHMENT_BYTES / (1024 * 1024))}MB`
+    );
+    err.status = 400;
+    throw err;
+  }
+}
+
+/**
+ * Inline base64 attachments plus files already on disk. Limits apply to both combined.
  * @param {unknown} raw
+ * @param {AttachmentSource[]} [sources]
  * @returns {AttachmentInput[]}
  */
-function normalizeAttachments(raw) {
-  if (!Array.isArray(raw) || !raw.length) return [];
-  if (raw.length > MAX_ATTACHMENTS) {
+export function normalizeAttachments(raw, sources = []) {
+  const inline = Array.isArray(raw) ? raw : [];
+  const onDisk = Array.isArray(sources) ? sources : [];
+  if (!inline.length && !onDisk.length) return [];
+  if (inline.length + onDisk.length > MAX_ATTACHMENTS) {
     const err = new Error(`at most ${MAX_ATTACHMENTS} attachments`);
     err.status = 400;
     throw err;
@@ -2215,7 +2245,7 @@ function normalizeAttachments(raw) {
   /** @type {AttachmentInput[]} */
   const out = [];
   let total = 0;
-  for (const item of raw) {
+  for (const item of inline) {
     if (!item || typeof item !== "object") continue;
     const name = sanitizeFilename(
       /** @type {{ name?: string, filename?: string }} */ (item).name ||
@@ -2249,21 +2279,8 @@ function normalizeAttachments(raw) {
       err.status = 400;
       throw err;
     }
-    if (buf.length > MAX_ATTACHMENT_BYTES) {
-      const err = new Error(
-        `attachment ${name} exceeds ${Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024))}MB`
-      );
-      err.status = 400;
-      throw err;
-    }
     total += buf.length;
-    if (total > MAX_TOTAL_ATTACHMENT_BYTES) {
-      const err = new Error(
-        `attachments total size exceeds ${Math.round(MAX_TOTAL_ATTACHMENT_BYTES / (1024 * 1024))}MB`
-      );
-      err.status = 400;
-      throw err;
-    }
+    checkAttachmentSize(name, buf.length, total);
     const mimeType = guessMime(
       /** @type {{ mimeType?: string, type?: string }} */ (item).mimeType ||
         /** @type {{ type?: string }} */ (item).type ||
@@ -2278,6 +2295,20 @@ function normalizeAttachments(raw) {
     });
     // stash bytes on object for write step
     /** @type {any} */ (out[out.length - 1])._buf = buf;
+  }
+  for (const src of onDisk) {
+    if (!src || typeof src.path !== "string" || !src.path) continue;
+    const name = sanitizeFilename(src.name || basename(src.path));
+    const bytes = Number(src.size) || 0;
+    if (bytes <= 0) continue;
+    total += bytes;
+    checkAttachmentSize(name, bytes, total);
+    out.push({
+      name,
+      mimeType: guessMime(src.mimeType || "", name),
+      sourcePath: src.path,
+      bytes,
+    });
   }
   return out;
 }
@@ -2317,10 +2348,18 @@ async function stageAttachments(session, sessionId, attachments) {
       name = `${stem}-${n}${ext}`;
     }
     usedNames.add(name.toLowerCase());
-    const buf =
-      /** @type {any} */ (att)._buf || Buffer.from(att.data, "base64");
     const absPath = join(dirAbs, name);
-    await writeFile(absPath, buf);
+    let bytes;
+    if (att.sourcePath) {
+      // FICLONE is a free copy-on-write clone on APFS; falls back to a real copy.
+      await copyFile(att.sourcePath, absPath, fsConstants.COPYFILE_FICLONE);
+      bytes = Number(att.bytes) || 0;
+    } else {
+      const buf =
+        /** @type {any} */ (att)._buf || Buffer.from(att.data || "", "base64");
+      await writeFile(absPath, buf);
+      bytes = buf.length;
+    }
     const mimeType = guessMime(att.mimeType || "", name);
     /** @type {StagedFile} */
     const staged = {
@@ -2328,7 +2367,7 @@ async function stageAttachments(session, sessionId, attachments) {
       mimeType,
       relPath: `${dirRel}/${name}`,
       absPath,
-      bytes: buf.length,
+      bytes,
       isImage: IMAGE_MIME.has(mimeType),
     };
     files.push(staged);
@@ -3236,6 +3275,7 @@ async function executeAgentTurn(sid, session, opts) {
  * @param {unknown} [attachmentsRaw]
  * @param {unknown} [uiContextRaw]
  * @param {unknown} [interruptRaw]
+ * @param {{ files?: AttachmentSource[] }} [opts] files: pre-uploaded draft files on disk
  */
 export async function messageAgent(
   sessionId,
@@ -3243,12 +3283,13 @@ export async function messageAgent(
   message,
   attachmentsRaw,
   uiContextRaw,
-  interruptRaw
+  interruptRaw,
+  opts = {}
 ) {
   const normalized = canonicalizeEmail(email);
   const sid = String(sessionId || "").trim();
   const text = String(message || "").trim();
-  const attachments = normalizeAttachments(attachmentsRaw);
+  const attachments = normalizeAttachments(attachmentsRaw, opts?.files);
   const uiContext = normalizeUiContext(uiContextRaw);
   const wantInterrupt = isTruthyFlag(interruptRaw);
   if (!sid || (!text && !attachments.length)) {
@@ -3416,7 +3457,6 @@ export async function messageAgent(
   const imageSources = hasNewAttachments ? newFiles : sessionFiles;
   if (imageSources.length) {
     const { readFile, access } = await import("node:fs/promises");
-    const { constants: fsConstants } = await import("node:fs");
     for (const f of imageSources) {
       if (!f.isImage || images.length >= 5) continue;
       try {
@@ -3467,7 +3507,9 @@ export async function messageAgent(
     });
   } else {
     session.messages.push(stampMessage("user", bubble));
-    persistSessionHistory(sid, session);
+    // Awaited so a brand-new chat's .md exists before the 202 and the SSE
+    // change; a /chats refresh right after send must already list it.
+    await persistSessionHistory(sid, session);
     session.workingLabel = WORKING_LABEL_DEFAULT;
     notifyEducationClients(normalized, "change", {
       source: "agent",

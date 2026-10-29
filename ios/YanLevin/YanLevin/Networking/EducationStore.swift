@@ -20,9 +20,11 @@ struct AgentMessageBody: Encodable {
     let attachments: [AgentAttachmentPayload]?
     let uiContext: AgentUiContext?
     var interrupt: Bool? = nil
+    /// Server draft whose uploaded files ride along; the server deletes it.
+    var draftId: String? = nil
 
     enum CodingKeys: String, CodingKey {
-        case sessionId, message, attachments, uiContext, interrupt
+        case sessionId, message, attachments, uiContext, interrupt, draftId
     }
 
     func encode(to encoder: Encoder) throws {
@@ -33,6 +35,9 @@ struct AgentMessageBody: Encodable {
         try c.encodeIfPresent(uiContext, forKey: .uiContext)
         if interrupt == true {
             try c.encode(true, forKey: .interrupt)
+        }
+        if let draftId, !draftId.isEmpty {
+            try c.encode(draftId, forKey: .draftId)
         }
     }
 }
@@ -613,6 +618,20 @@ struct AgentChatListResponse: Decodable {
     let ok: Bool?
     let sessionId: String?
     let chats: [AgentChatListItem]?
+    /// Older servers omit this.
+    let drafts: [ChatDraft]?
+
+    enum CodingKeys: String, CodingKey {
+        case ok, sessionId, chats, drafts
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        ok = try c.decodeIfPresent(Bool.self, forKey: .ok)
+        sessionId = try c.decodeIfPresent(String.self, forKey: .sessionId)
+        chats = try c.decodeIfPresent([AgentChatListItem].self, forKey: .chats)
+        drafts = try? c.decodeIfPresent([ChatDraft].self, forKey: .drafts)
+    }
 }
 
 struct PendingChatAttachment: Identifiable, Equatable {
@@ -621,21 +640,42 @@ struct PendingChatAttachment: Identifiable, Equatable {
     /// Shown in the composer chip / bubble. Full headline for news; otherwise `name`.
     let displayName: String
     let mimeType: String
+    /// Empty for files restored from a server draft (`serverFileId` set).
     let data: Data
+    let byteCount: Int
+    /// Id on the server draft once the upload finished.
+    var serverFileId: String?
+    var uploading: Bool
 
     init(
         id: UUID = UUID(),
         name: String,
         mimeType: String,
         data: Data,
-        displayName: String? = nil
+        displayName: String? = nil,
+        serverFileId: String? = nil,
+        byteCount: Int? = nil,
+        uploading: Bool = false
     ) {
         self.id = id
         self.name = name
         self.mimeType = mimeType
         self.data = data
+        self.byteCount = byteCount ?? data.count
+        self.serverFileId = serverFileId
+        self.uploading = uploading
         let shown = (displayName ?? name).trimmingCharacters(in: .whitespacesAndNewlines)
         self.displayName = shown.isEmpty ? name : shown
+    }
+
+    init(draftFile file: ChatDraftFile) {
+        self.init(
+            name: file.name,
+            mimeType: file.mimeType,
+            data: Data(),
+            serverFileId: file.id,
+            byteCount: file.size ?? 0
+        )
     }
 
     static func newsCapsule(todo: EducationTodo, capsule: EducationCapsule) -> PendingChatAttachment {
@@ -685,6 +725,26 @@ struct PendingChatAttachment: Identifiable, Equatable {
     }
 }
 
+/// A user send waiting on `POST agent/message`. Drives the pending history row.
+struct AgentPendingSend: Identifiable, Equatable {
+    let id: UUID
+    let draftId: String?
+    var sessionId: String?
+    let title: String
+    let started: String
+}
+
+/// Everything `deliverAgentSend` needs after the optimistic bubble is up.
+struct AgentSendTicket {
+    let messageID: UUID
+    let text: String
+    let attachments: [PendingChatAttachment]
+    let interrupt: Bool
+    let draftId: String?
+    let sessionId: String?
+    let viewGen: Int
+}
+
 @MainActor
 final class EducationStore: ObservableObject {
     @Published var tree: EducationTreeResponse?
@@ -698,7 +758,9 @@ final class EducationStore: ObservableObject {
     @Published var chatHistoryLoading = false
     @Published var agentNavigate: AgentEducationNavigate?
     @Published private(set) var treeEpoch = 0
+    @Published private(set) var pendingSends: [AgentPendingSend] = []
     weak var focus: EducationFocusStore?
+    weak var draftStore: ChatDraftStore?
     var workspace: String = ""
 
     private var apiPrefix: String {
@@ -760,7 +822,7 @@ final class EducationStore: ObservableObject {
         persistAgentChatTask = nil
         guard let email = persistEmail, !email.isEmpty else { return }
         let sessionId = agentSessionId
-        let messages = agentMessages
+        let messages = agentMessages.filter { !$0.pending }
         // A nil sessionId (fresh thread being prepared, or /agent/start failed)
         // must OMIT the key — `nil as Any` becomes NSNull in the dictionary and
         // UserDefaults throws NSInvalidArgumentException ("non-property list
@@ -819,12 +881,16 @@ final class EducationStore: ObservableObject {
         }
         // Keep SwiftUI identities stable across poll/SSE snapshots so MapKit
         // tiles and carousel state are not torn down on every "Working" tick.
-        let merged: [ChatMessage] = incoming.enumerated().map { index, msg in
-            guard index < agentMessages.count else { return msg }
+        // Pending sends are not on the server yet: keep them out of the index
+        // match and pinned to the tail until their POST returns.
+        let settled = agentMessages.filter { !$0.pending }
+        var merged: [ChatMessage] = incoming.enumerated().map { index, msg in
+            guard index < settled.count else { return msg }
             var next = msg
-            next.id = agentMessages[index].id
+            next.id = settled[index].id
             return next
         }
+        merged.append(contentsOf: agentMessages.filter(\.pending))
         guard merged != agentMessages else {
             flushPendingQueueInterrupt()
             return
@@ -1385,41 +1451,19 @@ final class EducationStore: ObservableObject {
         agentPollTask = nil
     }
 
-    func ensureAgent(token: String) async {
-        if agentSessionId != nil { return }
-        do {
-            let res: AgentStartResponse = try await APIClient.shared.request(
-                api("agent/start"),
-                method: "POST",
-                body: EmptyBody(),
-                bearer: token
-            )
-            if let sid = res.sessionId {
-                agentSessionId = sid
-                persistAgentChatNow()
-            } else {
-                errorText = res.error ?? "Could not start education agent."
-            }
-        } catch {
-            errorText = error.localizedDescription
-        }
-    }
-
-    func sendAgent(
+    /// Optimistic half of a send: the user bubble (pending, or queued behind a
+    /// running turn) and the pending history row. No network, no Working state.
+    func stageAgentSend(
         _ text: String,
         attachments: [PendingChatAttachment] = [],
-        uiContext: AgentUiContext? = nil,
         interrupt: Bool = false,
-        token: String
-    ) async {
+        draftId: String? = nil
+    ) -> AgentSendTicket? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty || !attachments.isEmpty else { return }
+        guard !trimmed.isEmpty || !attachments.isEmpty else { return nil }
         if !interrupt {
-            guard !isQueueFull else { return }
+            guard !isQueueFull else { return nil }
         }
-        await ensureAgent(token: token)
-        guard let sid = agentSessionId else { return }
-
         var bubble = trimmed
         if !attachments.isEmpty {
             let names = attachments.map(\.displayName).joined(separator: ", ")
@@ -1427,20 +1471,67 @@ final class EducationStore: ObservableObject {
             bubble = trimmed.isEmpty ? tag : "\(trimmed)\n\(tag)"
         }
         let willQueue = agentBusy && !interrupt
-        agentMessages.append(ChatMessage(role: "user", content: bubble, queued: willQueue))
+        let msg = ChatMessage(role: "user", content: bubble, queued: willQueue, pending: !willQueue)
+        agentMessages.append(msg)
+        let title = ChatDraft.firstLine(trimmed)
+            ?? attachments.first?.displayName
+            ?? "New chat"
+        pendingSends.append(
+            AgentPendingSend(
+                id: msg.id,
+                draftId: draftId,
+                sessionId: agentSessionId,
+                title: title,
+                started: ChatDraft.nowISO()
+            )
+        )
         persistAgentChatNow()
-        applyAgentRunState(status: "running", workingLabel: "Working")
+        return AgentSendTicket(
+            messageID: msg.id,
+            text: trimmed,
+            attachments: attachments,
+            interrupt: interrupt,
+            draftId: draftId,
+            sessionId: agentSessionId,
+            viewGen: agentViewGen
+        )
+    }
 
-        let payload: [AgentAttachmentPayload]? = attachments.isEmpty
+    /// Network half. Working (orb, beams) starts only once the server accepts
+    /// the turn. Returns false after restoring nothing but the error bubble;
+    /// the caller puts the text back into the composer.
+    func deliverAgentSend(
+        _ ticket: AgentSendTicket,
+        uiContext: AgentUiContext? = nil,
+        token: String
+    ) async -> Bool {
+        var sessionId = ticket.sessionId
+        if sessionId == nil {
+            sessionId = await startSessionForSend(ticket, token: token)
+        }
+        guard let sid = sessionId else {
+            failAgentSend(ticket, error: nil)
+            return false
+        }
+        if let i = pendingSends.firstIndex(where: { $0.id == ticket.messageID }) {
+            pendingSends[i].sessionId = sid
+        }
+
+        let files = await draftStore?.resolveUploads(ticket.attachments) ?? ticket.attachments
+        let inline = files.filter { $0.serverFileId == nil && !$0.data.isEmpty }
+        let payload: [AgentAttachmentPayload]? = inline.isEmpty
             ? nil
-            : attachments.map {
+            : inline.map {
                 AgentAttachmentPayload(
                     name: $0.name,
                     mimeType: $0.mimeType,
                     data: $0.data.base64EncodedString()
                 )
             }
-
+        let draftId = ticket.draftId.flatMap { id -> String? in
+            let uploaded = files.contains { $0.serverFileId != nil }
+            return uploaded || (draftStore?.serverMayHave(id) ?? false) ? id : nil
+        }
         let context = uiContext ?? AgentUiContext(client: "ios", view: "chat", title: "Personal Agent")
 
         do {
@@ -1449,48 +1540,78 @@ final class EducationStore: ObservableObject {
                 method: "POST",
                 body: AgentMessageBody(
                     sessionId: sid,
-                    message: trimmed,
+                    message: ticket.text,
                     attachments: payload,
                     uiContext: context,
-                    interrupt: interrupt ? true : nil
+                    interrupt: ticket.interrupt ? true : nil,
+                    draftId: draftId
                 ),
                 bearer: token
             )
-            applyWireMessages(res.messages)
-            if res.status == "running" || res.content == nil {
-                applyAgentRunState(status: "running", workingLabel: res.workingLabel)
-                startAgentPolling(token: token)
-            } else if let reply = res.text {
-                // Sync path fallback (shouldn't happen with 202 async API).
-                if agentMessages.last?.role != "assistant" {
-                    agentMessages.append(ChatMessage(role: "assistant", content: reply))
+            let visible = ticket.viewGen == agentViewGen && agentSessionId == sid
+            if visible {
+                if let i = agentMessages.firstIndex(where: { $0.id == ticket.messageID }) {
+                    agentMessages[i].pending = false
                 }
-                applyAgentRunState(status: "idle", workingLabel: nil)
+                applyWireMessages(res.messages)
+                if res.status == "running" || res.content == nil {
+                    applyAgentRunState(status: "running", workingLabel: res.workingLabel)
+                    startAgentPolling(token: token)
+                } else if let reply = res.text {
+                    // Sync path fallback (shouldn't happen with 202 async API).
+                    if agentMessages.last?.role != "assistant" {
+                        agentMessages.append(ChatMessage(role: "assistant", content: reply))
+                    }
+                    applyAgentRunState(status: "idle", workingLabel: nil)
+                }
                 persistAgentChatNow()
             }
+            await loadChatList(token: token)
+            pendingSends.removeAll { $0.id == ticket.messageID }
+            return true
         } catch {
-            // Drop optimistic bubble on failure.
-            if let last = agentMessages.last,
-               last.role == "user",
-               last.content == bubble
-            {
-                agentMessages.removeLast()
-            }
-            if !willQueue {
-                applyAgentRunState(status: "idle", workingLabel: nil)
-                stopAgentPolling()
-            }
-            let message: String
-            if case let APIError.http(code, _) = error, code == 429 {
-                message = "Queue full (max 8). Wait for a reply before sending more."
-            } else {
-                message = "Education agent unavailable (Mac / Cursor offline)."
-            }
-            agentMessages.append(
-                ChatMessage(role: "assistant", content: message)
-            )
-            persistAgentChatNow()
+            failAgentSend(ticket, error: error)
+            return false
         }
+    }
+
+    /// `agent/start` for a send from a blank thread. Only adopts the session
+    /// if the user is still looking at that blank thread.
+    private func startSessionForSend(_ ticket: AgentSendTicket, token: String) async -> String? {
+        do {
+            let res: AgentStartResponse = try await APIClient.shared.request(
+                api("agent/start"),
+                method: "POST",
+                body: EmptyBody(),
+                bearer: token
+            )
+            guard let sid = res.sessionId, !sid.isEmpty else {
+                errorText = res.error ?? "Could not start education agent."
+                return nil
+            }
+            if ticket.viewGen == agentViewGen, agentSessionId == nil {
+                agentSessionId = sid
+                persistAgentChatNow()
+            }
+            return sid
+        } catch {
+            errorText = error.localizedDescription
+            return nil
+        }
+    }
+
+    private func failAgentSend(_ ticket: AgentSendTicket, error: Error?) {
+        pendingSends.removeAll { $0.id == ticket.messageID }
+        guard ticket.viewGen == agentViewGen else { return }
+        agentMessages.removeAll { $0.id == ticket.messageID }
+        let message: String
+        if let error, case let APIError.http(code, _) = error, code == 429 {
+            message = "Queue full (max 8). Wait for a reply before sending more."
+        } else {
+            message = "Education agent unavailable (Mac / Cursor offline)."
+        }
+        agentMessages.append(ChatMessage(role: "assistant", content: message))
+        persistAgentChatNow()
     }
 
     /// Tear down the live Cursor agent for this thread. Prefer `startNewChat`
@@ -1580,6 +1701,9 @@ final class EducationStore: ObservableObject {
                 bearer: token
             )
             chatHistory = res.chats ?? []
+            if let drafts = res.drafts {
+                draftStore?.ingest(drafts)
+            }
         } catch {
             if chatHistory.isEmpty {
                 errorText = error.localizedDescription

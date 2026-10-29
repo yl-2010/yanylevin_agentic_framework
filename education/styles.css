@@ -306,7 +306,7 @@ a {
 .yan-chat-map-ios::before,
 .yan-chat-bubble::before,
 .edu-filter::before,
-.yan-chat-attach-chip::before {
+.yan-chat-attach-tile::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -1904,6 +1904,7 @@ a.edu-score {
   --lg-read-blur: 0px;
   --lg-panel-blur: 0px;
   --chat-pad: clamp(1rem, 2.5vw, 1.6rem);
+  --chat-panel-radius: clamp(1.5rem, 4vw, 2.4rem);
   --chat-circle: var(--corner-orb);
   /* Match .c-tl size so the panel clears the top liquid-glass orbs */
   --chat-top-orb: var(--corner-orb);
@@ -1962,9 +1963,6 @@ html[data-resolved-theme="light"] .yan-chat {
 }
 .yan-chat-column.has-input-text {
   --lg-read-blur: 20px;
-}
-.yan-chat.is-history .yan-chat-column--history {
-  --lg-panel-blur: 20px;
 }
 @media (prefers-reduced-motion: no-preference) {
   .yan-chat {
@@ -2085,101 +2083,103 @@ html[data-resolved-theme="dark"] .yan-chat-pill.corner.lg-refraction::after {
 }
 .yan-chat-column.is-composer-tall .yan-chat-input { align-self: stretch; height: auto; }
 .yan-chat-input::placeholder { color: var(--muted); opacity: 0.8; }
-.yan-chat-column.is-dragover .yan-chat-pill.corner {
-  box-shadow: 0 0 0 2px var(--chat-orange), 0 4px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
-}
-.yan-chat-column.is-dragover .yan-chat-panel {
-  box-shadow: 0 0 0 2px var(--chat-orange), 0 10px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
-}
 .yan-chat-attach-chips {
+  /* Tiles sit in the panel's bottom-left corner, concentric with its curve:
+     inset = panel radius - tile radius. 0.75rem is the panel-to-pill gap
+     baked into --chat-panel-bottom; subtract the scroll padding below. */
+  --tile-inset: calc(var(--chat-panel-radius) - 16px);
   position: absolute;
-  left: 1.15rem;
-  right: 3.2rem;
-  bottom: calc(100% + 0.35rem);
+  left: calc(var(--tile-inset) - 4px);
+  right: calc(var(--tile-inset) - 4px);
+  bottom: calc(100% + 0.75rem + var(--tile-inset) - 8px);
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  max-height: 4.5rem;
-  overflow: auto;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  /* Room for the tile shadow and hover lift inside the scroll clip. */
+  padding: 6px 4px 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
   pointer-events: auto;
   z-index: 5;
 }
+.yan-chat-attach-chips::-webkit-scrollbar { display: none; }
 .yan-chat-column.has-attachments .yan-chat-messages::after,
 .yan-chat-column.has-attachments .yan-chat-history::after {
-  height: calc(var(--chat-panel-radius) + 3.2rem);
+  height: calc(var(--chat-panel-radius) + 64px + 1rem);
 }
 .yan-chat-attach-chips[hidden] { display: none !important; }
-.yan-chat-attach-chip {
+.yan-chat-attach-tile {
   --lg-tint-rgb: var(--chat-orange-rgb);
   --lg-tint-opacity: 0.5;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  max-width: 11rem;
-  padding: 0.22rem 0.45rem 0.22rem 0.55rem;
-  border-radius: 999px;
   position: relative;
   isolation: isolate;
   overflow: hidden;
+  flex: 0 0 64px;
+  width: 64px;
+  height: 64px;
+  margin: 0;
+  padding: 0 6px 7px;
+  border: 0;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
   background: color-mix(in srgb, var(--panel-bg) 82%, transparent);
   color: var(--fg);
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1.2;
+  font-family: var(--body);
+  cursor: pointer;
   box-shadow: 0 2px 8px var(--lg-outer-shadow);
   backdrop-filter: blur(16px) saturate(1.55);
   -webkit-backdrop-filter: blur(16px) saturate(1.55);
+  transition: opacity 0.25s var(--ease), transform 0.25s var(--chat-spring), filter 0.2s var(--ease);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 @media (prefers-color-scheme: dark) {
-  html:not([data-resolved-theme="light"]) .yan-chat-attach-chip {
+  html:not([data-resolved-theme="light"]) .yan-chat-attach-tile {
     --lg-tint-opacity: 0.48;
   }
 }
-html[data-resolved-theme="dark"] .yan-chat-attach-chip {
+html[data-resolved-theme="dark"] .yan-chat-attach-tile {
   --lg-tint-opacity: 0.48;
 }
-html[data-resolved-theme="light"] .yan-chat-attach-chip {
+html[data-resolved-theme="light"] .yan-chat-attach-tile {
   --lg-tint-opacity: 0.52;
 }
-.yan-chat-attach-chip-thumb {
+.yan-chat-attach-tile:hover { transform: translateY(-1px); filter: brightness(1.06); }
+.yan-chat-attach-tile:active { transform: scale(0.95); transition-duration: 0.08s; }
+.yan-chat-attach-tile:focus-visible { outline: 2px solid var(--chat-orange); outline-offset: 2px; }
+.yan-chat-attach-tile.is-uploading { opacity: 0.55; }
+.yan-chat-attach-tile-ext {
+  position: absolute;
+  inset: 0 4px 16px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0.6;
+}
+.yan-chat-attach-tile-ext.is-long { font-size: 13px; }
+.yan-chat-attach-tile-name {
   position: relative;
   z-index: 2;
-  flex: 0 0 auto;
-  width: 1.15rem;
-  height: 1.15rem;
-  border-radius: 4px;
-  object-fit: cover;
-  background: color-mix(in srgb, var(--fg) 12%, transparent);
-}
-.yan-chat-attach-chip:has(.yan-chat-attach-chip-thumb) {
-  padding-left: 0.28rem;
-}
-.yan-chat-attach-chip-name {
-  position: relative;
-  z-index: 2;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.2;
+  opacity: 0.8;
 }
-.yan-chat-attach-chip-x {
-  position: relative;
-  z-index: 2;
-  flex: 0 0 auto;
-  margin: 0;
-  padding: 0;
-  width: 1.1rem;
-  height: 1.1rem;
-  border: 0;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--fg) 12%, transparent);
-  color: var(--fg);
-  cursor: pointer;
-  font-size: 0.85rem;
-  line-height: 1;
-  display: grid;
-  place-items: center;
-}
-.yan-chat-attach-chip-x:hover { background: color-mix(in srgb, var(--fg) 22%, transparent); }
 .yan-chat-send {
   --lg-filter: none;
   --lg-tint-rgb: var(--chat-orange-rgb);
@@ -2226,7 +2226,6 @@ html[data-resolved-theme="dark"] .yan-chat-send { --lg-tint-opacity: 0.4; }
   to { opacity: 1; transform: none; }
 }
 .yan-chat-panel {
-  --chat-panel-radius: clamp(1.5rem, 4vw, 2.4rem);
   --chat-x-size: 1.7rem;
   position: fixed; z-index: 89;
   left: var(--col-left, var(--pill-left)); right: auto;
@@ -2261,9 +2260,19 @@ html[data-resolved-theme="dark"] .yan-chat-send { --lg-tint-opacity: 0.4; }
   backdrop-filter: blur(14px) saturate(1.5); -webkit-backdrop-filter: blur(14px) saturate(1.5);
   transition: backdrop-filter 0.4s var(--ease), -webkit-backdrop-filter 0.4s var(--ease);
 }
-.yan-chat.is-history .yan-chat-column--history .yan-chat-panel.lg-fallback {
-  backdrop-filter: blur(20px) saturate(1.5);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+/* File drag over one box: hold the tint at the old busy pulse's peak. */
+.yan-chat-pill::before,
+.yan-chat-panel::before {
+  background-color: color-mix(
+    in srgb,
+    rgba(var(--chat-pulse-rgb), var(--chat-pulse-opacity)) calc(var(--chat-busy) * 100%),
+    rgba(var(--chat-clear-rgb), var(--chat-clear-opacity))
+  );
+  transition: --chat-busy 0.3s ease;
+}
+.yan-chat-pill.is-drop-target::before,
+.yan-chat-panel.is-drop-target::before {
+  --chat-busy: 1;
 }
 .yan-chat.has-panel .yan-chat-panel {
   pointer-events: auto; opacity: 1; transform: none;
@@ -2347,19 +2356,55 @@ html.lg-chrome .yan-chat-close:hover {
 }
 .yan-chat-history[hidden],
 .yan-chat-messages[hidden] { display: none !important; }
-.yan-chat-history-section { display: flex; flex-direction: column; gap: 0.12rem; min-width: 0; }
+.yan-chat-history-section {
+  display: flex; flex-direction: column; gap: 6px; min-width: 0;
+  padding: 0 0.85rem;
+}
 .yan-chat-history-label {
-  margin: 0 0 0.2rem; padding: 0 var(--chat-history-inset);
+  margin: 0 0 0.1rem; padding: 0 12px;
   font-family: var(--body); font-size: var(--text-caption); font-weight: 600;
   color: var(--muted);
 }
+/* Each row is its own frosted glass chip (iOS history rows). The ::before is
+   the tint layer so unread can swap it to orange. */
 .yan-chat-history-row {
+  --row-tint-rgb: var(--lg-tint-rgb);
+  --row-tint-opacity: 0.22;
+  --row-rim: rgba(255, 255, 255, 0.5);
+  --row-shine: rgba(255, 255, 255, 0.16);
   position: relative;
   isolation: isolate;
   display: flex; align-items: baseline; gap: 0.7rem;
-  width: 100%; margin: 0; padding: 0.55rem var(--chat-history-inset);
-  border: 0; border-radius: 0; background: transparent;
+  width: 100%; margin: 0; padding: 10px 12px;
+  border: 0; border-radius: 14px; background: transparent;
   color: var(--fg); font-family: var(--body); text-align: left; cursor: pointer;
+  box-shadow:
+    inset 0 0 0 0.5px var(--row-rim),
+    0 2px 10px color-mix(in srgb, var(--lg-outer-shadow) 45%, transparent);
+  backdrop-filter: blur(16px) saturate(1.5);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  transition:
+    transform 0.25s var(--chat-spring),
+    box-shadow 0.25s var(--ease);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-resolved-theme="light"]) .yan-chat-history-row {
+    --row-tint-opacity: 0.34;
+    --row-rim: rgba(255, 255, 255, 0.12);
+    --row-shine: rgba(255, 255, 255, 0.07);
+  }
+}
+html[data-resolved-theme="dark"] .yan-chat-history-row {
+  --row-tint-opacity: 0.34;
+  --row-rim: rgba(255, 255, 255, 0.12);
+  --row-shine: rgba(255, 255, 255, 0.07);
+}
+html[data-resolved-theme="light"] .yan-chat-history-row {
+  --row-tint-opacity: 0.22;
+  --row-rim: rgba(255, 255, 255, 0.5);
+  --row-shine: rgba(255, 255, 255, 0.16);
 }
 .yan-chat-history-row > * {
   position: relative;
@@ -2370,77 +2415,61 @@ html.lg-chrome .yan-chat-close:hover {
   position: absolute;
   inset: 0;
   z-index: 0;
+  border-radius: inherit;
   pointer-events: none;
-  background-image: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.12),
-    transparent 55%
-  );
-  background-color: rgba(var(--lg-tint-rgb), 0.12);
-  box-shadow: inset 0 0 var(--lg-shadow-blur) var(--lg-shadow-spread) var(--lg-shadow-color);
-  backdrop-filter: blur(12px) saturate(1.2);
-  -webkit-backdrop-filter: blur(12px) saturate(1.2);
-  opacity: 0;
-  transition: opacity 0.8s var(--ease);
+  background-image: linear-gradient(180deg, var(--row-shine), transparent 60%);
+  background-color: rgba(var(--row-tint-rgb), var(--row-tint-opacity));
+  box-shadow: inset 0 0 14px -5px var(--lg-shadow-color);
+  transition: background-color 0.35s var(--ease), filter 0.2s var(--ease);
+}
+.yan-chat-history-row.is-unread {
+  --row-tint-rgb: var(--chat-orange-rgb);
+  --row-tint-opacity: 0.2;
 }
 @media (prefers-color-scheme: dark) {
-  html:not([data-resolved-theme="light"]) .yan-chat-history-row::before {
-    background-image: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.08),
-      transparent 55%
-    );
-    background-color: rgba(var(--lg-tint-rgb), 0.22);
+  html:not([data-resolved-theme="light"]) .yan-chat-history-row.is-unread {
+    --row-tint-opacity: 0.26;
   }
 }
-html[data-resolved-theme="dark"] .yan-chat-history-row::before {
-  background-image: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.08),
-    transparent 55%
-  );
-  background-color: rgba(var(--lg-tint-rgb), 0.22);
+html[data-resolved-theme="dark"] .yan-chat-history-row.is-unread {
+  --row-tint-opacity: 0.26;
 }
-html[data-resolved-theme="light"] .yan-chat-history-row::before {
-  background-image: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.14),
-    transparent 55%
-  );
-  background-color: rgba(var(--lg-tint-rgb), 0.12);
+html[data-resolved-theme="light"] .yan-chat-history-row.is-unread {
+  --row-tint-opacity: 0.2;
+}
+.yan-chat-history-row:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 0 0 0.5px var(--row-rim),
+    0 6px 16px color-mix(in srgb, var(--lg-outer-shadow) 60%, transparent);
 }
 .yan-chat-history-row:hover::before,
-.yan-chat-history-row:focus-visible::before,
 .yan-chat-history-row.is-current::before {
-  opacity: 0.72;
-  transition: opacity 0s;
+  filter: brightness(1.12) saturate(1.1);
 }
-.yan-chat-history-row:focus-visible { outline: none; }
+.yan-chat-history-row.is-current {
+  box-shadow:
+    inset 0 0 0 1px var(--row-rim),
+    0 4px 14px color-mix(in srgb, var(--lg-outer-shadow) 55%, transparent);
+}
+.yan-chat-history-row:active {
+  transform: scale(0.98);
+  transition-duration: 0.08s;
+}
+.yan-chat-history-row:focus-visible { outline: 2px solid var(--chat-orange); outline-offset: 2px; }
+.yan-chat-history-row.is-pending .yan-chat-history-title,
+.yan-chat-history-row.is-draft .yan-chat-history-title {
+  opacity: 0.5;
+}
 @media (prefers-reduced-motion: reduce) {
+  .yan-chat-history-row,
   .yan-chat-history-row::before { transition-duration: 0.01ms; }
-}
-.yan-chat-history-dot {
-  flex: 0 0 8px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--chat-orange);
-  align-self: center;
-  margin-right: -0.35rem;
-}
-.yan-chat-history-dot.is-working {
-  animation: yan-chat-dot-pulse 1.15s ease-in-out infinite;
-}
-@keyframes yan-chat-dot-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.25; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .yan-chat-history-dot.is-working { animation: none; }
+  .yan-chat-history-row:hover { transform: none; }
 }
 .yan-chat-history-title {
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: var(--text-body); font-weight: 400; line-height: var(--lh-body);
+  transition: opacity 0.3s var(--ease);
 }
 .yan-chat-history-age {
   flex: 0 0 auto; font-size: var(--text-caption); font-weight: 400; color: var(--muted);
@@ -2511,8 +2540,17 @@ html[data-resolved-theme="light"] .yan-chat-bubble {
 .yan-chat-working {
   align-self: flex-start;
   flex-shrink: 0;
-  padding: 12px 14px;
-  color: var(--muted);
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border-radius: 18px;
+}
+.yan-chat-working-orb {
+  display: block;
+  width: 40px;
+  height: 40px;
 }
 @media (prefers-color-scheme: dark) {
   html:not([data-resolved-theme="light"]) .yan-chat-bubble--user {
@@ -2577,6 +2615,10 @@ html[data-resolved-theme="light"] .yan-chat-bubble--user {
   width: 100%;
   max-width: 100%;
   min-width: 0;
+}
+.yan-chat-turn--pending {
+  opacity: 0.42;
+  transition: opacity 0.3s var(--ease);
 }
 .yan-chat-turn--queued {
   opacity: 0.42;
@@ -2710,26 +2752,183 @@ a.yan-chat-widget {
   inherits: true;
   initial-value: 0;
 }
-.yan-chat.is-busy .yan-chat-pill {
-  animation: yan-chat-glass-pulse 2.8s ease-in-out infinite;
+
+/* Border beam adapted from border-beam by Jakub Antalik, MIT.
+   Web port of the "md" border variant with one orange color layer. The host
+   keeps its own ::before/::after (liquid glass), so the beam lives in a child
+   .yl-beam-ring: ::after is the 1px stroke, ::before the inner edge glow,
+   .yl-beam-bloom the blurred bloom. JS toggles .is-beaming on the host and
+   .is-beam-fading for the 0.6s fade out so the spin keeps going. */
+@property --beam-angle {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0deg;
 }
-.yan-chat.is-busy .yan-chat-pill::before,
-.yan-chat.is-busy .yan-chat-send::before {
-  background-color: color-mix(
-    in srgb,
-    rgba(var(--chat-pulse-rgb), var(--chat-pulse-opacity)) calc(var(--chat-busy) * 100%),
-    rgba(var(--chat-clear-rgb), var(--chat-clear-opacity))
-  );
+span.yl-beam-ring {
+  --beam-rgb: var(--chat-orange-rgb, 253, 88, 2);
+  --beam-stroke-opacity: 0.95;
+  --beam-inner-opacity: 0.26;
+  --beam-bloom-opacity: 0.6;
+  --beam-hot: rgba(255, 255, 255, 0.45);
+  --beam-inner-shadow: rgba(var(--beam-rgb), 0.5);
+  /* Inner glow fade depth. Short hosts (history rows) need less or the
+     top and bottom fades meet and fill the row. */
+  --beam-edge: 28px;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.6s ease;
 }
-@keyframes yan-chat-glass-pulse {
-  0%, 100% { --chat-busy: 0; }
-  50% { --chat-busy: 1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .yan-chat.is-busy .yan-chat-pill::before,
-  .yan-chat.is-busy .yan-chat-send::before {
-    background-color: rgba(var(--lg-tint-rgb), var(--lg-tint-opacity));
+@media (prefers-color-scheme: dark) {
+  html:not([data-resolved-theme="light"]) span.yl-beam-ring {
+    --beam-stroke-opacity: 0.9;
+    --beam-inner-opacity: 0.34;
+    --beam-bloom-opacity: 0.75;
+    --beam-hot: rgba(255, 255, 255, 0.7);
   }
+}
+html[data-resolved-theme="dark"] span.yl-beam-ring {
+  --beam-stroke-opacity: 0.9;
+  --beam-inner-opacity: 0.34;
+  --beam-bloom-opacity: 0.75;
+  --beam-hot: rgba(255, 255, 255, 0.7);
+}
+.yan-chat-history-row > span.yl-beam-ring { --beam-edge: 10px; }
+.is-beaming > span.yl-beam-ring { opacity: 1; }
+.is-beaming > span.yl-beam-ring,
+.is-beam-fading > span.yl-beam-ring {
+  animation: yl-beam-spin 1.96s linear infinite;
+}
+.yl-beam-ring::before,
+.yl-beam-ring::after,
+.yl-beam-bloom,
+.yl-beam-bloom::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.yl-beam-ring::after {
+  z-index: 2;
+  padding: 1px;
+  background:
+    conic-gradient(
+      from var(--beam-angle),
+      transparent 0%, transparent 60%,
+      var(--beam-hot) 66%,
+      transparent 72%, transparent 100%
+    ),
+    var(--chat-orange, rgb(var(--beam-rgb)));
+  -webkit-mask:
+    conic-gradient(
+      from var(--beam-angle),
+      transparent 0%, transparent 30%,
+      rgba(255, 255, 255, 0.1) 36%, rgba(255, 255, 255, 0.35) 44%,
+      white 52%, white 80%,
+      rgba(255, 255, 255, 0.35) 86%, rgba(255, 255, 255, 0.1) 92%,
+      transparent 95%, transparent 100%
+    ),
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: source-in, xor;
+  mask:
+    conic-gradient(
+      from var(--beam-angle),
+      transparent 0%, transparent 30%,
+      rgba(255, 255, 255, 0.1) 36%, rgba(255, 255, 255, 0.35) 44%,
+      white 52%, white 80%,
+      rgba(255, 255, 255, 0.35) 86%, rgba(255, 255, 255, 0.1) 92%,
+      transparent 95%, transparent 100%
+    ),
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: intersect, exclude;
+  opacity: var(--beam-stroke-opacity);
+}
+.yl-beam-ring::before {
+  z-index: 1;
+  background: rgba(var(--beam-rgb), 0.55);
+  box-shadow: inset 0 0 9px 1px var(--beam-inner-shadow);
+  -webkit-mask-image:
+    conic-gradient(
+      from var(--beam-angle),
+      transparent 0%, transparent 30%,
+      rgba(255, 255, 255, 0.1) 36%, rgba(255, 255, 255, 0.35) 44%,
+      white 52%, white 80%,
+      rgba(255, 255, 255, 0.35) 86%, rgba(255, 255, 255, 0.1) 92%,
+      transparent 95%, transparent 100%
+    ),
+    linear-gradient(white, transparent var(--beam-edge), transparent calc(100% - var(--beam-edge)), white),
+    linear-gradient(to right, white, transparent var(--beam-edge), transparent calc(100% - var(--beam-edge)), white);
+  -webkit-mask-composite: source-in, source-over;
+  mask-image:
+    conic-gradient(
+      from var(--beam-angle),
+      transparent 0%, transparent 30%,
+      rgba(255, 255, 255, 0.1) 36%, rgba(255, 255, 255, 0.35) 44%,
+      white 52%, white 80%,
+      rgba(255, 255, 255, 0.35) 86%, rgba(255, 255, 255, 0.1) 92%,
+      transparent 95%, transparent 100%
+    ),
+    linear-gradient(white, transparent var(--beam-edge), transparent calc(100% - var(--beam-edge)), white),
+    linear-gradient(to right, white, transparent var(--beam-edge), transparent calc(100% - var(--beam-edge)), white);
+  mask-composite: intersect, add;
+  opacity: var(--beam-inner-opacity);
+}
+/* Blur sits on the wrapper so it softens the masked ring instead of being
+   masked back down to 1px. */
+.yl-beam-bloom {
+  z-index: 3;
+  filter: blur(8px) saturate(1.2);
+  opacity: var(--beam-bloom-opacity);
+}
+.yl-beam-bloom::before {
+  padding: 2px;
+  background: conic-gradient(
+    from var(--beam-angle),
+    transparent 0%, transparent 58%,
+    rgba(var(--beam-rgb), 0.05) 62%,
+    rgba(var(--beam-rgb), 0.15) 65%,
+    rgba(var(--beam-rgb), 0.35) 67%,
+    rgba(var(--beam-rgb), 0.65) 69%,
+    rgba(var(--beam-rgb), 1) 70%,
+    rgba(var(--beam-rgb), 1) 70.5%,
+    rgba(var(--beam-rgb), 0.65) 71.5%,
+    rgba(var(--beam-rgb), 0.35) 73%,
+    rgba(var(--beam-rgb), 0.15) 75%,
+    rgba(var(--beam-rgb), 0.05) 78%,
+    transparent 82%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+@keyframes yl-beam-spin {
+  to { --beam-angle: 360deg; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-beaming > span.yl-beam-ring,
+  .is-beam-fading > span.yl-beam-ring {
+    animation: none;
+  }
+  span.yl-beam-ring { transition: none; }
+  .is-beaming > span.yl-beam-ring { opacity: 0.5; }
+  .yl-beam-ring::after {
+    background: var(--chat-orange, rgb(var(--beam-rgb)));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+  }
+  .yl-beam-ring::before,
+  .yl-beam-bloom { display: none; }
   .yan-chat-pill.corner, .yan-chat-panel, .yan-chat-launcher, .yan-chat-close, .yan-chat-form, .yan-chat-send {
     transition-duration: 0.01ms !important; animation: none !important;
   }

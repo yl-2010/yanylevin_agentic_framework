@@ -71,6 +71,8 @@ final class AppNavigationStore: ObservableObject {
     @Published var chatHandoffOpenExisting = false
     /// Bumped when the user taps the already-selected tab (UIKit intercept).
     @Published var tabReselectGeneration = 0
+    /// The thread open in the Chat tab has an agent turn running. Set by ChatView.
+    @Published var chatWorking = false
 
     func openChat(startNew: Bool = false, sessionId: String? = nil) {
         selectedTab = .chat

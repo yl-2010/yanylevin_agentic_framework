@@ -9,6 +9,8 @@ struct ChatMessage: Identifiable, Equatable, Codable {
     /// Server id for a waiting turn. Hold the bubble to interrupt with it.
     var queueId: String? = nil
     var widgets: [ChatWidget] = []
+    /// Local send the server has not accepted yet. Never persisted.
+    var pending: Bool = false
 
     enum CodingKeys: String, CodingKey {
         case role, content, queued, queueId, widgets
@@ -19,13 +21,15 @@ struct ChatMessage: Identifiable, Equatable, Codable {
         content: String,
         queued: Bool = false,
         queueId: String? = nil,
-        widgets: [ChatWidget] = []
+        widgets: [ChatWidget] = [],
+        pending: Bool = false
     ) {
         self.role = role
         self.content = content
         self.queued = queued
         self.queueId = queueId
         self.widgets = widgets
+        self.pending = pending
     }
 
     init(from decoder: Decoder) throws {

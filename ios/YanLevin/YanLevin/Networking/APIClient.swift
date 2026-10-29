@@ -125,6 +125,44 @@ struct APIClient {
         guard let http = response as? HTTPURLResponse else { throw APIError.decoding }
         return (data, http)
     }
+
+    /// Raw body upload (not JSON). Decodes a JSON response like `request`.
+    func upload<T: Decodable>(
+        _ path: String,
+        method: String = "POST",
+        data body: Data,
+        headers: [String: String],
+        bearer: String? = nil
+    ) async throws -> T {
+        guard let url = Self.makeURL(path: path) else { throw APIError.offline("Bad URL") }
+        var req = URLRequest(url: url)
+        req.httpMethod = method
+        req.cachePolicy = .reloadIgnoringLocalCacheData
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let bearer, !bearer.isEmpty {
+            req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
+        }
+        for (key, value) in headers {
+            req.setValue(value, forHTTPHeaderField: key)
+        }
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await session.upload(for: req, from: body)
+        } catch {
+            throw APIError.offline("Yan’s Mac is offline or unreachable. Try again later.")
+        }
+        guard let http = response as? HTTPURLResponse else { throw APIError.decoding }
+        if http.statusCode == 401 { throw APIError.unauthorized }
+        guard (200..<300).contains(http.statusCode) else {
+            let msg = String(data: data, encoding: .utf8) ?? ""
+            throw APIError.http(http.statusCode, msg.prefix(240).description)
+        }
+        do {
+            return try Self.decoder.decode(T.self, from: data)
+        } catch {
+            throw APIError.decoding
+        }
+    }
 }
 
 private struct AnyEncodable: Encodable {

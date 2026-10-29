@@ -108,6 +108,12 @@ import {
 } from "./headlines-activity.js";
 import { attachStudyRoutes } from "./study.js";
 import { readQuizAttempt, saveQuizAttempt } from "./quiz-attempts.js";
+import {
+  attachChatDraftRoutes,
+  chatDraftsRoot,
+  listDrafts,
+  loadMessageDraft,
+} from "./chat-drafts.js";
 
 const PORT = Number(process.env.PORT || 3004);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -612,6 +618,42 @@ function requireJypeUser(req, res, next) {
 
 const JYPE_WS = { workspace: "jype" };
 
+/**
+ * /agent/message. An optional draftId sends that draft's stored files with
+ * the turn, then deletes the draft once messageAgent accepts it.
+ * @param {import('express').Request} req
+ * @param {string} [workspace]
+ */
+async function postAgentMessage(req, workspace = "") {
+  const draft = await loadMessageDraft(req.user.email, workspace, req.body?.draftId);
+  const result = await messageAgent(
+    req.body?.sessionId,
+    req.user.email,
+    req.body?.message,
+    req.body?.attachments,
+    req.body?.uiContext,
+    req.body?.interrupt,
+    { files: draft.files }
+  );
+  await draft.consume();
+  return result;
+}
+
+/**
+ * @param {string} email
+ * @param {{ workspace?: string }} [opts]
+ */
+async function listAgentChatsWithDrafts(email, opts = {}) {
+  const result = await listAgentChats(email, opts);
+  let drafts = [];
+  try {
+    drafts = await listDrafts(chatDraftsRoot(email, opts.workspace));
+  } catch (err) {
+    console.error("[agent/chats] drafts", err);
+  }
+  return { ...result, drafts };
+}
+
 function bearerToken(req) {
   const header = req.headers.authorization || req.headers.Authorization;
   if (!header || typeof header !== "string") return "";
@@ -958,14 +1000,7 @@ app.post(
   requireEducationUser,
   async (req, res) => {
     try {
-      const result = await messageAgent(
-        req.body?.sessionId,
-        req.user.email,
-        req.body?.message,
-        req.body?.attachments,
-        req.body?.uiContext,
-        req.body?.interrupt
-      );
+      const result = await postAgentMessage(req);
       res.setHeader("Cache-Control", "no-store");
       // Async run — returns immediately with status:running; clients poll /state.
       res.status(202).json(result);
@@ -1045,7 +1080,7 @@ app.get("/api/education/agent/running", requireEducationUser, async (req, res) =
 
 app.get("/api/education/agent/chats", requireEducationUser, async (req, res) => {
   try {
-    const result = await listAgentChats(req.user.email);
+    const result = await listAgentChatsWithDrafts(req.user.email);
     res.setHeader("Cache-Control", "no-store");
     res.json(result);
   } catch (err) {
@@ -1097,6 +1132,11 @@ app.post("/api/education/agent/stop", requireEducationUser, async (req, res) => 
       error: err.message || "agent stop failed",
     });
   }
+});
+
+attachChatDraftRoutes(app, {
+  prefix: "/api/education/agent",
+  guard: requireEducationUser,
 });
 
 app.get("/api/jype/data", requireJypeUser, async (req, res) => {
@@ -1265,14 +1305,7 @@ app.post("/api/jype/agent/start", requireJypeUser, async (req, res) => {
 
 app.post("/api/jype/agent/message", requireJypeUser, async (req, res) => {
   try {
-    const result = await messageAgent(
-      req.body?.sessionId,
-      req.user.email,
-      req.body?.message,
-      req.body?.attachments,
-      req.body?.uiContext,
-      req.body?.interrupt
-    );
+    const result = await postAgentMessage(req, "jype");
     res.setHeader("Cache-Control", "no-store");
     res.status(202).json(result);
   } catch (err) {
@@ -1346,7 +1379,7 @@ app.get("/api/jype/agent/running", requireJypeUser, async (req, res) => {
 
 app.get("/api/jype/agent/chats", requireJypeUser, async (req, res) => {
   try {
-    const result = await listAgentChats(req.user.email, JYPE_WS);
+    const result = await listAgentChatsWithDrafts(req.user.email, JYPE_WS);
     res.setHeader("Cache-Control", "no-store");
     res.json(result);
   } catch (err) {
@@ -1402,6 +1435,12 @@ app.post("/api/jype/agent/stop", requireJypeUser, async (req, res) => {
       error: err.message || "agent stop failed",
     });
   }
+});
+
+attachChatDraftRoutes(app, {
+  prefix: "/api/jype/agent",
+  guard: requireJypeUser,
+  workspace: "jype",
 });
 
 /**

@@ -19,6 +19,7 @@ import {
   DEFAULT_MODEL_SPEC,
   EMPTY_TURN_REPLY,
   guestTurnModelSpec,
+  normalizeAttachments,
   formatLiveContextBlock,
   normalizeUiContext,
   buildYanLiveAppendix,
@@ -1407,3 +1408,52 @@ describe("Teams final reply delivery", () => {
   });
 });
 
+describe("normalizeAttachments with on-disk draft files", () => {
+  const MB = 1024 * 1024;
+
+  it("keeps inline base64 and adds disk sources without reading them", () => {
+    const out = normalizeAttachments(
+      [{ name: "a.png", data: Buffer.from("png").toString("base64") }],
+      [{ name: "../b.pdf", mimeType: "", size: 12, path: "/tmp/draft/xyz-b.pdf" }]
+    );
+    assert.equal(out.length, 2);
+    assert.equal(out[0].name, "a.png");
+    assert.equal(out[0].mimeType, "image/png");
+    assert.deepEqual(out[1], {
+      name: "b.pdf",
+      mimeType: "application/pdf",
+      sourcePath: "/tmp/draft/xyz-b.pdf",
+      bytes: 12,
+    });
+  });
+
+  it("returns [] for nothing and skips empty sources", () => {
+    assert.deepEqual(normalizeAttachments(undefined, undefined), []);
+    assert.deepEqual(normalizeAttachments([], [{ name: "x", size: 0, path: "/x" }]), []);
+  });
+
+  it("applies the count and total limits across both kinds", () => {
+    const sources = Array.from({ length: 16 }, (_, i) => ({
+      name: `f${i}.txt`,
+      size: 1,
+      path: `/tmp/f${i}`,
+    }));
+    assert.equal(normalizeAttachments([], sources).length, 16);
+    assert.throws(
+      () =>
+        normalizeAttachments(
+          [{ name: "x.txt", data: Buffer.from("x").toString("base64") }],
+          sources
+        ),
+      (err) => err.status === 400 && /at most 16/.test(err.message)
+    );
+    assert.throws(
+      () =>
+        normalizeAttachments(
+          [{ name: "x.txt", data: Buffer.alloc(1024).toString("base64") }],
+          [{ name: "big.bin", size: 64 * MB, path: "/tmp/big" }]
+        ),
+      (err) => err.status === 400 && /total size/.test(err.message)
+    );
+  });
+});

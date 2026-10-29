@@ -5,7 +5,42 @@ struct ChatHistorySection: Identifiable, Equatable {
     let id: String
     let title: String
     let showAge: Bool
-    let chats: [AgentChatListItem]
+    let entries: [ChatHistoryEntry]
+}
+
+/// Priority order, highest last: working > unread > pending > draft > normal.
+enum ChatHistoryRowState: Equatable {
+    case normal
+    case draft
+    case pending
+    case unread
+    case working
+
+    var accessibilityValue: String {
+        switch self {
+        case .normal: return ""
+        case .draft: return "Draft"
+        case .pending: return "Sending"
+        case .unread: return "Unread"
+        case .working: return "Working"
+        }
+    }
+}
+
+/// One sidebar row: a server chat, an unsent new-chat draft, or a send the
+/// server has not accepted yet.
+struct ChatHistoryEntry: Identifiable, Equatable {
+    enum Target: Equatable {
+        case chat(sessionId: String)
+        case draft(id: String)
+        case pending(sessionId: String?)
+    }
+
+    let id: String
+    let target: Target
+    let title: String
+    let updated: String
+    let state: ChatHistoryRowState
 }
 
 enum ChatISODate {
@@ -62,20 +97,98 @@ enum ChatHistoryGrouping {
         return ""
     }
 
+    /// Chats, sessionless drafts, and unclaimed pending sends merged newest first.
+    /// A pending send converts its draft row or chat row in place; only a send
+    /// with neither gets its own row.
+    static func entries(
+        chats: [AgentChatListItem],
+        drafts: [ChatDraft],
+        pending: [AgentPendingSend]
+    ) -> [ChatHistoryEntry] {
+        let chatIds = Set(chats.map(\.sessionId))
+        let draftedSessions = Set(drafts.compactMap { $0.hasContent ? $0.sessionId : nil })
+        var claimed = Set<UUID>()
+        var rows: [ChatHistoryEntry] = []
+
+        for chat in chats {
+            let sends = pending.filter { $0.sessionId == chat.sessionId }
+            sends.forEach { claimed.insert($0.id) }
+            let state: ChatHistoryRowState
+            if chat.isWorking {
+                state = .working
+            } else if chat.isUnread {
+                state = .unread
+            } else if !sends.isEmpty {
+                state = .pending
+            } else if draftedSessions.contains(chat.sessionId) {
+                state = .draft
+            } else {
+                state = .normal
+            }
+            rows.append(
+                ChatHistoryEntry(
+                    id: "chat-\(chat.sessionId)",
+                    target: .chat(sessionId: chat.sessionId),
+                    title: chat.displayTitle,
+                    updated: chat.updated,
+                    state: state
+                )
+            )
+        }
+
+        for draft in drafts where draft.sessionId == nil && draft.hasContent {
+            let send = pending.first { $0.draftId == draft.id }
+            if let send {
+                claimed.insert(send.id)
+                if let sid = send.sessionId, chatIds.contains(sid) { continue }
+            }
+            rows.append(
+                ChatHistoryEntry(
+                    id: "draft-\(draft.id)",
+                    target: .draft(id: draft.id),
+                    title: draft.displayTitle,
+                    updated: draft.updated,
+                    state: send == nil ? .draft : .pending
+                )
+            )
+        }
+
+        for send in pending where !claimed.contains(send.id) {
+            rows.append(
+                ChatHistoryEntry(
+                    id: "pending-\(send.id.uuidString)",
+                    target: .pending(sessionId: send.sessionId),
+                    title: send.title,
+                    updated: send.started,
+                    state: .pending
+                )
+            )
+        }
+
+        return rows.enumerated()
+            .sorted { a, b in
+                let da = ChatISODate.parse(a.element.updated) ?? .distantPast
+                let db = ChatISODate.parse(b.element.updated) ?? .distantPast
+                if da != db { return da > db }
+                return a.offset < b.offset
+            }
+            .map(\.element)
+    }
+
     static func sections(
-        from chats: [AgentChatListItem],
+        from entries: [ChatHistoryEntry],
         now: Date = Date(),
         calendar: Calendar = seattleCalendar
     ) -> [ChatHistorySection] {
         var order: [String] = []
-        var buckets: [String: (title: String, showAge: Bool, chats: [AgentChatListItem])] = [:]
-        for chat in chats {
-            let g = group(for: chat.updated, now: now, calendar: calendar)
+        var buckets: [String: (title: String, showAge: Bool, entries: [ChatHistoryEntry])] = [:]
+        for entry in entries {
+            let g = group(for: entry.updated, now: now, calendar: calendar)
             if buckets[g.id] == nil {
                 order.append(g.id)
                 buckets[g.id] = (g.title, g.showAge, [])
             }
-            buckets[g.id]?.chats.append(chat)
+            buckets[g.id]?.entries.append(entry)
         }
         return order.compactMap { key in
             guard let row = buckets[key] else { return nil }
@@ -83,7 +196,7 @@ enum ChatHistoryGrouping {
                 id: key,
                 title: row.title,
                 showAge: row.showAge,
-                chats: row.chats
+                entries: row.entries
             )
         }
     }
@@ -147,7 +260,7 @@ struct ChatHistoryPanel: View {
     let sections: [ChatHistorySection]
     let isLoading: Bool
     let width: CGFloat
-    var onSelect: (AgentChatListItem) -> Void
+    var onSelect: (ChatHistoryEntry) -> Void
 
     var body: some View {
         ScrollView {
@@ -169,20 +282,18 @@ struct ChatHistoryPanel: View {
                             .foregroundStyle(YLTheme.muted(colorScheme))
                             .padding(.horizontal, 4)
                             .padding(.bottom, 2)
-                        ForEach(section.chats) { chat in
+                        ForEach(section.entries) { entry in
                             Button {
-                                onSelect(chat)
+                                onSelect(entry)
                             } label: {
                                 ChatHistoryRowLabel(
-                                    chat: chat,
+                                    entry: entry,
                                     showAge: section.showAge
                                 )
                             }
-                            .buttonStyle(ChatHistoryRowButtonStyle())
-                            .accessibilityLabel(chat.displayTitle)
-                            .accessibilityValue(
-                                chat.isWorking ? "Working" : chat.isUnread ? "Unread" : ""
-                            )
+                            .buttonStyle(ChatHistoryRowButtonStyle(state: entry.state))
+                            .accessibilityLabel(entry.title)
+                            .accessibilityValue(entry.state.accessibilityValue)
                         }
                     }
                 }
@@ -278,29 +389,23 @@ private final class HistoryScrollClipLockView: UIView {
 
 private struct ChatHistoryRowLabel: View {
     @Environment(\.colorScheme) private var colorScheme
-    let chat: AgentChatListItem
+    let entry: ChatHistoryEntry
     let showAge: Bool
 
-    var body: some View {
-        if chat.isWorking || chat.isUnread {
-            HStack(alignment: .center, spacing: 8) {
-                ChatHistoryStatusDot(working: chat.isWorking)
-                titleAndAge
-            }
-        } else {
-            titleAndAge
-        }
+    private var faded: Bool {
+        entry.state == .draft || entry.state == .pending
     }
 
-    private var titleAndAge: some View {
+    var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(chat.displayTitle)
+            Text(entry.title)
                 .font(.body)
                 .foregroundStyle(YLTheme.fg(colorScheme))
+                .opacity(faded ? 0.5 : 1)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if showAge {
-                Text(ChatHistoryGrouping.relativeAge(from: chat.updated))
+                Text(ChatHistoryGrouping.relativeAge(from: entry.updated))
                     .font(.caption)
                     .foregroundStyle(YLTheme.muted(colorScheme))
                     .monospacedDigit()
@@ -311,42 +416,34 @@ private struct ChatHistoryRowLabel: View {
 
 /// Own Liquid Glass chip per past chat. Press shine comes from interactive glass only.
 private struct ChatHistoryRowButtonStyle: ButtonStyle {
+    let state: ChatHistoryRowState
+
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
+        ChatHistoryRowChrome(state: state) {
+            configuration.label
+        }
+    }
+}
+
+private struct ChatHistoryRowChrome<Label: View>: View {
+    let state: ChatHistoryRowState
+    @ViewBuilder var label: () -> Label
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ylPalette) private var palette
+
+    private var unreadTint: Color? {
+        guard state == .unread else { return nil }
+        return YLTheme.chatSend(colorScheme, palette: palette)
+            .opacity(colorScheme == .dark ? 0.38 : 0.3)
+    }
+
+    var body: some View {
+        label()
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .ylGlassRounded(cornerRadius: 14, interactive: true)
-    }
-}
-
-private struct ChatHistoryStatusDot: View {
-    let working: Bool
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.ylPalette) private var palette
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var dimmed = false
-
-    var body: some View {
-        Circle()
-            .fill(YLTheme.chatSend(colorScheme, palette: palette))
-            .frame(width: 8, height: 8)
-            .opacity(working && !reduceMotion && dimmed ? 0.25 : 1)
-            .onAppear(perform: syncPulse)
-            .onChange(of: working) { _, _ in
-                syncPulse()
-            }
-            .onChange(of: reduceMotion) { _, _ in
-                syncPulse()
-            }
-    }
-
-    private func syncPulse() {
-        dimmed = false
-        guard working, !reduceMotion else { return }
-        withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
-            dimmed = true
-        }
+            .ylGlassRounded(cornerRadius: 14, tint: unreadTint, interactive: true)
+            .ylBorderBeam(cornerRadius: 14, active: state == .working)
     }
 }

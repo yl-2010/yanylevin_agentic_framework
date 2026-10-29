@@ -66,6 +66,7 @@ targets:
           - ms-word
           - ms-excel
           - ms-powerpoint
+          - onenote
         YanSiteBaseURL: https://yanylevin.com
         YanApiBaseURL: https://api.yanylevin.com
         ITSAppUsesNonExemptEncryption: false
@@ -97,6 +98,8 @@ targets:
     dependencies:
       - package: GoogleSignIn
         product: GoogleSignIn
+      - package: LibrariesDev
+        product: ThinkingOrbsKit
       - target: YanLevinWidgets
         embed: true
   YanLevinWidgets:
@@ -155,6 +158,10 @@ packages:
   GoogleSignIn:
     url: https://github.com/google/GoogleSignIn-iOS
     from: "8.0.0"
+  # MIT. Root manifest exposes one product per port; only ThinkingOrbsKit is linked.
+  LibrariesDev:
+    url: https://github.com/Jakubantalik/Libraries.dev
+    revision: bad63221ebafa08d830586aa1721ecbd4ea02fcb
 schemes:
   YanLevin:
     build:

@@ -36,15 +36,30 @@
       form,
       input,
       sendBtn: form?.querySelector(".yan-chat-send") || null,
-      /** @type {{ id: string, file: File }[]} */
+      /** @type {PendingFile[]} */
       pendingFiles: [],
       /** @type {HTMLElement|null} */
       chipsEl: null,
-      /** @type {string[]} */
-      chipObjectUrls: [],
       lastPillH: 0,
+      /** Server draft this composer saves into. Null until the first edit. */
+      /** @type {string|null} */
+      draftId: null,
+      /** @type {string|null} */
+      draftSessionId: null,
+      draftUpdated: "",
+      /** Local text edits not yet sent to the server. */
+      dirty: false,
+      saveTimer: 0,
+      /** Date.now() of the last server ack, so an older GET cannot clear it. */
+      draftTouchedAt: 0,
     };
   }
+
+  /**
+   * @typedef {{ id: string, file: File|null, name: string, mimeType: string, size: number,
+   *   serverId: string, uploading: boolean, removed?: boolean, localOnly?: boolean,
+   *   upload?: Promise<void> }} PendingFile
+   */
 
   const historyComposer = bindComposer(historyCol, "history");
   const threadComposer = bindComposer(threadCol, "thread");
@@ -77,8 +92,9 @@
   let viewGen = 0;
   let historyFetchGen = 0;
   let historyStructureKey = "";
-  /** @type {string|null} */
-  let historyPointerSid = null;
+  /** Row under pointerdown, kept in case the list rebuilds before click. */
+  /** @type {{ sid: string, draftId: string, pending: boolean }|null} */
+  let historyPointerRow = null;
 
   const MAX_FILES = 16;
   /** Match server MAX_ATTACHMENT_BYTES / MAX_TOTAL_ATTACHMENT_BYTES. */
@@ -89,8 +105,31 @@
 
   /** @type {HTMLElement|null} */
   let workingEl = null;
+  /** @type {{ destroy: () => void }|null} */
+  let workingOrb = null;
+  let orbWaiting = false;
   let busyLabel = "Working…";
   let bubbleSeq = 0;
+
+  /** Last GET chats payload. Drafts are { id, sessionId, text, title, files, created, updated }. */
+  /** @type {{ sessionId?: string, title?: string, preview?: string, updated?: string, working?: boolean, unread?: boolean }[]} */
+  let lastChats = [];
+  /** @type {{ id: string, sessionId: string|null, text?: string, title?: string, files?: { id: string, name: string, mimeType?: string, size?: number }[], created?: string, updated?: string }[]} */
+  let lastDrafts = [];
+  let historyLoaded = false;
+  /**
+   * Sends that are not accepted yet (or accepted but not in GET chats yet).
+   * @type {Map<string, { key: string, title: string, updated: string, sessionId: string, draftId: string, pending: boolean }>}
+   */
+  const pendingRows = new Map();
+  /** @type {Map<string, Promise<void>>} */
+  const draftSaves = new Map();
+  /** Set when the Mac API has no drafts routes. Composers then stay local. */
+  let draftsApiMissing = false;
+  let launcherTimer = 0;
+  const DRAFT_ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
+  const DRAFT_SAVE_MS = 500;
+  const LAUNCHER_POLL_MS = 5000;
 
   function storageKey() {
     const email =
@@ -145,15 +184,20 @@
     return chipsEl;
   }
 
-  function clearChipObjectUrls(composer) {
-    for (const url of composer.chipObjectUrls) URL.revokeObjectURL(url);
-    composer.chipObjectUrls = [];
+  function fileExtLabel(name) {
+    const m = String(name || "").match(/\.([A-Za-z0-9]{1,10})$/);
+    return m ? `.${m[1].toLowerCase()}` : "file";
+  }
+
+  function fileStem(name) {
+    const raw = String(name || "");
+    const m = raw.match(/^(.+)\.[A-Za-z0-9]{1,10}$/);
+    return m ? m[1] : raw;
   }
 
   function renderChips(composer) {
     const el = ensureChipsEl(composer);
     el.innerHTML = "";
-    clearChipObjectUrls(composer);
     const had = composer.column.classList.contains("has-attachments");
     if (!composer.pendingFiles.length) {
       el.hidden = true;
@@ -165,39 +209,141 @@
     composer.column.classList.add("has-attachments");
     if (!had) scheduleGlassRefresh();
     for (const item of composer.pendingFiles) {
-      const chip = document.createElement("span");
-      chip.className = "yan-chat-attach-chip";
-      chip.title = item.file.name;
-      if (item.file.type.startsWith("image/")) {
-        const thumb = document.createElement("img");
-        thumb.className = "yan-chat-attach-chip-thumb";
-        thumb.alt = "";
-        const url = URL.createObjectURL(item.file);
-        composer.chipObjectUrls.push(url);
-        thumb.src = url;
-        chip.appendChild(thumb);
-      }
-      const label = document.createElement("span");
-      label.className = "yan-chat-attach-chip-name";
-      label.textContent = item.file.name;
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.className = "yan-chat-attach-chip-x";
-      remove.setAttribute("aria-label", `Remove ${item.file.name}`);
-      remove.textContent = "×";
-      remove.addEventListener("click", (event) => {
+      const tile = document.createElement("button");
+      tile.type = "button";
+      tile.className = "yan-chat-attach-tile";
+      tile.classList.toggle("is-uploading", item.uploading);
+      tile.title = item.name;
+      tile.setAttribute("aria-label", `Remove ${item.name}`);
+      const ext = document.createElement("span");
+      ext.className = "yan-chat-attach-tile-ext";
+      ext.setAttribute("aria-hidden", "true");
+      const extText = fileExtLabel(item.name);
+      ext.textContent = extText;
+      ext.classList.toggle("is-long", extText.length > 5);
+      const name = document.createElement("span");
+      name.className = "yan-chat-attach-tile-name";
+      name.setAttribute("aria-hidden", "true");
+      name.textContent = fileStem(item.name);
+      tile.appendChild(ext);
+      tile.appendChild(name);
+      tile.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        composer.pendingFiles = composer.pendingFiles.filter((f) => f.id !== item.id);
-        renderChips(composer);
+        removePendingFile(composer, item.id);
       });
-      chip.appendChild(label);
-      chip.appendChild(remove);
-      el.appendChild(chip);
+      el.appendChild(tile);
     }
   }
 
-  function resetComposer(composer) {
+  function localFileId() {
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function newDraftId() {
+    try {
+      if (typeof crypto?.randomUUID === "function") return crypto.randomUUID();
+    } catch {
+      /* fall through */
+    }
+    return `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+  }
+
+  function draftPath(id, suffix = "") {
+    return `${API}/agent/drafts/${encodeURIComponent(id)}${suffix}`;
+  }
+
+  function validDraft(d) {
+    return Boolean(d && typeof d === "object" && DRAFT_ID_RE.test(String(d.id || "")));
+  }
+
+  function upsertLocalDraft(draft) {
+    if (!validDraft(draft)) return;
+    lastDrafts = [draft, ...lastDrafts.filter((d) => d.id !== draft.id)].sort(
+      (a, b) => (Date.parse(b.updated || "") || 0) - (Date.parse(a.updated || "") || 0)
+    );
+    for (const composer of composers) {
+      if (composer.draftId === draft.id) composer.draftUpdated = String(draft.updated || "");
+    }
+  }
+
+  function removeLocalDraft(id) {
+    if (!id) return;
+    lastDrafts = lastDrafts.filter((d) => d.id !== id);
+  }
+
+  function draftOnServer(id) {
+    return Boolean(id) && lastDrafts.some((d) => d.id === id);
+  }
+
+  /** Express answers unknown routes with a 404 page, not { ok }. */
+  function isMissingRoute(res, data) {
+    return (
+      (res.status === 404 || res.status === 405 || res.status === 501) &&
+      !(data && typeof data === "object" && "ok" in data)
+    );
+  }
+
+  function markDraftsMissing() {
+    if (draftsApiMissing) return;
+    draftsApiMissing = true;
+    console.warn("[edu-chat] drafts API unavailable; keeping composers local");
+  }
+
+  /** Binds the composer to a draft id on its first edit. */
+  function ensureComposerDraft(composer) {
+    if (composer.draftId) return composer.draftId;
+    if (composer.role === "thread" && sessionId) {
+      const id = `s-${sessionId}`;
+      if (!DRAFT_ID_RE.test(id)) return null;
+      composer.draftId = id;
+      composer.draftSessionId = sessionId;
+    } else {
+      composer.draftId = newDraftId();
+      composer.draftSessionId = null;
+    }
+    composer.draftUpdated = "";
+    return composer.draftId;
+  }
+
+  /** Focused with content, unsaved, or mid-upload: a remote refresh must not touch it. */
+  function composerBusy(composer) {
+    const hasContent =
+      Boolean(String(composer.input?.value || "").length) || composer.pendingFiles.length > 0;
+    if (composer.dirty || composer.saveTimer) return true;
+    if (composer.draftId && draftSaves.has(composer.draftId)) return true;
+    if (composer.pendingFiles.some((f) => f.uploading)) return true;
+    return hasContent && document.activeElement === composer.input;
+  }
+
+  /**
+   * @param {ReturnType<typeof bindComposer>} composer
+   * @param {object} draft
+   */
+  function applyDraftToComposer(composer, draft) {
+    window.clearTimeout(composer.saveTimer);
+    composer.saveTimer = 0;
+    composer.dirty = false;
+    composer.draftId = String(draft.id);
+    composer.draftSessionId = draft.sessionId ? String(draft.sessionId) : null;
+    composer.draftUpdated = String(draft.updated || "");
+    if (composer.input) composer.input.value = String(draft.text || "");
+    composer.pendingFiles = (Array.isArray(draft.files) ? draft.files : [])
+      .filter((f) => f && f.id)
+      .map((f) => ({
+        id: localFileId(),
+        file: null,
+        name: String(f.name || "file"),
+        mimeType: String(f.mimeType || "application/octet-stream"),
+        size: Number(f.size) || 0,
+        serverId: String(f.id),
+        uploading: false,
+      }));
+    renderChips(composer);
+    syncComposerSize(composer);
+  }
+
+  function clearComposerUi(composer) {
     composer.pendingFiles = [];
     if (composer.input) {
       composer.input.value = "";
@@ -207,13 +353,247 @@
     syncComposerSize(composer);
   }
 
+  function unbindComposerDraft(composer) {
+    window.clearTimeout(composer.saveTimer);
+    composer.saveTimer = 0;
+    composer.dirty = false;
+    composer.draftId = null;
+    composer.draftSessionId = null;
+    composer.draftUpdated = "";
+  }
+
+  /**
+   * PUTs are chained per draft so an older body never lands after a newer one.
+   * @param {string} id
+   * @param {{ text: string, sessionId?: string }} body
+   */
+  function saveDraft(id, body) {
+    const prev = draftSaves.get(id) || Promise.resolve();
+    const run = prev
+      .catch(() => {})
+      .then(async () => {
+        if (draftsApiMissing || !window.YanMacApi) return;
+        const res = await window.YanMacApi.macFetch(draftPath(id), {
+          method: "PUT",
+          json: body,
+          timeoutMs: 30_000,
+        });
+        const data = await res.json().catch(() => null);
+        if (isMissingRoute(res, data)) {
+          markDraftsMissing();
+          return;
+        }
+        if (!res.ok) throw new Error(data?.error || `draft save failed (${res.status})`);
+        if (data?.draft) upsertLocalDraft(data.draft);
+        else removeLocalDraft(id);
+        for (const composer of composers) {
+          if (composer.draftId === id) composer.draftTouchedAt = Date.now();
+        }
+        renderHistoryList();
+      })
+      .catch((err) => {
+        console.warn("[edu-chat] draft save", err);
+        for (const composer of composers) {
+          if (composer.draftId === id) composer.dirty = true;
+        }
+      });
+    draftSaves.set(id, run);
+    run.finally(() => {
+      if (draftSaves.get(id) === run) draftSaves.delete(id);
+    });
+    return run;
+  }
+
+  /** Fire-and-forget request that survives pagehide. */
+  function keepaliveJson(method, path, body) {
+    const api = window.YanMacApi;
+    const token = api?.peekMacToken?.();
+    const base = window.__yanMacApiBase;
+    if (!token || !base) {
+      api?.macFetch(path, { method, json: body, timeoutMs: 15_000 }).catch(() => {});
+      return;
+    }
+    try {
+      fetch(`${String(base).replace(/\/$/, "")}${path}`, {
+        method,
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+        keepalive: true,
+      }).catch(() => {});
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /**
+   * @param {ReturnType<typeof bindComposer>} composer
+   * @param {{ keepalive?: boolean }} [opts]
+   */
+  function flushDraft(composer, opts = {}) {
+    window.clearTimeout(composer.saveTimer);
+    composer.saveTimer = 0;
+    const id = composer.draftId;
+    if (!id || !composer.dirty || draftsApiMissing) return Promise.resolve();
+    composer.dirty = false;
+    /** @type {{ text: string, sessionId?: string }} */
+    const body = { text: String(composer.input?.value || "") };
+    if (composer.draftSessionId) body.sessionId = composer.draftSessionId;
+    if (opts.keepalive) {
+      keepaliveJson("PUT", draftPath(id), body);
+      return Promise.resolve();
+    }
+    return saveDraft(id, body);
+  }
+
+  function onComposerEdit(composer) {
+    if (draftsApiMissing) return;
+    const text = String(composer.input?.value || "");
+    if (!composer.draftId && !text && !composer.pendingFiles.length) return;
+    if (!ensureComposerDraft(composer)) return;
+    composer.dirty = true;
+    window.clearTimeout(composer.saveTimer);
+    composer.saveTimer = window.setTimeout(() => {
+      composer.saveTimer = 0;
+      flushDraft(composer);
+    }, DRAFT_SAVE_MS);
+  }
+
+  function flushAllDraftsKeepalive() {
+    for (const composer of composers) flushDraft(composer, { keepalive: true });
+  }
+
+  /**
+   * Clears the local composer and unbinds it. The draft stays on the server
+   * (and in the sidebar) unless it was just sent.
+   * @param {ReturnType<typeof bindComposer>} composer
+   * @param {{ flush?: boolean }} [opts]
+   */
+  function resetComposer(composer, opts = {}) {
+    if (opts.flush !== false) flushDraft(composer);
+    unbindComposerDraft(composer);
+    clearComposerUi(composer);
+  }
+
+  /**
+   * @param {ReturnType<typeof bindComposer>} composer
+   * @param {PendingFile} item
+   */
+  function composerHolding(item) {
+    return composers.find((c) => c.pendingFiles.includes(item)) || null;
+  }
+
+  function dropFailedUpload(item, message) {
+    const composer = composerHolding(item);
+    if (composer) {
+      composer.pendingFiles = composer.pendingFiles.filter((f) => f !== item);
+      renderChips(composer);
+    }
+    if (item.removed) return;
+    if (composer?.role === "thread") {
+      appendBubble("assistant", message);
+      setState("panel");
+    } else {
+      console.warn("[edu-chat]", message);
+    }
+  }
+
+  /**
+   * @param {ReturnType<typeof bindComposer>} composer
+   * @param {string} draftId
+   * @param {PendingFile} item
+   */
+  function startUpload(composer, draftId, item) {
+    item.uploading = true;
+    const draftSessionId = composer.draftSessionId;
+    item.upload = (async () => {
+      try {
+        /** @type {Record<string, string>} */
+        const headers = {
+          "Content-Type": "application/octet-stream",
+          "X-File-Name": encodeURIComponent(item.name),
+          "X-File-Type": item.mimeType,
+        };
+        if (draftSessionId) headers["X-Session-Id"] = draftSessionId;
+        const res = await window.YanMacApi.macFetch(draftPath(draftId, "/files"), {
+          method: "POST",
+          body: item.file,
+          headers,
+          timeoutMs: 300_000,
+        });
+        const data = await res.json().catch(() => null);
+        item.uploading = false;
+        if (isMissingRoute(res, data)) {
+          markDraftsMissing();
+          item.localOnly = true;
+        } else if (!res.ok || !data?.file?.id) {
+          dropFailedUpload(
+            item,
+            data?.error || `Could not upload “${item.name}” (${res.status}).`
+          );
+          return;
+        } else {
+          item.serverId = String(data.file.id);
+          if (data.draft) upsertLocalDraft(data.draft);
+          for (const c of composers) {
+            if (c.draftId === draftId) c.draftTouchedAt = Date.now();
+          }
+          if (item.removed) deleteDraftFile(draftId, item.serverId);
+          else renderHistoryList();
+        }
+      } catch (err) {
+        item.uploading = false;
+        console.error("[edu-chat] upload", err);
+        dropFailedUpload(item, `Could not upload “${item.name}”. Is the Mac API running?`);
+        return;
+      }
+      const holder = composerHolding(item);
+      if (holder) renderChips(holder);
+    })();
+  }
+
+  async function deleteDraftFile(draftId, fileId) {
+    if (!draftId || !fileId || draftsApiMissing || !window.YanMacApi) return;
+    try {
+      const res = await window.YanMacApi.macFetch(
+        draftPath(draftId, `/files/${encodeURIComponent(fileId)}`),
+        { method: "DELETE", timeoutMs: 30_000 }
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return;
+      if (data?.draft) upsertLocalDraft(data.draft);
+      else removeLocalDraft(draftId);
+      for (const composer of composers) {
+        if (composer.draftId === draftId) composer.draftTouchedAt = Date.now();
+      }
+      renderHistoryList();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function removePendingFile(composer, localId) {
+    const item = composer.pendingFiles.find((f) => f.id === localId);
+    if (!item) return;
+    composer.pendingFiles = composer.pendingFiles.filter((f) => f !== item);
+    item.removed = true;
+    renderChips(composer);
+    if (item.serverId && composer.draftId) deleteDraftFile(composer.draftId, item.serverId);
+    // Still uploading: startUpload deletes it once the server id comes back.
+  }
+
   /**
    * @param {ReturnType<typeof bindComposer>} composer
    * @param {FileList|File[]} list
    */
   function addFiles(composer, list) {
     const files = Array.from(list || []);
-    let pendingTotal = composer.pendingFiles.reduce((n, p) => n + p.file.size, 0);
+    let pendingTotal = composer.pendingFiles.reduce((n, p) => n + (p.size || 0), 0);
+    /** @type {PendingFile[]} */
+    const added = [];
     for (const file of files) {
       if (!file || !(file instanceof File)) continue;
       if (composer.pendingFiles.length >= MAX_FILES) break;
@@ -238,14 +618,28 @@
         continue;
       }
       const dup = composer.pendingFiles.some(
-        (p) => p.file.name === file.name && p.file.size === file.size
+        (p) => p.name === file.name && p.size === file.size
       );
       if (dup) continue;
-      composer.pendingFiles.push({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      /** @type {PendingFile} */
+      const item = {
+        id: localFileId(),
         file,
-      });
+        name: file.name,
+        mimeType: file.type || "application/octet-stream",
+        size: file.size,
+        serverId: "",
+        uploading: false,
+      };
+      composer.pendingFiles.push(item);
+      added.push(item);
       pendingTotal += file.size;
+    }
+    if (added.length && !draftsApiMissing && window.YanMacApi) {
+      const draftId = ensureComposerDraft(composer);
+      if (draftId) {
+        for (const item of added) startUpload(composer, draftId, item);
+      }
     }
     renderChips(composer);
   }
@@ -652,7 +1046,7 @@
   function hideHistory(opts = {}) {
     const wasShowing = showingHistory;
     showingHistory = false;
-    historyPointerSid = null;
+    historyPointerRow = null;
     if (opts.markVisibleRead && wasShowing && sessionId && !sending) {
       markChatRead(sessionId);
     }
@@ -691,130 +1085,313 @@
     showHistory();
   }
 
-  /**
-   * Row identity for the history list. Omit `updated` so a running agent
-   * (which rewrites the transcript every bubble) does not rebuild the DOM
-   * under the pointer.
-   * @param {{ sessionId?: string, title?: string, preview?: string }[]} chats
-   */
-  function historyRowsKey(chats) {
-    return (chats || [])
-      .map((c) => `${c.sessionId || ""}\0${chatDisplayTitle(c)}`)
-      .join("\n");
+  function draftDisplayTitle(draft) {
+    const title = String(draft?.title || "").trim();
+    if (title) return title;
+    const text = String(draft?.text || "").trim().split("\n")[0];
+    if (text) return text.slice(0, 80);
+    const file = Array.isArray(draft?.files) ? draft.files[0] : null;
+    return file?.name ? String(file.name) : "Draft";
   }
 
   /**
-   * @param {HTMLElement} row
-   * @param {{ working?: boolean, unread?: boolean }} chat
+   * @typedef {{ key: string, title: string, updated: string, sessionId: string, draftId: string,
+   *   working: boolean, unread: boolean, pending: boolean, draft: boolean }} HistoryEntry
    */
-  function applyHistoryDot(row, chat) {
-    const working = Boolean(chat?.working);
-    const unread = Boolean(chat?.unread) && !working;
-    let dot = row.querySelector(".yan-chat-history-dot");
-    if (!working && !unread) {
-      dot?.remove();
-      const title = String(row.querySelector(".yan-chat-history-title")?.textContent || "Chat");
-      row.setAttribute("aria-label", title);
-      return;
-    }
-    if (!dot) {
-      dot = document.createElement("span");
-      dot.className = "yan-chat-history-dot";
-      dot.setAttribute("aria-hidden", "true");
-      row.insertBefore(dot, row.firstChild);
-    }
-    dot.classList.toggle("is-working", working);
-    dot.classList.toggle("is-unread", unread);
-    const title = String(row.querySelector(".yan-chat-history-title")?.textContent || "Chat");
-    row.setAttribute("aria-label", working ? `${title}, working` : `${title}, unread`);
-  }
 
-  /**
-   * @param {{ sessionId?: string, updated?: string, working?: boolean, unread?: boolean }[]} chats
-   */
-  function patchHistoryRows(chats) {
-    if (!historyEl) return;
-    const now = new Date();
-    for (const chat of chats || []) {
+  /** Chats, new-chat drafts, and local pending sends, newest first. */
+  function historyEntries() {
+    /** @type {Map<string, HistoryEntry>} */
+    const byKey = new Map();
+    for (const d of lastDrafts) {
+      if (!validDraft(d) || d.sessionId) continue;
+      const key = `d:${d.id}`;
+      byKey.set(key, {
+        key,
+        title: draftDisplayTitle(d),
+        updated: String(d.updated || d.created || ""),
+        sessionId: "",
+        draftId: String(d.id),
+        working: false,
+        unread: false,
+        pending: false,
+        draft: true,
+      });
+    }
+    for (const chat of lastChats) {
       const sid = String(chat?.sessionId || "");
       if (!sid) continue;
+      const key = `s:${sid}`;
+      byKey.set(key, {
+        key,
+        title: chatDisplayTitle(chat),
+        updated: String(chat.updated || ""),
+        sessionId: sid,
+        draftId: "",
+        working: Boolean(chat.working) || (sending && sid === sessionId),
+        unread: Boolean(chat.unread),
+        pending: false,
+        draft: false,
+      });
+    }
+    for (const p of pendingRows.values()) {
+      const prev = byKey.get(p.key);
+      if (p.draftId) byKey.delete(`d:${p.draftId}`);
+      const sid = p.sessionId || prev?.sessionId || "";
+      byKey.set(p.key, {
+        key: p.key,
+        title: (prev && !prev.draft && prev.title) || p.title,
+        updated: p.updated,
+        sessionId: sid,
+        draftId: sid ? "" : p.draftId,
+        working: Boolean(prev?.working) || (Boolean(sid) && sending && sid === sessionId),
+        unread: Boolean(prev?.unread),
+        pending: p.pending,
+        draft: false,
+      });
+    }
+    return [...byKey.values()].sort(
+      (a, b) => (Date.parse(b.updated) || 0) - (Date.parse(a.updated) || 0)
+    );
+  }
+
+  /**
+   * Row identity for the history list: ids, titles, and day group only. Row
+   * state and age are patched in place so a running agent (which rewrites
+   * the transcript every bubble) does not rebuild the DOM under the pointer.
+   * @param {HistoryEntry[]} entries
+   */
+  function historyRowsKey(entries) {
+    const now = new Date();
+    return `rows:${entries
+      .map((e) => `${e.key}\0${e.title}\0${chatHistoryGroup(e.updated, now).key}`)
+      .join("\n")}`;
+  }
+
+  function setBeam(el, on) {
+    if (!el) return;
+    let ring = el.querySelector(":scope > .yl-beam-ring");
+    if (on) {
+      window.clearTimeout(el._ylBeamFade);
+      el.classList.remove("is-beam-fading");
+      if (el.classList.contains("is-beaming")) return;
+      if (!ring) {
+        ring = document.createElement("span");
+        ring.className = "yl-beam-ring";
+        ring.setAttribute("aria-hidden", "true");
+        const bloom = document.createElement("span");
+        bloom.className = "yl-beam-bloom";
+        ring.appendChild(bloom);
+        el.appendChild(ring);
+        void ring.offsetWidth;
+      }
+      el.classList.add("is-beaming");
+      return;
+    }
+    if (!el.classList.contains("is-beaming")) return;
+    el.classList.remove("is-beaming");
+    el.classList.add("is-beam-fading");
+    el._ylBeamFade = window.setTimeout(() => el.classList.remove("is-beam-fading"), 650);
+  }
+
+  /**
+   * One state per row, highest first: working > unread > pending > draft.
+   * @param {HTMLElement} row
+   * @param {HistoryEntry} entry
+   */
+  function applyRowState(row, entry) {
+    const working = entry.working;
+    const unread = !working && entry.unread;
+    const pending = !working && !unread && entry.pending;
+    const draft = !working && !unread && !pending && entry.draft;
+    row.classList.toggle("is-working", working);
+    row.classList.toggle("is-unread", unread);
+    row.classList.toggle("is-pending", pending);
+    row.classList.toggle("is-draft", draft);
+    setBeam(row, working);
+    if (entry.sessionId) {
+      row.dataset.sessionId = entry.sessionId;
+      delete row.dataset.draftId;
+    } else if (entry.draftId) {
+      row.dataset.draftId = entry.draftId;
+      delete row.dataset.sessionId;
+    }
+    if (entry.pending) row.dataset.pending = "1";
+    else delete row.dataset.pending;
+    const title = entry.title || "Chat";
+    const suffix = working
+      ? ", working"
+      : unread
+        ? ", unread"
+        : pending
+          ? ", sending"
+          : draft
+            ? ", draft"
+            : "";
+    row.setAttribute("aria-label", `${title}${suffix}`);
+  }
+
+  /** @param {HistoryEntry} entry */
+  function buildHistoryRow(entry, showAge) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "yan-chat-history-row";
+    btn.dataset.rowKey = entry.key;
+    const title = document.createElement("span");
+    title.className = "yan-chat-history-title";
+    title.textContent = entry.title || "Chat";
+    btn.appendChild(title);
+    if (showAge) {
+      const age = document.createElement("span");
+      age.className = "yan-chat-history-age";
+      age.textContent = relativeChatAge(entry.updated);
+      btn.appendChild(age);
+    }
+    applyRowState(btn, entry);
+    return btn;
+  }
+
+  /** @param {HistoryEntry[]} entries */
+  function patchHistoryRows(entries) {
+    if (!historyEl) return;
+    const now = new Date();
+    for (const entry of entries) {
       const row = historyEl.querySelector(
-        `.yan-chat-history-row[data-session-id="${CSS.escape(sid)}"]`
+        `.yan-chat-history-row[data-row-key="${CSS.escape(entry.key)}"]`
       );
       if (!row) continue;
       const age = row.querySelector(".yan-chat-history-age");
-      if (age) age.textContent = relativeChatAge(chat.updated, now);
-      applyHistoryDot(row, chat);
+      if (age) age.textContent = relativeChatAge(entry.updated, now);
+      applyRowState(row, entry);
     }
   }
 
-  async function renderHistory() {
-    if (!historyEl || !window.YanMacApi) return;
+  /** Paint the sidebar from the cached lists. Cheap; patches when ids/titles match. */
+  function renderHistoryList() {
+    if (!historyEl) return;
+    const entries = historyEntries();
+    if (!historyLoaded && !entries.length) return;
+    const nextKey = historyRowsKey(entries);
+    if (nextKey === historyStructureKey) {
+      patchHistoryRows(entries);
+      markCurrentHistoryRow();
+      return;
+    }
+    historyStructureKey = nextKey;
+    historyEl.innerHTML = "";
+    if (!entries.length) {
+      const empty = document.createElement("p");
+      empty.className = "yan-chat-history-empty";
+      empty.textContent = "No past chats yet.";
+      historyEl.appendChild(empty);
+      return;
+    }
+    for (const section of groupChatHistory(entries)) {
+      const wrap = document.createElement("section");
+      wrap.className = "yan-chat-history-section";
+      const label = document.createElement("h2");
+      label.className = "yan-chat-history-label";
+      label.textContent = section.label;
+      wrap.appendChild(label);
+      for (const entry of section.chats) {
+        wrap.appendChild(buildHistoryRow(entry, section.showAge));
+      }
+      historyEl.appendChild(wrap);
+    }
+    markCurrentHistoryRow();
+  }
+
+  function anyChatWorking() {
+    return sending || lastChats.some((c) => c && c.working);
+  }
+
+  /** Thread panel beams while the viewed chat runs; the closed circle beams for any run. */
+  function syncBeams() {
+    const closed = state() === "closed";
+    setBeam(threadComposer.panel, sending && !closed);
+    setBeam(historyComposer.pill, closed && anyChatWorking());
+    const poll = closed && lastChats.some((c) => c && c.working);
+    if (!poll) {
+      window.clearTimeout(launcherTimer);
+      launcherTimer = 0;
+    } else if (!launcherTimer) {
+      launcherTimer = window.setTimeout(() => {
+        launcherTimer = 0;
+        refreshChats().catch(() => {});
+      }, LAUNCHER_POLL_MS);
+    }
+  }
+
+  /** Pull remote draft edits into idle composers; last write wins by `updated`. */
+  function syncComposersFromDrafts(fetchStartedAt) {
+    for (const composer of composers) {
+      if (composerBusy(composer)) continue;
+      if (composer.draftTouchedAt > fetchStartedAt) continue;
+      if (composer.draftId) {
+        const remote = lastDrafts.find((d) => d.id === composer.draftId);
+        if (!remote) {
+          // Sent or cleared on another device.
+          unbindComposerDraft(composer);
+          clearComposerUi(composer);
+          continue;
+        }
+        const remoteAt = Date.parse(remote.updated || "") || 0;
+        const localAt = Date.parse(composer.draftUpdated || "") || 0;
+        if (remoteAt > localAt) applyDraftToComposer(composer, remote);
+        continue;
+      }
+      if (composer.role !== "thread" || !sessionId) continue;
+      if (String(composer.input?.value || "") || composer.pendingFiles.length) continue;
+      const saved = lastDrafts.find((d) => d.id === `s-${sessionId}`);
+      if (saved) applyDraftToComposer(composer, saved);
+    }
+  }
+
+  /** Drop pending rows once GET chats lists their session. */
+  function prunePendingRows() {
+    const known = new Set(lastChats.map((c) => String(c?.sessionId || "")));
+    for (const [id, p] of pendingRows) {
+      if (!p.pending && p.sessionId && known.has(p.sessionId)) pendingRows.delete(id);
+    }
+  }
+
+  async function refreshChats() {
+    if (!window.YanMacApi) return;
     const fetchGen = ++historyFetchGen;
+    const startedAt = Date.now();
     try {
       const res = await window.YanMacApi.macFetch(`${API}/agent/chats`, {
         method: "GET",
         timeoutMs: 30_000,
       });
       const data = await res.json().catch(() => ({}));
-      if (fetchGen !== historyFetchGen || !showingHistory) return;
-      const chats = Array.isArray(data.chats) ? data.chats : [];
-      const nextKey = historyRowsKey(chats);
-      if (nextKey === historyStructureKey && historyEl.childElementCount) {
-        patchHistoryRows(chats);
-        markCurrentHistoryRow();
-        return;
+      if (fetchGen !== historyFetchGen) return;
+      if (!res.ok) throw new Error(data.error || `chats failed (${res.status})`);
+      lastChats = Array.isArray(data.chats) ? data.chats : [];
+      if (Array.isArray(data.drafts)) {
+        lastDrafts = data.drafts.filter(validDraft);
+        syncComposersFromDrafts(startedAt);
       }
-      historyStructureKey = nextKey;
-      historyEl.innerHTML = "";
-      if (!chats.length) {
-        const empty = document.createElement("p");
-        empty.className = "yan-chat-history-empty";
-        empty.textContent = "No past chats yet.";
-        historyEl.appendChild(empty);
-        return;
-      }
-      const sections = groupChatHistory(chats);
-      for (const section of sections) {
-        const wrap = document.createElement("section");
-        wrap.className = "yan-chat-history-section";
-        const label = document.createElement("h2");
-        label.className = "yan-chat-history-label";
-        label.textContent = section.label;
-        wrap.appendChild(label);
-        for (const chat of section.chats) {
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "yan-chat-history-row";
-          btn.dataset.sessionId = String(chat.sessionId || "");
-          const title = document.createElement("span");
-          title.className = "yan-chat-history-title";
-          title.textContent = chatDisplayTitle(chat);
-          btn.appendChild(title);
-          if (section.showAge) {
-            const age = document.createElement("span");
-            age.className = "yan-chat-history-age";
-            age.textContent = relativeChatAge(chat.updated);
-            btn.appendChild(age);
-          }
-          applyHistoryDot(btn, chat);
-          if (sessionId && String(chat.sessionId || "") === sessionId) {
-            btn.classList.add("is-current");
-            btn.setAttribute("aria-current", "true");
-          }
-          wrap.appendChild(btn);
-        }
-        historyEl.appendChild(wrap);
-      }
+      historyLoaded = true;
+      prunePendingRows();
+      renderHistoryList();
+      syncBeams();
     } catch {
-      if (fetchGen !== historyFetchGen || !showingHistory || !historyEl) return;
+      if (fetchGen !== historyFetchGen || !historyEl) return;
+      syncBeams();
+      if (historyLoaded) return;
       historyStructureKey = "";
+      if (!showingHistory) return;
       historyEl.innerHTML = "";
       const empty = document.createElement("p");
       empty.className = "yan-chat-history-empty";
       empty.textContent = "Could not load past chats.";
       historyEl.appendChild(empty);
     }
+  }
+
+  function renderHistory() {
+    return refreshChats();
   }
 
   async function markChatRead(sid) {
@@ -838,7 +1415,7 @@
     if (wideEnough()) showingHistory = true;
     else hideHistory();
     markChatRead(id);
-    resetComposer(threadComposer);
+    if (id !== sessionId) resetComposer(threadComposer);
     setState("panel", { focusComposer: threadComposer });
     if (id === sessionId) return;
     if (!window.YanMacApi) return;
@@ -859,6 +1436,7 @@
       if (Array.isArray(data.messages)) applyServerMessages(data.messages);
       preferPanel = true;
       persistLocal();
+      restoreSessionDraft();
       setState("panel", { focusComposer: threadComposer });
       if (data.status === "running") {
         setBusy(true);
@@ -867,6 +1445,7 @@
       } else {
         setBusy(false);
       }
+      refreshChats().catch(() => {});
     } catch (err) {
       if (gen !== viewGen) return;
       console.error("[edu-chat] resume", err);
@@ -877,6 +1456,68 @@
       );
       setState("panel");
     }
+  }
+
+  /** Put a saved `s-<sessionId>` draft back into an empty thread composer. */
+  function restoreSessionDraft() {
+    const composer = threadComposer;
+    if (!sessionId || composer.draftId) return;
+    if (String(composer.input?.value || "") || composer.pendingFiles.length) return;
+    const saved = lastDrafts.find((d) => d.id === `s-${sessionId}`);
+    if (saved) applyDraftToComposer(composer, saved);
+  }
+
+  /** Leave the current thread view without stopping its run. */
+  function detachThreadView() {
+    viewGen += 1;
+    stopPolling();
+    sessionId = null;
+    messages = [];
+    sending = false;
+    root.classList.remove("is-busy");
+    clearMessagesDom();
+    persistLocal();
+  }
+
+  /** Open a new-chat draft: empty thread, its text and files in the composer. */
+  function openDraft(id) {
+    const draft = lastDrafts.find((d) => d.id === id);
+    if (!draft) return;
+    if (threadComposer.draftId !== id) {
+      if (messages.length || sending || sessionId) detachThreadView();
+      resetComposer(threadComposer);
+      if (historyComposer.draftId === id) {
+        // Same draft is live in the new-chat composer: move it over as is.
+        const from = historyComposer;
+        const dirty = from.dirty || Boolean(from.saveTimer);
+        threadComposer.draftId = from.draftId;
+        threadComposer.draftSessionId = from.draftSessionId;
+        threadComposer.draftUpdated = from.draftUpdated;
+        threadComposer.draftTouchedAt = from.draftTouchedAt;
+        if (threadComposer.input) threadComposer.input.value = String(from.input?.value || "");
+        threadComposer.pendingFiles = from.pendingFiles;
+        from.pendingFiles = [];
+        unbindComposerDraft(from);
+        clearComposerUi(from);
+        renderChips(threadComposer);
+        syncComposerSize(threadComposer);
+        if (dirty) onComposerEdit(threadComposer);
+      } else {
+        applyDraftToComposer(threadComposer, draft);
+      }
+    }
+    showThread = true;
+    if (wideEnough()) showingHistory = true;
+    else hideHistory();
+    setState("panel", { focusComposer: threadComposer });
+    renderHistoryList();
+  }
+
+  function showPendingThread() {
+    showThread = true;
+    if (wideEnough()) showingHistory = true;
+    else hideHistory();
+    setState("panel", { focusComposer: threadComposer });
   }
 
   const COMPOSER_MAX_LINES = 8;
@@ -934,8 +1575,11 @@
 
   function markCurrentHistoryRow() {
     if (!historyEl) return;
+    const viewedDraft = !sessionId && showThread ? threadComposer.draftId : null;
     historyEl.querySelectorAll(".yan-chat-history-row").forEach((row) => {
-      const on = Boolean(sessionId) && row.dataset.sessionId === sessionId;
+      const on = sessionId
+        ? row.dataset.sessionId === sessionId
+        : Boolean(viewedDraft) && row.dataset.draftId === viewedDraft;
       row.classList.toggle("is-current", on);
       if (on) row.setAttribute("aria-current", "true");
       else row.removeAttribute("aria-current");
@@ -1069,6 +1713,7 @@
     }
     syncComposerSize();
     scheduleGlassRefresh();
+    syncBeams();
     const focusEl = opts.focusComposer?.input;
     if (open && !opts.skipFocus && focusEl) {
       window.setTimeout(
@@ -1159,8 +1804,8 @@
 
   function clearMessagesDom() {
     if (!messagesEl) return;
+    removeWorkingEl();
     messagesEl.innerHTML = "";
-    workingEl = null;
   }
 
   function messageReuseKey(msg) {
@@ -1177,6 +1822,7 @@
         role: m.role,
         content: String(m.content || ""),
         queued: Boolean(m.queued),
+        pending: Boolean(m.pending),
         queueId: m.queued && m.queueId ? String(m.queueId) : "",
         widgets: m.widgets || null,
       }))
@@ -1187,19 +1833,41 @@
     const label = String(next || "").trim() || "Working…";
     if (busyLabel === label) return;
     busyLabel = label;
-    if (workingEl) {
-      const inner = workingEl.querySelector(":scope > .yan-chat-bubble-in");
-      if (inner) inner.textContent = busyLabel;
+    workingEl?.setAttribute("aria-label", busyLabel);
+  }
+
+  function removeWorkingEl() {
+    workingOrb?.destroy();
+    workingOrb = null;
+    workingEl?.remove();
+    workingEl = null;
+  }
+
+  /** chat-orb.js is a deferred module; mount once it has set window.YLOrb. */
+  function mountWorkingOrb() {
+    if (!workingEl || workingOrb || !workingEl.isConnected) return;
+    const canvas = workingEl.querySelector(".yan-chat-working-orb");
+    if (!canvas) return;
+    if (window.YLOrb && typeof window.YLOrb.mount === "function") {
+      workingOrb = window.YLOrb.mount(canvas, { size: 40 });
+      return;
     }
+    if (orbWaiting) return;
+    orbWaiting = true;
+    window.addEventListener(
+      "ylorb-ready",
+      () => {
+        orbWaiting = false;
+        mountWorkingOrb();
+      },
+      { once: true }
+    );
   }
 
   function syncWorkingEl() {
     if (!messagesEl) return;
     if (!sending) {
-      if (workingEl) {
-        workingEl.remove();
-        workingEl = null;
-      }
+      removeWorkingEl();
       return;
     }
     let created = false;
@@ -1209,14 +1877,20 @@
         "yan-chat-bubble yan-chat-bubble--assistant yan-chat-working";
       workingEl.dataset.liquidGlass = "rounded";
       workingEl.dataset.filterId = "lg-edu-chat-working";
-      const inner = document.createElement("span");
-      inner.className = "yan-chat-bubble-in";
-      inner.textContent = busyLabel;
-      workingEl.appendChild(inner);
+      workingEl.setAttribute("role", "status");
+      workingEl.setAttribute("aria-label", busyLabel);
+      const canvas = document.createElement("canvas");
+      canvas.className = "yan-chat-working-orb";
+      canvas.width = 80;
+      canvas.height = 80;
+      canvas.setAttribute("aria-hidden", "true");
+      workingEl.appendChild(canvas);
       created = true;
     }
     const firstQueued = [...messagesEl.querySelectorAll(":scope > .yan-chat-turn")].find(
-      (el) => el.classList.contains("yan-chat-turn--queued")
+      (el) =>
+        el.classList.contains("yan-chat-turn--queued") ||
+        el.classList.contains("yan-chat-turn--pending")
     );
     if (firstQueued) {
       if (workingEl.nextSibling !== firstQueued) {
@@ -1225,11 +1899,13 @@
     } else if (messagesEl.lastElementChild !== workingEl) {
       messagesEl.appendChild(workingEl);
     }
+    mountWorkingOrb();
     if (created) refreshGlass();
   }
 
   function syncQueuedTurn(turn, msg) {
     const queued = Boolean(msg && msg.queued);
+    turn.classList.toggle("yan-chat-turn--pending", Boolean(msg && msg.pending) && !queued);
     turn.classList.toggle("yan-chat-turn--queued", queued);
     if (!queued) {
       turn.removeAttribute("title");
@@ -1356,15 +2032,17 @@
   /**
    * @param {string} role
    * @param {string} text
-   * @param {{ queued?: boolean }} [opts]
+   * @param {{ queued?: boolean, pending?: boolean }} [opts]
    */
   function appendBubble(role, text, opts = {}) {
-    /** @type {{ role: string, content: string, queued?: boolean }} */
+    /** @type {{ role: string, content: string, queued?: boolean, pending?: boolean }} */
     const msg = { role, content: text };
     if (opts.queued) msg.queued = true;
+    else if (opts.pending) msg.pending = true;
     messages.push(msg);
     renderMessagesDom({ forceScroll: true });
     persistLocal();
+    return msg;
   }
 
   function lastUserBubble() {
@@ -1408,6 +2086,13 @@
     if (wasSending && !next && sessionId && !threadCol.hidden) {
       markChatRead(sessionId);
     }
+    if (!next && sessionId) {
+      const chat = lastChats.find((c) => c && c.sessionId === sessionId);
+      if (chat) chat.working = false;
+    }
+    renderHistoryList();
+    syncBeams();
+    if (wasSending && !next) refreshChats().catch(() => {});
   }
 
   function stopPolling() {
@@ -1442,6 +2127,8 @@
         if (Array.isArray(m.widgets) && m.widgets.length) out.widgets = m.widgets;
         return out;
       });
+    // Sends the server has not accepted yet stay at the end.
+    next.push(...messages.filter((m) => m && m.pending));
     if (messagesFingerprint(next) === messagesFingerprint(messages)) {
       maybeFlushPendingQueueInterrupt();
       return;
@@ -1537,9 +2224,13 @@
     const fresh = composer.role === "history";
     const interrupt = Boolean(opts.interrupt) && !fresh;
     const text = String(raw || "").trim();
-    const files = composer.pendingFiles.slice();
-    if (!text && !files.length) return;
+    const items = composer.pendingFiles.slice();
+    if (!text && !items.length) return;
     if (!fresh && !interrupt && queueFull()) return;
+
+    const draftId = composer.draftId;
+    const draftSessionId = composer.draftSessionId;
+    const saveInFlight = draftId ? draftSaves.get(draftId) : null;
 
     if (fresh && (messages.length || sending)) {
       viewGen += 1;
@@ -1561,33 +2252,83 @@
 
     const label =
       text +
-      (files.length
-        ? `${text ? "\n" : ""}[${files.length} file${files.length === 1 ? "" : "s"}: ${files
-            .map((f) => f.file.name)
+      (items.length
+        ? `${text ? "\n" : ""}[${items.length} file${items.length === 1 ? "" : "s"}: ${items
+            .map((f) => f.name)
             .join(", ")}]`
         : "");
     const willQueue = !fresh && sending && !interrupt;
-    appendBubble("user", label || "(attachment)", { queued: willQueue });
-    resetComposer(composer);
+    // Idle chat: show the turn faded until the server accepts it. No orb or
+    // beam yet. A busy chat keeps the queued / interrupt path.
+    const usePending = !sending;
+    const localMsg = appendBubble("user", label || "(attachment)", {
+      queued: willQueue,
+      pending: usePending,
+    });
+    resetComposer(composer, { flush: false });
     setState("panel", { skipFocus: true });
     flyUserBubble(originRect);
-    if (!sending) setBusy(true);
-    else {
+    if (!usePending) {
       updateComposerEnabled();
       startPolling();
     }
     preferPanel = true;
     const sendGen = viewGen;
 
-    try {
-      const sid = await ensureSession();
-      /** @type {{ name: string, mimeType: string, data: string }[]} */
-      const attachments = [];
-      for (const item of files) {
-        attachments.push(await fileToAttachment(item.file));
+    let rowId = "";
+    if (usePending) {
+      rowId = localFileId();
+      const draftRow = Boolean(draftId) && !draftSessionId;
+      const followUp = !fresh && sessionId ? sessionId : "";
+      pendingRows.set(rowId, {
+        key: followUp ? `s:${followUp}` : draftRow ? `d:${draftId}` : `p:${rowId}`,
+        title: (text.split("\n")[0] || items[0]?.name || "Chat").slice(0, 80),
+        updated: new Date().toISOString(),
+        sessionId: followUp,
+        draftId: draftRow ? String(draftId) : "",
+        pending: true,
+      });
+      renderHistoryList();
+    }
+    const dropPendingRow = () => {
+      if (rowId && pendingRows.delete(rowId)) renderHistoryList();
+    };
+
+    const removeLocalMsg = () => {
+      const idx = messages.lastIndexOf(localMsg);
+      if (idx >= 0) messages.splice(idx, 1);
+    };
+
+    const restoreComposer = () => {
+      const target = !composer.column.hidden ? composer : threadComposer;
+      if (target.draftId || String(target.input?.value || "") || target.pendingFiles.length) {
+        return;
       }
+      target.draftId = draftId;
+      target.draftSessionId = draftSessionId;
+      target.draftUpdated = "";
+      if (target.input) target.input.value = text;
+      target.pendingFiles = items.filter((f) => !f.removed);
+      renderChips(target);
+      syncComposerSize(target);
+      if (draftId && text) onComposerEdit(target);
+    };
+
+    let accepted = false;
+    try {
+      const waitUploads = Promise.all([
+        saveInFlight ? saveInFlight.catch(() => {}) : null,
+        ...items.map((f) => (f.upload ? f.upload.catch(() => {}) : null)),
+      ]);
+      const [sid] = await Promise.all([ensureSession(), waitUploads]);
+      const fallback = items.filter((f) => !f.removed && !f.serverId && f.file);
+      /** @type {{ name: string, mimeType: string, data: string }[]} */
+      const attachments = await Promise.all(fallback.map((f) => fileToAttachment(f.file)));
       /** @type {Record<string, unknown>} */
       const body = { sessionId: sid, message: text };
+      const sendDraft =
+        Boolean(draftId) && (draftOnServer(draftId) || items.some((f) => f.serverId));
+      if (sendDraft) body.draftId = draftId;
       if (attachments.length) body.attachments = attachments;
       if (interrupt) body.interrupt = true;
       try {
@@ -1610,18 +2351,18 @@
         }
       );
       const data = await res.json().catch(() => ({}));
-      if (sendGen !== viewGen || (sid && sessionId && sid !== sessionId)) return;
+      const stale = sendGen !== viewGen || Boolean(sid && sessionId && sid !== sessionId);
       if (!res.ok) {
-        // Drop the optimistic bubble on failure.
-        if (
-          messages.length &&
-          messages[messages.length - 1]?.role === "user" &&
-          messages[messages.length - 1]?.content === (label || "(attachment)")
-        ) {
-          messages.pop();
+        dropPendingRow();
+        if (stale) {
+          refreshChats().catch(() => {});
+          return;
         }
-        if (!willQueue) setBusy(false);
+        // Drop the optimistic bubble on failure.
+        removeLocalMsg();
+        if (!willQueue && !usePending) setBusy(false);
         else renderMessagesDom();
+        restoreComposer();
         if (res.status === 503) {
           appendBubble(
             "assistant",
@@ -1640,27 +2381,49 @@
         setState("panel");
         return;
       }
+      accepted = true;
+      // The server deleted the draft when it took the message.
+      if (sendDraft) removeLocalDraft(String(draftId));
+      const row = rowId ? pendingRows.get(rowId) : null;
+      if (row) {
+        row.pending = false;
+        row.sessionId = sid;
+        row.key = `s:${sid}`;
+        row.draftId = "";
+      }
+      if (stale) {
+        renderHistoryList();
+        refreshChats().catch(() => {});
+        return;
+      }
+      delete localMsg.pending;
       if (Array.isArray(data.messages)) {
         applyServerMessages(data.messages);
+      } else {
+        renderMessagesDom();
+        persistLocal();
       }
       setBusy(true);
       setState("panel", { skipFocus: true });
-      if (showingHistory) renderHistory().catch(() => {});
+      refreshChats().catch(() => {});
       // Keep busy + poll until assistant reply lands (and queue drains).
       startPolling();
       await pollState();
     } catch (err) {
-      if (sendGen !== viewGen) return;
-      console.error("[edu-chat]", err);
-      if (
-        messages.length &&
-        messages[messages.length - 1]?.role === "user" &&
-        messages[messages.length - 1]?.content === (label || "(attachment)")
-      ) {
-        messages.pop();
+      if (accepted) {
+        console.error("[edu-chat] after send", err);
+        return;
       }
-      if (!willQueue) setBusy(false);
+      dropPendingRow();
+      if (sendGen !== viewGen) {
+        refreshChats().catch(() => {});
+        return;
+      }
+      console.error("[edu-chat]", err);
+      removeLocalMsg();
+      if (!willQueue && !usePending) setBusy(false);
       else renderMessagesDom();
+      restoreComposer();
       appendBubble(
         "assistant",
         "Could not reach the personal agent. Is the Mac API running?"
@@ -1685,7 +2448,7 @@
   /** Hide every chat view. The thread stays in history and keeps running. */
   function closeAllChats() {
     viewGen += 1;
-    composers.forEach(resetComposer);
+    composers.forEach((composer) => resetComposer(composer));
     showThread = false;
     showingHistory = false;
     persistLocal();
@@ -1819,7 +2582,10 @@
       if (event.target === form) input?.focus({ preventScroll: true });
     });
 
-    input?.addEventListener("input", () => syncComposerSize(composer));
+    input?.addEventListener("input", () => {
+      syncComposerSize(composer);
+      onComposerEdit(composer);
+    });
 
     input?.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" || event.shiftKey || event.isComposing || event.keyCode === 229) {
@@ -2078,19 +2844,32 @@
     true
   );
 
+  /** @param {Element|null|undefined} row */
+  function historyRowRef(row) {
+    if (!row) return null;
+    const el = /** @type {HTMLElement} */ (row);
+    return {
+      sid: el.dataset.sessionId || "",
+      draftId: el.dataset.draftId || "",
+      pending: el.dataset.pending === "1",
+    };
+  }
+
   historyEl?.addEventListener("pointerdown", (event) => {
     if (event.button && event.button !== 0) return;
-    const row = event.target.closest?.(".yan-chat-history-row");
-    historyPointerSid = row?.dataset.sessionId || null;
+    historyPointerRow = historyRowRef(event.target.closest?.(".yan-chat-history-row"));
   });
   historyEl?.addEventListener("pointercancel", () => {
-    historyPointerSid = null;
+    historyPointerRow = null;
   });
   historyEl?.addEventListener("click", (event) => {
-    const row = event.target.closest?.(".yan-chat-history-row");
-    const sid = historyPointerSid || row?.dataset.sessionId || "";
-    historyPointerSid = null;
-    if (sid) openHistoryChat(sid);
+    const ref =
+      historyPointerRow || historyRowRef(event.target.closest?.(".yan-chat-history-row"));
+    historyPointerRow = null;
+    if (!ref) return;
+    if (ref.sid) openHistoryChat(ref.sid);
+    else if (ref.pending) showPendingThread();
+    else if (ref.draftId) openDraft(ref.draftId);
   });
 
   window.addEventListener("keyup", onEnterKeyup);
@@ -2124,11 +2903,28 @@
     return files;
   }
 
+  /** @type {HTMLElement|null} */
+  let dropTarget = null;
+
+  /** The one box (input pill or the panel above it) under the drag. */
+  function dropBox(node) {
+    const el = node instanceof Element ? node : node instanceof Node ? node.parentElement : null;
+    const box = el?.closest?.(".yan-chat-pill, .yan-chat-panel");
+    return box && composerFromNode(box) ? /** @type {HTMLElement} */ (box) : null;
+  }
+
+  function setDropTarget(el) {
+    if (dropTarget === el) return;
+    dropTarget?.classList.remove("is-drop-target");
+    dropTarget = el;
+    dropTarget?.classList.add("is-drop-target");
+  }
+
   function onDragEnter(event) {
     const composer = composerFromNode(event.target);
     if (!isFileDrag(event) || !composer) return;
     event.preventDefault();
-    composer.column.classList.add("is-dragover");
+    setDropTarget(dropBox(event.target));
     if (state() === "closed") openChat();
   }
 
@@ -2137,24 +2933,22 @@
     if (!isFileDrag(event) || !composer) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
-    composer.column.classList.add("is-dragover");
+    setDropTarget(dropBox(event.target));
   }
 
   function onDragLeave(event) {
     if (!isFileDrag(event)) return;
-    const next = event.relatedTarget;
-    if (next instanceof Node && composerFromNode(next)) return;
-    composers.forEach((composer) => composer.column.classList.remove("is-dragover"));
+    setDropTarget(dropBox(event.relatedTarget));
   }
 
   function onDrop(event) {
+    setDropTarget(null);
     const composer = composerFromNode(event.target);
     if (!composer) return;
     const files = filesFromDrop(event);
     if (!files.length) return;
     event.preventDefault();
     event.stopPropagation();
-    composers.forEach((item) => item.column.classList.remove("is-dragover"));
     if (state() === "closed") openChat();
     addFiles(composer, files);
     composer.input?.focus({ preventScroll: true });
@@ -2168,6 +2962,13 @@
       el.addEventListener("drop", onDrop, true);
     });
   }
+  window.addEventListener("drop", () => setDropTarget(null), true);
+  window.addEventListener("dragend", () => setDropTarget(null));
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushAllDraftsKeepalive();
+  });
+  window.addEventListener("pagehide", flushAllDraftsKeepalive);
 
   window.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || state() === "closed") return;
@@ -2260,7 +3061,7 @@
   window.__eduChatRefresh = () => {
     if (sessionId) pollState().catch(() => {});
     else resumeFromServer().catch(() => {});
-    if (showingHistory) renderHistory().catch(() => {});
+    refreshChats().catch(() => {});
   };
 
   function chatDeepLinkId() {
@@ -2278,6 +3079,8 @@
   const deepChat = chatDeepLinkId();
   const resumeKick = () => {
     resumeAttempts += 1;
+    // The closed circle needs the chat list to know if anything is running.
+    if (!historyLoaded && window.YanMacApi) refreshChats().catch(() => {});
     if (deepChat) {
       if (!window.YanMacApi) {
         if (resumeAttempts < 8) window.setTimeout(resumeKick, 400);

@@ -40,6 +40,7 @@
 		45C10542870F5305373A709F /* YLWebMarkdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BAB5B4C79A9563E4CD43937 /* YLWebMarkdown.swift */; };
 		47486BD29572D791F436479F /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20592DA9B5602E124F949B98 /* Theme.swift */; };
 		47BF6E39D031C641B7C86505 /* KaTeX_Main-BoldItalic.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 04CDAACEDCB8632DFA206E04 /* KaTeX_Main-BoldItalic.woff2 */; };
+		4AD009B6C43403D940841F1F /* ThinkingOrbsKit in Frameworks */ = {isa = PBXBuildFile; productRef = C709C6BD023A6B8E7C0C82A4 /* ThinkingOrbsKit */; };
 		5042EA7C46B4C52D533DCB11 /* katex.min.js in Resources */ = {isa = PBXBuildFile; fileRef = 9736796556D2DB3AAC2335CC /* katex.min.js */; };
 		5172BD9CA2C8FCCBCB09D120 /* EducationSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = F05C0EC38920C98140B2615D /* EducationSchedule.swift */; };
 		525934297753945BDF705169 /* KaTeX_Main-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 5548E02316B0D1BF20E6A183 /* KaTeX_Main-Regular.woff2 */; };
@@ -54,6 +55,7 @@
 		6C1FD5253AE396A06C06B7B6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3BFC5D2A192A99E4F618F79B /* Assets.xcassets */; };
 		6CAACE8D2A6B7AE17C6904C3 /* LiveActivityChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A86C6C326C4186DB341D3C76 /* LiveActivityChrome.swift */; };
 		6F2D78286E2759B68E96CC8E /* katex.min.css in Resources */ = {isa = PBXBuildFile; fileRef = 7F860DE68210C9F4D65C0EAD /* katex.min.css */; };
+		7490CBED789100552F9C45DD /* ChatAttachmentTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5664BAE900646BDCAA097429 /* ChatAttachmentTile.swift */; };
 		750B305214CC33B4665E103E /* ClassActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9762E211D40ABD71EF6B883D /* ClassActivityAttributes.swift */; };
 		759BFDA13D21B1C13ED6D8B5 /* FitnessStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 584356DE1F7514C323536418 /* FitnessStore.swift */; };
 		769F11E79F596FE23EA6CB7C /* KaTeX_Fraktur-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 5381129AF38A038755AB1851 /* KaTeX_Fraktur-Regular.woff2 */; };
@@ -62,6 +64,7 @@
 		7BF72D47663386A13338DA91 /* KaTeX_Size3-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 9EC3D1C27A611BCEB5A03A7D /* KaTeX_Size3-Regular.woff2 */; };
 		7FABD05D5D1BBC89B680FD9B /* PadTabBarPin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79A3148F43AFD9F3B55F1A43 /* PadTabBarPin.swift */; };
 		80F305A0D987798481E11086 /* KaTeX_Script-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 1E4FD5BD956FB8EDDCEA9EFC /* KaTeX_Script-Regular.woff2 */; };
+		8214A22DEE1542B0EC9F7A0F /* ChatDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCCAA3CC9D5DF782932D5C1B /* ChatDraftStore.swift */; };
 		824D6E2F1C587C1EFEBBF1E5 /* EducationContextFiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23283A3D071E6F63E623FD38 /* EducationContextFiles.swift */; };
 		826F6BD0C6720A6D4550B518 /* GlassChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4533B0C052E08A466A1A195A /* GlassChrome.swift */; };
 		8855992881D58F17A8FE5242 /* KaTeX_Size1-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = F833CB1445F5C3B9B8CF1568 /* KaTeX_Size1-Regular.woff2 */; };
@@ -102,12 +105,14 @@
 		E5D3D404265535523A7F4395 /* KaTeX_Main-Italic.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = AEDA43EEE10F6FB6DAEA7F01 /* KaTeX_Main-Italic.woff2 */; };
 		ED3F577E7DFF1C56B3FD96F7 /* OpenAgentChatIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8821DC411CE772F1EBF795CE /* OpenAgentChatIntent.swift */; };
 		EDBCEE776FEEB42A93437629 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8651995A2DE1EC4290CBBDCC /* Assets.xcassets */; };
+		F45C99C5519725B12E0C2130 /* YLTintedOrb.swift in Sources */ = {isa = PBXBuildFile; fileRef = B48A79E30C688E32642F479E /* YLTintedOrb.swift */; };
 		F4D7D1D5846E78005F4C7208 /* GymView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832A6558D9C48C7524ACB200 /* GymView.swift */; };
 		F9C7AD0752E69A760C92D4A4 /* KaTeX_Size2-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = E3AE16848FCC140C9B24282B /* KaTeX_Size2-Regular.woff2 */; };
 		F9E81A6B0E896B79B4F154F8 /* EducationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F29B1D9327A0BC8892A063 /* EducationView.swift */; };
 		FB984709102CEEBE7FA05D21 /* KaTeX_Main-Bold.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = B0F00385349BEF0F602B6F45 /* KaTeX_Main-Bold.woff2 */; };
 		FCD578D1578794C0352E389D /* OpenClassIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C2AAC92030253A56EE90A26 /* OpenClassIntent.swift */; };
 		FD12A4ABE3044E9013C5FE5A /* KaTeX_Fraktur-Bold.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 98F5DB4B8725AB106C823FB3 /* KaTeX_Fraktur-Bold.woff2 */; };
+		FDD4021B84648D43BC4778CE /* YLBorderBeam.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E5ADCA9FF7CDD1B12C2081D /* YLBorderBeam.swift */; };
 		FFC0F77C0E51CD50A10215FF /* AgentLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1287B556EE753FA8E29940A /* AgentLiveActivity.swift */; };
 /* End PBXBuildFile section */
 
@@ -145,6 +150,7 @@
 		13E6C6E576FBB4F67B006FB4 /* YLHostedFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLHostedFocus.swift; sourceTree = "<group>"; };
 		1D74026100E777A198580A59 /* WidgetEducationLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetEducationLoader.swift; sourceTree = "<group>"; };
 		1E4FD5BD956FB8EDDCEA9EFC /* KaTeX_Script-Regular.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Script-Regular.woff2"; sourceTree = "<group>"; };
+		1E5ADCA9FF7CDD1B12C2081D /* YLBorderBeam.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLBorderBeam.swift; sourceTree = "<group>"; };
 		1FFCFCEECE10E079F84FFF3A /* FitnessModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitnessModels.swift; sourceTree = "<group>"; };
 		20592DA9B5602E124F949B98 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		23283A3D071E6F63E623FD38 /* EducationContextFiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EducationContextFiles.swift; sourceTree = "<group>"; };
@@ -170,6 +176,7 @@
 		51A6DDC91012A844AA890035 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		5381129AF38A038755AB1851 /* KaTeX_Fraktur-Regular.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Fraktur-Regular.woff2"; sourceTree = "<group>"; };
 		5548E02316B0D1BF20E6A183 /* KaTeX_Main-Regular.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Main-Regular.woff2"; sourceTree = "<group>"; };
+		5664BAE900646BDCAA097429 /* ChatAttachmentTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAttachmentTile.swift; sourceTree = "<group>"; };
 		56E5089678AC6FD751ABBA54 /* TodoWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoWidget.swift; sourceTree = "<group>"; };
 		584356DE1F7514C323536418 /* FitnessStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitnessStore.swift; sourceTree = "<group>"; };
 		593E309C735275989CBC1866 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
@@ -204,10 +211,12 @@
 		B0F00385349BEF0F602B6F45 /* KaTeX_Main-Bold.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Main-Bold.woff2"; sourceTree = "<group>"; };
 		B3F59C1B7CC61E1680271B65 /* AppLoadingScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLoadingScreen.swift; sourceTree = "<group>"; };
 		B414370293577E90FDB3BC95 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
+		B48A79E30C688E32642F479E /* YLTintedOrb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLTintedOrb.swift; sourceTree = "<group>"; };
 		BD7AE7215F57F3740AB87531 /* YanLevinApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YanLevinApp.swift; sourceTree = "<group>"; };
 		BE69351E7F5EA54D38D8FA97 /* YanLevinWidgetsBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YanLevinWidgetsBundle.swift; sourceTree = "<group>"; };
 		C591473A552F86C4D658DD74 /* NaturalWhen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NaturalWhen.swift; sourceTree = "<group>"; };
 		CA73E841EE806831FD0F0861 /* ChatSendFlight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSendFlight.swift; sourceTree = "<group>"; };
+		CCCAA3CC9D5DF782932D5C1B /* ChatDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatDraftStore.swift; sourceTree = "<group>"; };
 		D1287B556EE753FA8E29940A /* AgentLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentLiveActivity.swift; sourceTree = "<group>"; };
 		D468F5B66C3D9BB130D39AAA /* AuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthStore.swift; sourceTree = "<group>"; };
 		D52A64A697EC5F95C4A2B684 /* EducationTabScroll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EducationTabScroll.swift; sourceTree = "<group>"; };
@@ -238,6 +247,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C9DF62AF737C33204914CB98 /* GoogleSignIn in Frameworks */,
+				4AD009B6C43403D940841F1F /* ThinkingOrbsKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -322,6 +332,7 @@
 				2723AF7679B0DE1C331A02F3 /* APIClient+URL.swift */,
 				3E7DDEA1EF28086A8752029D /* AppGroupStore.swift */,
 				D468F5B66C3D9BB130D39AAA /* AuthStore.swift */,
+				CCCAA3CC9D5DF782932D5C1B /* ChatDraftStore.swift */,
 				FEF42D98892009798E7AA8FB /* ChatModels.swift */,
 				29892B1F97CCD28845DB2EEF /* EducationModels.swift */,
 				F05C0EC38920C98140B2615D /* EducationSchedule.swift */,
@@ -338,6 +349,7 @@
 		6D6F1C173653D5A6EFDF06EE /* Chat */ = {
 			isa = PBXGroup;
 			children = (
+				5664BAE900646BDCAA097429 /* ChatAttachmentTile.swift */,
 				9BBD84778BC1EBA0B291C926 /* ChatHistory.swift */,
 				CA73E841EE806831FD0F0861 /* ChatSendFlight.swift */,
 				A056C44E530D5338DB54978D /* ChatView.swift */,
@@ -373,6 +385,7 @@
 				4533B0C052E08A466A1A195A /* GlassChrome.swift */,
 				C591473A552F86C4D658DD74 /* NaturalWhen.swift */,
 				20592DA9B5602E124F949B98 /* Theme.swift */,
+				1E5ADCA9FF7CDD1B12C2081D /* YLBorderBeam.swift */,
 				DB1CE3B3DB78550077E7BECD /* YLHaptics.swift */,
 				13E6C6E576FBB4F67B006FB4 /* YLHostedFocus.swift */,
 				E41EB89491918E6F0C2E4F19 /* YLKeyboard.swift */,
@@ -380,6 +393,7 @@
 				080B5543DFC0877FE81D2D84 /* YLMark.swift */,
 				F851AE2250BE4269E53498EE /* YLMarkdown.swift */,
 				9A015C81FA07EC99A09C44AE /* YLMotion.swift */,
+				B48A79E30C688E32642F479E /* YLTintedOrb.swift */,
 				4BAB5B4C79A9563E4CD43937 /* YLWebMarkdown.swift */,
 			);
 			path = Design;
@@ -510,6 +524,7 @@
 			name = YanLevin;
 			packageProductDependencies = (
 				9D32EB49F8063F208E32F95D /* GoogleSignIn */,
+				C709C6BD023A6B8E7C0C82A4 /* ThinkingOrbsKit */,
 			);
 			productName = YanLevin;
 			productReference = 311ADB15534A57F1748F1E96 /* YanLevin.app */;
@@ -545,6 +560,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				18C178DA3D94F5ED2C35D329 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				C7E8D1010EB5BDE6885CB0E4 /* XCRemoteSwiftPackageReference "Libraries.dev" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 40A2D816426D38376D2A48CE /* Products */;
@@ -613,6 +629,8 @@
 				B1D99F7011A4A4F668A1CFB2 /* AppGroupStore.swift in Sources */,
 				958BCCA3A8A3810849928DDB /* AppLoadingScreen.swift in Sources */,
 				02E4B0AB334E7E786B92BAFF /* AuthStore.swift in Sources */,
+				7490CBED789100552F9C45DD /* ChatAttachmentTile.swift in Sources */,
+				8214A22DEE1542B0EC9F7A0F /* ChatDraftStore.swift in Sources */,
 				1A9B6E82F6D2D31EC8BA1C4D /* ChatHistory.swift in Sources */,
 				32B21003D97E555F1A6F5D88 /* ChatModels.swift in Sources */,
 				016EA89B8F227C0DDEED8851 /* ChatSendFlight.swift in Sources */,
@@ -646,6 +664,7 @@
 				C52595D82A1AB8D1201B44B3 /* RootTabView.swift in Sources */,
 				E0DACB5DB2DB4BB7947801BD /* TabReselectObserver.swift in Sources */,
 				47486BD29572D791F436479F /* Theme.swift in Sources */,
+				FDD4021B84648D43BC4778CE /* YLBorderBeam.swift in Sources */,
 				D283F05FAC1FF2FF6D883046 /* YLHaptics.swift in Sources */,
 				093950D06486BD77A0BB4EA4 /* YLHostedFocus.swift in Sources */,
 				55E8EB83D402053CEB351A61 /* YLKeyboard.swift in Sources */,
@@ -653,6 +672,7 @@
 				A0F684FF13DDC6E02923E9CD /* YLMark.swift in Sources */,
 				1D54D63591106F2E66FD43BC /* YLMarkdown.swift in Sources */,
 				92B5F17CAFBFD2DE8AA97AEB /* YLMotion.swift in Sources */,
+				F45C99C5519725B12E0C2130 /* YLTintedOrb.swift in Sources */,
 				45C10542870F5305373A709F /* YLWebMarkdown.swift in Sources */,
 				B6F580E7F659994D82092817 /* YanLevinApp.swift in Sources */,
 			);
@@ -946,6 +966,14 @@
 				minimumVersion = 8.0.0;
 			};
 		};
+		C7E8D1010EB5BDE6885CB0E4 /* XCRemoteSwiftPackageReference "Libraries.dev" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Jakubantalik/Libraries.dev";
+			requirement = {
+				kind = revision;
+				revision = bad63221ebafa08d830586aa1721ecbd4ea02fcb;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -953,6 +981,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 18C178DA3D94F5ED2C35D329 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignIn;
+		};
+		C709C6BD023A6B8E7C0C82A4 /* ThinkingOrbsKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C7E8D1010EB5BDE6885CB0E4 /* XCRemoteSwiftPackageReference "Libraries.dev" */;
+			productName = ThinkingOrbsKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

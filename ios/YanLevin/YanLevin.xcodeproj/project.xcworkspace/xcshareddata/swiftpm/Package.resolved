@@ -1,5 +1,5 @@
 {
-  "originHash" : "68aa00e3cba36db2e0a76f54dbc84d1f079d8aa9a19bfa9fce02d6286bd620b7",
+  "originHash" : "7a6ad3ed0a3f7b85dd9619478fd67f4ea4562586708dbf42f322e76ba5ecb139",
   "pins" : [
     {
       "identity" : "app-check",
@@ -62,6 +62,14 @@
       "state" : {
         "revision" : "040d087ac2267d2ddd4cca36c757d1c6a05fdbfe",
         "version" : "101.0.0"
+      }
+    },
+    {
+      "identity" : "libraries.dev",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Jakubantalik/Libraries.dev",
+      "state" : {
+        "revision" : "bad63221ebafa08d830586aa1721ecbd4ea02fcb"
       }
     },
     {

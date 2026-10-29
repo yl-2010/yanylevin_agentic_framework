@@ -55,7 +55,17 @@ struct ChatView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var visitorStore = VisitorChatStore()
     @StateObject private var educationStore = EducationStore()
+    @StateObject private var draftStore = ChatDraftStore()
     @State private var draft = ""
+    /// Server draft the composer writes to. Nil on a blank chat until the
+    /// first keystroke or attachment.
+    @State private var activeDraftId: String?
+    /// Thread the composer belongs to; its draft id is `s-<sessionId>`.
+    @State private var activeDraftSessionId: String?
+    /// Last draft id restored into the composer, so late list refreshes fill it at most once.
+    @State private var restoredDraftBinding: String?
+    /// Bumped whenever the composer is pointed at another thread or draft.
+    @State private var composerBindingGeneration = 0
     @State private var backend: ChatBackend = .publicChat
     @State private var didChooseBackend = false
     @State private var pendingAttachments: [PendingChatAttachment] = []
@@ -179,9 +189,24 @@ struct ChatView: View {
     private var queuedAnimationSignature: Int {
         var hash = 5381
         for msg in messages {
-            hash = ((hash << 5) &+ hash) &+ (msg.queued ? 1 : 0)
+            hash = ((hash << 5) &+ hash) &+ (msg.queued ? 1 : 0) &+ (msg.pending ? 2 : 0)
         }
         return hash
+    }
+
+    /// Drives the full-screen beam in `YanLevinApp`.
+    private var chatBeamActive: Bool {
+        usesEducation && educationStore.agentBusy
+    }
+
+    private var historySections: [ChatHistorySection] {
+        ChatHistoryGrouping.sections(
+            from: ChatHistoryGrouping.entries(
+                chats: educationStore.chatHistory,
+                drafts: draftStore.drafts,
+                pending: educationStore.pendingSends
+            )
+        )
     }
 
     /// While the field is one line tall, center the send capsule on the
@@ -242,13 +267,9 @@ struct ChatView: View {
                                     // so the pill is not covered by the next bubble.
                                     .zIndex(copyMenuMessageID == msg.id ? 10 : 0)
                                 case .working(let label):
-                                    ChatWorkingBubble(
-                                        label: label,
-                                        isWide: isWide,
-                                        colorScheme: colorScheme
-                                    )
-                                    .equatable()
-                                    .id("working-indicator")
+                                    ChatOrbBubble(label: label, isWide: isWide)
+                                        .equatable()
+                                        .id("working-indicator")
                                 }
                             }
                         }
@@ -334,6 +355,9 @@ struct ChatView: View {
                 }
             }
             .onAppear {
+                educationStore.draftStore = draftStore
+                draftStore.workspace = educationFocus.workspace
+                draftStore.token = auth.session?.token
                 // Convert a lock-screen pending flag into a handoff BEFORE the
                 // default backend entry, or cold launch would start two chats.
                 nav.consumePendingNewChatIfNeeded()
@@ -374,6 +398,15 @@ struct ChatView: View {
             .onChange(of: composerFocused) { _, focused in
                 if focused, !padLandscape { closeChatHistory() }
             }
+            .onChange(of: draft) { _, text in
+                syncDraftText(text)
+            }
+            .onChange(of: draftStore.drafts) { _, _ in
+                restoreActiveDraftIfIdle()
+            }
+            .onChange(of: chatBeamActive, initial: true) { _, active in
+                if nav.chatWorking != active { nav.chatWorking = active }
+            }
             .fileImporter(
                 isPresented: $showFileImporter,
                 allowedContentTypes: [.item, .image, .pdf, .data],
@@ -402,6 +435,9 @@ struct ChatView: View {
         .task(id: liveTaskID) {
             guard usesEducation, let token = auth.session?.token else { return }
             educationStore.workspace = educationFocus.workspace
+            educationStore.draftStore = draftStore
+            draftStore.workspace = educationFocus.workspace
+            draftStore.token = token
             consumeChatHandoff()
             if !educationStore.isStartingNewChat, !nav.chatHandoffStartNew {
                 await educationStore.resumeAgentChat(
@@ -415,9 +451,19 @@ struct ChatView: View {
         .onChange(of: educationFocus.workspace) { _, ws in
             educationStore.workspace = ws
             educationStore.presentBlankChat()
+            draftStore.reset()
+            draftStore.workspace = ws
+            bindComposer(toSession: nil, forceClear: true)
             liveSessionID += 1
         }
         .onChange(of: scenePhase) { _, phase in
+            if phase == .background {
+                let flushTask = UIApplication.shared.beginBackgroundTask(withName: "chat-draft-flush")
+                Task {
+                    await draftStore.flushAll()
+                    UIApplication.shared.endBackgroundTask(flushTask)
+                }
+            }
             if phase == .active {
                 consumeChatHandoff()
             }
@@ -643,7 +689,7 @@ struct ChatView: View {
                             .allowsHitTesting(false)
 
                         ChatHistoryPanel(
-                            sections: ChatHistoryGrouping.sections(from: educationStore.chatHistory),
+                            sections: historySections,
                             isLoading: educationStore.chatHistoryLoading,
                             width: width,
                             onSelect: selectHistoryChat
@@ -734,7 +780,7 @@ struct ChatView: View {
         return Group {
             if mountPanel {
                 ChatHistoryPanel(
-                    sections: ChatHistoryGrouping.sections(from: educationStore.chatHistory),
+                    sections: historySections,
                     isLoading: educationStore.chatHistoryLoading,
                     width: width,
                     onSelect: selectHistoryChat
@@ -936,9 +982,25 @@ struct ChatView: View {
         Task { await educationStore.markChatRead(sessionId: sid, token: token) }
     }
 
-    private func selectHistoryChat(_ chat: AgentChatListItem) {
+    private func selectHistoryChat(_ entry: ChatHistoryEntry) {
+        switch entry.target {
+        case .chat(let sessionId):
+            selectHistorySession(sessionId)
+        case .draft(let id):
+            openDraft(id: id)
+        case .pending(let sessionId):
+            if let sessionId {
+                selectHistorySession(sessionId)
+            } else {
+                YLHaptics.tap()
+                if !padLandscape { closeChatHistory(markVisibleRead: false) }
+            }
+        }
+    }
+
+    private func selectHistorySession(_ sessionId: String) {
         YLHaptics.tap()
-        let sameThread = chat.sessionId == educationStore.agentSessionId
+        let sameThread = sessionId == educationStore.agentSessionId
         if padLandscape {
             if sameThread {
                 markVisibleChatReadIfIdle()
@@ -947,11 +1009,130 @@ struct ChatView: View {
             closeChatHistory(markVisibleRead: sameThread)
         }
         guard let token = auth.session?.token else { return }
-        Task { await educationStore.markChatRead(sessionId: chat.sessionId, token: token) }
+        Task { await educationStore.markChatRead(sessionId: sessionId, token: token) }
         if sameThread {
             return
         }
-        Task { await educationStore.resumePersistedChat(sessionId: chat.sessionId, token: token) }
+        bindComposer(toSession: sessionId)
+        Task { await educationStore.resumePersistedChat(sessionId: sessionId, token: token) }
+    }
+
+    /// Unsent new-chat draft: blank thread, composer refilled, files kept on the server.
+    private func openDraft(id: String) {
+        YLHaptics.tap()
+        if !padLandscape {
+            closeChatHistory(markVisibleRead: false)
+        }
+        guard activeDraftId != id, let saved = draftStore.draft(id: id) else { return }
+        educationStore.presentBlankChat()
+        bindComposer(to: saved)
+    }
+
+    /// Point the composer at a thread. `nil` is a blank new chat. Swaps the
+    /// visible text only when it belonged to a draft or the target has one.
+    private func bindComposer(toSession sessionId: String?, forceClear: Bool = false) {
+        let id = sessionId.map(ChatDraft.sessionDraftId)
+        let saved = draftStore.draft(id: id)
+        let replace = forceClear || activeDraftId != nil || saved != nil
+        composerBindingGeneration += 1
+        activeDraftId = id
+        activeDraftSessionId = sessionId
+        restoredDraftBinding = saved == nil ? nil : id
+        guard replace else { return }
+        applyComposerContent(
+            text: saved?.text ?? "",
+            attachments: (saved?.files ?? []).map(PendingChatAttachment.init(draftFile:))
+        )
+    }
+
+    private func bindComposer(to saved: ChatDraft) {
+        composerBindingGeneration += 1
+        activeDraftId = saved.id
+        activeDraftSessionId = saved.sessionId
+        restoredDraftBinding = saved.id
+        applyComposerContent(
+            text: saved.text,
+            attachments: saved.files.map(PendingChatAttachment.init(draftFile:))
+        )
+    }
+
+    private func applyComposerContent(text: String, attachments: [PendingChatAttachment]) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            draft = text
+            pendingAttachments = attachments
+        }
+        if text.isEmpty {
+            YLComposerInput.clearFocusedText()
+        }
+    }
+
+    private func ensureActiveDraftId() -> String {
+        if let activeDraftId { return activeDraftId }
+        let id = activeDraftSessionId.map(ChatDraft.sessionDraftId) ?? UUID().uuidString
+        activeDraftId = id
+        restoredDraftBinding = id
+        return id
+    }
+
+    private func syncDraftText(_ text: String) {
+        guard usesEducation else { return }
+        let id: String
+        if let activeDraftId {
+            id = activeDraftId
+        } else {
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            id = ensureActiveDraftId()
+        }
+        if draftStore.draft(id: id)?.text == text { return }
+        if text.isEmpty, draftStore.draft(id: id) == nil, pendingAttachments.isEmpty { return }
+        draftStore.token = auth.session?.token
+        draftStore.setText(text, draftId: id, sessionId: activeDraftSessionId)
+    }
+
+    /// A chat opened before the draft list arrived gets its saved draft once,
+    /// and only while the composer is idle and empty.
+    private func restoreActiveDraftIfIdle() {
+        guard usesEducation, !composerFocused, draft.isEmpty, pendingAttachments.isEmpty else { return }
+        guard let id = activeDraftId ?? activeDraftSessionId.map(ChatDraft.sessionDraftId),
+              restoredDraftBinding != id,
+              let saved = draftStore.draft(id: id),
+              saved.hasContent,
+              !educationStore.pendingSends.contains(where: { $0.draftId == id })
+        else { return }
+        bindComposer(to: saved)
+    }
+
+    private func addAttachment(_ attachment: PendingChatAttachment) {
+        var item = attachment
+        let token = auth.session?.token
+        let upload = usesEducation && token != nil && !item.data.isEmpty
+        item.uploading = upload
+        pendingAttachments.append(item)
+        guard upload else { return }
+        let id = ensureActiveDraftId()
+        draftStore.token = token
+        let task = draftStore.upload(item, draftId: id, sessionId: activeDraftSessionId)
+        let attachmentID = item.id
+        Task { @MainActor in
+            let file = await task.value
+            guard let i = pendingAttachments.firstIndex(where: { $0.id == attachmentID }) else { return }
+            pendingAttachments[i].uploading = false
+            pendingAttachments[i].serverFileId = file?.id
+        }
+    }
+
+    private func removeAttachment(_ item: PendingChatAttachment) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
+            pendingAttachments.removeAll { $0.id == item.id }
+        }
+        guard usesEducation, let id = activeDraftId else { return }
+        if let fileId = item.serverFileId {
+            draftStore.deleteFile(fileId, draftId: id)
+        } else if item.uploading {
+            draftStore.cancelUpload(item.id)
+        }
     }
 
     /// Entering the Personal Agent (public → personal toggle, cold launch,
@@ -963,6 +1144,7 @@ struct ChatView: View {
             closeChatHistory(animated: false, markVisibleRead: false)
         }
         educationStore.presentBlankChat()
+        bindComposer(toSession: nil)
     }
 
     /// Horizontal offset that recenters the 760pt column in the space beside
@@ -1031,36 +1213,21 @@ struct ChatView: View {
     private func composer(focus: FocusState<Bool>.Binding) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if usesEducation, !pendingAttachments.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(pendingAttachments) { item in
-                        HStack(alignment: .top, spacing: 8) {
-                            Text(item.displayName)
-                                .font(.body.weight(.semibold))
-                                .multilineTextAlignment(.leading)
-                                .lineLimit(nil)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .layoutPriority(1)
-                            Button {
-                                YLHaptics.tap()
-                                pendingAttachments.removeAll { $0.id == item.id }
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 18))
-                                    .symbolRenderingMode(.hierarchical)
-                                    .foregroundStyle(YLTheme.muted(colorScheme))
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(pendingAttachments) { item in
+                            ChatAttachmentTile(attachment: item) {
+                                removeAttachment(item)
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Remove \(item.displayName)")
+                            .transition(.scale(scale: 0.6).combined(with: .opacity))
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
-                        .foregroundStyle(YLTheme.fg(colorScheme))
-                        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                        .ylGlassRounded(cornerRadius: 22, interactive: true)
                     }
+                    .padding(.horizontal, IMessageComposer.horizontalPadding)
+                    .padding(.vertical, 4)
                 }
-                .padding(.horizontal, IMessageComposer.horizontalPadding)
+                // Glass finger-stretch on a tile must not clip at the row edge.
+                .scrollClipDisabled()
+                .frame(height: ChatAttachmentTile.side + 8)
                 .frame(maxWidth: AdaptiveLayout.chatMaxWidth)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -1227,6 +1394,14 @@ struct ChatView: View {
         if usesEducation, !interrupt, educationStore.isQueueFull { return }
         let text = draft
         let files = pendingAttachments
+        let sendDraftId = usesEducation ? activeDraftId : nil
+        let sendSessionId = activeDraftSessionId
+        if let sendDraftId {
+            draftStore.beginSend(sendDraftId)
+        }
+        // Next keystroke opens a fresh draft (s-<sessionId>, or a new UUID).
+        activeDraftId = nil
+        let binding = composerBindingGeneration
         prepareSendFlight(text: text)
         var transaction = Transaction()
         transaction.disablesAnimations = true
@@ -1242,8 +1417,40 @@ struct ChatView: View {
         }
         let generation = sendFlightGeneration
         Task {
-            await send(text, attachments: files, interrupt: interrupt)
+            let ok = await send(text, attachments: files, interrupt: interrupt, draftId: sendDraftId)
             clearPendingSendFlightIfOrphaned(generation: generation)
+            if let sendDraftId {
+                draftStore.endSend(sendDraftId, success: ok)
+            }
+            guard usesEducation, binding == composerBindingGeneration else { return }
+            if ok {
+                adoptSessionAfterSend()
+            } else if draft.isEmpty, pendingAttachments.isEmpty {
+                let restored = await draftStore.resolveUploads(files)
+                guard binding == composerBindingGeneration, draft.isEmpty, pendingAttachments.isEmpty else { return }
+                activeDraftId = sendDraftId
+                activeDraftSessionId = sendSessionId
+                restoredDraftBinding = sendDraftId
+                applyComposerContent(text: text, attachments: restored)
+            }
+        }
+    }
+
+    /// A blank-thread send just created a session. Later drafts in this
+    /// composer belong to it (`s-<sessionId>`), including text typed mid-send.
+    private func adoptSessionAfterSend() {
+        guard activeDraftSessionId == nil,
+              let sid = educationStore.agentSessionId, !sid.isEmpty
+        else { return }
+        activeDraftSessionId = sid
+        guard let oldId = activeDraftId else { return }
+        guard pendingAttachments.isEmpty else { return }
+        let newId = ChatDraft.sessionDraftId(sid)
+        draftStore.deleteDraft(id: oldId)
+        activeDraftId = newId
+        restoredDraftBinding = newId
+        if !draft.isEmpty {
+            draftStore.setText(draft, draftId: newId, sessionId: sid)
         }
     }
 
@@ -1368,6 +1575,9 @@ struct ChatView: View {
             nav.chatHandoffStartNew = false
             nav.chatHandoffOpenExisting = false
             nav.chatHandoffSessionId = nil
+            if resumeSid != educationStore.agentSessionId {
+                bindComposer(toSession: resumeSid)
+            }
             Task { await educationStore.resumePersistedChat(sessionId: resumeSid, token: token) }
             return
         }
@@ -1383,8 +1593,7 @@ struct ChatView: View {
             if !padLandscape {
                 closeChatHistory(animated: false, markVisibleRead: false)
             }
-            draft = ""
-            pendingAttachments = []
+            bindComposer(toSession: nil, forceClear: true)
             let fullAccess = auth.hasFullAccess || AppGroupStore.hasFullAccess
             if fullAccess {
                 educationStore.presentBlankChat()
@@ -1403,7 +1612,7 @@ struct ChatView: View {
                 if pendingAttachments.contains(where: { $0.name == att.name && $0.data == att.data }) {
                     continue
                 }
-                pendingAttachments.append(att)
+                addAttachment(att)
             }
         }
         nav.chatHandoffAttachments = []
@@ -1424,9 +1633,21 @@ struct ChatView: View {
         }
     }
 
-    private func send(_ text: String, attachments: [PendingChatAttachment] = [], interrupt: Bool = false) async {
+    /// False when the turn did not reach the server (the caller restores the composer).
+    private func send(
+        _ text: String,
+        attachments: [PendingChatAttachment] = [],
+        interrupt: Bool = false,
+        draftId: String? = nil
+    ) async -> Bool {
         if usesEducation {
-            guard let token = auth.session?.token else { return }
+            guard let token = auth.session?.token else { return false }
+            guard let ticket = educationStore.stageAgentSend(
+                text,
+                attachments: attachments,
+                interrupt: interrupt,
+                draftId: draftId
+            ) else { return false }
             // Prefetch schedule tree so nowContext stays warm; server still
             // recomputes active class on every agent turn.
             if educationStore.tree == nil {
@@ -1440,15 +1661,10 @@ struct ChatView: View {
                 withLoc.phoneLocation = PhoneLocationReporter.shared.snapshot
                 PhoneLocationReporter.shared.refresh()
             }
-            await educationStore.sendAgent(
-                text,
-                attachments: attachments,
-                uiContext: withLoc,
-                interrupt: interrupt,
-                token: token
-            )
+            return await educationStore.deliverAgentSend(ticket, uiContext: withLoc, token: token)
         } else {
             await visitorStore.send(text)
+            return true
         }
     }
 
@@ -1459,11 +1675,11 @@ struct ChatView: View {
                 continue
             }
             let compressed = Self.compressImageDataIfNeeded(data) ?? data
-            let used = pendingAttachments.reduce(0) { $0 + $1.data.count }
+            let used = pendingAttachments.reduce(0) { $0 + $1.byteCount }
             guard compressed.count <= ChatAttachmentLimits.maxFileBytes else { continue }
             guard used + compressed.count <= ChatAttachmentLimits.maxTotalBytes else { break }
             let name = "photo-\(pendingAttachments.count + 1).jpg"
-            pendingAttachments.append(
+            addAttachment(
                 PendingChatAttachment(name: name, mimeType: "image/jpeg", data: compressed)
             )
         }
@@ -1516,10 +1732,10 @@ struct ChatView: View {
                 finalData = data
                 mime = Self.mimeType(for: url) ?? "application/octet-stream"
             }
-            let used = pendingAttachments.reduce(0) { $0 + $1.data.count }
+            let used = pendingAttachments.reduce(0) { $0 + $1.byteCount }
             guard finalData.count <= ChatAttachmentLimits.maxFileBytes else { continue }
             guard used + finalData.count <= ChatAttachmentLimits.maxTotalBytes else { break }
-            pendingAttachments.append(
+            addAttachment(
                 PendingChatAttachment(name: name, mimeType: mime, data: finalData)
             )
         }
@@ -1695,27 +1911,24 @@ private struct ChatEmptyState: View, Equatable {
     }
 }
 
-private struct ChatWorkingBubble: View, Equatable {
+/// Working indicator: the tinted working orb in a clear glass square. The
+/// label is spoken only.
+private struct ChatOrbBubble: View, Equatable {
     let label: String
     let isWide: Bool
-    let colorScheme: ColorScheme
+
+    private static let side: CGFloat = 56
+    private static let cornerRadius: CGFloat = 18
 
     var body: some View {
         HStack {
-            HStack(alignment: .center, spacing: 6) {
-                Text(label)
-                    .font(.body)
-                YLBusyDots()
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .foregroundStyle(YLTheme.muted(colorScheme))
-            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            // Same interactive Liquid Glass as fitness recent boxes / composer field.
-            .ylGlassRounded(cornerRadius: 22, interactive: true)
-            .chatHistorySwipeBlock()
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(label)
+            YLTintedOrb(size: 40)
+                .frame(width: Self.side, height: Self.side)
+                .contentShape(RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
+                .ylGlassRounded(cornerRadius: Self.cornerRadius, interactive: true, clear: true)
+                .chatHistorySwipeBlock()
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(label)
 
             Spacer(minLength: isWide ? 120 : 40)
         }
@@ -1841,7 +2054,7 @@ private struct ChatBubbleView: View, Equatable {
                                 }
                         }
                     }
-                    .opacity(msg.queued && !interruptArmed ? 0.42 : 1)
+                    .opacity((msg.queued || msg.pending) && !interruptArmed ? 0.42 : 1)
                     .scaleEffect(interruptArmed ? 1.04 : 1)
                     .animation(.spring(response: 0.28, dampingFraction: 0.72), value: interruptArmed)
                     .overlay {
