@@ -2042,6 +2042,14 @@ html[data-resolved-theme="dark"] .yan-chat-pill.corner.lg-refraction::after {
 .yan-chat.has-panel .yan-chat-close--panel {
   opacity: 1; pointer-events: auto;
 }
+/* History stays open beside a chat, so that chat's control is a minus.
+   The markup rotates a plus into an X with an inline style. */
+.yan-chat.is-dual [data-edu-chat-close-thread] svg {
+  transform: none !important;
+}
+.yan-chat.is-dual [data-edu-chat-close-thread] svg rect[height="15"] {
+  display: none;
+}
 
 .yan-chat-form {
   position: absolute; inset: 0; z-index: 4; display: flex; align-items: center; gap: 0.45rem;

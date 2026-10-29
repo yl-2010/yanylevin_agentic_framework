@@ -1597,6 +1597,9 @@
     else if (wasDual && showThread && open) showingHistory = false;
     layoutDual = dual;
     root.classList.toggle("is-dual", dual);
+    closeThreadBtns.forEach((btn) => {
+      btn.setAttribute("aria-label", dual ? "Hide this chat" : "Close this chat");
+    });
     if (dual && !wasDual) renderHistory().catch(() => {});
     syncHistoryFrost();
 
