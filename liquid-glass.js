@@ -1920,6 +1920,13 @@ void main() {
     syncMagneticFromPointer();
   }
 
+  // Magnetic pull + press for elements created after load (chat attachment tiles).
+  window.lgBindMagnetic = (el, strength) => {
+    if (cheapGlassOn()) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    bindMagnetic(el, strength || 0.28);
+  };
+
   // Allow chatbot (and other UI) to rebuild filters after size/shape changes.
   window.reinitLiquidGlass = () => {
     const finish = () => {

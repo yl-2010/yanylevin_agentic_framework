@@ -179,7 +179,8 @@
     const chipsEl = document.createElement("div");
     chipsEl.className = "yan-chat-attach-chips";
     chipsEl.hidden = true;
-    if (composer.form) composer.form.insertBefore(chipsEl, composer.form.firstChild);
+    // In the column, not the pill, so tiles skip the pill's magnetic transform.
+    composer.column.appendChild(chipsEl);
     composer.chipsEl = chipsEl;
     return chipsEl;
   }
@@ -233,6 +234,7 @@
         removePendingFile(composer, item.id);
       });
       el.appendChild(tile);
+      window.lgBindMagnetic?.(tile, 0.2);
     }
   }
 

@@ -2084,25 +2084,40 @@ html[data-resolved-theme="dark"] .yan-chat-pill.corner.lg-refraction::after {
 .yan-chat-column.is-composer-tall .yan-chat-input { align-self: stretch; height: auto; }
 .yan-chat-input::placeholder { color: var(--muted); opacity: 0.8; }
 .yan-chat-attach-chips {
-  /* Tiles sit in the panel's bottom-left corner, concentric with its curve:
-     inset = panel radius - tile radius. 0.75rem is the panel-to-pill gap
-     baked into --chat-panel-bottom; subtract the scroll padding below. */
+  /* Placed from the panel's own box (same vars as .yan-chat-panel), so the
+     first tile is concentric with its bottom-left corner:
+     inset = panel radius - tile radius, minus the scroll padding. */
   --tile-inset: calc(var(--chat-panel-radius) - 16px);
-  position: absolute;
-  left: calc(var(--tile-inset) - 4px);
-  right: calc(var(--tile-inset) - 4px);
-  bottom: calc(100% + 0.75rem + var(--tile-inset) - 8px);
+  --tile-pad: 12px;
+  position: fixed;
+  left: calc(var(--col-left, var(--pill-left)) + var(--tile-inset) - var(--tile-pad));
+  width: calc(var(--col-w, var(--pill-w)) - 2 * (var(--tile-inset) - var(--tile-pad)));
+  bottom: calc(var(--chat-panel-bottom) + var(--tile-inset) - var(--tile-pad));
+  box-sizing: border-box;
   display: flex;
   flex-wrap: nowrap;
   gap: 0.5rem;
-  /* Room for the tile shadow and hover lift inside the scroll clip. */
-  padding: 6px 4px 8px;
+  /* Room for the shadow and magnetic pull inside the scroll clip. */
+  padding: var(--tile-pad);
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
+  pointer-events: none;
+  z-index: 92;
+  opacity: 0;
+  transition:
+    opacity 0.28s var(--ease),
+    left 0.7s var(--chat-spring),
+    width 0.7s var(--chat-spring),
+    bottom 0.35s var(--ease);
+}
+.yan-chat.is-open .yan-chat-attach-chips {
+  opacity: 1;
+  transition-delay: 0.2s, 0s, 0s, 0s;
+}
+.yan-chat.is-open .yan-chat-attach-chips .yan-chat-attach-tile {
   pointer-events: auto;
-  z-index: 5;
 }
 .yan-chat-attach-chips::-webkit-scrollbar { display: none; }
 .yan-chat-column.has-attachments .yan-chat-messages::after,
@@ -2149,8 +2164,9 @@ html[data-resolved-theme="dark"] .yan-chat-attach-tile {
 html[data-resolved-theme="light"] .yan-chat-attach-tile {
   --lg-tint-opacity: 0.52;
 }
-.yan-chat-attach-tile:hover { transform: translateY(-1px); filter: brightness(1.06); }
-.yan-chat-attach-tile:active { transform: scale(0.95); transition-duration: 0.08s; }
+/* Motion comes from liquid-glass.js magnetic pull + press (inline transform). */
+.yan-chat-attach-tile:hover { filter: brightness(1.06); }
+.yan-chat-attach-tile:active { filter: brightness(0.96); }
 .yan-chat-attach-tile:focus-visible { outline: 2px solid var(--chat-orange); outline-offset: 2px; }
 .yan-chat-attach-tile.is-uploading { opacity: 0.55; }
 .yan-chat-attach-tile-ext {
