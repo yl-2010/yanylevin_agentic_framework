@@ -45,6 +45,8 @@ struct YLBorderBeam: View {
     var cornerRadius: CGFloat
     var active: Bool
     var lineWidth: CGFloat = 1.5
+    /// Solid orange stroke, as a fraction of `lineWidth`. Glow and bloom stay on `lineWidth`.
+    var outlineScale: CGFloat = 1
     var style: YLBeamStyle = .full
 
     @Environment(\.colorScheme) private var colorScheme
@@ -57,7 +59,7 @@ struct YLBorderBeam: View {
         ZStack {
             if mounted {
                 if reduceMotion {
-                    shape.strokeBorder(color.opacity(0.45), lineWidth: lineWidth)
+                    shape.strokeBorder(color.opacity(0.45), lineWidth: outlineWidth)
                 } else {
                     TimelineView(.animation(paused: !active)) { timeline in
                         let turns = (timeline.date.timeIntervalSinceReferenceDate / YLBeamTiming.revolution)
@@ -114,13 +116,13 @@ struct YLBorderBeam: View {
                 .mask(mask)
                 .opacity(dark ? 0.55 : 0.45)
 
-            // Stroke ring (web ::after).
+            // Stroke ring (web ::after). Width follows outlineScale; glow stays on lineWidth.
             shape
-                .strokeBorder(color, lineWidth: lineWidth)
+                .strokeBorder(color, lineWidth: outlineWidth)
                 .mask(mask)
 
             shape
-                .strokeBorder(Color.white, lineWidth: max(0.5, lineWidth * 0.6))
+                .strokeBorder(Color.white, lineWidth: max(0.5, outlineWidth * 0.6))
                 .mask(coreMask)
                 .opacity(dark ? 0.55 : 0.35)
 
@@ -139,6 +141,8 @@ struct YLBorderBeam: View {
     }
 
     private var compact: Bool { style == .compact }
+
+    private var outlineWidth: CGFloat { lineWidth * outlineScale }
 }
 
 extension View {
@@ -147,10 +151,17 @@ extension View {
         cornerRadius: CGFloat,
         active: Bool,
         lineWidth: CGFloat = 1.5,
+        outlineScale: CGFloat = 1,
         style: YLBeamStyle = .full
     ) -> some View {
         overlay {
-            YLBorderBeam(cornerRadius: cornerRadius, active: active, lineWidth: lineWidth, style: style)
+            YLBorderBeam(
+                cornerRadius: cornerRadius,
+                active: active,
+                lineWidth: lineWidth,
+                outlineScale: outlineScale,
+                style: style
+            )
         }
     }
 }
