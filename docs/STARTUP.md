@@ -23,9 +23,15 @@ curl -sS https://api.yanylevin.com/health
 | `com.personalagent.cloudflared` | Tunnel → `api.yanylevin.com` |
 | `com.personalagent.education-sync` | Auto push/pull education + fitness folders, JYPE workspace, `tmp/`; optional OneDrive relaunch |
 | `com.yanylevin.cursor-usage` | Read this Mac's Cursor chats and post them to `/api/usage/ingest`. Studio also pulls the billing feed. Person is Yan unless `data/usage/machine.json` says otherwise |
-| `com.yanylevin.lmstudio-gpt-oss` | Open LM Studio at login and load `openai/gpt-oss-20b` with no TTL |
+| `com.yanylevin.lmstudio-gpt-oss` | Open LM Studio at login and load `openai/gpt-oss-20b`. It stays loaded |
 
 Plists live in `~/Library/LaunchAgents/`.
+
+```bash
+bash $HOME/yanylevin_agentic_framework/deploy/launchagents/install-lmstudio-gpt-oss.sh
+```
+
+Logs: `/tmp/yanylevin-lmstudio-gpt-oss.log`. This agent only loads gpt-oss. Orpheus stays unloaded until another local API voice asks for it.
 
 ### Education / data folder sync (Mac Studio + MacBook)
 
