@@ -91,7 +91,7 @@ private struct YLScreenBeam: View {
     var body: some View {
         GeometryReader { proxy in
             Color.clear
-                .ylBorderBeam(cornerRadius: YLDisplayCorner.radius, active: active, lineWidth: 2.5, outlineScale: 0.5)
+                .ylBorderBeam(cornerRadius: YLDisplayCorner.radius, active: active, lineWidth: 1.25)
                 .ignoresSafeArea()
         }
         .ignoresSafeArea(.keyboard)
