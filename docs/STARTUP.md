@@ -42,7 +42,7 @@ Keeps these paths in sync with `origin/main`:
 Behavior:
 
 - Local file changes → debounce → commit → pull → push
-- Remote changes → poll (~20s) → fast-forward when this Mac has no extra commits, otherwise rebase onto `origin/main` (do not `git pull --rebase origin main`; Apple Git 2.54 errors with "Cannot rebase onto multiple branches"). Fetch uses IPv4 SSH to `ssh.github.com:443`, then retries `github.com:22` on DNS or timeout. A hung git+ssh group is killed so leftover ref locks cannot freeze the next poll. Catch-up rebases get 5 minutes. Unheld `.git/*.lock` files (index, HEAD, `origin/main`) are deleted.
+- Remote changes → poll (~20s on the Studio, ~5s on the MacBook) → fast-forward when this Mac has no extra commits, otherwise rebase onto `origin/main` (do not `git pull --rebase origin main`; Apple Git 2.54 errors with "Cannot rebase onto multiple branches"). Fetch uses IPv4 SSH to `ssh.github.com:443`, then retries `github.com:22` with ssh config ignored on DNS or timeout. A fetch left open across sleep is killed on wake. A hung git+ssh group is killed so leftover ref locks cannot freeze the next poll. Catch-up rebases get 5 minutes. Unheld `.git/*.lock` files (index, HEAD, `origin/main`) are deleted.
 - Same poll: if fewer than two `OneDrive` GUI processes are running, optionally relaunch OneDrive. Waits 2 minutes between retries if launch fails.
 
 Install / reload on each Mac (repo path `$HOME/yanylevin_agentic_framework`, Homebrew node):

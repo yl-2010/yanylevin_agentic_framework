@@ -24,11 +24,13 @@ import { promisify } from "node:util";
 import {
   SSH_PRIMARY,
   STALE_LOCK_RELS,
+  defaultPollMs,
   lsofBin,
   pickSshCommand,
   remoteUpdateArgs,
   shouldRemoveStaleLock,
   shouldRetryGit,
+  wokeFromSleep,
 } from "./education-folder-sync-lib.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -41,13 +43,13 @@ export const PATHS = [
   "tmp",
 ];
 
+const HOST = hostname().replace(/\.local$/, "");
 const DEBOUNCE_MS = Number(process.env.EDU_SYNC_DEBOUNCE_MS || 2500);
-const POLL_MS = Number(process.env.EDU_SYNC_POLL_MS || 20000);
+const POLL_MS = defaultPollMs(HOST, process.env.EDU_SYNC_POLL_MS);
 const GIT_TIMEOUT_MS = Number(process.env.EDU_SYNC_GIT_TIMEOUT_MS || 45000);
 const PULL_TIMEOUT_MS = Number(process.env.EDU_SYNC_PULL_TIMEOUT_MS || 300000);
 const STALE_LOCK_MS = Number(process.env.EDU_SYNC_STALE_LOCK_MS || 15000);
 const GIT_SSH_COMMAND = process.env.GIT_SSH_COMMAND || SSH_PRIMARY;
-const HOST = hostname().replace(/\.local$/, "");
 const IS_MAC = process.platform === "darwin";
 const ONEDRIVE_APP = "/Applications/OneDrive.app";
 const ONEDRIVE_EXPECTED = Number(process.env.EDU_SYNC_ONEDRIVE_EXPECTED || 0);
@@ -60,6 +62,9 @@ let lastOneDriveLaunchAt = 0;
 let chain = Promise.resolve();
 let debounceTimer = null;
 let syncing = false;
+
+/** @type {{ pid: number, kind: string } | null} */
+let inflight = null;
 
 function log(...args) {
   const line = `[education-sync ${new Date().toISOString()}] ${args.join(" ")}\n`;
@@ -107,6 +112,7 @@ async function git(args, opts = {}) {
       stdio: ["ignore", "pipe", "pipe"],
       detached: true,
     });
+    inflight = { pid: child.pid, kind: String(args[0] || "") };
     let stdout = "";
     let stderr = "";
     let settled = false;
@@ -115,6 +121,7 @@ async function git(args, opts = {}) {
       if (settled) return;
       settled = true;
       if (timer) clearTimeout(timer);
+      if (inflight && inflight.pid === child.pid) inflight = null;
       resolve(payload);
     };
     timer = setTimeout(() => {
@@ -424,6 +431,24 @@ async function main() {
     });
     syncCycle("poll").catch(() => {});
   }, POLL_MS);
+
+  // Sleep pauses this timer. On wake it fires late by about the sleep length.
+  // A fetch started before the lid closed is a dead socket. Kill that one so
+  // the cycle retries on the network that is up now.
+  let nextBeat = Date.now() + 5000;
+  setInterval(() => {
+    const now = Date.now();
+    const late = now - nextBeat;
+    nextBeat = now + 5000;
+    if (!wokeFromSleep(late)) return;
+    const stuck = inflight;
+    if (!stuck || stuck.kind !== "fetch") {
+      log(`awake after ${Math.round(late / 1000)}s`);
+      return;
+    }
+    log(`awake after ${Math.round(late / 1000)}s, dropping the fetch`);
+    killProcessGroup(stuck.pid);
+  }, 5000);
 }
 
 const isMain =

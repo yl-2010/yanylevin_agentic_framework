@@ -3,13 +3,23 @@
  * Keep this import-safe: the LaunchAgent script calls main() on load.
  */
 
+import { homedir } from "node:os";
+
 /** GitHub SSH over 443, IPv4 only. UW Wi-Fi and some home routers black-hole IPv6. */
 export const SSH_PRIMARY =
   "ssh -4 -o BatchMode=yes -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 -o Hostname=ssh.github.com -p 443";
 
-/** Same options on github.com:22 when ssh.github.com DNS or 443 fails. */
+/**
+ * github.com:22 with no ssh config. The MacBook config rewrites github.com to
+ * ssh.github.com:443, so a plain fallback still dies when that name does not resolve.
+ */
 export const SSH_FALLBACK =
-  "ssh -4 -o BatchMode=yes -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=2";
+  `ssh -F /dev/null -4 -i ${homedir()}/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=2`;
+
+export const STUDIO_POLL_MS = 20000;
+export const MACBOOK_POLL_MS = 5000;
+/** A poll timer this late means the Mac slept. Wall clock, not the paused monotonic clock. */
+export const WAKE_LATE_MS = 30000;
 
 export const STALE_LOCK_RELS = [
   "index.lock",
@@ -65,4 +75,19 @@ export function shouldRemoveStaleLock({ ageMs, hasHolder, staleMs }) {
 /** macOS ships lsof in /usr/sbin. The education-sync LaunchAgent PATH does not include that directory, so a bare `lsof` never runs and every stale lock looks held. */
 export function lsofBin(platform = process.platform) {
   return platform === "darwin" ? "/usr/sbin/lsof" : "lsof";
+}
+
+/** Studio stays on a 20s poll. The MacBook polls faster so a manual pull is usually empty. */
+export function defaultPollMs(host, envValue) {
+  if (envValue != null && String(envValue).trim() !== "") {
+    const n = Number(envValue);
+    if (Number.isFinite(n) && n >= 1000) return n;
+  }
+  if (/mac-?studio/i.test(String(host || ""))) return STUDIO_POLL_MS;
+  return MACBOOK_POLL_MS;
+}
+
+/** setInterval fires late by the sleep duration. 30s late is a wake, not a slow tick. */
+export function wokeFromSleep(lateMs, thresholdMs = WAKE_LATE_MS) {
+  return Number(lateMs) >= Number(thresholdMs);
 }
