@@ -135,7 +135,6 @@
 }
 
 .fit-machine-filters .edu-filter.is-on {
-  --lg-tint-rgb: 27, 125, 138;
   box-shadow:
     0 2px var(--lg-outer-shadow-blur) var(--lg-outer-shadow),
     0 0 0 1.5px color-mix(in srgb, var(--fit-filter-color, var(--accent)) 70%, transparent);

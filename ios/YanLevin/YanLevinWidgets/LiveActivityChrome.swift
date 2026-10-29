@@ -14,12 +14,12 @@ enum LiveActivityChrome {
 enum LiveActivityPalette {
     static let mark = Color.white
 
-    /// Dusty teal (app accent with the saturation pulled down).
-    private static let lightAccent = Color(red: 0x30 / 255, green: 0x6D / 255, blue: 0x75 / 255)
-    private static let darkAccent = Color(red: 0x7E / 255, green: 0xB7 / 255, blue: 0xB6 / 255)
+    /// Dusty version of the personal accent.
+    private static let lightAccent = BrandPalette.personalLiveActivityLight
+    private static let darkAccent = BrandPalette.personalLiveActivityDark
 
-    /// Dusty orange. Same hue as before, brightness bumped.
-    static let orange = Color(hue: 25 / 360, saturation: 0.55, brightness: 0.93)
+    /// Dusty version of the agent accent.
+    static let orange = BrandPalette.agentLiveActivity
 
     /// Island is always a black pill.
     static let islandAccent = darkAccent

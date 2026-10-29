@@ -7,6 +7,7 @@
     "server": "npm run start --prefix server",
     "server:dev": "npm run dev --prefix server",
     "deploy:web": "npx vercel deploy --prod --yes",
+    "brand": "node scripts/build-brand.mjs",
     "daily-briefing": "npm run daily-briefing --prefix server",
     "location-history": "npm run location-history --prefix server",
     "life-state": "npm run life-state --prefix server",

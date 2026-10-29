@@ -56,8 +56,9 @@ That matches `/education`: desktop follows the sun, phone stays on the device.
 
 ### Tokens
 
-Light (`:root`) from quotes.html. Dark from errores.html.
+Light (`:root`) from quotes.html. Dark from errores.html. The `--accent` and `--ok` values come from `brand/palette.mjs` (personal) through `npm run brand`. Copy whatever this block says today. Files you already wrote keep their colors.
 
+<!-- brand:object-html-personal -->
 ```css
 :root {
   color-scheme: light dark;
@@ -79,37 +80,39 @@ Light (`:root`) from quotes.html. Dark from errores.html.
     --bg: #12161b;
     --fg: #e8edf2;
     --muted: #9aa3ad;
-    --accent: #5ec4d0;
+    --accent: #71c4c2;
     --card: rgba(28, 34, 41, 0.88);
     --line: rgba(232, 237, 242, 0.1);
     --bad: #ff7a72;
     --bad-bg: rgba(255, 122, 114, 0.16);
     --good: #5dcc8a;
     --good-bg: rgba(93, 204, 138, 0.14);
-    --ok: #5ec4d0;
+    --ok: #71c4c2;
   }
 }
 html[data-resolved-theme="dark"] {
   --bg: #12161b;
   --fg: #e8edf2;
   --muted: #9aa3ad;
-  --accent: #5ec4d0;
+  --accent: #71c4c2;
   --card: rgba(28, 34, 41, 0.88);
   --line: rgba(232, 237, 242, 0.1);
   --bad: #ff7a72;
   --bad-bg: rgba(255, 122, 114, 0.16);
   --good: #5dcc8a;
   --good-bg: rgba(93, 204, 138, 0.14);
-  --ok: #5ec4d0;
+  --ok: #71c4c2;
 }
 ```
+<!-- brand:end -->
 
 `--bad` / `--good` / `--ok` are for marked-up corrections. A quotes page can omit using them. Do not invent a second teal.
 
 Need both the media query **and** `html[data-resolved-theme="dark"]`. Desktop night with OS set to light only hits the attribute. Desktop day with OS set to dark is why the media query is `:not([data-resolved-theme="light"])`.
 
-**JYPE objects** (`education/projects/jype/…`) use the same layout with the red wash from `/jype/styles.css`, not lake/teal:
+**JYPE objects** (`education/projects/jype/…`) use the same layout with the red wash from `/jype/styles.css`, not lake/teal. Accent values come from `brand/palette.mjs` (jype):
 
+<!-- brand:object-html-jype -->
 ```css
 :root {
   --bg: #f2e7e8;
@@ -131,6 +134,7 @@ html[data-resolved-theme="dark"] {
   --card: rgba(40, 22, 26, 0.88);
 }
 ```
+<!-- brand:end -->
 
 `--fg`, `--muted`, `--line`, `--bad`, `--good` stay as above. Do not mix teal onto a JYPE page.
 

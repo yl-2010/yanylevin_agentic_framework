@@ -38,6 +38,7 @@ Leave these off every page:
 - `/favicon.svg`. Use a data-URI icon in the page's own colors
 - Breadcrumbs back to Home, Notes, or a class
 - Inter on white, or a purple gradient, as the default look
+- The `--yl-*` brand tokens and `brand/palette.mjs`. A celebration's colors are literal hex in its own CSS and never change when the brand palette does
 
 The front page is `index.html` with its own CSS. An extra page gets its own `index.html` too. A shared reset is fine. A shared theme file that makes every page the same card stack is a miss. If you add a page, change the structure. Motifs come from the accomplishment. The reading, the shape of the test, the jokes in the chat.
 

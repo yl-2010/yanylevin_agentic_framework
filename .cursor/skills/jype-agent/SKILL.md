@@ -44,7 +44,7 @@ The JYPE Teams chat is one room. Yan, Alex, Example Friend, and Example Neighbor
 
 **Yan's agent channels (Yan, 2026-10-18 JYPE Teams).** Teams or Personal Agent in the yanylevin app. Not a JYPE group chat in the app. `workspace: jype` in `.chat-history/` is still personal chat when the file says Personal Agent chat.
 
-Study guides and big plans: `.cursor/skills/yanylevin-webpage-create/SKILL.md`. Dashboard JSON and tiles: `.cursor/skills/personal-agent/education-dashboard.md` (JYPE paragraph). Object HTML in the grade folder: `.cursor/skills/object-html/SKILL.md`.
+Study guides and big plans: `.cursor/skills/yanylevin-webpage-create/SKILL.md`. JYPE pages load `/jype/styles.css` and use `var(--accent)`, never a typed red, so a JYPE color change in `brand/palette.mjs` reaches every one. Dashboard JSON and tiles: `.cursor/skills/personal-agent/education-dashboard.md` (JYPE paragraph). Object HTML in the grade folder: `.cursor/skills/object-html/SKILL.md`.
 
 A celebration site for finishing a book, MA, test, or project is `.cursor/skills/create-celebration-website/SKILL.md`. Leave off `sites[]`, the notes hub, and the house theme. Keep the URL out of the reply while the event is still ahead. Schedule the link send only when that skill can name the end time.
 

@@ -32,6 +32,7 @@
 		37DB0F8C9AC5EC78F60E0F1E /* KaTeX_Caligraphic-Bold.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = D913F63D10113FC6768FB45B /* KaTeX_Caligraphic-Bold.woff2 */; };
 		37DD00EC16A32006CC2AEFB7 /* OpenTodoIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499CB5F2593A83941A69B5D4 /* OpenTodoIntent.swift */; };
 		388B229B71EC77D5B676128B /* EducationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94CCFD3097868B59A3491ED /* EducationStore.swift */; };
+		3A4A775CA1B99956167CF5F4 /* BrandPalette.generated.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6610FE3E29D6F593B1DC26FC /* BrandPalette.generated.swift */; };
 		3B957FF9EC905A753653E97F /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DEC95CF8756916C4C1611A6 /* KeychainStore.swift */; };
 		3BD6862825206AB0E66181FA /* KaTeX_SansSerif-Bold.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = E5C4FE7A49E80950C7429564 /* KaTeX_SansSerif-Bold.woff2 */; };
 		3DA5590F09A92039E16CAB9F /* LiveActivityCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCB80DB0E58FCD6ADF01F139 /* LiveActivityCoordinator.swift */; };
@@ -108,6 +109,7 @@
 		F42A52E29287660A0A3C1E15 /* YLDisplayCorner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3684BF0E5983154F456DA19C /* YLDisplayCorner.swift */; };
 		F45C99C5519725B12E0C2130 /* YLTintedOrb.swift in Sources */ = {isa = PBXBuildFile; fileRef = B48A79E30C688E32642F479E /* YLTintedOrb.swift */; };
 		F4D7D1D5846E78005F4C7208 /* GymView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832A6558D9C48C7524ACB200 /* GymView.swift */; };
+		F8E78EDDD052981BC36B8AD8 /* BrandPalette.generated.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6610FE3E29D6F593B1DC26FC /* BrandPalette.generated.swift */; };
 		F9C7AD0752E69A760C92D4A4 /* KaTeX_Size2-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = E3AE16848FCC140C9B24282B /* KaTeX_Size2-Regular.woff2 */; };
 		F9E81A6B0E896B79B4F154F8 /* EducationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F29B1D9327A0BC8892A063 /* EducationView.swift */; };
 		FB984709102CEEBE7FA05D21 /* KaTeX_Main-Bold.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = B0F00385349BEF0F602B6F45 /* KaTeX_Main-Bold.woff2 */; };
@@ -183,6 +185,7 @@
 		584356DE1F7514C323536418 /* FitnessStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitnessStore.swift; sourceTree = "<group>"; };
 		593E309C735275989CBC1866 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
 		5999526ED018A9822D26520F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		6610FE3E29D6F593B1DC26FC /* BrandPalette.generated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandPalette.generated.swift; sourceTree = "<group>"; };
 		67483E28EDDF1CD3D9F6A453 /* ScheduleWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleWidget.swift; sourceTree = "<group>"; };
 		697A904D8BE3400C45BC3787 /* AgentActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentActivityAttributes.swift; sourceTree = "<group>"; };
 		6C079B6112B2296F43A5F907 /* markdown.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = markdown.js; sourceTree = "<group>"; };
@@ -384,6 +387,7 @@
 			children = (
 				80FC48973417CD8112FE819E /* AdaptiveLayout.swift */,
 				B3F59C1B7CC61E1680271B65 /* AppLoadingScreen.swift */,
+				6610FE3E29D6F593B1DC26FC /* BrandPalette.generated.swift */,
 				4533B0C052E08A466A1A195A /* GlassChrome.swift */,
 				C591473A552F86C4D658DD74 /* NaturalWhen.swift */,
 				20592DA9B5602E124F949B98 /* Theme.swift */,
@@ -632,6 +636,7 @@
 				B1D99F7011A4A4F668A1CFB2 /* AppGroupStore.swift in Sources */,
 				958BCCA3A8A3810849928DDB /* AppLoadingScreen.swift in Sources */,
 				02E4B0AB334E7E786B92BAFF /* AuthStore.swift in Sources */,
+				F8E78EDDD052981BC36B8AD8 /* BrandPalette.generated.swift in Sources */,
 				7490CBED789100552F9C45DD /* ChatAttachmentTile.swift in Sources */,
 				8214A22DEE1542B0EC9F7A0F /* ChatDraftStore.swift in Sources */,
 				1A9B6E82F6D2D31EC8BA1C4D /* ChatHistory.swift in Sources */,
@@ -691,6 +696,7 @@
 				C8C917A12192A2765731C041 /* AgentActivityAttributes.swift in Sources */,
 				FFC0F77C0E51CD50A10215FF /* AgentLiveActivity.swift in Sources */,
 				A3F8D551C2EE0A3BE4752D3A /* AppGroupStore.swift in Sources */,
+				3A4A775CA1B99956167CF5F4 /* BrandPalette.generated.swift in Sources */,
 				9BEC1717E9F8F9A601A23781 /* ChatControlWidget.swift in Sources */,
 				750B305214CC33B4665E103E /* ClassActivityAttributes.swift in Sources */,
 				2F8898FEF901A1138B646B7E /* ClassLiveActivity.swift in Sources */,

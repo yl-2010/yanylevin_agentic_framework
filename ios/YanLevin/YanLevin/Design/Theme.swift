@@ -17,39 +17,38 @@ extension EnvironmentValues {
     }
 }
 
+/// Brand colors come from `BrandPalette` (brand/palette.mjs, `npm run brand`). Neutrals stay here.
 enum YLTheme {
     /// Keep `LaunchBackground` in Assets.xcassets in sync with bg0.
     static let lightBg0 = Color(red: 0xE8 / 255, green: 0xED / 255, blue: 0xF2 / 255)
     static let lightBg1 = Color(red: 0xDD / 255, green: 0xE5 / 255, blue: 0xEC / 255)
     static let lightFg = Color(red: 0x14 / 255, green: 0x18 / 255, blue: 0x1D / 255)
     static let lightMuted = Color(red: 0x5A / 255, green: 0x64 / 255, blue: 0x70 / 255)
-    static let lightAccent = Color(red: 0x1B / 255, green: 0x7D / 255, blue: 0x8A / 255)
+    static let lightAccent = BrandPalette.personalAccentLight
 
     static let darkBg0 = Color(red: 0x0B / 255, green: 0x0E / 255, blue: 0x11 / 255)
     static let darkBg1 = Color(red: 0x0F / 255, green: 0x14 / 255, blue: 0x1A / 255)
     static let darkFg = Color(red: 0xE9 / 255, green: 0xEE / 255, blue: 0xF2 / 255)
     static let darkMuted = Color(red: 0x98 / 255, green: 0xA2 / 255, blue: 0xAD / 255)
-    static let darkAccent = Color(red: 0x71 / 255, green: 0xC4 / 255, blue: 0xC2 / 255)
+    static let darkAccent = BrandPalette.personalAccentDark
 
-    /// Website chat send tint (`--chat-orange`).
-    static let chatOrange = Color(red: 0xFD / 255, green: 0x58 / 255, blue: 0x02 / 255)
-    static let chatOrangeDark = Color(red: 0xF4 / 255, green: 0x68 / 255, blue: 0x10 / 255)
+    /// Chat send tint. Debate uses this too, never its own.
+    static let chatOrange = BrandPalette.agentAccentLight
+    static let chatOrangeDark = BrandPalette.agentAccentDark
 
-    /// `/jype` wash (`jype/styles.css`).
-    static let jypeLightBg0 = Color(red: 0xF2 / 255, green: 0xE7 / 255, blue: 0xE8 / 255)
-    static let jypeLightBg1 = Color(red: 0xEA / 255, green: 0xD6 / 255, blue: 0xD8 / 255)
-    static let jypeLightAccent = Color(red: 0xC2 / 255, green: 0x27 / 255, blue: 0x3A / 255)
-    static let jypeDarkBg0 = Color(red: 0x16 / 255, green: 0x0C / 255, blue: 0x0F / 255)
-    static let jypeDarkBg1 = Color(red: 0x1D / 255, green: 0x11 / 255, blue: 0x14 / 255)
-    static let jypeDarkAccent = Color(red: 0xE0 / 255, green: 0x7A / 255, blue: 0x82 / 255)
+    static let jypeLightBg0 = BrandPalette.jypeBg0Light
+    static let jypeLightBg1 = BrandPalette.jypeBg1Light
+    static let jypeLightAccent = BrandPalette.jypeAccentLight
+    static let jypeDarkBg0 = BrandPalette.jypeBg0Dark
+    static let jypeDarkBg1 = BrandPalette.jypeBg1Dark
+    static let jypeDarkAccent = BrandPalette.jypeAccentDark
 
-    /// `/debate` wash (`debate/styles.css`).
-    static let debateLightBg0 = Color(red: 0xE4 / 255, green: 0xE6 / 255, blue: 0xEE / 255)
-    static let debateLightBg1 = Color(red: 0xD8 / 255, green: 0xDA / 255, blue: 0xE6 / 255)
-    static let debateLightAccent = Color(red: 0x5C / 255, green: 0x64 / 255, blue: 0x90 / 255)
-    static let debateDarkBg0 = Color(red: 0x12 / 255, green: 0x14 / 255, blue: 0x1C / 255)
-    static let debateDarkBg1 = Color(red: 0x17 / 255, green: 0x1A / 255, blue: 0x24 / 255)
-    static let debateDarkAccent = Color(red: 0x9A / 255, green: 0x9D / 255, blue: 0xB8 / 255)
+    static let debateLightBg0 = BrandPalette.debateBg0Light
+    static let debateLightBg1 = BrandPalette.debateBg1Light
+    static let debateLightAccent = BrandPalette.debateAccentLight
+    static let debateDarkBg0 = BrandPalette.debateBg0Dark
+    static let debateDarkBg1 = BrandPalette.debateBg1Dark
+    static let debateDarkAccent = BrandPalette.debateAccentDark
 
     static func bg0(_ scheme: ColorScheme, palette: YLPalette = .standard) -> Color {
         switch palette {

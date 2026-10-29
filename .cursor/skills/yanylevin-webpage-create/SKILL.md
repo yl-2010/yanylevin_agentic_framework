@@ -23,6 +23,12 @@ User gives a URL like `example.com/your-page`. You ship a page that looks like t
 
 Do not run the frontend-design "unique aesthetic" playbook. This is the existing site. No Inter, no purple gradients, no new display font.
 
+**Colors.** Every page picks one of three themes. Never type brand hex into page CSS. Use `var(--accent)`, `var(--bloom-a)`, and the other tokens.
+
+- **Personal (default).** Load `/education/styles.css`. The page follows the personal color in `brand/palette.mjs`.
+- **JYPE.** Also load `/jype/styles.css` after it. The page follows the JYPE color.
+- **Unique color on yanylevin chrome.** Only when Yan asks for its own color. Load `/education/styles.css` for the glass and orbs. Then pin `--accent`, `--bloom-a`, `--bloom-b`, `--bloom-c`, `--bg-0`, and `--bg-1` with literal hex in the page CSS, in `:root`, the dark media query, and `html[data-resolved-theme="dark"]`. Copy the pattern from `mama-birthday-2026/styles.css`. That color stays fixed when the palette changes.
+
 Apply Unslop to every heading and sentence on the page. No em dashes.
 
 ## 1. Map the URL

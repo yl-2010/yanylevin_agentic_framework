@@ -14,6 +14,9 @@ Alex, skip this whole skill.
 Chat is the normal Personal Agent. Objects live in the personal debate
 project, not `education/projects/jype/`.
 
+Debate's page color is `debate` in `brand/palette.mjs`. Debate chat always
+uses the agent color. Never set `--chat-*` in `debate/styles.css`.
+
 Do **not** dump full old case text into git. Patterns live in
 `education/you@example.com/projects/debate/CONTEXT.md`. Re-read that
 file when Yan asks how he writes cases, or before updating it.
