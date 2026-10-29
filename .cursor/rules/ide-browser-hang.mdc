@@ -1,0 +1,28 @@
+---
+description: Do not call the Cursor IDE browser. It hangs the agent turn.
+alwaysApply: true
+---
+
+# IDE browser hangs the turn
+
+Do not call `cursor-ide-browser`. That is `browser_navigate`, `browser_snapshot`, `browser_lock`, `browser_tabs`, `browser_cdp`, `browser_take_screenshot`, `browser_click`, and every other tool in that namespace.
+
+Those tools share one webview. Navigate waits 30 seconds for the load event, then runs `executeJavaScript` with no timeout. A preview server that already died, a module script that never finishes loading, or a second agent navigating the same tab leaves that promise open. The turn heartbeats and does not continue. On this Mac the long ones ran 58, 73, and 78 minutes, and they only ended when a new user message canceled the tool. `browser_tabs` and `browser_cdp` hung the same way.
+
+Check the page with headless Chrome. Set the shell `block_until_ms` so the command itself cannot sit there.
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --headless=new --disable-gpu --hide-scrollbars \
+  --user-data-dir=/tmp/yl-headless-chrome \
+  --window-size=1280,800 \
+  --virtual-time-budget=2000 \
+  --screenshot=/tmp/yl-shot.png \
+  "http://127.0.0.1:PORT/"
+```
+
+Run `curl -m 3 -o /dev/null -w '%{http_code}\n' URL` first. A `python3 -m http.server` started in the background dies when that shell step ends. Start it again in the same command as the screenshot, or confirm the port is open.
+
+Logged-in pages use `node server/agent-browser.js goto "URL"`. Read `.cursor/skills/personal-browser/SKILL.md`. Those Express `browser_*` tools are a different Chrome. They are not `cursor-ide-browser`.
+
+If headless Chrome fails, report that. Do not open the IDE browser as a fallback.

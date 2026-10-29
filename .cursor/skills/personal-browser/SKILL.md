@@ -49,9 +49,11 @@ Express / iOS / web / `@agent`: `browser_navigate`, `browser_snapshot`,
 `browser_screenshot`, `browser_login`, `browser_close`. Snapshot, then act on
 `[ref]` numbers. Do not guess pixels. After four failed clicks, stop.
 
-Cursor Desktop: `cursor-ide-browser` is fine for public pages. For a logged-in
-Chrome profile, use the `browser_*` tools in this chat (Express attaches them).
-One-shot CLI (opens Chrome, prints a snapshot, quits Chrome):
+Cursor Desktop: do not use `cursor-ide-browser`. It hangs the agent turn.
+`.cursor/rules/ide-browser-hang.mdc` has the reason and the headless Chrome
+command. For a logged-in Chrome profile, use the Express `browser_*` tools
+when this chat has them. One-shot CLI opens Chrome, prints a snapshot, and
+quits Chrome:
 
 ```bash
 node server/agent-browser.js goto "https://example.com"
