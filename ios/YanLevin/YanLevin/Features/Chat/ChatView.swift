@@ -199,10 +199,6 @@ struct ChatView: View {
         usesEducation && educationStore.agentBusy
     }
 
-    private var anyChatWorking: Bool {
-        usesEducation && educationStore.chatHistory.contains(where: \.isWorking)
-    }
-
     private var historySections: [ChatHistorySection] {
         ChatHistoryGrouping.sections(
             from: ChatHistoryGrouping.entries(
@@ -410,9 +406,6 @@ struct ChatView: View {
             }
             .onChange(of: chatBeamActive, initial: true) { _, active in
                 if nav.chatWorking != active { nav.chatWorking = active }
-            }
-            .onChange(of: anyChatWorking, initial: true) { _, working in
-                if nav.anyChatWorking != working { nav.anyChatWorking = working }
             }
             .fileImporter(
                 isPresented: $showFileImporter,

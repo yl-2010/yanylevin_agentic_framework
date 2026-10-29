@@ -39,17 +39,8 @@ struct YanLevinApp: App {
         WindowGroup {
             ZStack {
                 RootTabView()
-                YLScreenBeam(active: (nav.chatWorking && nav.selectedTab == .chat))
+                YLScreenBeam(active: nav.chatWorking && nav.selectedTab == .chat)
                     .environment(\.ylPalette, educationFocus.isJype ? .jype : .standard)
-                if !AdaptiveLayout.isPad {
-                    YLChatTabGlow(
-                        active: nav.chatWorking || nav.anyChatWorking,
-                        palette: educationFocus.isJype ? .jype : .standard
-                    )
-                    .frame(width: 0, height: 0)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-                }
                 if showLaunchCover {
                     AppLoadingScreen()
                         .transition(.opacity)
