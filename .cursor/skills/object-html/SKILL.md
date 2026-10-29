@@ -271,7 +271,6 @@ Copy this into the new file, then fill in title and `<main>`. The second `<scrip
     <h1>…</h1>
     <p class="sub">…</p>
   </main>
-  <script src="/js/vercel-analytics.js?v=1"></script>
 </body>
 </html>
 ```

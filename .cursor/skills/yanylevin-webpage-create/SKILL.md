@@ -73,7 +73,7 @@ Every page needs:
 6. Top-left YL squircle linking to `https://yanylevin.com/`
 7. Top-right empty circle, `aria-label="Toggle theme"`, `draggable="false"`
 8. Hidden SVG `<defs id="liquid-glass-defs">`
-9. Scripts, in this order: `/js/vercel-analytics.js`, `/liquid-glass.js`, `/theme-orb.js`, `/yl-home-link.js`
+9. Scripts, in this order: `/liquid-glass.js`, `/theme-orb.js`, `/yl-home-link.js`
 
 Skeleton (keep the YL path exactly):
 
@@ -116,7 +116,6 @@ Skeleton (keep the YL path exactly):
     <svg class="liquid-glass-svg" xmlns="http://www.w3.org/2000/svg" width="0" height="0" aria-hidden="true" focusable="false" color-interpolation-filters="sRGB" style="position:absolute;width:0;height:0;overflow:hidden;pointer-events:none">
       <defs id="liquid-glass-defs"></defs>
     </svg>
-    <script src="/js/vercel-analytics.js?v=1"></script>
     <script src="/liquid-glass.js?v=chrome-perf9"></script>
     <script src="/theme-orb.js?v=chrome-perf6"></script>
     <script src="/yl-home-link.js?v=3"></script>

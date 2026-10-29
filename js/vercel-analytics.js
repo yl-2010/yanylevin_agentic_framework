@@ -1,7 +1,12 @@
-// Vercel Web Analytics. The queue has to exist before the hosted script loads.
+// Vercel Web Analytics for the public homepage only.
 // Query strings are removed so an auth code in the URL is not stored.
 (function () {
   if (window.__ylVa) return;
+  var host = location.hostname;
+  if (host !== "yanylevin.com" && host !== "www.yanylevin.com") return;
+  var path = location.pathname;
+  if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+  if (path !== "/" && path !== "/index.html") return;
   window.__ylVa = true;
 
   window.va =
