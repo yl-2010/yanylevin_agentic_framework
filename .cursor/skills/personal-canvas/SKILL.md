@@ -174,7 +174,7 @@ No chat file and no text/URL: submit the student file already in that OneDrive f
 
 **Save / put this in / handle / store** (and any file request that does not say submit / turn in / upload to Canvas): identify the todo the same way, rename if needed, store on OneDrive. Stop. Do not call `submit`. If the destination is an existing Word, Excel, or PowerPoint file, do not store over it. Edit that file in the Office app with computer use and save from the app. A new Office file can be stored.
 
-Homework goes on the todo that already exists. A new todo is rare. A scan of an MA or QA he already took goes on that earlier assessment todo, named like the Canvas title with MA or QA kept, and a copy goes in `education/tests/<class>/`. Do not make a new todo due today to hold the scan. Full rules are in the education-dashboard skill, Chat attachments.
+Homework goes on the todo that already exists. A new todo is rare. A scan of an MA or QA he already took goes on that earlier assessment todo, named like the Canvas title with MA or QA kept, and a copy goes in `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.tests/<class>/`. Do not make a new todo due today to hold the scan. Full rules are in the education-dashboard skill, Chat attachments.
 
 ```bash
 node --env-file=server/.env server/canvas-files.js store --src <path> --canvas-id <id>

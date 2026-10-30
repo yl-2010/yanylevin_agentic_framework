@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { isFitnessUser } from "./fitness-data.js";
 import { canonicalizeEmail } from "./identity.js";
 import { logSdkResult, personFromEmail } from "./usage-log.js";
-import { gitAddCommitPush } from "./git-publish.js";
+import { FITNESS_DIR } from "./onedrive-projects.js";
 import {
   AUTO_MODEL_SELECTION,
   INTERACTIVE_FALLBACK_DELAYS_MS,
@@ -156,16 +156,16 @@ function systemPrompt(email, machineId, machineName) {
   return [
     "You are the fitness / gym OS agent for yanylevin.com /fitness (iOS text input).",
     `Signed-in user email: ${email}`,
-    `Only create/update files under fitness/${email}/`,
+    `Only create/update files under ${FITNESS_DIR}/${email}/`,
     "Never touch another user's email folder.",
     "Never edit main-site chatbot code, education folders, or LM Studio wiring.",
     "Never spawn a Cursor cloud agent.",
     "Prefer the fitness-os skill instructions when present.",
     "",
     "Data layout:",
-    `fitness/${email}/meta.json`,
-    `fitness/${email}/machines/<machineId>/machine.json  — { id, name, order, color }`,
-    `fitness/${email}/machines/<machineId>/entries.json — { entries: [{ id, weight, at }] }`,
+    `${FITNESS_DIR}/${email}/meta.json`,
+    `${FITNESS_DIR}/${email}/machines/<machineId>/machine.json  — { id, name, order, color }`,
+    `${FITNESS_DIR}/${email}/machines/<machineId>/entries.json — { entries: [{ id, weight, at }] }`,
     "",
     "Rules:",
     "- Each weight entry needs weight (number) and at (ISO timestamp, time of input).",
@@ -376,11 +376,6 @@ export async function messageFitnessAgent(sessionId, email, message, ctx = {}) {
         ? "The fitness agent hit an error. Try again."
         : "Done.";
   }
-
-  gitAddCommitPush({
-    paths: [`fitness/${normalized}`],
-    message: `fitness: agent update for ${normalized}`,
-  }).catch((err) => console.error("[fitness-agent] git publish", err));
 
   return { ok: true, reply: content, sessionId: sid };
 }

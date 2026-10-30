@@ -28,6 +28,7 @@ import { listClassEntriesForRoot, scheduleTodayKey } from "./education-data.js";
 import { scheduleOnedriveSnapshotRefresh } from "./education-onedrive-snapshot.js";
 import { formatDeletedBlock, loadDeletedMarkdown } from "./education-match.js";
 import { gitAddCommitPush } from "./git-publish.js";
+import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 import { attachCanvasComments, attachCanvasOverlay, canvasAssignmentIdFromLink } from "./canvas-grades.js";
 import {
   createLaterAuthRetry,
@@ -37,14 +38,14 @@ import {
 } from "./cursor-sdk-auth.js";
 import { OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
 
-export const CANVAS_REL = `education/${YAN_EMAIL}/.canvas`;
+export const CANVAS_REL = join(YAN_EDUCATION_DIR, ".canvas");
 export function canvasSyncHm(meta) {
   return nightlyAgentsHm(meta);
 }
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_BASE = "https://canvas.instructure.com";
-const META_PATH = join(ROOT, "education", YAN_EMAIL, "daily-briefing", "meta.json");
+const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
 const LOCK_PATH = "/tmp/yanylevin-canvas-sync.lock";
 export const CANVAS_LOCK_STALE_MS = 90 * 60 * 1000;
 export const CANVAS_LOCK_RETRY_MS = 3 * 60 * 1000;
@@ -112,7 +113,7 @@ export function canvasConfig() {
 export function canvasDir(override) {
   const explicit = String(override || "").trim();
   if (explicit) return explicit;
-  return join(ROOT, CANVAS_REL);
+  return CANVAS_REL;
 }
 
 export function clip(raw, max = 200) {
@@ -375,7 +376,7 @@ export function filterCanvasSnapshotToDashboard(snapshot, classNames) {
 }
 
 async function listDashboardClassNames() {
-  const root = join(ROOT, "education", YAN_EMAIL);
+  const root = YAN_EDUCATION_DIR;
   /** @type {string[]} */
   const names = [];
   for (const entry of await listClassEntriesForRoot(root)) {
@@ -1978,7 +1979,7 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
       });
       laterAuthRetry.clear();
       await gitAddCommitPush({
-        paths: [`education/${YAN_EMAIL}/.canvas`],
+        paths: [CANVAS_REL],
         message: `education: ${dateKey} canvas snapshot (junior courses not published)`,
       });
       return {
@@ -2000,7 +2001,7 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
     );
 
     const deletedBlock = formatDeletedBlock(
-      await loadDeletedMarkdown(join(ROOT, "education", YAN_EMAIL))
+      await loadDeletedMarkdown(YAN_EDUCATION_DIR)
     );
     const lastHourly = await readLastHourlySync(dir);
     const hourlyBlock = lastHourly
@@ -2058,7 +2059,7 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
       (fetched.snapshot?.assignments || []).map((row) => row.id)
     );
     await gitAddCommitPush({
-      paths: [`education/${YAN_EMAIL}`],
+      paths: [YAN_EDUCATION_DIR],
       message: `education: ${dateKey} canvas sync`,
     });
 
@@ -2141,7 +2142,7 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
     const assignments = fetched.snapshot?.assignments || [];
     const seen = await readSeenAssignmentIds(dir);
     const pending = await readPendingLinkIds(dir);
-    const canvasPaths = [`education/${YAN_EMAIL}/.canvas`];
+    const canvasPaths = [CANVAS_REL];
 
     if (seen == null) {
       await writeSnapshotFiles(dir, fetched.snapshot);

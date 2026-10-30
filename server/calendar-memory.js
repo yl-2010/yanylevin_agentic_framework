@@ -6,11 +6,11 @@
 
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { namesAreSimilar } from "./education-match.js";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const USER_ROOT = join(ROOT, "education/you@example.com");
+import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+
+const USER_ROOT = YAN_EDUCATION_DIR;
 
 export const AGENT_CREATED_PATH = join(USER_ROOT, "calendar/agent-created.jsonl");
 export const DELETED_EVENTS_PATH = join(USER_ROOT, "calendar/deleted-events.jsonl");

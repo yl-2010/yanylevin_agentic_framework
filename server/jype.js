@@ -1,14 +1,11 @@
 /**
  * Shared JYPE workspace (Yan, Alex, Example Friend, Example Neighbor).
- * Data lives in education/projects/jype. Chats go in that tree's
+ * Data lives in OneDrive Projects/JYPE. Chats go in that tree's
  * .chat-history, not anyone's personal folder.
  */
 
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { canonicalizeEmail } from "./identity.js";
-
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+import { JYPE_DIR } from "./onedrive-projects.js";
 
 export const JYPE_WORKSPACE = "jype";
 export const JYPE_ROOT_REL = "education/projects/jype";
@@ -33,8 +30,8 @@ export const JYPE_EMAIL_ALIASES = Object.freeze({
   "edeng@school.example": "neighbor@example.com",
 });
 
-export function jypeRootAbs(root = ROOT) {
-  return join(root, JYPE_ROOT_REL);
+export function jypeRootAbs() {
+  return JYPE_DIR;
 }
 
 export function normalizeJypeWorkspace(raw) {

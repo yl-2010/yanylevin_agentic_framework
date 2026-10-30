@@ -41,7 +41,7 @@ Keep existing files. Never delete a brain file. Merge Standing. Timeline
 append-only (`- YYYY-MM-DD | fact [iMessage]`, America/Los_Angeles, skip
 duplicates). Facts, not transcripts.
 
-Primary folder: `education/you@example.com/brain/people/<slug>/`
+Primary folder: `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/people/<slug>/`
 
 | File | Contents |
 | --- | --- |

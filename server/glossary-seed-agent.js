@@ -16,7 +16,7 @@ import {
 } from "./cursor-sdk-auth.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const BRAIN_REL = "education/you@example.com/brain";
+import { BRAIN_DIR as BRAIN_REL } from "./onedrive-projects.js";
 const LOCK_PATH = "/tmp/yanylevin-glossary-seed.lock";
 const LOCK_STALE_MS = 90 * 60 * 1000;
 
@@ -55,7 +55,7 @@ export function buildGlossarySeedPrompt({ dateKey, timezone }) {
     `Read ${brain}/identity.md, ${brain}/identity-school.md, ${brain}/identity-accounts.md, ${brain}/identity-logistics.md, ${brain}/patterns.md, and ${brain}/threads/.`,
     `Read the newest 14 files in ${brain}/journal/.`,
     `Read frontmatter only of ${brain}/orgs/, ${brain}/groups/, and ${brain}/places/. When an abbreviation is that entity's shorthand, add a pointer with --see. Do not copy the card into the gloss.`,
-    "Read class short names from education/you@example.com/classes/*/class.json (the name field) and .cursor/skills/class-schedule/SKILL.md for schedule words.",
+    "Read class short names from /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education/classes/*/class.json (the name field) and .cursor/skills/class-schedule/SKILL.md for schedule words.",
     "Skip people aliases. Those stay on person cards. Do not glob brain/people/.",
     "Skip full chat history and OneNote.",
     "Skip secrets, passwords, and diagnoses. Skip a term when the meaning is not clear. A wrong expansion is worse than a miss.",

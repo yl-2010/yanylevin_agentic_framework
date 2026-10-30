@@ -283,6 +283,8 @@
   let dateFilter = loadDateFilters();
   /** Dates panel: collapsed shows upcoming 6; expanded shows all. */
   let datesExpanded = false;
+  /** Projects panel: collapsed shows main. Expanded adds hidden. Backend never arrives. */
+  let projectsExpanded = false;
   /** Class comments panel: collapsed shows the 3 newest. */
   let classCommentsExpanded = false;
   /** Home comments panel: same collapse, only the fresh window. */
@@ -2156,9 +2158,20 @@
   }
 
   function projectsPanelHtml(filterId = "lg-edu-projects") {
-    const projects = (tree?.projects || []).filter((p) => !isFixture(p));
+    const projects = (tree?.projects || []).filter((p) => {
+      if (isFixture(p)) return false;
+      const tier = String(p.tier || "main").trim().toLowerCase();
+      if (tier === "backend") return false;
+      if (tier === "hidden") return projectsExpanded;
+      return true;
+    });
     const rows = projects.map(projectRowHtml).join("");
-    return panelHtml("Projects", listOrEmpty(rows), { filterId });
+    const titleHtml = `<button type="button" class="edu-projects-toggle" data-projects-expand aria-expanded="${
+      projectsExpanded ? "true" : "false"
+    }" aria-label="${
+      projectsExpanded ? "Collapse projects" : "Expand projects"
+    }">Projects</button>`;
+    return panelHtml("Projects", listOrEmpty(rows), { filterId, titleHtml });
   }
 
   function findCaseById(caseId) {
@@ -3886,6 +3899,14 @@
   function bindAppClicks() {
     appEl?.addEventListener("click", (event) => {
       const t = /** @type {HTMLElement} */ (event.target);
+
+      const projectsToggle = t.closest?.("[data-projects-expand]");
+      if (projectsToggle) {
+        event.preventDefault();
+        projectsExpanded = !projectsExpanded;
+        render();
+        return;
+      }
 
       const datesToggle = t.closest?.("[data-dates-expand]");
       if (datesToggle) {

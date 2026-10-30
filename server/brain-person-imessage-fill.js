@@ -22,7 +22,7 @@ import { resolveExportDir } from "./imessage-read.js";
 import { LOCAL_SOCK } from "./local-ipc.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const BRAIN_REL = "education/you@example.com/brain";
+import { BRAIN_DIR as BRAIN_REL } from "./onedrive-projects.js";
 const BATCH_BYTES = 400_000;
 const MET_SINCE = "2024-09-01T00:00:00Z";
 

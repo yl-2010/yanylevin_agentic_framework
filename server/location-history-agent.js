@@ -25,16 +25,11 @@ import {
   hasUnprocessedLocationPoints,
   locationHistoryDir,
 } from "./phone-location.js";
+import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = "/tmp/yanylevin-location-history.lock";
-const META_PATH = join(
-  REPO_ROOT,
-  "education",
-  YAN_EMAIL,
-  "daily-briefing",
-  "meta.json"
-);
+const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
 const INTERVAL_MS = 4 * 60 * 60 * 1000;
 const LOCK_STALE_MS = 45 * 60 * 1000;
 

@@ -4,8 +4,6 @@
  */
 
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { formatThemeContext } from "./chat-theme.js";
 import {
   buildCompactAboutYan,
@@ -14,8 +12,9 @@ import {
   retrieveYanSections,
 } from "./yan-retrieve.js";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const YAN_MD_PATH = join(ROOT, "data", "owner.md");
+import { YAN_MD_PATH as ONEDRIVE_YAN_MD } from "./onedrive-projects.js";
+
+const YAN_MD_PATH = ONEDRIVE_YAN_MD;
 
 let cached = null;
 let cachedAt = 0;

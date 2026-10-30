@@ -19,7 +19,7 @@ import { gitAddCommitPush } from "./git-publish.js";
 import { BATCH_BYTES, chunkDumpText, filesFromMonth } from "./school-mail-fill.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const BRAIN_REL = "education/you@example.com/brain";
+import { BRAIN_DIR as BRAIN_REL } from "./onedrive-projects.js";
 
 export const APPLE_MAIL_FILL_MODEL_SPEC = {
   id: process.env.CURSOR_APPLE_MAIL_FILL_MODEL || "composer-2.5",
@@ -253,7 +253,7 @@ export async function runAppleMailFill(opts = {}) {
     filled = true;
 
     try {
-      const stateFile = join(REPO_ROOT, BRAIN_REL, "state.json");
+      const stateFile = join(BRAIN_REL, "state.json");
       const state = JSON.parse(await readFile(stateFile, "utf8"));
       const next = recordAppleMailFillComplete(state);
       await writeFile(stateFile, `${JSON.stringify(next, null, 2)}\n`);
@@ -277,7 +277,7 @@ export async function runAppleMailFill(opts = {}) {
         `${BRAIN_REL}/patterns.md`,
         `${BRAIN_REL}/threads`,
         `${BRAIN_REL}/state.json`,
-        "education/you@example.com/dates",
+        "/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education/dates",
       ],
       message: "brain: fill from Apple Mail history",
     });

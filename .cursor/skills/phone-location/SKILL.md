@@ -26,7 +26,7 @@ Do **not** dump history into every turn. When the question is about today, yeste
 
 Only open `log-YYYY-MM.jsonl` if the markdown is missing or the question needs raw coordinates. Do not invent a timeline from `.location.json` alone.
 
-A scheduled Composer 2.5 job at 01:00 (and every 4h if new points) updates the markdown from the JSONL (and Mail.app ride receipts when traveling). A separate Grok 4.7 xhigh job at 01:00, after compose, names businesses/buildings and trip modes. Indoor activity stays in life-state. Context synthesis at 02:30 may rewrite a stay or trip when it infers more (whose house, robotaxi not car), still as an address, not a room tour. At 03:00 a Composer 2.5 job projects named stays into durable `education/you@example.com/brain/places/` cards. If markdown is behind the live fix, say the history may be a few hours stale.
+A scheduled Composer 2.5 job at 01:00 (and every 4h if new points) updates the markdown from the JSONL (and Mail.app ride receipts when traveling). A separate Grok 4.7 xhigh job at 01:00, after compose, names businesses/buildings and trip modes. Indoor activity stays in life-state. Context synthesis at 02:30 may rewrite a stay or trip when it infers more (whose house, robotaxi not car), still as an address, not a room tour. At 03:00 a Composer 2.5 job projects named stays into durable `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/places/` cards. If markdown is behind the live fix, say the history may be a few hours stale.
 
 ## Do not
 

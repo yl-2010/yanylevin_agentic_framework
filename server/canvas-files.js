@@ -78,8 +78,10 @@ const MIME_BY_EXT = {
   ".mp4": "video/mp4",
 };
 
+import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+
 function yanRoot() {
-  return join(ROOT, "education", YAN_EMAIL);
+  return YAN_EDUCATION_DIR;
 }
 
 async function readJsonFile(path) {

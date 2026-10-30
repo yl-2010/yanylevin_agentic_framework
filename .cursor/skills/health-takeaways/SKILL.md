@@ -31,7 +31,7 @@ All under `education/you@example.com/health/`:
 | `history-patterns.md` | Standing essay. Update only when a pattern changed. Rules in `.cursor/skills/health-history/SKILL.md`. |
 | `state.json` | Cursor. Set `lastTakeawaysAt` when you finish. |
 
-Gym stack weights are a different log (`fitness/you@example.com/`). Leave them alone unless a Health workout name clearly matches a gym session.
+Gym stack weights are a different log (`/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.fitness/you@example.com/`). Leave them alone unless a Health workout name clearly matches a gym session.
 
 ## Steps
 

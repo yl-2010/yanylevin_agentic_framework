@@ -380,7 +380,7 @@ export function formatDeletedBlock(deletedMarkdown) {
   const body = String(deletedMarkdown || "").trim();
   if (!body) return "";
   return [
-    "Manually deleted objects (deleted.md). For a date or todo, if a proposed item looks like one of these, SKIP creating it. Judgement, not exact date/time. Do not write update <gone-path>. Next year's occurrence is allowed. For an Apple Calendar event, skip only an identical tombstone (similar title and the same start, end, location, and link). A new time, place, or link is a new event. Fingerprints also live in education/you@example.com/calendar/deleted-events.jsonl.",
+    "Manually deleted objects (deleted.md). For a date or todo, if a proposed item looks like one of these, SKIP creating it. Judgement, not exact date/time. Do not write update <gone-path>. Next year's occurrence is allowed. For an Apple Calendar event, skip only an identical tombstone (similar title and the same start, end, location, and link). A new time, place, or link is a new event. Fingerprints also live in /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education/calendar/deleted-events.jsonl.",
     body,
   ].join("\n");
 }

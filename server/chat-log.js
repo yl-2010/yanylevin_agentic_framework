@@ -7,12 +7,12 @@
 
 import { createHash } from "node:crypto";
 import { appendFile, mkdir, readFile, stat } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
 import { isFullAccessEmail } from "./identity.js";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const LOG_PATH = join(ROOT, "data", "chat-log.md");
+import { CHAT_LOG_PATH } from "./onedrive-projects.js";
+
+const LOG_PATH = CHAT_LOG_PATH;
 const PACIFIC_TZ = "America/Los_Angeles";
 
 /** @param {string|null|undefined} email */

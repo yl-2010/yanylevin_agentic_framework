@@ -23,16 +23,11 @@ import {
 } from "./life-state.js";
 import { buildLifeStateSnapshot } from "./life-state-snapshot.js";
 import { YAN_EMAIL } from "./phone-location.js";
+import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = "/tmp/yanylevin-life-state.lock";
-const META_PATH = join(
-  REPO_ROOT,
-  "education",
-  YAN_EMAIL,
-  "daily-briefing",
-  "meta.json"
-);
+const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
 export const LIFE_STATE_INTERVAL_MS = 5 * 60 * 1000;
 const LOCK_STALE_MS = 8 * 60 * 1000;
 
@@ -132,7 +127,7 @@ export function buildLifeStatePrompt({ dateKey, timezone, snapshotPath }) {
     "Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} (timezone ${timezone}).`,
     `Snapshot: ${snapshotPath || LIFE_STATE_SNAPSHOT_PATH}`,
-    "Read education/you@example.com/life-state/schema.md and heuristics.md.",
+    "Read /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education/life-state/schema.md and heuristics.md.",
     "Read the snapshot and its previous samples. Do not open Mail, OneNote, Teams, Canvas, journal, or Health sleep.",
     `Write a guess JSON to ${LIFE_STATE_GUESS_PATH} (kind, activity, place, placeLabel, confidence, evidence, optional notes, model composer-2.5). CLI fills at/local/dateKey/since/continued.`,
     `Then: node server/life-state.js append ${LIFE_STATE_GUESS_PATH}`,

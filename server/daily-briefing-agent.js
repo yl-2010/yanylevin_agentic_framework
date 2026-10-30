@@ -33,13 +33,9 @@ const LOCK_PATH = "/tmp/yanylevin-daily-briefing.lock";
 const SERVER_LOG_PATH = "/tmp/personal-agent-server.log";
 /** Global unslop skill. Phase 3 reads it; never inline into prompts. */
 const UNSLOP_SKILL_PATH = join(homedir(), ".cursor/skills/unslop/SKILL.md");
-const META_PATH = join(
-  REPO_ROOT,
-  "education",
-  BRIEFING_EMAIL,
-  "daily-briefing",
-  "meta.json"
-);
+import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+
+const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
 
 /** Undated leftover from before date-keyed drafts. Ignore it. */
 export const NEWS_DRAFT_PATH = "/tmp/yanylevin-daily-briefing-news-draft.json";
@@ -689,11 +685,11 @@ export function buildUnslopPrompt({ dateKey, timezone, force, dueTime }) {
     `Read and apply the unslop skill (${UNSLOP_SKILL_PATH}). Do not inline the whole skill.`,
     `Read ${draft} and ${recap}. Unslop news capsule titles and bodies plus the agent recap body. Do not remove an URGENT bullet. Phase 2 kept it because the failure is still open.`,
     `If ${draft} is missing, do not copy yesterday's todo news. Stop and say the news draft is missing.`,
-    `Write education/${BRIEFING_EMAIL}/todos/${dateKey}-daily-briefing/todo.json:`,
+    `Write ${YAN_EDUCATION_DIR}/todos/${dateKey}-daily-briefing/todo.json:`,
     `Title like "August 12th Daily Briefing". kind dailyBriefing. dueDate ${dateKey}, dueTime ${dueTime}. showInDates false. done false. createdAt is now, not a copy of yesterday.`,
     "capsules: agent-recap first (from agent recap draft, keep noVote true), then ~10 news capsules. Top-level citations from news draft only, alphabetical by name.",
     "Capsule thumbs are 3-way: up, down, null (neutral). Agent recap has noVote and no citations.",
-    "Then rewrite education/you@example.com/daily-briefing/taste.md from last week's news thumbs only (not agent recap).",
+    "Then rewrite /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education/daily-briefing/taste.md from last week's news thumbs only (not agent recap).",
     rebuild,
   ].join("\n");
 }
@@ -822,7 +818,7 @@ async function runDailyBriefingOnce({ force = false, dateKey: dateKeyOpt } = {})
     if (outcome.transientFailed) return phaseFailed("unslop", outcome, dateKey);
 
     await gitAddCommitPush({
-      paths: [`education/${BRIEFING_EMAIL}`],
+      paths: [YAN_EDUCATION_DIR],
       message: `education: ${dateKey} daily briefing`,
     });
 

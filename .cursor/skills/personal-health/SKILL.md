@@ -22,7 +22,7 @@ Do not dump the whole tree into every turn. Start here:
 - `education/you@example.com/health/takeaways.md` — nightly prose, newest day on top
 - `education/you@example.com/health/workouts.md` — every Apple Workout session Node has merged
 - `education/you@example.com/health/history-patterns.md` — standing patterns from the full archive, when it exists
-- `education/you@example.com/brain/health.md` — standing body facts (sleep band, training era, recovery tells), when it exists
+- `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/health.md` — standing body facts (sleep band, training era, recovery tells), when it exists
 
 Open `raw/*.json` only when the markdown is missing a day or the question needs a number that is not in the takeaways (exact HRV, a specific sleep stage). `log-YYYY-MM.jsonl` is an ingest index, not a chart.
 
@@ -30,7 +30,7 @@ Open `raw/*.json` only when the markdown is missing a day or the question needs 
 
 Dumps through the 2026-09-26 10:49 AM PT ingest (`lastIngestAt` 2026-09-26T17:49:30.244Z) are how he actually slept. Do not treat sleep hours from any later dump as real until Yan says otherwise. For those later nights use life-state, screens, and lights. A 5-minute tick that still said office or bedroom-awake does not throw out a Watch block from a dump inside that actual window. Every other Health metric is always real.
 
-Gym stack weights live under `fitness/you@example.com/` (fitness-os skill). Different log. Use both when he asks about "the gym" in a way that could mean machines or Watch workouts.
+Gym stack weights live under `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.fitness/you@example.com/` (fitness-os skill). Different log. Use both when he asks about "the gym" in a way that could mean machines or Watch workouts.
 
 ## Staleness
 

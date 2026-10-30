@@ -22,7 +22,7 @@ import {
 } from "./school-mail.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const BRAIN_REL = "education/you@example.com/brain";
+import { BRAIN_DIR as BRAIN_REL } from "./onedrive-projects.js";
 export const BATCH_BYTES = 400_000;
 
 export const SCHOOL_MAIL_FILL_MODEL_SPEC = {
@@ -124,8 +124,8 @@ export function buildSchoolMailFillPrompt({ outDir, file, batchIndex, batchCount
     "Update existing person/group/org cards when this month states a fact about them.",
     "Create a new person folder only for a real EPS teacher, counselor, classmate, or family-school contact Yan clearly knows. Never card Scoir, GitHub, university marketing, or mailing lists.",
     "Timeline append-only: `- YYYY-MM-DD | fact [school-mail]`. Skip duplicates. Facts, not transcripts.",
-    "Education dates that belong on the Dates panel (orientation, conferences, picture day, field trips) can be written under education/you@example.com/dates/ per the education-dashboard skill if they are not already there.",
-    "Read education/you@example.com/deleted.md. Skip dates that look like a row Yan already deleted (judgement, not exact clocks).",
+    "Education dates that belong on the Dates panel (orientation, conferences, picture day, field trips) can be written under /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education/dates/ per the education-dashboard skill if they are not already there.",
+    "Read /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education/deleted.md. Skip dates that look like a row Yan already deleted (judgement, not exact clocks).",
     "Identity.md only for Yan map facts that are new (current grade). A new email on identity-accounts.md means Yan's address. Other people's mail goes on their card. School standing goes to identity-school.md. Dated school events go to the matching org timeline. Do not paste email bodies.",
     "Reply with one line: month, cards touched, dates added. Do not quote emails.",
   ].join("\n");
@@ -260,7 +260,7 @@ export async function runSchoolMailFill(opts = {}) {
     filled = true;
 
     try {
-      const stateFile = join(REPO_ROOT, BRAIN_REL, "state.json");
+      const stateFile = join(BRAIN_REL, "state.json");
       const state = JSON.parse(await readFile(stateFile, "utf8"));
       state.cursors = state.cursors && typeof state.cursors === "object" ? state.cursors : {};
       state.cursors.schoolMailSince = new Date().toISOString();
@@ -285,7 +285,7 @@ export async function runSchoolMailFill(opts = {}) {
         `${BRAIN_REL}/patterns.md`,
         `${BRAIN_REL}/threads`,
         `${BRAIN_REL}/state.json`,
-        "education/you@example.com/dates",
+        "/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education/dates",
       ],
       message: "brain: fill from EPS Outlook history",
     });

@@ -35,12 +35,7 @@ Logs: `/tmp/yanylevin-lmstudio-gpt-oss.log`. This agent only loads gpt-oss. Orph
 
 ### Education / data folder sync (Mac Studio + MacBook)
 
-Keeps these paths in sync with `origin/main`:
-
-- `education/you@example.com`, `education/you@example.com`
-- `education/projects/jype` (shared /jype dashboard: chats, todos, classes)
-- `fitness/you@example.com`, `fitness/you@example.com`
-- `tmp/`
+Keeps `tmp/` in sync with `origin/main`. Education, JYPE, fitness, and the chat and login logs live on OneDrive.
 
 Behavior:
 

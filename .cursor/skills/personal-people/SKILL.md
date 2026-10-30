@@ -16,7 +16,7 @@ Alex, skip this whole skill. Never glob `brain/people/`. Never dump the
 folder into a turn.
 
 Standing memory about people Yan knows, plus groups, orgs, and places, as a
-typed graph. Contract: `education/you@example.com/brain/schema.md`. Live
+typed graph. Contract: `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/schema.md`. Live
 contact lookup uses AddressBook sqlite
 (`.cursor/skills/personal-contacts/SKILL.md`), not Contacts.app.
 

@@ -28,6 +28,7 @@ import { canonicalizeEmail, isJypeAccessEmail } from "./identity.js";
 import { LOCAL_SOCK } from "./local-ipc.js";
 import { WHATSAPP_AGENT_ENABLED } from "./whatsapp-mention.js";
 import { normalizeJypeWorkspace } from "./jype.js";
+import { FUTURE_AGENTS_DIR } from "./onedrive-projects.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DIR_NAME = "future-agents";
@@ -43,13 +44,14 @@ function httpError(message, status) {
   return err;
 }
 
-function resolveRoot(root) {
+function agentsDir(root) {
   const explicit = String(root || "").trim();
-  return explicit || ROOT;
+  if (explicit) return join(explicit, "data", DIR_NAME);
+  return FUTURE_AGENTS_DIR;
 }
 
 export function futureAgentsDir(root) {
-  return join(resolveRoot(root), "data", DIR_NAME);
+  return agentsDir(root);
 }
 
 function recordPath(sessionId, root) {

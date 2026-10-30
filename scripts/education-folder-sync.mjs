@@ -8,9 +8,8 @@
  * On each poll, relaunches OneDrive if either signed-in account quit.
  *
  * Paths:
- *   education/$OWNER_EMAIL
- *   fitness/$OWNER_EMAIL
  *   tmp
+ * User data and project trees live on OneDrive, not in this sync.
  *
  * Run via LaunchAgent com.personalagent.education-sync (Mac Studio + MacBook).
  */

@@ -10,6 +10,7 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 import { withCloudRetry } from "./cloud-storage-io.js";
 import { stripHtml } from "./canvas-sync.js";
 import { classMeetingsBetween } from "./education-class-todo.js";
@@ -42,8 +43,7 @@ const MAPPED_ONEDRIVE_FOLDERS = {
   physics: "H. Physics",
 };
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const YAN_ROOT = join(ROOT, "education", "you@example.com");
+const YAN_ROOT = YAN_EDUCATION_DIR;
 const CANVAS_DIR = join(YAN_ROOT, ".canvas");
 
 const TODO_TAG_PREFIX = /^(CW|HW|QA|MA)(?:\s*:\s*|\s+)/i;

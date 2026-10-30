@@ -2,7 +2,7 @@
 name: fitness-os
 description: >-
   Personal gym tracker for /fitness on yanylevin.com and the iOS Fitness tab.
-  Append or delete weight entries under fitness/<email>/machines/, parse typed
+  Append or delete weight entries under OneDrive Projects/.fitness/<email>/machines/, parse typed
   numbers like "100, 105, 105", and create machines when asked. Use when the
   user mentions gym, fitness, machines, weights, or /fitness.
 ---
@@ -14,15 +14,15 @@ Two entry points share this skill: **iOS Gym text input** (Cursor SDK local agen
 ## Scope
 
 - Allowed users: `you@example.com`, `you@example.com`
-- App/agent sessions inject the signed-in email — write only under `fitness/<that-email>/`
-- In Cursor Desktop on Yan’s Mac, default to `fitness/you@example.com/` unless the user names Alex
+- App/agent sessions inject the signed-in email — write only under `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.fitness/<that-email>/`
+- In Cursor Desktop on Yan's Mac, default to `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.fitness/you@example.com/` unless the user names Alex
 - Never touch the other user’s folder
 - Never edit education data, main-site chatbot wiring, or LM Studio config
 
 ## File schema
 
 ```
-fitness/<email>/
+/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.fitness/<email>/
   meta.json                 # email, displayName, timezone
   machines/<machineId>/
     machine.json            # id, name, order

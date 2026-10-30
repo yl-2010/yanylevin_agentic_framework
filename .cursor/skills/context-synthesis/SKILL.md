@@ -66,7 +66,7 @@ the address.
 
 ## Write
 
-`education/you@example.com/brain/` (schema in `brain/schema.md`):
+`/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/` (schema in `brain/schema.md`):
 
 | Page | Rules |
 |------|-------|

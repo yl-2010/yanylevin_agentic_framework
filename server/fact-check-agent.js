@@ -23,6 +23,7 @@ import {
 } from "./cursor-sdk-auth.js";
 import { gitAddCommitPush } from "./git-publish.js";
 import { BRAIN_REL, YAN_EMAIL } from "./context-synthesis-agent.js";
+import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 import { weekDateHelper } from "./local-clock.js";
 import {
   isLocationBrainBusy,
@@ -35,14 +36,8 @@ import { HEALTH_REL } from "./phone-health.js";
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = "/tmp/yanylevin-fact-check.lock";
-const META_PATH = join(
-  REPO_ROOT,
-  "education",
-  YAN_EMAIL,
-  "daily-briefing",
-  "meta.json"
-);
-const BRAIN_STATE_PATH = join(REPO_ROOT, BRAIN_REL, "state.json");
+const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
+const BRAIN_STATE_PATH = join(BRAIN_REL, "state.json");
 const LOCK_STALE_MS = 90 * 60 * 1000;
 const WAIT_MS = 90 * 60 * 1000;
 const WAIT_POLL_MS = 5000;
@@ -380,10 +375,9 @@ async function runFactCheckOnce({ force = false, dateKey: dateKeyOpt } = {}) {
         BRAIN_REL,
         LOCATION_HISTORY_REL,
         HEALTH_REL,
-        `education/${YAN_EMAIL}/dates`,
-        `education/${YAN_EMAIL}/classes`,
-        `education/${YAN_EMAIL}/projects`,
-        `education/${YAN_EMAIL}/todos`,
+        `${YAN_EDUCATION_DIR}/dates`,
+        `${YAN_EDUCATION_DIR}/classes`,
+        `${YAN_EDUCATION_DIR}/todos`,
       ],
       message: `education: ${dateKey} fact-check`,
     });

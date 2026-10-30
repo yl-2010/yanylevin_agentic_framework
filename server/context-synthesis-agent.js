@@ -37,23 +37,15 @@ import { LOCATION_HISTORY_REL } from "./phone-location.js";
 import { HEALTH_REL } from "./phone-health.js";
 import { LIFE_STATE_CONTEXT_PATH, prefetchLifeStateContext } from "./life-state.js";
 import { weekDateHelper } from "./local-clock.js";
+import { BRAIN_DIR, YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 import { OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
 
 export { LIFE_STATE_CONTEXT_PATH };
 
-export const BRAIN_REL = `education/${YAN_EMAIL}/brain`;
+export const BRAIN_REL = BRAIN_DIR;
 
-/** Education trees plus `server/` so lint tooling fixes like serializers ship with tonight's commit. */
-export const NIGHTLY_GIT_PATHS = [
-  BRAIN_REL,
-  LOCATION_HISTORY_REL,
-  HEALTH_REL,
-  `education/${YAN_EMAIL}/dates`,
-  `education/${YAN_EMAIL}/classes`,
-  `education/${YAN_EMAIL}/projects`,
-  `education/${YAN_EMAIL}/todos`,
-  "server",
-];
+/** User data lives on OneDrive. Nightly commits only ship code fixes. */
+export const NIGHTLY_GIT_PATHS = ["server"];
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = "/tmp/yanylevin-context-synthesis.lock";
@@ -71,13 +63,7 @@ export const SCREENTIME_PREFETCH_PATH = "/tmp/yanylevin-context-screentime.json"
 export const CHAT_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 export const SCREENTIME_LOOKBACK_DAYS = 7;
 const USER_QUERY_RE = /<user_query>\s*([\s\S]*?)\s*<\/user_query>/i;
-const META_PATH = join(
-  REPO_ROOT,
-  "education",
-  YAN_EMAIL,
-  "daily-briefing",
-  "meta.json"
-);
+const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
 export const SYNTHESIS_LOCK_STALE_MS = 90 * 60 * 1000;
 const LOCK_STALE_MS = SYNTHESIS_LOCK_STALE_MS;
 
@@ -213,7 +199,7 @@ async function readMeta() {
 export function brainDir(override) {
   const explicit = String(override || "").trim();
   if (explicit) return explicit;
-  return join(REPO_ROOT, BRAIN_REL);
+  return BRAIN_REL;
 }
 
 function statePath(dir = brainDir()) {
@@ -484,7 +470,7 @@ export function buildPeopleBootstrapPrompt({ dateKey, timezone }) {
     "Do not rewrite memories.md except a short Durable pointer that full person context lives under brain/people/. Do not compile news. Do not send mail or iMessage.",
     "Read every dump, then write people. Contacts are one source among many, not the seed list.",
     `Dumps: contacts ${CONTACTS_PREFETCH_PATH}; iMessage chats/handles + name mentions ${IMESSAGE_PEOPLE_PREFETCH_PATH}; mail correspondents ${MAIL_PEOPLE_PREFETCH_PATH}; school name index ${SCHOOL_NAMES_PREFETCH_PATH} (lookup only).`,
-    `Also read ${brain}/memories.md, education/you@example.com/daily-briefing/profile.md, ${LOCATION_HISTORY_REL}/places.md and trips.md, education todos/dates/projects that name people, and the chats dump ${CHATS_PREFETCH_PATH}. Calendar: node server/calendar-cli.js events for a wide window if it works; if denied, skip.`,
+    `Also read ${brain}/memories.md, ${YAN_EDUCATION_DIR}/daily-briefing/profile.md, ${LOCATION_HISTORY_REL}/places.md and trips.md, education todos/dates/projects that name people, and the chats dump ${CHATS_PREFETCH_PATH}. Calendar: node server/calendar-cli.js events for a wide window if it works; if denied, skip.`,
     "Who gets a file: real people from Contacts (name+phone or already in another source); iMessage thread participants; names mentioned at least twice in iMessage bodies (resolve via school index: full name, grade/class of, teacher vs student); mail correspondents who are people not receipts/noreply; calendar names; anyone already in memories/chats/places (Rajasi, Michael, Adi, Alex, Milos, David, Nikita, Kirsten, Gaylynn, Yulong, Example Neighbor, Example Friend, etc.).",
     "Do not import the EPS roster or Teachers sheet. School xlsx / four11 are identity lookup after a name already qualified. Group-chat titles are relationship context, not fake people.",
     "Thin cards for weak-but-real contacts. Rich files (or person.md + log.md folders) only where we have real context. Promote family, Alex, Milos, Nikita to folders if standing would get long.",

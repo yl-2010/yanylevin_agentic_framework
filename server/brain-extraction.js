@@ -11,7 +11,7 @@ import { gitAddCommitPush } from "./git-publish.js";
 import { promptWithAuthRetry } from "./cursor-sdk-auth.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const BRAIN_REL = "education/you@example.com/brain";
+import { BRAIN_DIR as BRAIN_REL } from "./onedrive-projects.js";
 const YAN = "you@example.com";
 const MAX_TEXT = 6000;
 

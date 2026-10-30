@@ -5,7 +5,7 @@
  */
 
 import { open, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { CHAT_TITLE_STYLE } from "./chat-title.js";
 import {
@@ -22,6 +22,7 @@ import {
   reapplyChatTitleStarters,
 } from "./education-chat-history.js";
 import { normalizeJypeWorkspace } from "./jype.js";
+import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 import { gitAddCommitPush } from "./git-publish.js";
 import { FULL_ACCESS_EMAILS, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
 import {
@@ -34,14 +35,13 @@ import { nextLocalHmAt } from "./location-history-agent.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = "/tmp/yanylevin-chat-title-refresh.lock";
-const META_PATH = join(
-  REPO_ROOT,
-  "education",
-  YAN_EMAIL,
-  "daily-briefing",
-  "meta.json"
-);
+const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
 const STATE_REL = `education/${YAN_EMAIL}/daily-briefing/chat-title-refresh-state.json`;
+const STATE_ABS = join(
+  YAN_EDUCATION_DIR,
+  "daily-briefing",
+  "chat-title-refresh-state.json"
+);
 const LOCK_STALE_MS = 90 * 60 * 1000;
 
 export const CHAT_TITLE_LOOKBACK_MS = 24 * 60 * 60 * 1000;
@@ -119,6 +119,7 @@ async function readMeta() {
 }
 
 function statePath(root = REPO_ROOT) {
+  if (!root || resolve(root) === resolve(REPO_ROOT)) return STATE_ABS;
   return join(root, STATE_REL);
 }
 
@@ -311,6 +312,8 @@ async function releaseLock(handle) {
  * @param {string} [root]
  */
 export async function chatTitleRefreshGitPaths(root = REPO_ROOT) {
+  /** Live chats are on OneDrive. A custom root is the test layout. */
+  if (!root || resolve(root) === resolve(REPO_ROOT)) return [];
   /** @type {string[]} */
   const paths = [];
   for (const email of CHAT_TITLE_REFRESH_EMAILS) {

@@ -4,14 +4,13 @@
  */
 
 import { appendFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { YAN_EMAIL, readPhoneLocation } from "./phone-location.js";
-
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 
 export const LIFE_STATE_DIRNAME = "life-state";
-export const LIFE_STATE_REL = `education/${YAN_EMAIL}/${LIFE_STATE_DIRNAME}`;
+export const LIFE_STATE_REL = join(YAN_EDUCATION_DIR, LIFE_STATE_DIRNAME);
 export const LIFE_STATE_SNAPSHOT_PATH = "/tmp/yanylevin-life-state-snapshot.json";
 export const LIFE_STATE_GUESS_PATH = "/tmp/yanylevin-life-state-guess.json";
 export const LIFE_STATE_CONTEXT_PATH = "/tmp/yanylevin-context-life-state.json";
@@ -62,7 +61,7 @@ export function lifeStateDir(override) {
   const explicit = String(override || "").trim();
   if (explicit) return explicit;
   const env = String(process.env.LIFE_STATE_DIR || "").trim();
-  return env || join(ROOT, LIFE_STATE_REL);
+  return env || LIFE_STATE_REL;
 }
 
 function clipStr(raw, max) {

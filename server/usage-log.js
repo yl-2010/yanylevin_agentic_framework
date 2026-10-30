@@ -8,13 +8,13 @@
 
 import { createHash, timingSafeEqual, randomUUID } from "node:crypto";
 import { appendFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { chatTitlesForSessions } from "./education-chat-history.js";
 import { canonicalizeEmail } from "./identity.js";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-export const USAGE_DIR = join(ROOT, "data", "usage");
+import { USAGE_DIR as ONEDRIVE_USAGE_DIR } from "./onedrive-projects.js";
+
+export const USAGE_DIR = ONEDRIVE_USAGE_DIR;
 export const USAGE_ROWS_PATH = join(USAGE_DIR, "rows.jsonl");
 export const USAGE_META_PATH = join(USAGE_DIR, "meta.json");
 

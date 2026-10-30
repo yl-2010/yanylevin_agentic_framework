@@ -1189,7 +1189,7 @@ describe("publicDebateCase", () => {
     const raw = JSON.parse(
       await readFile(
         new URL(
-          "../education/you@example.com/projects/debate/cases/justice-requires-open-borders/case.json",
+          "$HOME/Documents/Projects/Debate/cases/justice-requires-open-borders/case.json",
           import.meta.url
         ),
         "utf8"

@@ -4,7 +4,7 @@
  */
 
 import { readdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runCalendar } from "./calendar-cli.js";
 import { briefingNow, resolveBriefingTimezone } from "./daily-briefing-agent.js";
@@ -25,16 +25,10 @@ import {
   YAN_EMAIL,
 } from "./phone-location.js";
 import { recentSessions } from "./screentime-read.js";
+import { FITNESS_DIR as FITNESS_ROOT, YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const META_PATH = join(
-  ROOT,
-  "education",
-  YAN_EMAIL,
-  "daily-briefing",
-  "meta.json"
-);
-const FITNESS_DIR = join(ROOT, "fitness", YAN_EMAIL, "machines");
+const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
+const FITNESS_DIR = join(FITNESS_ROOT, YAN_EMAIL, "machines");
 
 export const KNOWN_PLACES = [
   {

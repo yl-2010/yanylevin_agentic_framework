@@ -392,9 +392,10 @@ struct EducationProject: Decodable, Identifiable, Hashable {
     let todos: [EducationTodo]?
     let dates: [EducationDate]?
     let cases: [EducationCase]?
+    let tier: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, filter, order, files, todos, dates, href, cases
+        case id, name, filter, order, files, todos, dates, href, cases, tier
         case detail = "description"
     }
 
@@ -432,7 +433,8 @@ struct EducationProject: Decodable, Identifiable, Hashable {
             files: files,
             todos: todos?.map(transform),
             dates: dates,
-            cases: cases
+            cases: cases,
+            tier: tier
         )
     }
 }

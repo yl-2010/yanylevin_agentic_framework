@@ -339,7 +339,7 @@ describe("formatChatHistoryHint", () => {
       currentSessionId: SID,
       recent: [],
     });
-    assert.match(hint, /education\/you@example.com\/\.chat-history\//);
+    assert.match(hint, /Projects\/\.education\/\.chat-history\//);
     assert.match(hint, new RegExp(`${SID}\\.md`));
     assert.match(hint, /Older threads: none yet/);
     assert.match(hint, /Grep\/Read/);

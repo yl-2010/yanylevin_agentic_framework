@@ -23,10 +23,7 @@ ios/shortcuts/**/workflow.filled.json
 ios/shortcuts/**/workflow.filled.plist
 ios/shortcuts/**/workflow.filled.shortcut
 ios/shortcuts/**/workflow.json
-education/*/.projects-opened.json
 education/**/.chat-drafts/
-data/headlines-assignments.json
-data/agent-actions.jsonl
 data/usage/
 data/future-agents/
 data/study/

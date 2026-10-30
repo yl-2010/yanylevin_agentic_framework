@@ -43,13 +43,8 @@ Read `SOUL.md` at the repo root on **every** turn for persona, voice, and judgme
 
 ## Always: git
 
-education-sync already commits and pushes these paths. Do not commit them yourself.
+education-sync already commits and pushes `tmp/`. User data and projects live on OneDrive. Do not commit those yourself.
 
-- `education/<email>/`
-- `education/projects/jype`
-- `fitness/<email>/`
-- `data/chat-log.md`
-- `data/login-log.md`
 - `tmp/`
 
 If you edit any other file in this repo, commit only those files and `git push origin main` before the turn ends. That includes `server/`, `.cursor/`, site UI, and scripts. Stay on `main`. Do not `git add` unrelated dirty files that were already in the tree. Never commit `server/.env` or other secrets.
@@ -70,7 +65,7 @@ If this turn names a person (given name, last name, nickname, or alias), look th
 
 1. Read `.cursor/skills/personal-people/SKILL.md`
 2. Pull the card: `node server/brain-entity-card.js "<name or slug>"` (fields, edges, typed files, recent timeline in one call)
-3. Ambiguous name: check `education/you@example.com/brain/people/index.md` aliases; several rows match means pull every matching card before choosing
+3. Ambiguous name: check `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/people/index.md` aliases; several rows match means pull every matching card before choosing
 4. Open a typed file (`relationship.md`, `beliefs.md`, `threads.md`, `schedule.md`, `notes.md`) only when the question needs it. `schedule.md` for their classes, free periods, or other recurring commitments
 5. If nothing matches, say so. Do not invent a second person
 
@@ -121,7 +116,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Apple Screen Time / app usage (Yan only) | `.cursor/skills/personal-screentime/SKILL.md` |
 | Contacts lookup (sqlite, no Contacts.app) | `.cursor/skills/personal-contacts/SKILL.md` |
 | Their classes, free periods, recurring sports or clubs | that person's `people/<slug>/schedule.md` (Yan only; not `schedule.json`) |
-| Standing memories / brain (Yan only) | `education/you@example.com/brain/` — `identity.md` (map), `identity-school.md`, `identity-accounts.md`, `identity-logistics.md`, `patterns.md`, `health.md`, `threads/`, `journal/`, `places/`; contract in `brain/schema.md` (life facts; agent behavior is `SOUL.md` + the matching skill, not here) |
+| Standing memories / brain (Yan only) | `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/` — `identity.md` (map), `identity-school.md`, `identity-accounts.md`, `identity-logistics.md`, `patterns.md`, `health.md`, `threads/`, `journal/`, `places/`; contract in `brain/schema.md` (life facts; agent behavior is `SOUL.md` + the matching skill, not here) |
 | Unknown shorthand, slang, abbreviations (Yan only) | `node server/brain-glossary.js "<term>"`. New slang this turn: `add --term --gloss`. Do not read `brain/glossary/index.md` whole. |
 | Nightly context synthesis (manual run) | `.cursor/skills/context-synthesis/SKILL.md` |
 | Nightly fact-check (manual run) | `.cursor/skills/nightly-fact-check/SKILL.md` |
@@ -181,11 +176,11 @@ A celebration site for finishing a book, MA, test, or project is `.cursor/skills
 
 ## Practice tests
 
-When you make a practice test or problem set, any class, any person, open the real test or problem set copy already on disk first. Copies are under `education/tests/`. Match that sheet. Header, name and date lines, numbering, point values, and how each problem sits on the page. Write new problems. Leave a large blank gap under each question, enough to write the work on the printed PDF.
+When you make a practice test or problem set, any class, any person, open the real test or problem set copy already on disk first. Copies are under `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.tests/`. Match that sheet. Header, name and date lines, numbering, point values, and how each problem sits on the page. Write new problems. Leave a large blank gap under each question, enough to write the work on the printed PDF.
 
 A scan of an MA or QA Yan already took also lands here, same filename as the OneDrive todo copy, under that class folder. Filing rules are in the education-dashboard skill, Chat attachments.
 
-**Last year's calc, Alex this year (Yan, 2026-10-15).** `education/tests/` is a private guide, including the calc Yan took last year that Alex is taking now. Use it to see what the test covers and how the page is laid out. Do not give him the same questions. Change the numbers, and change enough of the setup that it is a new problem. That applies to PDFs, chat answers, and any explanation of a problem.
+**Last year's calc, Alex this year (Yan, 2026-10-15).** `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.tests/` is a private guide, including the calc Yan took last year that Alex is taking now. Use it to see what the test covers and how the page is laid out. Do not give him the same questions. Change the numbers, and change enough of the setup that it is a new problem. That applies to PDFs, chat answers, and any explanation of a problem.
 
 Teams is visible to the school, including 1:1s. Never paste, quote, or closely paraphrase an original question there. Do not say you have a scan, a copy on disk, or last year's test. Call them practice problems. A changed practice PDF can go by iMessage. Do not send the original file.
 

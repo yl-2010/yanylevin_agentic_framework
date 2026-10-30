@@ -34,16 +34,11 @@ import {
 } from "./life-state.js";
 import { nextLocalHmAt } from "./location-history-agent.js";
 import { YAN_EMAIL } from "./phone-location.js";
+import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = "/tmp/yanylevin-life-state-cleanup.lock";
-const META_PATH = join(
-  REPO_ROOT,
-  "education",
-  YAN_EMAIL,
-  "daily-briefing",
-  "meta.json"
-);
+const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
 const LOCK_STALE_MS = 90 * 60 * 1000;
 const TICK_WAIT_MS = 8 * 60 * 1000;
 const TICK_POLL_MS = 2000;
@@ -173,7 +168,7 @@ export function buildLifeStateCleanupPrompt({
     `Today's date key: ${dateKey} (timezone ${timezone}). Journal / cleanup day is ${journalKey}.`,
     weekDateHelper(dateKey, timezone),
     `Dump: ${LIFE_STATE_CLEANUP_DAY_PATH} (segments plus every sample for ${journalKey}).`,
-    "Read education/you@example.com/life-state/schema.md and heuristics.md.",
+    "Read /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education/life-state/schema.md and heuristics.md.",
     "Use Screen Time, iMessage, school Teams, Calendar, location places.md/trips.md, schedule.json, gym entries, Shortcut signals, chat history, and Apple Health dump sleep (takeaways.md) only through the 2026-09-26 10:49 AM PT ingest. Unix socket for Screen Time and iMessage. Later Health-app sleep is inflated until Yan says otherwise. Do not use those later hours to decide sleeping vs awake.",
     "Keep every existing at/local/dateKey. Do not invent or delete ticks. Fix flicker and wrong kinds (lone sleeping between awake, Home while GPS was at school, leftover-fan shower).",
     `Write ${LIFE_STATE_CLEANUP_PATCH_PATH} as { dateKey: "${journalKey}", corrections: [...] }. Empty corrections if the day is clean.`,

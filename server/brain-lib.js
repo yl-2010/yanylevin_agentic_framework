@@ -10,9 +10,9 @@ import { OWNER_EMAIL } from "./identity.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const REPO_ROOT = path.resolve(__dirname, "..");
-export const EDU_ROOT = path.join(REPO_ROOT, "education", OWNER_EMAIL);
+export const EDU_ROOT = process.env.EDU_ROOT || path.join(REPO_ROOT, "education", OWNER_EMAIL);
 // BRAIN_ROOT env override exists for tests and dry-runs against scratch copies.
-export const BRAIN_ROOT = process.env.BRAIN_ROOT || path.join(EDU_ROOT, "brain");
+export const BRAIN_ROOT = process.env.BRAIN_ROOT || path.join(REPO_ROOT, "brain");
 
 export const ENTITY_DIRS = [
   { kind: "person", dir: "people", folder: true },

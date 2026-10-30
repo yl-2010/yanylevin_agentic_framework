@@ -9,12 +9,12 @@
 import { timingSafeEqual } from "node:crypto";
 import { appendFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { canonicalizeEmail, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
+import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 
-export const LOCATION_REL = `education/${YAN_EMAIL}/.location.json`;
 export const LOCATION_HISTORY_DIRNAME = "location";
-export const LOCATION_HISTORY_REL = `education/${YAN_EMAIL}/${LOCATION_HISTORY_DIRNAME}`;
+export const LOCATION_REL = join(YAN_EDUCATION_DIR, ".location.json");
+export const LOCATION_HISTORY_REL = join(YAN_EDUCATION_DIR, LOCATION_HISTORY_DIRNAME);
 export const HISTORY_DEDUPE_MS = 60_000;
 
 /**
@@ -30,7 +30,6 @@ export function locationIdiomAllowed(raw) {
   return idiom === "phone" || idiom === "iphone";
 }
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const MAX_PLACE = 120;
 const STALE_AFTER_MS = 6 * 60 * 60 * 1000;
 const AUDIO_SET = new Set(["speaker", "headphones", "bluetooth", "car"]);
@@ -46,7 +45,7 @@ export function phoneLocationPath(override) {
   const explicit = String(override || "").trim();
   if (explicit) return explicit;
   const env = String(process.env.PHONE_LOCATION_PATH || "").trim();
-  return env || join(ROOT, LOCATION_REL);
+  return env || LOCATION_REL;
 }
 
 /** @param {string} [override] */
@@ -54,7 +53,7 @@ export function locationHistoryDir(override) {
   const explicit = String(override || "").trim();
   if (explicit) return explicit;
   const env = String(process.env.PHONE_LOCATION_HISTORY_DIR || "").trim();
-  return env || join(ROOT, LOCATION_HISTORY_REL);
+  return env || LOCATION_HISTORY_REL;
 }
 
 /**

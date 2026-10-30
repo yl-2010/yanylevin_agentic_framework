@@ -30,16 +30,11 @@ import {
   isLocationHistoryBusy,
   nextLocalHmAt,
 } from "./location-history-agent.js";
+import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = "/tmp/yanylevin-location-enrichment.lock";
-const META_PATH = join(
-  REPO_ROOT,
-  "education",
-  YAN_EMAIL,
-  "daily-briefing",
-  "meta.json"
-);
+const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
 const LOCK_STALE_MS = 90 * 60 * 1000;
 const COMPOSE_WAIT_MS = 15 * 60 * 1000;
 const COMPOSE_POLL_MS = 5000;
@@ -160,7 +155,7 @@ export function buildLocationEnrichmentPrompt({ dateKey, timezone, force }) {
     "Two equal passes: stays AND trips. A finished places.md does not finish the job.",
     "For each unenriched stay: identify the business/building from iMessage, Mail.app, Calendar, contacts, chat history, the 5-minute life-state log, and web search for the address. places.md is name, address, arrive/leave only.",
     "Life-state: /tmp/yanylevin-context-life-state.json or node server/life-state.js day <date>. Use it to name home vs EPS vs gym. Do not paste samples, rooms, apps, class periods, gym sets, shower, or sleep into places.md. Indoor activity stays in life-state.",
-    "Chat history is a required source, same rank as Calendar and iMessage. Grep and Read education/you@example.com/.chat-history/ for stay addresses, business names, and trip modes. Follow .cursor/skills/past-chats/SKILL.md. Do not skip this source. Do not paste transcripts into places.md or trips.md.",
+    "Chat history is a required source, same rank as Calendar and iMessage. Grep and Read /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education/.chat-history/ for stay addresses, business names, and trip modes. Follow .cursor/skills/past-chats/SKILL.md. Do not skip this source. Do not paste transcripts into places.md or trips.md.",
     "trips.md is unfinished if any line is still **car** or **rideshare**. That is the compose GPS default, not a conclusion.",
     "Trip pass is required. Before keeping car, search Mail.app (see the skill) for ride receipts covering those local dates. Also grep chat history for robotaxi / Uber / pickup / flight mentions on those dates.",
     "Exchange Inbox first (mailbox Inbox of account Exchange): Tesla Robotaxi receipts (subject contains Robotaxi, sender tesla.com) and Uber (subject contains trip with / sender uber.com), plus Waymo, Lyft, Zoox. One needle per osascript; use a 14-day date cutoff.",

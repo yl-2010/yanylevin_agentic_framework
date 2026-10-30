@@ -24,6 +24,7 @@ import {
   normalizeJypeWorkspace,
   originIsJypeThread,
 } from "./jype.js";
+import { educationDataDir, JYPE_DIR } from "./onedrive-projects.js";
 import { gitAddCommitPush } from "./git-publish.js";
 import { encodeEducationRouteId } from "./education-route-id.js";
 import { enqueueBrainExtraction } from "./brain-extraction.js";
@@ -1729,7 +1730,7 @@ async function disposeSession(id) {
     activeByEmail.delete(focusKey(s.email, s.workspace));
   }
   if (s?.uploadDirRel) {
-    await rm(join(REPO_ROOT, s.uploadDirRel), {
+    await rm(s.uploadDirRel.startsWith("/") ? s.uploadDirRel : join(REPO_ROOT, s.uploadDirRel), {
       recursive: true,
       force: true,
     }).catch(() => {});
@@ -1803,7 +1804,7 @@ export const PERSONAL_SKILL_PATHS = {
   fitness: ".cursor/skills/fitness-os/SKILL.md",
   browser: ".cursor/skills/personal-browser/SKILL.md",
   computer: ".cursor/skills/personal-computer/SKILL.md",
-  brain: "education/you@example.com/brain/schema.md",
+  brain: "/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/schema.md",
   synthesis: ".cursor/skills/context-synthesis/SKILL.md",
   locationEnrichment: ".cursor/skills/location-enrichment/SKILL.md",
   locationBrain: ".cursor/skills/location-brain/SKILL.md",
@@ -1813,6 +1814,11 @@ export const PERSONAL_SKILL_PATHS = {
   futureAgents: ".cursor/skills/future-agents/SKILL.md",
   celebration: ".cursor/skills/create-celebration-website/SKILL.md",
 };
+
+function chatUploadDir(email, workspace, id) {
+  const base = workspace === "jype" ? JYPE_DIR : educationDataDir(email) || "";
+  return join(base, ".chat-uploads", id);
+}
 
 const FUTURE_AGENT_HINT =
   "If the reply has to wait (remind me, once we're done, end of the period, send it later), call schedule_future_agent this turn. Read the future-agents skill. Do what you can now. Do not say you will remember.";
@@ -1840,12 +1846,12 @@ export function systemPrompt(email, opts = {}) {
       "You are the JYPE agent for yanylevin.com/jype (shared by Yan, Alex, Example Friend, and Example Neighbor).",
       `Signed-in user: ${email} (${given}).`,
       "Yan: full write in this repo and on this Mac.",
-      "JYPE chats live in education/projects/jype/.chat-history/. They stay in the history list. No 10-minute hide.",
+      `JYPE chats live in ${JYPE_DIR}/.chat-history/. They stay in the history list. No 10-minute hide.`,
       "Public pages this JYPE agent creates get a sites[] tile on the related JYPE class. Do not copy Yan's personal /education sites onto JYPE unless Yan is sending that URL to a JYPE member.",
       "On Yan's Mac Studio: after push, run npm run deploy:web yourself when the live site must change. Do not ask Yan or JYPE members to deploy. Read the jype-agent skill.",
       "Never mention the surprise hoodies to Alex, or in any chat he can see, including this one, until Yan says he has been given his. Yan, 2026-10-09.",
-      "education/tests/ is a private guide, including calc Yan took last year that Alex is taking now. Change the numbers before Alex sees a problem. Never put an original question in Teams. The school can read Teams. In Teams, do not say a scan or last year's test exists. Yan, 2026-10-15.",
-      "Plain speech in every JYPE chat. No Your Majesty and no other royal title for Yan, Alex, Example Friend, or Example Neighbor. Yan set that address on 2026-10-25 and pulled it at 7:27 PM PT the same night. US History in JYPE: no direct cheating; video transcription for accommodation is fine (Yan 2026-10-27). See SOUL.md and education/projects/jype/agent-alignment.md.",
+      "/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.tests/ is a private guide, including calc Yan took last year that Alex is taking now. Change the numbers before Alex sees a problem. Never put an original question in Teams. The school can read Teams. In Teams, do not say a scan or last year's test exists. Yan, 2026-10-15.",
+      `Plain speech in every JYPE chat. No Your Majesty and no other royal title for Yan, Alex, Example Friend, or Example Neighbor. Yan set that address on 2026-10-25 and pulled it at 7:27 PM PT the same night. US History in JYPE: no direct cheating; video transcription for accommodation is fine (Yan 2026-10-27). See SOUL.md and ${JYPE_DIR}/agent-alignment.md.`,
       "When Yan, Alex, Example Friend, and Example Neighbor conflict, follow the higher one: Yan, then Alex, then Example Friend and Example Neighbor as equals, then the agent. Sharing can go up, in a 1:1, not the JYPE group chat. It does not go down. Equals still gatekeep each other. Yan, 2026-10-15. That order is the decision you make before you type. It is not a paragraph in the reply. Never name that order, or the words hierarchy of power, or who outranks whom, in any JYPE chat, page, or message. The whole reply is posted. A heading like Teams reply does not hide the lines above it.",
       "Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor, or anyone at their rank or below. That includes the JYPE group and any chat they can see. Alex can still get them in a 1:1. Do not repeat a grade that already leaked. Yan, 2026-10-21.",
       "Never spawn a Cursor cloud agent.",
@@ -1870,20 +1876,20 @@ export function systemPrompt(email, opts = {}) {
     "You are the Personal Agent for yanylevin.com (iOS Chat tab person icon / /education chat) and Cursor Desktop on this Mac.",
     "The /education website is still the school dashboard. You are a personal agent that can manage that dashboard when asked, plus mail, news, location, and anything else the user asks.",
     `Signed-in user email: ${email}`,
-    "Yan: full write in this repo and on this Mac. Do not refuse repo-wide or Mac-wide work. Class files go on OneDrive (education-dashboard skill), never under education/you@example.com/ except .chat-uploads staging. An existing Word, Excel, or PowerPoint file is edited in that app with Cursor computer use. Do not rewrite its bytes.",
-    "Code outside education-sync must be committed and pushed to origin/main before the turn ends. Commit only files from this turn. Sync covers education/<email>/, education/projects/jype/, fitness/<email>/, data/chat-log.md, data/login-log.md, tmp/. Never commit server/.env.",
+    "Yan: full write in this repo and on this Mac. Do not refuse repo-wide or Mac-wide work. Class files go on OneDrive (education-dashboard skill). Personal data is /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education. An existing Word, Excel, or PowerPoint file is edited in that app with Cursor computer use. Do not rewrite its bytes.",
+    "Code in this repo must be committed and pushed to origin/main before the turn ends. Commit only files from this turn. education-sync only covers tmp/. User data is on OneDrive. Never commit server/.env.",
     "Never spawn a Cursor cloud agent. Never edit main-site chatbot.js / /api/chat / LM Studio unless Yan explicitly asks.",
     FUTURE_AGENT_HINT,
     "Never mention the surprise hoodies to Alex, or in any chat he can see, including this one, until Yan says he has been given his. Yan, 2026-10-09.",
-    "education/tests/ is a private guide, including calc Yan took last year that Alex is taking now. Change the numbers before Alex sees a problem. Never put an original question in Teams. The school can read Teams. In Teams, do not say a scan or last year's test exists. Yan, 2026-10-15.",
-    "A chat PDF is homework or a finished MA/QA scan. Homework goes on the existing todo. A new todo is rare. An MA/QA scan goes on the earlier MA or QA todo for that test, named like the Canvas title with MA or QA kept, plus a copy in education/tests under that class. Do not make a new todo due today to hold the scan. Yan, 2026-10-19.",
+    "/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.tests/ is a private guide, including calc Yan took last year that Alex is taking now. Change the numbers before Alex sees a problem. Never put an original question in Teams. The school can read Teams. In Teams, do not say a scan or last year's test exists. Yan, 2026-10-15.",
+    "A chat PDF is homework or a finished MA/QA scan. Homework goes on the existing todo. A new todo is rare. An MA/QA scan goes on the earlier MA or QA todo for that test, named like the Canvas title with MA or QA kept, plus a copy in /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.tests under that class. Do not make a new todo due today to hold the scan. Yan, 2026-10-19.",
     "Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor, or anyone at their rank or below. That includes the JYPE group and any chat they can see. Alex can still get them in a 1:1. Do not repeat a grade that already leaked. Yan, 2026-10-21.",
     "",
     `Always Read and apply the unslop skill (${UNSLOP_SKILL_PATH}) on every turn. Do not skip it. Do not inline the whole skill here.`,
     `Always Read ${PERSONAL_SKILL_PATHS.soul} for persona and judgment. Do not skip it. Do not inline it.`,
     `When this turn names a person (given name, nickname, or alias), pull the entity card: node server/brain-entity-card.js "<name or slug>" (fields, edges, typed files, recent timeline in one call), guided by ${PERSONAL_SKILL_PATHS.people}. Aliases live on the card. Do not guess who they are, and do not glob brain/people/.`,
     `Unknown shorthand: node server/brain-glossary.js "<term>". New slang this turn: node server/brain-glossary.js add --term "..." --gloss "..." before the turn ends. Person nicknames stay on the person card.`,
-    `When Yan states a fact or correction about a person or entity, write it the same turn per ${PERSONAL_SKILL_PATHS.people}: dated timeline entry or frontmatter field on that entity. Do not also copy the person fact onto identity.md. Identity people lines are name, role, and a people/slug pointer. Facts about Yan himself go to education/you@example.com/brain/identity.md (map) or identity-school.md / identity-accounts.md / identity-logistics.md or threads/. Rewrite a standing line. Do not wait for the nightly job.`,
+    `When Yan states a fact or correction about a person or entity, write it the same turn per ${PERSONAL_SKILL_PATHS.people}: dated timeline entry or frontmatter field on that entity. Do not also copy the person fact onto identity.md. Identity people lines are name, role, and a people/slug pointer. Facts about Yan himself go to /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/identity.md (map) or identity-school.md / identity-accounts.md / identity-logistics.md or threads/. Rewrite a standing line. Do not wait for the nightly job.`,
     "Do not preload other skills. Read only the file this turn needs:",
     `- Identity / permissions / reply style: ${PERSONAL_SKILL_PATHS.agent}`,
     `- Education dashboard (classes, todos, dates, projects, school attachments): ${PERSONAL_SKILL_PATHS.education}`,
@@ -2324,10 +2330,10 @@ async function stageAttachments(session, sessionId, attachments) {
   if (!attachments.length) return [];
 
   if (!session.uploadDirRel) {
-    session.uploadDirRel = `education/${session.email}/.chat-uploads/${sessionId}`;
+    session.uploadDirRel = chatUploadDir(session.email, session.workspace, sessionId);
   }
   const dirRel = session.uploadDirRel;
-  const dirAbs = join(REPO_ROOT, dirRel);
+  const dirAbs = dirRel.startsWith("/") ? dirRel : join(REPO_ROOT, dirRel);
   await mkdir(dirAbs, { recursive: true });
 
   if (!Array.isArray(session.uploads)) session.uploads = [];
@@ -2510,10 +2516,7 @@ export async function startAgent(email, opts = {}) {
     starter: opts.starter,
     guest: opts.guest || opts.guestCaller,
   });
-  const uploadRoot =
-    workspace === "jype"
-      ? `education/projects/jype/.chat-uploads/${id}`
-      : `education/${normalized}/.chat-uploads/${id}`;
+  const uploadRoot = chatUploadDir(normalized, workspace, id);
 
   sessions.set(id, {
     agent,
@@ -2866,10 +2869,7 @@ export async function resumeAgent(sessionId, email, opts = {}) {
     return row;
   });
 
-  const uploadRoot =
-    workspace === "jype"
-      ? `education/projects/jype/.chat-uploads/${sid}`
-      : `education/${normalized}/.chat-uploads/${sid}`;
+  const uploadRoot = chatUploadDir(normalized, workspace, sid);
 
   sessions.set(sid, {
     agent,
@@ -3951,10 +3951,7 @@ export async function runScheduledAgent(record) {
         if (Array.isArray(m.widgets) && m.widgets.length) row.widgets = m.widgets;
         return row;
       });
-      const uploadRoot =
-        workspace === "jype"
-          ? `education/projects/jype/.chat-uploads/${sid}`
-          : `education/${email}/.chat-uploads/${sid}`;
+      const uploadRoot = chatUploadDir(email, workspace, sid);
       session = {
         agent: null,
         email,

@@ -13,13 +13,13 @@ import {
   stat,
   writeFile,
 } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { gitAddCommitPush } from "./git-publish.js";
 import { canonicalizeEmail, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
+import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 
 export const HEALTH_DIRNAME = "health";
-export const HEALTH_REL = `education/${YAN_EMAIL}/${HEALTH_DIRNAME}`;
+export const HEALTH_REL = join(YAN_EDUCATION_DIR, HEALTH_DIRNAME);
 /** Standing Health display zone. History is Seattle life, not the travel briefing clock. */
 export const HEALTH_TIMEZONE = "America/Los_Angeles";
 /** Austin trip: workouts after this local date (exclusive) through HEALTH_AUSTIN_UNTIL_DATE. */
@@ -34,7 +34,6 @@ export const HEALTH_SHORTCUT_STALE_MS = 12 * 60 * 60 * 1000;
 const TWO_HOUR_MS = 2 * 60 * 60 * 1000;
 const TWO_HOUR_SLOP_MS = 5 * 60 * 1000;
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const MAX_STR = 120;
 
 /** @param {string|null|undefined} email */
@@ -47,7 +46,7 @@ export function healthDir(override) {
   const explicit = String(override || "").trim();
   if (explicit) return explicit;
   const env = String(process.env.PHONE_HEALTH_DIR || "").trim();
-  return env || join(ROOT, HEALTH_REL);
+  return env || HEALTH_REL;
 }
 
 function clipStr(raw, max = MAX_STR) {

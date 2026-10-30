@@ -9,7 +9,7 @@
  */
 
 import { mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { briefingNow, resolveBriefingTimezone } from "./daily-briefing-agent.js";
 import { isSchoolDayParts, scheduleNowParts } from "./education-data.js";
@@ -24,16 +24,11 @@ import { readCurrentLifeState } from "./life-state.js";
 import { haversineMeters, homeBooleanKind, KNOWN_PLACES } from "./life-state-snapshot.js";
 import { readPhoneLocation, YAN_EMAIL } from "./phone-location.js";
 import { appendAgentAction, lightsActionSummary } from "./agent-actions.js";
+import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = "/tmp/yanylevin-home-agent.lock";
-const META_PATH = join(
-  REPO_ROOT,
-  "education",
-  YAN_EMAIL,
-  "daily-briefing",
-  "meta.json"
-);
+const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
 const TZ = "America/Los_Angeles";
 
 export const HOME_AGENT_INTERVAL_MS = 60 * 60 * 1000;
@@ -106,6 +101,9 @@ const laterAuthRetry = createLaterAuthRetry({
  * @param {string} [root]
  */
 export function vacuumStatePath(root = REPO_ROOT) {
+  if (!root || resolve(root) === resolve(REPO_ROOT)) {
+    return join(YAN_EDUCATION_DIR, "home", "vacuum.json");
+  }
   return join(root, "education", YAN_EMAIL, "home", "vacuum.json");
 }
 
@@ -113,6 +111,9 @@ export function vacuumStatePath(root = REPO_ROOT) {
  * @param {string} [root]
  */
 export function lightsStatePath(root = REPO_ROOT) {
+  if (!root || resolve(root) === resolve(REPO_ROOT)) {
+    return join(YAN_EDUCATION_DIR, "home", "lights.json");
+  }
   return join(root, "education", YAN_EMAIL, "home", "lights.json");
 }
 
@@ -844,7 +845,7 @@ export function buildHomeAgentPrompt(opts) {
     `Never trigger ${JSON.stringify(VACUUM_SCENE_FORBIDDEN)}.`,
     "HomeClaw listing action_count 0 is normal for this scene. The Roomba still starts. Record the start unless the trigger command itself fails.",
     "If the trigger fails, do not record a start.",
-    "Read the vacuum file, Apple Calendar for the next several hours (node server/calendar-cli.js events), life-state now and recent samples (node server/life-state.js now, node server/life-state.js recent 6), and today's class schedule when it is a school day (education/you@example.com/schedule.json)."
+    "Read the vacuum file, Apple Calendar for the next several hours (node server/calendar-cli.js events), life-state now and recent samples (node server/life-state.js now, node server/life-state.js recent 6), and today's class schedule when it is a school day (/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education/schedule.json)."
   );
   if (spec.family) {
     lines.push(
@@ -921,7 +922,7 @@ async function readMeta() {
 async function readSchoolSchedule() {
   try {
     const raw = await readFile(
-      join(REPO_ROOT, "education", YAN_EMAIL, "schedule.json"),
+      join(YAN_EDUCATION_DIR, "schedule.json"),
       "utf8"
     );
     const schedule = JSON.parse(raw);

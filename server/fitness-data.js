@@ -1,6 +1,6 @@
 /**
  * File-backed gym / fitness tracker.
- * Roots: fitness/<email>/ under the repo.
+ * Roots: OneDrive Projects/.fitness/<email>/.
  *
  * Session = Pacific calendar date of each entry's `at` timestamp.
  * Fresh entries stay pending (excluded from recent boxes / history charts)
@@ -8,18 +8,16 @@
  */
 
 import { readdir, readFile, writeFile, mkdir } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { gitAddCommitPush } from "./git-publish.js";
 import {
   canonicalizeEmail,
   isFullAccessEmail,
   FULL_ACCESS_EMAILS,
 } from "./identity.js";
+import { FITNESS_DIR } from "./onedrive-projects.js";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-export const FITNESS_ROOT = join(ROOT, "fitness");
+export const FITNESS_ROOT = FITNESS_DIR;
 export const FITNESS_TZ = "America/Los_Angeles";
 /** How long new logs stay as floating "pending" chips before joining charts. */
 export const PENDING_SOLIDIFY_MS = 2 * 60 * 60 * 1000;
@@ -341,13 +339,6 @@ export async function appendFitnessEntries(email, machineId, weights, opts = {})
     JSON.stringify({ entries: existing }, null, 2) + "\n",
     "utf8"
   );
-
-  if (opts.publish !== false) {
-    gitAddCommitPush({
-      paths: [`fitness/${normalized}`],
-      message: `fitness: add ${nums.length} entr${nums.length === 1 ? "y" : "ies"} on ${mid} for ${normalized}`,
-    }).catch((err) => console.error("[fitness-data] git publish", err));
-  }
 
   return { machineId: mid, created, tree: await readFitnessTree(normalized) };
 }

@@ -17,6 +17,8 @@ struct EducationView: View {
     @State private var todoTypeFilters: Set<String> = EducationTodoFilter.load()
     @State private var datesExpanded = false
     @State private var dateFilters: Set<String> = EducationDateFilter.load()
+    /// Projects: collapsed shows main. Expanded adds hidden.
+    @State private var projectsExpanded = false
     /// Home comments: collapsed shows the 3 newest inside the fresh window.
     @State private var homeCommentsExpanded = false
     /// Bumped to cancel/restart SSE + polling (same effect as leaving the tab).
@@ -305,8 +307,27 @@ struct EducationView: View {
     }
 
     private var projectsPanel: some View {
-        eduPanel(title: "Projects") {
-            let projects = store.tree?.projects ?? []
+        let projects = (store.tree?.projects ?? []).filter { project in
+            let tier = (project.tier ?? "main").lowercased()
+            if tier == "backend" { return false }
+            if tier == "hidden" { return projectsExpanded }
+            return true
+        }
+        return VStack(alignment: .leading, spacing: 12) {
+            Button {
+                YLHaptics.tap()
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    projectsExpanded.toggle()
+                }
+            } label: {
+                Text("Projects")
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(YLTheme.fg(colorScheme))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(projectsExpanded ? "Collapse projects" : "Expand projects")
+
+            VStack(alignment: .leading, spacing: 0) {
             if projects.isEmpty {
                 emptyRow("Nothing here")
             } else {
@@ -336,7 +357,11 @@ struct EducationView: View {
                     }
                 }
             }
+            }
         }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .ylGlassRounded(cornerRadius: 22, interactive: true)
     }
 
     private var completedPanel: some View {

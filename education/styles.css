@@ -1215,6 +1215,7 @@ a.edu-comment-body {
 }
 
 .edu-dates-toggle,
+.edu-projects-toggle,
 .edu-todos-toggle,
 .edu-completed-toggle,
 .edu-comments-toggle {
@@ -1235,6 +1236,7 @@ a.edu-comment-body {
 }
 
 .edu-dates-toggle:focus-visible,
+.edu-projects-toggle:focus-visible,
 .edu-todos-toggle:focus-visible,
 .edu-completed-toggle:focus-visible,
 .edu-comments-toggle:focus-visible {

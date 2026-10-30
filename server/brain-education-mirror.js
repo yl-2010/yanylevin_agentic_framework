@@ -10,6 +10,7 @@ import fs from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { EDU_ROOT, BRAIN_ROOT, serializeFrontmatter } from "./brain-lib.js";
+import { listTopLevelProjects } from "./onedrive-projects.js";
 import { withCloudRetry, isTransientCloudError } from "./cloud-storage-io.js";
 import { EDUCATION_META_DIR, gradeDirFromMeta, objectDirId } from "./education-onedrive.js";
 
@@ -251,20 +252,26 @@ async function collect() {
     await collectChildren(stubs, dirPath, `education/classes/${slug}`, slug, classFolder);
   }
 
-  for (const slug of listDirs(path.join(EDU_ROOT, "projects"))) {
-    const dirPath = path.join(EDU_ROOT, "projects", slug);
-    const project = await readJson(path.join(dirPath, "project.json"));
-    if (!project) continue;
+  const skipMirror = new Set([
+    "education",
+    "prasham-education",
+    "fitness",
+    "tests",
+    "yanylevin-backend",
+    "_example-dummy",
+  ]);
+  for (const row of await listTopLevelProjects({ includeBackend: true })) {
+    if (skipMirror.has(row.id) || row.props?.fixture === true) continue;
     stubs.push(
       stub({
-        outPath: path.join(MIRROR_ROOT, "projects", `${slug}.md`),
-        name: project.name,
+        outPath: path.join(MIRROR_ROOT, "projects", `${row.id}.md`),
+        name: row.props.name,
         kind: "education-project",
-        source: `projects/${slug}/project.json`,
-        fields: { order: project.order ?? null },
+        source: `${row.dir}/project.json`,
+        fields: { order: row.props.order ?? null, tier: row.tier },
       }),
     );
-    await collectChildren(stubs, dirPath, `education/projects/${slug}`, slug);
+    await collectChildren(stubs, row.dir, `projects/${row.id}`, row.id);
   }
 
   for (const slug of listDirs(path.join(EDU_ROOT, "todos"))) {

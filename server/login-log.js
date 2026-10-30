@@ -6,13 +6,13 @@
  */
 
 import { appendFile, mkdir, readFile, stat } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
 import { formatPacificTime, isChatLogViewer } from "./chat-log.js";
 import { canonicalizeEmail } from "./identity.js";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const LOG_PATH = join(ROOT, "data", "login-log.md");
+import { LOGIN_LOG_PATH } from "./onedrive-projects.js";
+
+const LOG_PATH = LOGIN_LOG_PATH;
 const PLACEHOLDER_EMAILS = new Set(["visitor@yanylevin.com"]);
 
 export { isChatLogViewer as isLoginLogViewer };

@@ -1,8 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   buildCompactAboutYan,
   extractField,
@@ -11,9 +9,9 @@ import {
   tokenizeQuery,
 } from "./yan-retrieve.js";
 import { buildYanSystemPrompt } from "./yan-kb.js";
+import { YAN_MD_PATH } from "./onedrive-projects.js";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const yanMd = readFileSync(join(ROOT, "data", "owner.md"), "utf8");
+const yanMd = readFileSync(YAN_MD_PATH, "utf8");
 
 describe("yan-retrieve", () => {
   it("parses ## sections from owner.md", () => {

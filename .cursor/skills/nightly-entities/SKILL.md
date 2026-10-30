@@ -20,7 +20,7 @@ for people; you are where person facts land.
 
 ## Contract
 
-- Read `education/you@example.com/brain/schema.md` first; its frontmatter
+- Read `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/schema.md` first; its frontmatter
   and edge rules are hard requirements (scalars bare, arrays/objects one-line
   JSON, edges a block list of one-line JSON objects, enum only).
 - Touch ONLY entities in the digest list (plus creating a missing edge-target

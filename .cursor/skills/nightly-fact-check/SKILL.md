@@ -23,7 +23,7 @@ Every claim overnight agents wrote tonight should match the source. Fix what is 
 
 Verify:
 
-- Git-visible writes from tonight's jobs under `education/you@example.com/brain/` (`identity.md`, `identity-school.md`, `identity-accounts.md`, `identity-logistics.md`, `patterns.md`, `health.md`, `threads/`, tonight's journal `journal/<dateKey minus 1 day>.md`, entity cards phase 2 touched), `location/places.md` + `trips.md`, `health/takeaways.md`, education `date.json` / `todo.json` if phase 4 or Canvas wrote them.
+- Git-visible writes from tonight's jobs under `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/` (`identity.md`, `identity-school.md`, `identity-accounts.md`, `identity-logistics.md`, `patterns.md`, `health.md`, `threads/`, tonight's journal `journal/<dateKey minus 1 day>.md`, entity cards phase 2 touched), `location/places.md` + `trips.md`, `health/takeaways.md`, education `date.json` / `todo.json` if phase 4 or Canvas wrote them.
 - `[iMessage]` / `[mail]` timeline lines dated today or yesterday, even if a chat-time write put them there earlier. Standing and identity lines that restate those facts.
 - `brain/state.json` `notes` when they restate facts.
 
@@ -81,7 +81,7 @@ Round-trip confirmations: read every leg, not the subject-line outbound. A Tesla
 
 ## How to correct
 
-Read `education/you@example.com/brain/schema.md` first.
+Read `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/schema.md` first.
 
 | Kind | Where | How |
 | --- | --- | --- |

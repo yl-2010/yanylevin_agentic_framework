@@ -187,7 +187,7 @@ describe("Personal Agent models", () => {
 describe("Personal Agent system prompt", () => {
   it("stays slim and points at on-demand files instead of dumping recipes", () => {
     const prompt = systemPrompt(YAN);
-    assert.ok(prompt.length < 7800, `prompt length ${prompt.length}`);
+    assert.ok(prompt.length < 8500, `prompt length ${prompt.length}`);
     assert.match(prompt, /Personal Agent/);
     assert.match(prompt, /schedule_future_agent/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.futureAgents));
@@ -198,7 +198,7 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /Always Read and apply the unslop skill/);
     assert.match(prompt, /Never mention the surprise hoodies to Alex/);
     assert.match(prompt, /Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor/);
-    assert.match(prompt, /education\/tests\/ is a private guide/);
+    assert.match(prompt, /Projects\/\.tests\/ is a private guide/);
     assert.match(prompt, /do not say a scan or last year's test exists/);
     assert.match(prompt, /EPS student IDs \/ school photos/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.soul));
@@ -232,7 +232,7 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /images has no pixels/);
     assert.match(prompt, /existing Word, Excel, or PowerPoint/);
     assert.match(prompt, /School Outlook still cannot send/);
-    assert.ok(prompt.length < 7800, `prompt length ${prompt.length}`);
+    assert.ok(prompt.length < 8500, `prompt length ${prompt.length}`);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.chats));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.location));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.lifeState));
@@ -277,7 +277,7 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /npm run deploy:web yourself/);
     assert.match(prompt, /Never mention the surprise hoodies to Alex/);
     assert.match(prompt, /Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor/);
-    assert.match(prompt, /education\/tests\/ is a private guide/);
+    assert.match(prompt, /Projects\/\.tests\/ is a private guide/);
     assert.match(prompt, /do not say a scan or last year's test exists/);
     assert.match(prompt, /No Your Majesty and no other royal title/);
     assert.doesNotMatch(prompt, /as royalty/);
@@ -441,7 +441,7 @@ describe("Personal Agent live context", () => {
 describe("Personal Agent skill files", () => {
   it("keeps education dashboard context and recipes on disk", async () => {
     for (const rel of Object.values(PERSONAL_SKILL_PATHS)) {
-      const text = await readFile(join(REPO_ROOT, rel), "utf8");
+      const text = await readFile(rel.startsWith("/") ? rel : join(REPO_ROOT, rel), "utf8");
       assert.ok(text.length > 80, rel);
     }
     const unslop = await readFile(UNSLOP_SKILL_PATH, "utf8");
@@ -739,7 +739,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /life-state-cleanup-agent\.js/);
     assert.match(agent, /eps-four11/);
 
-    const brain = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.brain), "utf8");
+    const brain = await readFile(PERSONAL_SKILL_PATHS.brain, "utf8");
     assert.match(brain, /Frontmatter contract/);
     assert.match(brain, /Single operator/);
     assert.match(brain, /edges/);

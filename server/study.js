@@ -33,7 +33,9 @@ const execFileAsync = promisify(execFile);
 const SERVER_DIR = fileURLToPath(new URL(".", import.meta.url));
 const REPO_ROOT = join(SERVER_DIR, "..");
 
-export const STUDY_ROOT = join(REPO_ROOT, "data", "study");
+import { STUDY_DIR } from "./onedrive-projects.js";
+
+export const STUDY_ROOT = STUDY_DIR;
 export const MAX_FILES = 20;
 export const MAX_FILE_BYTES = 12 * 1024 * 1024;
 export const MAX_TOTAL_BYTES = 40 * 1024 * 1024;

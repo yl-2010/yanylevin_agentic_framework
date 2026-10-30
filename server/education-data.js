@@ -1,12 +1,12 @@
 /**
  * File-backed education OS reader / todo.done writer.
- * Roots: education/<email>/ under the repo.
+ * Roots: OneDrive Projects folders. Personal opened-project timestamps stay in the repo.
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createReadStream } from "node:fs";
 import { createRequire } from "node:module";
-import { readdir, readFile, writeFile, stat } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -51,7 +51,17 @@ import {
   isJypeAccessEmail,
   FULL_ACCESS_EMAILS,
 } from "./identity.js";
-import { JYPE_ROOT_REL, normalizeJypeWorkspace } from "./jype.js";
+import { normalizeJypeWorkspace } from "./jype.js";
+import {
+  JYPE_DIR,
+  PERSONAL_PROJECTS,
+  SCHOOL_PROJECTS,
+  YAN_EDUCATION_DIR,
+  educationDataDir,
+  findTopLevelProject,
+  listTopLevelProjects,
+  usesTopLevelProjects,
+} from "./onedrive-projects.js";
 
 const require = createRequire(import.meta.url);
 const cloudMissStore = new AsyncLocalStorage();
@@ -622,7 +632,7 @@ export async function resolveContextFile(email, opts) {
       err.status = 400;
       throw err;
     }
-    folder = join(root, "projects", id);
+    folder = await locateProjectDir(root, id, email, opts.workspace);
   } else if (scope === "todo") {
     if (!id) {
       const err = new Error("todo id required");
@@ -630,7 +640,8 @@ export async function resolveContextFile(email, opts) {
       throw err;
     }
     if (projectId) {
-      folder = join(root, "projects", projectId, "todos", id);
+      const projectDir = await locateProjectDir(root, projectId, email, opts.workspace);
+      folder = projectDir ? join(projectDir, "todos", id) : null;
     } else if (classId) {
       const entry = await classEntryForRoot(root, classId);
       if (entry) {
@@ -653,7 +664,8 @@ export async function resolveContextFile(email, opts) {
       throw err;
     }
     if (projectId) {
-      folder = join(root, "projects", projectId, "dates", id);
+      const projectDir = await locateProjectDir(root, projectId, email, opts.workspace);
+      folder = projectDir ? join(projectDir, "dates", id) : null;
     } else if (classId) {
       const entry = await classEntryForRoot(root, classId);
       if (entry) {
@@ -673,6 +685,12 @@ export async function resolveContextFile(email, opts) {
     throw err;
   }
 
+  if (!folder) {
+    const missing = new Error("not found");
+    missing.status = 404;
+    throw missing;
+  }
+
   const absFolder = resolve(folder);
   const absRoot = resolve(root);
   const meta = (await readJsonFile(join(root, "meta.json"))) || {};
@@ -683,7 +701,11 @@ export async function resolveContextFile(email, opts) {
   const inOnedrive =
     Boolean(absGrade) &&
     (absFolder === absGrade || absFolder.startsWith(absGrade + sep));
-  if (!inEducation && !inOnedrive) {
+  const inProjects = [PERSONAL_PROJECTS, SCHOOL_PROJECTS].some((drive) => {
+    const absDrive = resolve(drive);
+    return absFolder === absDrive || absFolder.startsWith(absDrive + sep);
+  });
+  if (!inEducation && !inOnedrive && !inProjects) {
     const err = new Error("forbidden");
     err.status = 403;
     throw err;
@@ -859,20 +881,54 @@ export function userEducationRoot(email, opts = {}) {
       err.status = 403;
       throw err;
     }
-    return join(ROOT, JYPE_ROOT_REL);
+    return JYPE_DIR;
   }
   if (!isEducationUser(normalized)) {
     const err = new Error("forbidden");
     err.status = 403;
     throw err;
   }
-  // Prevent path traversal — email folders are literal addresses.
   if (normalized.includes("..") || normalized.includes("/") || normalized.includes("\\")) {
     const err = new Error("invalid email");
     err.status = 400;
     throw err;
   }
-  return join(EDUCATION_ROOT, normalized);
+  const onedrive = educationDataDir(normalized, workspace);
+  if (!onedrive) {
+    const err = new Error("forbidden");
+    err.status = 403;
+    throw err;
+  }
+  return onedrive;
+}
+
+/**
+ * Opened-project timestamps stay in the git repo for personal logins.
+ * JYPE's file lives with the JYPE folder on OneDrive.
+ * @param {string} email
+ * @param {string} [workspace]
+ */
+function projectsOpenedPath(email, workspace) {
+  if (normalizeJypeWorkspace(workspace) === "jype") {
+    return join(JYPE_DIR, PROJECTS_OPENED_FILE);
+  }
+  return join(EDUCATION_ROOT, canonicalizeEmail(email), PROJECTS_OPENED_FILE);
+}
+
+/**
+ * @param {string} root
+ * @param {string} projectId
+ * @param {string} email
+ * @param {string} [workspace]
+ */
+async function locateProjectDir(root, projectId, email, workspace) {
+  const id = isSafeObjectId(projectId);
+  if (!id) return null;
+  if (usesTopLevelProjects(email, workspace)) {
+    const hit = await findTopLevelProject(id);
+    return hit?.dir || null;
+  }
+  return join(root, "projects", id);
 }
 
 async function readJsonFile(path) {
@@ -1262,6 +1318,25 @@ function pathInside(parent, child) {
 }
 
 /**
+ * Project folder for a linkedFiles pointer. Yan's projects sit in the
+ * OneDrive Projects directories, not under the education root.
+ * @param {string} root
+ * @param {string} projectId
+ * @returns {Promise<string|null>}
+ */
+async function linkedProjectDir(root, projectId) {
+  const id = isSafeObjectId(projectId);
+  if (!id) return null;
+  if (resolve(root) === resolve(YAN_EDUCATION_DIR)) {
+    const hit = await findTopLevelProject(id);
+    return hit?.dir ? resolve(hit.dir) : null;
+  }
+  const projectDir = resolve(join(root, "projects", id));
+  if (!pathInside(root, projectDir)) return null;
+  return projectDir;
+}
+
+/**
  * Pointers on `.todo.json` `linkedFiles`.
  * `name` plus `todo` / `canvasId` is a file in another todo of the same class.
  * `pageId` is a OneNote site already stored on that todo. `canvasId` wins
@@ -1390,10 +1465,9 @@ export async function resolveProjectLinkedFile(root, todoFolder, fileName) {
   const links = parseLinkedFiles(props?.linkedFiles).filter(
     (link) => link.project && link.name.toLowerCase() === name.toLowerCase()
   );
-  const absRoot = resolve(root);
   for (const link of links) {
-    const projectDir = resolve(join(absRoot, "projects", link.project));
-    if (!pathInside(absRoot, projectDir)) continue;
+    const projectDir = await linkedProjectDir(root, link.project);
+    if (!projectDir) continue;
     const absFile = resolve(join(projectDir, link.name));
     if (!pathInside(projectDir, absFile)) continue;
     try {
@@ -1421,7 +1495,6 @@ export async function resolveProjectLinkedFile(root, todoFolder, fileName) {
 export async function appendProjectFileLinks(todos, root) {
   const list = Array.isArray(todos) ? todos : [];
   if (!root) return list;
-  const absRoot = resolve(root);
   for (const todo of list) {
     if (!todo || typeof todo !== "object") continue;
     const links = parseLinkedFiles(todo.linkedFiles).filter(
@@ -1439,8 +1512,8 @@ export async function appendProjectFileLinks(todos, root) {
     for (const link of links) {
       const key = link.name.toLowerCase();
       if (own.has(key)) continue;
-      const projectDir = resolve(join(absRoot, "projects", link.project));
-      if (!pathInside(absRoot, projectDir)) continue;
+      const projectDir = await linkedProjectDir(root, link.project);
+      if (!projectDir) continue;
       const absFile = resolve(join(projectDir, link.name));
       if (!pathInside(projectDir, absFile)) continue;
       try {
@@ -2705,15 +2778,38 @@ async function loadEducationTree(
       ? sourceClassesOpt
       : walkedSource || published.sourceClasses;
 
-  const projectIds = await listDirs(join(root, "projects"));
+  /** @type {{ id: string, dir: string, props: object }[]} */
+  const projectEntries = [];
+  if (usesTopLevelProjects(email, workspace)) {
+    for (const row of await listTopLevelProjects()) {
+      projectEntries.push({
+        id: row.id,
+        dir: row.dir,
+        props: { ...row.props, id: row.id, tier: row.tier },
+      });
+    }
+  } else {
+    for (const projectId of await listDirs(join(root, "projects"))) {
+      const dir = join(root, "projects", projectId);
+      const props = await readJsonFile(join(dir, "project.json"));
+      if (!props || typeof props !== "object") continue;
+      const tier = String(props.tier || "main").trim().toLowerCase();
+      if (tier === "backend") continue;
+      projectEntries.push({
+        id: projectId,
+        dir,
+        props: { ...props, id: projectId, tier: tier === "hidden" ? "hidden" : "main" },
+      });
+    }
+  }
   /** @type {object[]} */
   const projects = [];
-  for (const projectId of projectIds) {
-    const projectDir = join(root, "projects", projectId);
+  for (const entry of projectEntries) {
+    const projectId = entry.id;
+    const projectDir = entry.dir;
+    const props = entry.props;
     const projectJson = join(projectDir, "project.json");
-    const props = await readJsonFile(projectJson);
-    if (!props || typeof props !== "object") continue;
-    const project = { id: projectId, ...props };
+    const project = { ...props, id: projectId };
     if (isHiddenFromUi(project)) continue;
     if (!includeFixtures && isFixture(project)) continue;
 
@@ -2755,7 +2851,10 @@ async function loadEducationTree(
       ...(projectCases.length ? { cases: projectCases } : {}),
     });
   }
-  const openedAt = mergeCreateOpenedAt(await readProjectsOpened(root), projects);
+  const openedAt = mergeCreateOpenedAt(
+    await readProjectsOpened(dirname(projectsOpenedPath(email, workspace))),
+    projects
+  );
   const sortedProjects = sortEducationProjects(
     projects.map(({ _birthMs, ...rest }) => rest),
     {
@@ -2873,9 +2972,8 @@ export async function findTodo(
   /** @type {string[]} */
   const candidates = [];
   if (scopedProject) {
-    candidates.push(
-      join(root, "projects", scopedProject, "todos", id, "todo.json")
-    );
+    const projectDir = await locateProjectDir(root, scopedProject, email, workspace);
+    if (projectDir) candidates.push(join(projectDir, "todos", id, "todo.json"));
   } else if (scopedClass) {
     const entry = await classEntryForRoot(root, scopedClass);
     if (entry) {
@@ -2902,9 +3000,14 @@ export async function findTodo(
         candidates.push(join(folder, "todo.json"));
       }
     }
-    const projectIds = await listDirs(join(root, "projects"));
-    for (const pid of projectIds) {
-      candidates.push(join(root, "projects", pid, "todos", id, "todo.json"));
+    if (usesTopLevelProjects(email, workspace)) {
+      for (const row of await listTopLevelProjects({ includeBackend: true })) {
+        candidates.push(join(row.dir, "todos", id, "todo.json"));
+      }
+    } else {
+      for (const pid of await listDirs(join(root, "projects"))) {
+        candidates.push(join(root, "projects", pid, "todos", id, "todo.json"));
+      }
     }
   }
 
@@ -2926,6 +3029,11 @@ export async function findTodo(
         if (hit) resolvedClass = hit.id;
         const pm = resolved.match(/\/projects\/([^/]+)\/todos\//);
         if (pm) resolvedProject = pm[1];
+        if (!resolvedProject && usesTopLevelProjects(email, workspace)) {
+          const rows = await listTopLevelProjects({ includeBackend: true });
+          const projectHit = rows.find((row) => resolved.startsWith(row.dir + "/"));
+          if (projectHit) resolvedProject = projectHit.id;
+        }
       }
       return {
         path: resolved,
@@ -3011,25 +3119,24 @@ export async function markProjectOpened(email, projectId, opts = {}) {
     err.status = 400;
     throw err;
   }
-  const props = await readJsonFile(join(root, "projects", id, "project.json"));
+  const projectDir = await locateProjectDir(root, id, email, opts.workspace);
+  const props = projectDir ? await readJsonFile(join(projectDir, "project.json")) : null;
   if (!props || typeof props !== "object") {
     const err = new Error("project not found");
     err.status = 404;
     throw err;
   }
-  if (isFixture({ id, ...props })) {
+  if (String(props.tier || "").toLowerCase() === "backend" || isFixture({ id, ...props })) {
     const err = new Error("fixture projects are read-only");
     err.status = 403;
     throw err;
   }
-  const opened = await readProjectsOpened(root);
+  const openedFile = projectsOpenedPath(email, opts.workspace);
+  const opened = await readProjectsOpened(dirname(openedFile));
   const lastOpenedAt = new Date().toISOString();
   opened[id] = lastOpenedAt;
-  await writeFile(
-    join(root, PROJECTS_OPENED_FILE),
-    JSON.stringify(opened, null, 2) + "\n",
-    "utf8"
-  );
+  await mkdir(dirname(openedFile), { recursive: true });
+  await writeFile(openedFile, JSON.stringify(opened, null, 2) + "\n", "utf8");
   return { id, lastOpenedAt };
 }
 
