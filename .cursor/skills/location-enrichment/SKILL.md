@@ -69,49 +69,25 @@ Look as far as you need. Yan only. Do not dump full threads into the markdown.
 
 ## Trip pass: Mail.app ride receipts
 
-Do this **after** (or in parallel with) places. One-needle `whose` queries with a date cutoff. Never iterate the whole inbox. Never nest many needles in one script (Exchange will hang).
+Do this **after** (or in parallel with) places. One needle per command, against Mail's Envelope Index. Never iterate the inbox in AppleScript. `whose date received` on Exchange stalls.
 
-**Where the receipts actually are:** Tesla Robotaxi and Uber Family receipts land in **Exchange** `Inbox` (`you@example.com`), sender `tesla.com` / `uber.com`. They are usually **not** in Gmail. Gmail's inbox mailbox is `"INBOX"` (all caps), not `"Inbox"`.
+**Where the receipts actually are:** Tesla Robotaxi and Uber Family receipts land in **Exchange** `Inbox` (`you@example.com`), sender `tesla.com` / `uber.com`. They are usually **not** in Gmail. The command below already searches Exchange, Gmail, and iCloud.
 
 Tesla subjects look like `Robotaxi Ride Receipt on August 16, 2026`. Uber subjects look like `Your Saturday afternoon trip with Uber` (sometimes prefixed `[Family]`).
 
-Search Exchange first (swap the subject/sender string; run **separate** scripts):
+`--since` is 14 days before the job, ISO UTC. One needle per command:
 
 ```bash
-osascript <<'APPLESCRIPT'
-tell application "Mail"
-  set inboxBox to mailbox "Inbox" of account "Exchange"
-  set cutoff to (current date) - (14 * days)
-  set output to ""
-  repeat with m in (messages of inboxBox whose date received > cutoff and subject contains "Robotaxi")
-    set output to output & (subject of m) & " | " & (sender of m) & " | " & (date received of m as string) & linefeed
-  end repeat
-  return output
-end tell
-APPLESCRIPT
+node server/apple-mail.js since --since 2026-10-16T07:00:00.000Z --subject Robotaxi
+node server/apple-mail.js since --since 2026-10-16T07:00:00.000Z --from tesla.com
+node server/apple-mail.js since --since 2026-10-16T07:00:00.000Z --from uber.com
+node server/apple-mail.js since --since 2026-10-16T07:00:00.000Z --subject "trip with"
+node server/apple-mail.js since --since 2026-10-16T07:00:00.000Z --subject Waymo
+node server/apple-mail.js since --since 2026-10-16T07:00:00.000Z --subject Lyft
+node server/apple-mail.js since --since 2026-10-16T07:00:00.000Z --subject Zoox
 ```
 
-Also run the same pattern with `sender contains "tesla.com"`, `sender contains "uber.com"`, `subject contains "trip with"`, `subject contains "Waymo"`, `subject contains "Lyft"`, `subject contains "Zoox"`. Then Gmail if Exchange is empty:
-
-```bash
-osascript <<'APPLESCRIPT'
-tell application "Mail"
-  set a to account "Google"
-  set inboxBox to missing value
-  repeat with b in mailboxes of a
-    if name of b is "INBOX" then set inboxBox to b
-  end repeat
-  set cutoff to (current date) - (14 * days)
-  set output to ""
-  repeat with m in (messages of inboxBox whose date received > cutoff and subject contains "Robotaxi")
-    set output to output & (subject of m) & " | " & (sender of m) & " | " & (date received of m as string) & linefeed
-  end repeat
-  return output
-end tell
-APPLESCRIPT
-```
-
-Read one matching body (`content of theMsg`). Extract **only** service, pickup address, dropoff address, start time, end time, duration/distance if present. No fares, no card digits, no full bodies into `trips.md`.
+If `count` is 0, there is no receipt. If a row came back, read that one body (`content` of the message whose subject is that exact subject). Do not add a date to that AppleScript. Extract **only** service, pickup address, dropoff address, start time, end time, duration/distance if present. No fares, no card digits, no full bodies into `trips.md`.
 
 Match a receipt to a GPS leg by overlapping **local** time (job timezone) and pickup/dropoff vs nearby stays. Receipt wins for mode. GPS keeps the path. A stay tagged "ride pickup" makes the **following** trip a ride until receipts say otherwise.
 

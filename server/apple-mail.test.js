@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 import {
   accountFromMailbox,
   assertDumpQuality,
+  dateReceivedSinceClause,
   decodeQuotedPrintable,
   dumpAppleMail,
   emptyBodyRate,
@@ -16,6 +17,7 @@ import {
   formatDumpMessage,
   isFiledMailbox,
   isWatchMailbox,
+  listMailSince,
   parseEmlx,
   shouldSkipMailbox,
   wrapEmlx,
@@ -220,5 +222,57 @@ describe("apple-mail dump end-to-end", () => {
     assert.match(dumped, /Costco run after school/);
     assert.match(dumped, /account=Google/);
     assert.match(dumped, /from=rajasi@hotmail.com/);
+  });
+
+  it("since uses unix seconds and the 2001 epoch, and skips mail before the cutoff", async () => {
+    const root = await mkdtemp(join(tmpdir(), "apple-mail-since-"));
+    const mailRoot = join(root, "Mail");
+    const db = join(root, "Envelope Index");
+    await mkdir(join(mailRoot, "EXCHANGE-UUID", "Inbox.mbox"), { recursive: true });
+    const unixNew = Date.parse("2026-10-29T05:15:00Z") / 1000;
+    const unixOld = Date.parse("2026-10-01T05:15:00Z") / 1000;
+    const appleNew = Date.parse("2026-10-28T05:15:00Z") / 1000 - 978307200;
+    assert.match(dateReceivedSinceClause("m.date_received", "2026-10-22T09:30:08.350Z"), /m\.date_received > /);
+
+    await execFileAsync("sqlite3", [
+      db,
+      `
+      CREATE TABLE messages (ROWID INTEGER PRIMARY KEY, sender INTEGER, subject INTEGER, date_received REAL, mailbox INTEGER, deleted INTEGER);
+      CREATE TABLE subjects (ROWID INTEGER PRIMARY KEY, subject TEXT);
+      CREATE TABLE addresses (ROWID INTEGER PRIMARY KEY, address TEXT);
+      CREATE TABLE mailboxes (ROWID INTEGER PRIMARY KEY, url TEXT);
+      INSERT INTO addresses VALUES (1, 'tesla@tesla.com');
+      INSERT INTO addresses VALUES (2, 'old@example.com');
+      INSERT INTO subjects VALUES (1, 'Robotaxi Ride Receipt on October 29');
+      INSERT INTO subjects VALUES (2, 'Old newsletter');
+      INSERT INTO subjects VALUES (3, 'PathIvy digest');
+      INSERT INTO mailboxes VALUES (1, 'ews://EXCHANGE-UUID/Inbox');
+      INSERT INTO messages VALUES (1, 1, 1, ${unixNew}, 1, 0);
+      INSERT INTO messages VALUES (2, 2, 2, ${unixOld}, 1, 0);
+      INSERT INTO messages VALUES (3, 1, 3, ${appleNew}, 1, 0);
+      `,
+    ]);
+
+    const all = await listMailSince({
+      mailRoot,
+      envelopeDb: db,
+      since: "2026-10-22T09:30:08.350Z",
+    });
+    assert.equal(all.count, 2);
+    assert.deepEqual(
+      all.messages.map((m) => m.subject),
+      ["Robotaxi Ride Receipt on October 29", "PathIvy digest"]
+    );
+    assert.equal(all.messages[0].account, "Exchange");
+    assert.equal(all.messages[0].from, "tesla@tesla.com");
+
+    const needle = await listMailSince({
+      mailRoot,
+      envelopeDb: db,
+      since: "2026-10-22T09:30:08.350Z",
+      subject: "robotaxi",
+    });
+    assert.equal(needle.count, 1);
+    assert.match(needle.messages[0].subject, /Robotaxi/);
   });
 });

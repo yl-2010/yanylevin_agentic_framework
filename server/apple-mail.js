@@ -61,6 +61,25 @@ export function isoToAppleTime(iso) {
   return ms / 1000 - APPLE_EPOCH;
 }
 
+/**
+ * Mail stores `date_received` as Unix seconds on current accounts, as
+ * milliseconds in a few rows, and as seconds since 2001-01-01 in older
+ * dumps. AppleScript `whose date received` does not use this column. On
+ * Exchange that filter round-trips the inbox and stalls.
+ */
+export function dateReceivedSinceClause(column, sinceIso) {
+  const ms = Date.parse(String(sinceIso || "").trim());
+  if (!Number.isFinite(ms)) return "";
+  const unix = ms / 1000;
+  const apple = unix - APPLE_EPOCH;
+  const col = column;
+  return (
+    `((${col} > 1000000000000 AND ${col} > ${ms}) OR ` +
+    `(${col} > 1000000000 AND ${col} <= 1000000000000 AND ${col} > ${unix}) OR ` +
+    `(${col} > 0 AND ${col} <= 1000000000 AND ${col} > ${apple}))`
+  );
+}
+
 export function monthKeyFromIso(iso) {
   const key = String(iso || "").slice(0, 7);
   return /^\d{4}-\d{2}$/.test(key) ? key : "unknown";
@@ -399,6 +418,7 @@ export async function listEnvelopeMessages(db, opts = {}) {
   const hasSubjects = tables.includes("subjects");
   const hasAddresses = tables.includes("addresses");
   const sinceIso = String(opts.sinceIso || "").trim();
+  const includeRecipients = opts.includeRecipients !== false;
 
   const senderJoin =
     hasAddresses && msgCols.includes("sender")
@@ -433,8 +453,8 @@ export async function listEnvelopeMessages(db, opts = {}) {
   const where = [];
   if (msgCols.includes("deleted")) where.push("COALESCE(m.deleted, 0) = 0");
   if (sinceIso) {
-    const apple = isoToAppleTime(sinceIso);
-    if (apple) where.push(`${dateExpr} > ${apple}`);
+    const sinceClause = dateReceivedSinceClause(dateExpr, sinceIso);
+    if (sinceClause) where.push(sinceClause);
   }
   const deletedWhere = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
@@ -456,7 +476,7 @@ export async function listEnvelopeMessages(db, opts = {}) {
 
   /** @type {Map<number, string[]>} */
   const toById = new Map();
-  if (tables.includes("recipients") && hasAddresses) {
+  if (includeRecipients && tables.includes("recipients") && hasAddresses) {
     const recCols = await columnNames(db, "recipients");
     const msgCol = recCols.includes("message")
       ? "message"
@@ -637,6 +657,66 @@ export async function listRecentAppleMail(opts = {}) {
 }
 
 /**
+ * Inbox and junk headers since an ISO timestamp. Envelope Index only.
+ * No AppleScript, no message bodies.
+ * @param {{ mailRoot?: string, envelopeDb?: string, since?: string, subject?: string, from?: string, limit?: number }} [opts]
+ */
+export async function listMailSince(opts = {}) {
+  const sinceIso = String(opts.since || "").trim();
+  if (!Number.isFinite(Date.parse(sinceIso))) {
+    throw new Error("since must be an ISO timestamp");
+  }
+  const mailRoot = String(opts.mailRoot || "").trim() || defaultMailRoot();
+  const envelopeDb =
+    String(opts.envelopeDb || "").trim() || defaultMailEnvelopeDb();
+  const subjectNeedle = String(opts.subject || "").trim().toLowerCase();
+  const fromNeedle = String(opts.from || "").trim().toLowerCase();
+  const limit = Math.min(Math.max(Number(opts.limit) || 500, 1), FILE_LIST_MAX);
+
+  const snapshot = await snapshotEnvelopeDb(envelopeDb);
+  let rows;
+  try {
+    rows = await listEnvelopeMessages(snapshot, {
+      sinceIso,
+      includeRecipients: false,
+    });
+  } finally {
+    await rm(snapshot, { force: true }).catch(() => {});
+    await rm(`${snapshot}-wal`, { force: true }).catch(() => {});
+    await rm(`${snapshot}-shm`, { force: true }).catch(() => {});
+  }
+
+  const uuidMap = await accountMapFromMailRoot(mailRoot);
+  /** @type {object[]} */
+  const messages = [];
+  for (const row of rows) {
+    if (!isWatchMailbox(row.mailboxUrl, row.mailboxName)) continue;
+    if (isFiledMailbox(row.mailboxUrl, row.mailboxName)) continue;
+    const subject = String(row.subject || "");
+    const from = String(row.from || "");
+    if (subjectNeedle && !subject.toLowerCase().includes(subjectNeedle)) continue;
+    if (fromNeedle && !from.toLowerCase().includes(fromNeedle)) continue;
+    messages.push({
+      account: resolveAccount(row.mailboxUrl, uuidMap),
+      folder: folderFromMailbox(row.mailboxUrl, row.mailboxName),
+      received: row.received,
+      from,
+      subject,
+    });
+  }
+  messages.sort((a, b) => String(b.received).localeCompare(String(a.received)));
+  const truncated = messages.length > limit;
+  const picked = messages.slice(0, limit);
+  return {
+    ok: true,
+    since: new Date(sinceIso).toISOString(),
+    count: picked.length,
+    truncated,
+    messages: picked,
+  };
+}
+
+/**
  * @param {{ mailRoot?: string, envelopeDb?: string, outDir?: string, since?: string }} [opts]
  */
 export async function dumpAppleMail(opts = {}) {
@@ -768,9 +848,26 @@ if (isMain) {
     const i = argv.indexOf(name);
     return i !== -1 ? String(argv[i + 1] || "").trim() : fallback;
   }
-  if (cmd !== "dump") {
+  if (cmd === "since") {
+    listMailSince({
+      since: flag("--since"),
+      subject: flag("--subject"),
+      from: flag("--from"),
+      limit: flag("--limit"),
+      mailRoot: flag("--mail-root"),
+      envelopeDb: flag("--db"),
+    })
+      .then((result) => {
+        console.log(JSON.stringify(result));
+      })
+      .catch((err) => {
+        console.error("[apple-mail] since failed", err);
+        process.exitCode = 1;
+      });
+  } else if (cmd !== "dump") {
     console.error(
-      "usage: node apple-mail.js dump [--out dir] [--since ISO] [--mail-root path] [--db path]"
+      "usage: node apple-mail.js dump [--out dir] [--since ISO] [--mail-root path] [--db path]\n" +
+        "       node apple-mail.js since --since ISO [--subject text] [--from text] [--limit n]"
     );
     process.exitCode = 1;
   } else {

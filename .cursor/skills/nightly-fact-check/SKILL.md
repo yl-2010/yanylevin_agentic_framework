@@ -69,7 +69,9 @@ Overnight triage only scans Inbox since `mailSince`. Standing logistics live in 
 
 Re-open Mail.app (personal-mail skill) when tonight's writes mention mail, a
 flight, a refund, a booking, an itinerary, or say something is "not in mail"
-/ "no flight number." `/tmp/yanylevin-apple-mail-export` only exists while a
+/ "no flight number." List with `node server/apple-mail.js since --since <ISO>`.
+Do not AppleScript `whose date received` on Exchange. That call stalls.
+`/tmp/yanylevin-apple-mail-export` only exists while a
 one-shot fill is running. After that job it is deleted. A missing dump is
 expected, not a failed ingest. A quiet overnight Inbox is not proof the
 confirmation does not exist.

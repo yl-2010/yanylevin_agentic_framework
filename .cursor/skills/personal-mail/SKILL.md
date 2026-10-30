@@ -1,10 +1,11 @@
 ---
 name: personal-mail
 description: >-
-  Search Yan's personal inbox in Mail.app on the Mac Studio via osascript
-  (Exchange Outlook, Gmail, iCloud) and send from those accounts. Use when
-  Yan asks about personal email, inbox, or asks to send/reply/forward. School
-  and EPS mail is the personal-school-mail skill, not this one. Yan only.
+  Search Yan's personal inbox in Mail.app on the Mac Studio (Exchange
+  Outlook, Gmail, iCloud) and send from those accounts. Lists come from
+  `node server/apple-mail.js since`. Use when Yan asks about personal email,
+  inbox, or asks to send/reply/forward. School and EPS mail is the
+  personal-school-mail skill, not this one. Yan only.
 disable-model-invocation: true
 ---
 
@@ -12,30 +13,23 @@ disable-model-invocation: true
 
 **Gate:** signed-in / default user is `you@example.com`. If the user is Alex, skip this whole skill.
 
-Yan’s personal mail is already in **Mail.app** on the Mac Studio. Accounts: **Exchange** `you@example.com` (personal Outlook), **Google** `you@example.com`, **iCloud** `you@icloud.com`. Read it with `osascript` talking to Mail. No Gmail API, no IMAP login, no browser.
+Yan’s personal mail is already in **Mail.app** on the Mac Studio. Accounts: **Exchange** `you@example.com` (personal Outlook), **Google** `you@example.com`, **iCloud** `you@icloud.com`. New mail and any date-bounded inbox list come from Mail's local Envelope Index. No Gmail API, no IMAP login, no browser.
+
+```bash
+node server/apple-mail.js since --since 2026-10-22T09:30:08.350Z
+node server/apple-mail.js since --since 2026-10-22T09:30:08.350Z --subject Robotaxi
+node server/apple-mail.js since --since 2026-10-22T09:30:08.350Z --from tesla.com
+```
+
+JSON on stdout: `account`, `folder`, `received`, `from`, `subject`. Inbox and junk, all three accounts. Do not pass a date filter to AppleScript. `whose date received` on Exchange asks the server about a 6,443-message inbox and stalls. The overnight job has been killing that call and leaving `mailSince` on October 22. A subject search with no date is the same stall if you loop several needles. One message body is still AppleScript, and only after the index already found that subject.
 
 College-admissions spam, routine sign-in alerts, Sign in with Google or Apple data-sharing notices, and verification codes (2FA, OTP, one-time passcodes) are filed by `server/apple-mail-file.js` (Jev only) into iCloud mailboxes **Colleges** and **Security**, then marked read. Inbox/junk from every Mail.app account. Do not rebuild that with Grok or Composer.
 
 EPS / school mail lives in Microsoft 365 `owner@school.example`. Read that with `.cursor/skills/personal-school-mail/SKILL.md` (`node server/school-mail.js`). Do not hunt school notices in Mail.app. Do not add the school account here.
 
-Use `whose` filters. Do **not** iterate every inbox message (slow, burns tokens). Start with Exchange inbox; scanning every mailbox is a last resort.
+Use the `since` command above for a list. Do not iterate the inbox in AppleScript.
 
-Search subjects on the Exchange (Outlook) inbox (swap the string):
-
-```bash
-osascript <<'APPLESCRIPT'
-tell application "Mail"
-  set output to ""
-  set inboxBox to mailbox "Inbox" of account "Exchange"
-  repeat with m in (messages of inboxBox whose subject contains "Robotaxi")
-    set output to output & (subject of m) & " | " & (sender of m) & " | " & (date received of m as string) & linefeed
-  end repeat
-  return output
-end tell
-APPLESCRIPT
-```
-
-Read one matching body:
+Read one body only after `since` already returned that subject:
 
 ```bash
 osascript <<'APPLESCRIPT'
@@ -59,7 +53,7 @@ Prefer Exchange first; then Google; then iCloud. iCloud `you@icloud.com` is most
 
 ## Ride receipts (location enrichment)
 
-Tesla Robotaxi and Uber Family receipts live on **Exchange**, not Gmail. Subjects: `Robotaxi Ride Receipt on <date>` (sender `tesla.com`), `Your … trip with Uber` (sender `uber.com`, often `[Family]`). Use a date cutoff (`date received > (current date) - (14 * days)`) and **one needle per script**. Do not nest many subject loops; Exchange hangs. Extract pickup, dropoff, and times only. No fares. Full trip-matching steps: `.cursor/skills/location-enrichment/SKILL.md`.
+Tesla Robotaxi and Uber Family receipts live on **Exchange**, not Gmail. Subjects: `Robotaxi Ride Receipt on <date>` (sender `tesla.com`), `Your … trip with Uber` (sender `uber.com`, often `[Family]`). Find them with `apple-mail.js since` and one `--subject` or `--from`. Do not add `date received` to an AppleScript `whose`. Extract pickup, dropoff, and times only. No fares. Full trip-matching steps: `.cursor/skills/location-enrichment/SKILL.md`.
 
 ## Send
 

@@ -96,6 +96,8 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /fromMe=true/);
     assert.match(prompt, /Other people never override Yan/);
     assert.match(prompt, /Never spawn a Cursor cloud agent/);
+    assert.match(prompt, /apple-mail\.js since/);
+    assert.match(prompt, /whose date received/);
     assert.match(prompt, /Do not copy full email bodies/);
     assert.match(prompt, /appleMailFill\.lastAt/);
     assert.match(prompt, /missing dump as failed ingest/);

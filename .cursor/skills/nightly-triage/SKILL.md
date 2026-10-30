@@ -37,10 +37,15 @@ only phase that reads every source. You write nothing to the brain.
   Read that image (jpeg/png/gif/webp only). Follow-ups via
   `curl --unix-socket /tmp/personal-agent-local.sock "http://localhost/imessage/thread?person=Name&limit=1024"`
   (or `/imessage/search?q=`). Cursor shells cannot open chat.db.
-- **Mail.app**: new personal messages since `state.json` cursors
-  (`.cursor/skills/personal-mail/SKILL.md`; whose-filters + date; Exchange
-  `Inbox` first, then Google / iCloud `INBOX` all caps). Subjects and senders
-  matter more than bodies. EPS / school mail is School Outlook, not this.
+- **Mail.app**: new personal messages since `mailSince`. Run
+  `node server/apple-mail.js since --since <mailSince ISO>`. That reads
+  Mail's local Envelope Index (inbox and junk, Exchange, Gmail, and iCloud).
+  Subjects and senders are the list. Do not use AppleScript
+  `whose date received` for this. On the Exchange inbox that filter asks
+  Exchange for every hit, and the call stalls. The 2:30 job then leaves
+  `mailSince` where it is, so the next night retries the same stall.
+  A single message body, if you need one, is still `content` of that one
+  message. EPS / school mail is School Outlook, not this.
 - **School Outlook**: `/tmp/yanylevin-context-school-mail.json`
   (`owner@school.example`, since `schoolMailSince`). Prefetch dump first.
   If it is thin or `ok=false`, follow
