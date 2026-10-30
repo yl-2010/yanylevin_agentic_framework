@@ -500,6 +500,7 @@ struct AgentChatWireMessage: Decodable {
     let queued: Bool?
     let queueId: String?
     let widgets: [ChatWidget]?
+    let files: [ChatMessageFile]?
 }
 
 struct AgentInterruptQueuedBody: Encodable {
@@ -840,6 +841,12 @@ final class EducationStore: ObservableObject {
                 {
                     row["widgets"] = obj
                 }
+                if !msg.files.isEmpty,
+                   let data = try? APIClient.encoder.encode(msg.files),
+                   let obj = try? JSONSerialization.jsonObject(with: data)
+                {
+                    row["files"] = obj
+                }
                 return row
             },
         ]
@@ -876,7 +883,8 @@ final class EducationStore: ObservableObject {
                 content: row.content ?? "",
                 queued: row.queued == true,
                 queueId: (queueId?.isEmpty == false) ? queueId : nil,
-                widgets: row.widgets ?? []
+                widgets: row.widgets ?? [],
+                files: row.files ?? []
             )
         }
         // Keep SwiftUI identities stable across poll/SSE snapshots so MapKit
@@ -1382,6 +1390,31 @@ final class EducationStore: ObservableObject {
         return dest
     }
 
+    /// Download one file attached to a sent chat message, for Quick Look.
+    func downloadChatFile(sessionId: String, name: String, token: String) async throws -> URL {
+        let (data, http) = try await APIClient.shared.requestRaw(
+            api("agent/file"),
+            bearer: token,
+            query: [
+                URLQueryItem(name: "sessionId", value: sessionId),
+                URLQueryItem(name: "name", value: name),
+            ]
+        )
+        guard (200..<300).contains(http.statusCode) else {
+            let msg = String(data: data, encoding: .utf8) ?? ""
+            throw APIError.http(http.statusCode, String(msg.prefix(240)))
+        }
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("chat-files", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let folder = dir.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let destName = URL(fileURLWithPath: name).lastPathComponent
+        let dest = folder.appendingPathComponent(destName.isEmpty ? "file" : destName)
+        try data.write(to: dest, options: .atomic)
+        return dest
+    }
+
     /// Refresh the chat already open in this process. Does not adopt the
     /// Mac's focused session, so a chat started on the website stays there.
     func resumeAgentChat(email: String?, token: String) async {
@@ -1464,14 +1497,21 @@ final class EducationStore: ObservableObject {
         if !interrupt {
             guard !isQueueFull else { return nil }
         }
-        var bubble = trimmed
-        if !attachments.isEmpty {
-            let names = attachments.map(\.displayName).joined(separator: ", ")
-            let tag = "[\(attachments.count) file\(attachments.count == 1 ? "" : "s"): \(names)]"
-            bubble = trimmed.isEmpty ? tag : "\(trimmed)\n\(tag)"
-        }
         let willQueue = agentBusy && !interrupt
-        let msg = ChatMessage(role: "user", content: bubble, queued: willQueue, pending: !willQueue)
+        let files = attachments.map { item in
+            ChatMessageFile(
+                name: item.name,
+                mimeType: item.mimeType,
+                localData: item.data.isEmpty ? nil : item.data
+            )
+        }
+        let msg = ChatMessage(
+            role: "user",
+            content: trimmed,
+            queued: willQueue,
+            files: files,
+            pending: !willQueue
+        )
         agentMessages.append(msg)
         let title = ChatDraft.firstLine(trimmed)
             ?? attachments.first?.displayName

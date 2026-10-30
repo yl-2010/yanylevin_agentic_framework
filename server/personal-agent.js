@@ -5,9 +5,9 @@
 
 import { randomUUID } from "node:crypto";
 import { constants as fsConstants } from "node:fs";
-import { copyFile, mkdir, writeFile, rm } from "node:fs/promises";
+import { copyFile, mkdir, writeFile, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join, basename, extname } from "node:path";
+import { dirname, join, basename, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isEducationUser, resolveNowScheduleContext } from "./education-data.js";
 import { notifyEducationClients } from "./education-events.js";
@@ -39,6 +39,9 @@ import {
   persistChatHistory,
   resolveChatStarter,
   sanitizeSessionId,
+  normalizeChatFiles,
+  splitChatMessageFiles,
+  safeChatFileName,
   EPHEMERAL_HIDE_MS,
 } from "./education-chat-history.js";
 import { enqueueChatTitle, isStubChatTitle } from "./chat-title.js";
@@ -104,7 +107,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PA_ERROR_REPLY =
   "The personal agent hit an error. Try again or use Cursor Desktop with the personal-agent skill.";
 
-/** @typedef {{ role: 'user'|'assistant', content: string, queued?: boolean, queueId?: string, widgets?: object[], at?: string, endOfTurn?: boolean }} ChatMessage */
+/** @typedef {{ role: 'user'|'assistant', content: string, queued?: boolean, queueId?: string, widgets?: object[], files?: { name: string, mimeType: string }[], at?: string, endOfTurn?: boolean }} ChatMessage */
 
 /**
  * Prepared agent turn (active or waiting in turnQueue).
@@ -117,6 +120,7 @@ const PA_ERROR_REPLY =
  *   attachmentCount: number,
  *   sessionAttachmentCount: number,
  *   bubble: string,
+ *   files?: { name: string, mimeType: string }[],
  *   queueId?: string,
  *   interrupted?: boolean,
  *   imessageDeliverFinal?: boolean,
@@ -404,29 +408,47 @@ setInterval(pruneSessions, 5 * 60 * 1000).unref?.();
  * @param {Session} session
  * @returns {ChatMessage[]}
  */
+/**
+ * UI shape. File tiles ride on `files`. The old `[N files: …]` tag is stripped.
+ * @param {ChatMessage|TurnOpts|{ content?: string, role?: string, files?: { name: string, mimeType: string }[], widgets?: object[], queued?: boolean, queueId?: string }} m
+ * @param {{ queued?: boolean, queueId?: string }} [extra]
+ * @returns {ChatMessage}
+ */
+function wireMessage(m, extra) {
+  const isUser = m?.role !== "assistant";
+  const shown = isUser
+    ? splitChatMessageFiles(m?.content ?? "")
+    : { content: String(m?.content || ""), files: [] };
+  const files = isUser && normalizeChatFiles(m?.files).length
+    ? normalizeChatFiles(m.files)
+    : shown.files;
+  /** @type {ChatMessage} */
+  const row = {
+    role: m?.role === "assistant" ? "assistant" : "user",
+    content: shown.content,
+  };
+  if (Array.isArray(m?.widgets) && m.widgets.length) row.widgets = m.widgets;
+  if (files.length) row.files = files;
+  if (extra?.queued || m?.queued) row.queued = true;
+  const queueId = extra?.queueId || m?.queueId;
+  if (row.queued && queueId) row.queueId = String(queueId);
+  return row;
+}
+
 export function snapshotMessages(session) {
   /** @type {ChatMessage[]} */
-  const out = (session.messages || []).map((m) => {
-    /** @type {ChatMessage} */
-    const row = {
-      role: m.role,
-      content: m.content,
-    };
-    if (Array.isArray(m.widgets) && m.widgets.length) {
-      row.widgets = m.widgets;
-    }
-    // endOfTurn is backend-only — never shown in the UI.
-    return row;
-  });
+  const out = (session.messages || []).map((m) => wireMessage(m));
   for (const turn of session.turnQueue || []) {
-    /** @type {ChatMessage} */
-    const row = {
-      role: "user",
-      content: turn.bubble || "(attachment)",
-      queued: true,
-    };
-    if (turn.queueId) row.queueId = turn.queueId;
-    out.push(row);
+    out.push(
+      wireMessage(
+        {
+          role: "user",
+          content: turn.bubble || (normalizeChatFiles(turn.files).length ? "" : "(attachment)"),
+          files: turn.files,
+        },
+        { queued: true, queueId: turn.queueId }
+      )
+    );
   }
   return out;
 }
@@ -571,25 +593,27 @@ export function formatVisibleTranscript(session, currentBubble) {
   const msgs = Array.isArray(session?.messages) ? session.messages : [];
   let end = msgs.length;
   const bubble = String(currentBubble || "");
-  if (
-    end > 0 &&
-    bubble &&
-    msgs[end - 1]?.role === "user" &&
-    msgs[end - 1]?.content === bubble
-  ) {
-    end -= 1;
+  if (end > 0 && msgs[end - 1]?.role === "user") {
+    const last = String(msgs[end - 1]?.content || "");
+    if ((bubble && last === bubble) || (!bubble && !last.trim())) end -= 1;
   }
   /** @type {string[]} */
   const lines = [];
   for (let i = 0; i < end; i++) {
     const m = msgs[i];
-    const text = String(m?.content || "").trim();
+    const shown = splitChatMessageFiles(m?.content || "");
+    const text = shown.content.trim();
+    const names = (
+      normalizeChatFiles(m?.files).length ? normalizeChatFiles(m.files) : shown.files
+    ).map((f) => f.name);
+    const fileNote = names.length ? `Attached files: ${names.join(", ")}` : "";
     const fences =
       m?.role === "assistant" ? formatWidgetsAsFences(m.widgets) : "";
-    if (!text && !fences) continue;
+    if (!text && !fences && !fileNote) continue;
     const who = m.role === "assistant" ? "Assistant" : "User";
     lines.push(`${who}:`);
     if (text) lines.push(text);
+    if (fileNote) lines.push(fileNote);
     if (fences) lines.push(fences);
     lines.push("");
   }
@@ -667,7 +691,7 @@ export function shouldAppendEndOfTurn(messages, content, widgets) {
  * @param {'user'|'assistant'} role
  * @param {string} content
  * @param {object[]} [widgets]
- * @param {{ endOfTurn?: boolean }} [extra]
+ * @param {{ endOfTurn?: boolean, files?: { name: string, mimeType: string }[] }} [extra]
  */
 export function stampMessage(role, content, widgets, extra) {
   const text =
@@ -675,6 +699,8 @@ export function stampMessage(role, content, widgets, extra) {
   /** @type {ChatMessage} */
   const row = { role, content: text, at: new Date().toISOString() };
   if (Array.isArray(widgets) && widgets.length) row.widgets = widgets;
+  const files = normalizeChatFiles(extra?.files);
+  if (files.length) row.files = files;
   if (extra?.endOfTurn) row.endOfTurn = true;
   return row;
 }
@@ -1704,7 +1730,9 @@ async function releaseFocusFrom(id) {
  */
 function appendPromotedUserMessage(session, turn) {
   if (!Array.isArray(session.messages)) session.messages = [];
-  session.messages.push(stampMessage("user", turn.bubble || "(attachment)"));
+  const files = normalizeChatFiles(turn?.files);
+  const content = String(turn?.bubble || "").trim() || (files.length ? "" : "(attachment)");
+  session.messages.push(stampMessage("user", content, null, { files }));
 }
 
 /**
@@ -1728,12 +1756,6 @@ async function disposeSession(id) {
   sessions.delete(id);
   if (s?.email && activeByEmail.get(focusKey(s.email, s.workspace)) === id) {
     activeByEmail.delete(focusKey(s.email, s.workspace));
-  }
-  if (s?.uploadDirRel) {
-    await rm(s.uploadDirRel.startsWith("/") ? s.uploadDirRel : join(REPO_ROOT, s.uploadDirRel), {
-      recursive: true,
-      force: true,
-    }).catch(() => {});
   }
   await disposeCursorAgent(s?.agent);
   await closeAgentBrowser().catch(() => {});
@@ -1818,6 +1840,131 @@ export const PERSONAL_SKILL_PATHS = {
 function chatUploadDir(email, workspace, id) {
   const base = workspace === "jype" ? JYPE_DIR : educationDataDir(email) || "";
   return join(base, ".chat-uploads", id);
+}
+
+/**
+ * @param {{ role?: string, content?: string, at?: string, widgets?: object[], files?: { name: string, mimeType: string }[] }} m
+ * @returns {ChatMessage}
+ */
+function messageFromHistory(m) {
+  /** @type {ChatMessage} */
+  const row = {
+    role: m.role === "assistant" ? "assistant" : "user",
+    content: m.content || "",
+    at: m.at,
+  };
+  if (Array.isArray(m.widgets) && m.widgets.length) row.widgets = m.widgets;
+  const files = normalizeChatFiles(m.files);
+  if (files.length) row.files = files;
+  return row;
+}
+
+/**
+ * Files stay on disk after the session ends so a sent tile can open them.
+ * @param {Session} session
+ */
+async function hydrateUploads(session) {
+  if (!session || session.uploadsHydrated) return;
+  session.uploadsHydrated = true;
+  if (!Array.isArray(session.uploads)) session.uploads = [];
+  if (!session.uploadDirRel) return;
+  const dirAbs = session.uploadDirRel.startsWith("/")
+    ? session.uploadDirRel
+    : join(REPO_ROOT, session.uploadDirRel);
+  let names;
+  try {
+    names = await readdir(dirAbs);
+  } catch {
+    return;
+  }
+  const known = new Set(session.uploads.map((f) => f.name.toLowerCase()));
+  for (const name of names) {
+    if (!name || name.startsWith(".") || known.has(name.toLowerCase())) continue;
+    const absPath = join(dirAbs, name);
+    let st;
+    try {
+      st = await stat(absPath);
+    } catch {
+      continue;
+    }
+    if (!st.isFile()) continue;
+    const mimeType = guessMime("", name);
+    session.uploads.push({
+      name,
+      mimeType,
+      relPath: `${session.uploadDirRel}/${name}`,
+      absPath,
+      bytes: st.size,
+      isImage: IMAGE_MIME.has(mimeType),
+    });
+    known.add(name.toLowerCase());
+  }
+}
+
+/**
+ * Authenticated download of one file attached in a chat.
+ * @param {string} email
+ * @param {unknown} workspace
+ * @param {unknown} sessionId
+ * @param {unknown} nameRaw
+ * @returns {Promise<{ path: string, name: string, size: number }>}
+ */
+export async function resolveChatUploadFile(email, workspace, sessionId, nameRaw) {
+  const sid = sanitizeSessionId(sessionId);
+  const name = safeChatFileName(nameRaw);
+  if (!sid || !name) {
+    const err = new Error("sessionId and file name required");
+    err.status = 400;
+    throw err;
+  }
+  const normalized = canonicalizeEmail(email);
+  const ws = normalizeJypeWorkspace(workspace);
+  if (!canUseAgent(normalized, ws)) {
+    const err = new Error("forbidden");
+    err.status = 403;
+    throw err;
+  }
+  const live = sessions.get(sid);
+  if (live) {
+    if (!canAccessSession(live, normalized)) {
+      const err = new Error("forbidden");
+      err.status = 403;
+      throw err;
+    }
+  } else {
+    const loaded = await loadChatHistory({
+      email: normalized,
+      sessionId: sid,
+      workspace: ws,
+    });
+    if (!loaded) {
+      const err = new Error("file not found");
+      err.status = 404;
+      throw err;
+    }
+  }
+  const dirRel = chatUploadDir(normalized, ws, sid);
+  const dirAbs = resolve(dirRel.startsWith("/") ? dirRel : join(REPO_ROOT, dirRel));
+  const abs = resolve(dirAbs, name);
+  if (abs !== dirAbs && !abs.startsWith(dirAbs + sep)) {
+    const err = new Error("file not found");
+    err.status = 404;
+    throw err;
+  }
+  let st;
+  try {
+    st = await stat(abs);
+  } catch {
+    const err = new Error("file not found");
+    err.status = 404;
+    throw err;
+  }
+  if (!st.isFile()) {
+    const err = new Error("file not found");
+    err.status = 404;
+    throw err;
+  }
+  return { path: abs, name, size: st.size };
 }
 
 const FUTURE_AGENT_HINT =
@@ -2862,12 +3009,7 @@ export async function resumeAgent(sessionId, email, opts = {}) {
     workspace === "jype" ? { model: copyModelSpec(DEFAULT_MODEL_SPEC) } : {}
   );
   /** @type {ChatMessage[]} */
-  const messages = (loaded.messages || []).map((m) => {
-    /** @type {ChatMessage} */
-    const row = { role: m.role, content: m.content, at: m.at };
-    if (Array.isArray(m.widgets) && m.widgets.length) row.widgets = m.widgets;
-    return row;
-  });
+  const messages = (loaded.messages || []).map((m) => messageFromHistory(m));
 
   const uploadRoot = chatUploadDir(normalized, workspace, sid);
 
@@ -2937,17 +3079,14 @@ export async function resumeAgent(sessionId, email, opts = {}) {
 }
 
 /**
- * Format the user bubble text (matches web/iOS clients).
- * @param {string} text
- * @param {StagedFile[]} newFiles
+ * Names shown on the sent-message tiles. Bytes stay on disk.
+ * @param {StagedFile[]} staged
+ * @returns {{ name: string, mimeType: string }[]}
  */
-function userBubbleLabel(text, newFiles) {
-  const files = newFiles || [];
-  if (!files.length) return text;
-  const tag = `[${files.length} file${files.length === 1 ? "" : "s"}: ${files
-    .map((f) => f.name)
-    .join(", ")}]`;
-  return text ? `${text}\n${tag}` : tag;
+function chatFilesForBubble(staged) {
+  return normalizeChatFiles(
+    (staged || []).map((f) => ({ name: f.name, mimeType: f.mimeType || "" }))
+  );
 }
 
 /**
@@ -3351,6 +3490,7 @@ export async function messageAgent(
 
   let newFiles;
   try {
+    await hydrateUploads(session);
     newFiles = await stageAttachments(session, sid, attachments);
   } catch (err) {
     if (claimedIdleSlot || interrupting) session.status = "idle";
@@ -3473,7 +3613,8 @@ export async function messageAgent(
     }
   }
 
-  const bubble = userBubbleLabel(text, newFiles) || "(attachment)";
+  const files = chatFilesForBubble(newFiles);
+  const bubble = String(text || "").trim();
   /** @type {TurnOpts} */
   const turnOpts = {
     prompt,
@@ -3484,6 +3625,7 @@ export async function messageAgent(
     attachmentCount: newFiles.length,
     sessionAttachmentCount: sessionFiles.length,
     bubble,
+    files,
     interrupted: interrupting,
   };
   claimChannelDelivery(session, turnOpts);
@@ -3506,7 +3648,9 @@ export async function messageAgent(
       queueLength: queuedTurnCount(session),
     });
   } else {
-    session.messages.push(stampMessage("user", bubble));
+    session.messages.push(
+      stampMessage("user", bubble || (files.length ? "" : "(attachment)"), null, { files })
+    );
     // Awaited so a brand-new chat's .md exists before the 202 and the SSE
     // change; a /chats refresh right after send must already list it.
     await persistSessionHistory(sid, session);
@@ -3945,12 +4089,7 @@ export async function runScheduledAgent(record) {
         scheduledInflight.delete(sid);
         return;
       }
-      const messages = (loaded.messages || []).map((m) => {
-        /** @type {ChatMessage} */
-        const row = { role: m.role, content: m.content, at: m.at };
-        if (Array.isArray(m.widgets) && m.widgets.length) row.widgets = m.widgets;
-        return row;
-      });
+      const messages = (loaded.messages || []).map((m) => messageFromHistory(m));
       const uploadRoot = chatUploadDir(email, workspace, sid);
       session = {
         agent: null,

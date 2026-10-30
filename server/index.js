@@ -72,6 +72,7 @@ import {
   listAgentChats,
   resumeAgent,
   markAgentChatRead,
+  resolveChatUploadFile,
   startFutureAgentScheduler,
 } from "./personal-agent.js";
 import {
@@ -1133,6 +1134,26 @@ attachChatDraftRoutes(app, {
   guard: requireEducationUser,
 });
 
+app.get("/api/education/agent/file", requireEducationUser, async (req, res) => {
+  try {
+    const file = await resolveChatUploadFile(
+      req.user.email,
+      "",
+      req.query?.sessionId,
+      req.query?.name
+    );
+    sendContextFile(res, file);
+  } catch (err) {
+    console.error("[/api/education/agent/file]", err);
+    if (!res.headersSent) {
+      res.status(err.status || 500).json({
+        ok: false,
+        error: err.message || "file failed",
+      });
+    }
+  }
+});
+
 app.get("/api/jype/data", requireJypeUser, async (req, res) => {
   try {
     const tree = await readEducationTree(req.user.email, JYPE_WS);
@@ -1435,6 +1456,26 @@ attachChatDraftRoutes(app, {
   prefix: "/api/jype/agent",
   guard: requireJypeUser,
   workspace: "jype",
+});
+
+app.get("/api/jype/agent/file", requireJypeUser, async (req, res) => {
+  try {
+    const file = await resolveChatUploadFile(
+      req.user.email,
+      "jype",
+      req.query?.sessionId,
+      req.query?.name
+    );
+    sendContextFile(res, file);
+  } catch (err) {
+    console.error("[/api/jype/agent/file]", err);
+    if (!res.headersSent) {
+      res.status(err.status || 500).json({
+        ok: false,
+        error: err.message || "file failed",
+      });
+    }
+  }
 });
 
 /**

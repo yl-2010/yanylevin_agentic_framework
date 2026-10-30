@@ -1,4 +1,5 @@
 import PhotosUI
+import QuickLook
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
@@ -71,6 +72,8 @@ struct ChatView: View {
     @State private var pendingAttachments: [PendingChatAttachment] = []
     @State private var showFileImporter = false
     @State private var showPhotoPicker = false
+    @State private var chatFilePreview: ChatOpenedFile?
+    @State private var chatFileError: String?
     @State private var composerFocused = false
     /// Live height of the glass field — the vertical-axis TextField's real
     /// single-line height can drift a point above the nominal 36, which made
@@ -404,6 +407,18 @@ struct ChatView: View {
             .onChange(of: chatBeamActive, initial: true) { _, active in
                 if nav.chatWorking != active { nav.chatWorking = active }
             }
+            .sheet(item: $chatFilePreview) { item in
+                EducationQuickLookPreview(url: item.url)
+                    .ignoresSafeArea()
+            }
+            .alert("Couldn't open file", isPresented: Binding(
+                get: { chatFileError != nil },
+                set: { if !$0 { chatFileError = nil } }
+            )) {
+                Button("OK", role: .cancel) { chatFileError = nil }
+            } message: {
+                Text(chatFileError ?? "")
+            }
             .fileImporter(
                 isPresented: $showFileImporter,
                 allowedContentTypes: [.item, .image, .pdf, .data],
@@ -537,6 +552,10 @@ struct ChatView: View {
                 guard let token = auth.session?.token else { return }
                 Task { await educationStore.interruptQueued(messageID: id, token: token) }
             },
+            onOpenFile: { file in
+                let pending = msg.pending
+                Task { await openSentFile(file, pending: pending) }
+            },
             onBubbleFrame: { frame in
                 updateSendFlightDest(frame)
             }
@@ -544,6 +563,34 @@ struct ChatView: View {
         .equatable()
         .opacity(flying ? 0 : 1)
         .animation(nil, value: flying)
+    }
+
+    private func openSentFile(_ file: ChatMessageFile, pending: Bool) async {
+        if let data = file.localData, !data.isEmpty {
+            let dir = FileManager.default.temporaryDirectory
+                .appendingPathComponent("chat-files", isDirectory: true)
+            let folder = dir.appendingPathComponent(UUID().uuidString, isDirectory: true)
+            do {
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                let destName = URL(fileURLWithPath: file.name).lastPathComponent
+                let dest = folder.appendingPathComponent(destName.isEmpty ? "file" : destName)
+                try data.write(to: dest, options: .atomic)
+                chatFilePreview = ChatOpenedFile(url: dest)
+            } catch {
+                if !pending { chatFileError = "Couldn't open \(file.name)" }
+            }
+            return
+        }
+        guard let token = auth.session?.token, let sid = educationStore.agentSessionId, !sid.isEmpty else {
+            if !pending { chatFileError = "Couldn't open \(file.name)" }
+            return
+        }
+        do {
+            let url = try await educationStore.downloadChatFile(sessionId: sid, name: file.name, token: token)
+            chatFilePreview = ChatOpenedFile(url: url)
+        } catch {
+            if !pending { chatFileError = "Couldn't open \(file.name)" }
+        }
     }
 
     private func scrollChatToEnd(proxy: ScrollViewProxy) {
@@ -1956,6 +2003,67 @@ private struct QueueInterruptAccessibility: ViewModifier {
     }
 }
 
+private struct ChatOpenedFile: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+/// File tiles above a sent message. Rows wrap and sit on the trailing edge.
+private struct TrailingFileWrap: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let laid = rows(proposal: proposal, subviews: subviews)
+        let width = proposal.width ?? laid.map(\.width).max() ?? 0
+        let height = laid.reduce(CGFloat(0)) { $0 + $1.height }
+            + spacing * CGFloat(max(0, laid.count - 1))
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let laid = rows(proposal: proposal, subviews: subviews)
+        var y = bounds.minY
+        var index = 0
+        for row in laid {
+            var x = bounds.maxX - row.width
+            for size in row.sizes {
+                subviews[index].place(
+                    at: CGPoint(x: x, y: y),
+                    proposal: ProposedViewSize(width: size.width, height: size.height)
+                )
+                x += size.width + spacing
+                index += 1
+            }
+            y += row.height + spacing
+        }
+    }
+
+    private struct Row {
+        var sizes: [CGSize] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+    }
+
+    private func rows(proposal: ProposedViewSize, subviews: Subviews) -> [Row] {
+        let maxWidth = proposal.width ?? .greatestFiniteMagnitude
+        var laid: [Row] = []
+        var row = Row()
+        for sub in subviews {
+            let size = sub.sizeThatFits(.unspecified)
+            let next = row.sizes.isEmpty ? size.width : row.width + spacing + size.width
+            if !row.sizes.isEmpty, next > maxWidth {
+                laid.append(row)
+                row = Row()
+            }
+            row.sizes.append(size)
+            row.width = row.sizes.count == 1 ? size.width : row.width + spacing + size.width
+            row.height = max(row.height, size.height)
+        }
+        if !row.sizes.isEmpty { laid.append(row) }
+        return laid
+    }
+}
+
 private struct ChatBubbleView: View, Equatable {
     let msg: ChatMessage
     let usesEducation: Bool
@@ -1969,6 +2077,7 @@ private struct ChatBubbleView: View, Equatable {
     var onShowCopyMenu: () -> Void
     var onDismissCopyMenu: () -> Void
     var onInterruptQueued: () -> Void = {}
+    var onOpenFile: (ChatMessageFile) -> Void = { _ in }
     var onBubbleFrame: ((CGRect) -> Void)?
     @State private var interruptArmed = false
 
@@ -2019,18 +2128,31 @@ private struct ChatBubbleView: View, Equatable {
         let isUser = msg.role == "user"
         let sendTint = YLTheme.chatSend(colorScheme, palette: palette)
             .opacity(colorScheme == .dark ? 0.26 : 0.16)
-        let copyable = !msg.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let bubbleText = msg.bubbleText
+        let copyable = !bubbleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let sentFiles = isUser ? msg.displayFiles : []
         let showWidgets = usesEducation && !isUser && !msg.widgets.isEmpty
-        return VStack(alignment: .leading, spacing: 0) {
+        return VStack(alignment: isUser ? .trailing : .leading, spacing: sentFiles.isEmpty ? 0 : 8) {
+            if !sentFiles.isEmpty {
+                TrailingFileWrap(spacing: 8) {
+                    ForEach(Array(sentFiles.enumerated()), id: \.offset) { _, file in
+                        ChatAttachmentTile(name: file.name, opensOnTap: true) {
+                            onOpenFile(file)
+                        }
+                    }
+                }
+                .chatHistorySwipeBlock()
+            }
+            if copyable {
             HStack {
                 if isUser { Spacer(minLength: isWide ? 120 : 40) }
                 if copyable {
                     Group {
                         if usesEducation && !isUser {
-                            YLMarkdownText(source: msg.content, scheme: colorScheme, palette: palette)
+                            YLMarkdownText(source: bubbleText, scheme: colorScheme, palette: palette)
                                 .equatable()
                         } else {
-                            Text(msg.content)
+                            Text(bubbleText)
                                 .foregroundStyle(YLTheme.fg(colorScheme))
                         }
                     }
@@ -2065,7 +2187,7 @@ private struct ChatBubbleView: View, Equatable {
                     .overlay(alignment: copyMenuBelow ? .bottom : .top) {
                         if showCopyMenu {
                             copyMessagePill {
-                                UIPasteboard.general.string = msg.content
+                                UIPasteboard.general.string = bubbleText
                                 YLHaptics.tap()
                                 onDismissCopyMenu()
                             }
@@ -2107,13 +2229,14 @@ private struct ChatBubbleView: View, Equatable {
                     )
                     .accessibilityAction(named: "Copy") {
                         guard copyable else { return }
-                        UIPasteboard.general.string = msg.content
+                        UIPasteboard.general.string = bubbleText
                         YLHaptics.tap()
                     }
                 }
                 if !isUser { Spacer(minLength: isWide ? 120 : 40) }
             }
             .zIndex(showCopyMenu ? 2 : 0)
+            }
 
             if showWidgets {
                 ChatWidgetCarousel(
@@ -2130,7 +2253,7 @@ private struct ChatBubbleView: View, Equatable {
                 .zIndex(1)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
     }
 
     private func copyMessagePill(action: @escaping () -> Void) -> some View {

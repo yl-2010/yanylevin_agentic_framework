@@ -1,9 +1,12 @@
 import SwiftUI
 
-/// Square composer tile for one pending attachment. Tapping it removes it.
+/// Square glass tile for one chat file. Draft tap removes it. Sent tap opens it.
 struct ChatAttachmentTile: View {
-    let attachment: PendingChatAttachment
-    var onRemove: () -> Void
+    let name: String
+    var displayName: String
+    var uploading: Bool = false
+    var opensOnTap: Bool = false
+    var action: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.ylPalette) private var palette
@@ -11,8 +14,31 @@ struct ChatAttachmentTile: View {
     static let side: CGFloat = 64
     private static let cornerRadius: CGFloat = 16
 
+    init(attachment: PendingChatAttachment, action: @escaping () -> Void) {
+        self.name = attachment.name
+        self.displayName = attachment.displayName
+        self.uploading = attachment.uploading
+        self.opensOnTap = false
+        self.action = action
+    }
+
+    init(
+        name: String,
+        displayName: String? = nil,
+        uploading: Bool = false,
+        opensOnTap: Bool = false,
+        action: @escaping () -> Void
+    ) {
+        self.name = name
+        let shown = (displayName ?? name).trimmingCharacters(in: .whitespacesAndNewlines)
+        self.displayName = shown.isEmpty ? name : shown
+        self.uploading = uploading
+        self.opensOnTap = opensOnTap
+        self.action = action
+    }
+
     private var extensionLabel: String {
-        let ext = (attachment.name as NSString).pathExtension.lowercased()
+        let ext = (name as NSString).pathExtension.lowercased()
         return ext.isEmpty ? "file" : ".\(ext)"
     }
 
@@ -20,7 +46,7 @@ struct ChatAttachmentTile: View {
         let shape = RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
         Button {
             YLHaptics.tap()
-            onRemove()
+            action()
         } label: {
             VStack(spacing: 2) {
                 Spacer(minLength: 0)
@@ -29,7 +55,7 @@ struct ChatAttachmentTile: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 Spacer(minLength: 0)
-                Text(attachment.displayName)
+                Text(displayName)
                     .font(.caption2)
                     .foregroundStyle(YLTheme.muted(colorScheme))
                     .lineLimit(1)
@@ -49,8 +75,8 @@ struct ChatAttachmentTile: View {
             )
         }
         .buttonStyle(.plain)
-        .opacity(attachment.uploading ? 0.55 : 1)
-        .animation(.easeInOut(duration: 0.2), value: attachment.uploading)
-        .accessibilityLabel("Remove \(attachment.displayName)")
+        .opacity(uploading ? 0.55 : 1)
+        .animation(.easeInOut(duration: 0.2), value: uploading)
+        .accessibilityLabel("\(opensOnTap ? "Open" : "Remove") \(displayName)")
     }
 }

@@ -94,6 +94,91 @@ function messageBody(content) {
   return text || "(empty)";
 }
 
+const CHAT_FILES_FENCE_RE = /```chat-files\s*\n([\s\S]*?)\n```/g;
+const LEGACY_FILE_TAG_RE = /(?:^|\n)\[\d+ files?: ([^\]]+)\]\s*$/;
+
+/**
+ * Basename only. Rejects path pieces.
+ * @param {unknown} raw
+ * @returns {string}
+ */
+export function safeChatFileName(raw) {
+  const name = String(raw || "")
+    .replace(/\\/g, "/")
+    .split("/")
+    .pop()
+    .trim();
+  if (!name || name === "." || name === ".." || name.length > 180) return "";
+  if (/[\r\n\0]/.test(name)) return "";
+  return name;
+}
+
+/**
+ * @param {unknown} raw
+ * @returns {{ name: string, mimeType: string }[]}
+ */
+export function normalizeChatFiles(raw) {
+  if (!Array.isArray(raw)) return [];
+  /** @type {{ name: string, mimeType: string }[]} */
+  const out = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const name = safeChatFileName(/** @type {{ name?: unknown }} */ (row).name);
+    if (!name) continue;
+    const mimeType = String(/** @type {{ mimeType?: unknown }} */ (row).mimeType || "")
+      .trim()
+      .slice(0, 120);
+    out.push({ name, mimeType });
+    if (out.length >= 16) break;
+  }
+  return out;
+}
+
+/**
+ * Pull structured files and the old `[N files: a, b]` tag out of a bubble.
+ * @param {unknown} raw
+ * @returns {{ content: string, files: { name: string, mimeType: string }[] }}
+ */
+export function splitChatMessageFiles(raw) {
+  let text = String(raw || "");
+  /** @type {{ name: string, mimeType: string }[]} */
+  const fromFence = [];
+  text = text.replace(CHAT_FILES_FENCE_RE, (_, body) => {
+    try {
+      fromFence.push(...normalizeChatFiles(JSON.parse(String(body || ""))));
+    } catch {
+      /* leave the fence out either way */
+    }
+    return "\n";
+  });
+  const tag = text.match(LEGACY_FILE_TAG_RE);
+  /** @type {{ name: string, mimeType: string }[]} */
+  let fromTag = [];
+  if (tag) {
+    fromTag = normalizeChatFiles(
+      tag[1]
+        .split(", ")
+        .map((name) => ({ name }))
+    );
+    text = text.slice(0, tag.index).trim();
+  } else {
+    text = text.trim();
+  }
+  const files = fromFence.length ? fromFence : fromTag;
+  if (files.length && (text === "(empty)" || text === "(attachment)")) text = "";
+  return { content: text, files };
+}
+
+/**
+ * @param {unknown} files
+ * @returns {string}
+ */
+function formatChatFilesFence(files) {
+  const list = normalizeChatFiles(files);
+  if (!list.length) return "";
+  return "```chat-files\n" + JSON.stringify(list) + "\n```";
+}
+
 /**
  * One-line thread title for the history list.
  * @param {unknown} raw
@@ -359,6 +444,11 @@ export function formatChatHistoryMarkdown(opts) {
     const at = m.at ? isoOrNow(m.at) : updatedAt;
     lines.push(`## ${who} — ${at}`);
     lines.push(messageBody(m.content));
+    const fileFence = m.role === "user" ? formatChatFilesFence(m.files) : "";
+    if (fileFence) {
+      lines.push("");
+      lines.push(fileFence);
+    }
     const fences = formatWidgetsAsFences(m.widgets);
     if (fences) {
       lines.push("");
@@ -401,7 +491,10 @@ export function parseChatHistoryMeta(markdown) {
     const body = after.split("\n").slice(1).join("\n");
     const nextHeading = body.search(/^## /m);
     const chunk = (nextHeading >= 0 ? body.slice(0, nextHeading) : body).trim();
-    preview = chunk.replace(/\s+/g, " ").slice(0, PREVIEW_MAX);
+    const shown = splitChatMessageFiles(chunk);
+    preview = (shown.content || shown.files[0]?.name || "")
+      .replace(/\s+/g, " ")
+      .slice(0, PREVIEW_MAX);
   }
   return {
     session: field("session"),
@@ -452,7 +545,15 @@ export function parseChatHistoryMessages(markdown) {
       if (parsed.widgets.length) row.widgets = parsed.widgets;
       messages.push(row);
     } else {
-      messages.push({ role, content: body || "(empty)", at });
+      const shown = splitChatMessageFiles(body);
+      /** @type {{ role: 'user'|'assistant', content: string, at: string, files?: { name: string, mimeType: string }[] }} */
+      const row = {
+        role,
+        content: shown.content || (shown.files.length ? "" : "(empty)"),
+        at,
+      };
+      if (shown.files.length) row.files = shown.files;
+      messages.push(row);
     }
   }
   return messages;
@@ -473,7 +574,7 @@ export function formatChatHistoryHint(opts) {
   /** @type {string[]} */
   const lines = [
     "Past Personal Agent chats (text kept forever; the UI lists showing threads and can reopen them):",
-    `Folder: ${dir}/  — Grep/Read when earlier chats could matter (callbacks, last time, decisions, unfinished work). Do not recap unprompted. Do not read another user's .chat-history/. Unsaved chat uploads still expire with the session.`,
+    `Folder: ${dir}/  — Grep/Read when earlier chats could matter (callbacks, last time, decisions, unfinished work). Do not recap unprompted. Do not read another user's .chat-history/. Chat uploads stay in .chat-uploads for that thread.`,
     "To hide a thread from the iOS/web chat history list, set visibility: hidden in that file header (add the line after title: or updated: if missing). Do not delete the file. Default is showing.",
   ];
   if (current) {

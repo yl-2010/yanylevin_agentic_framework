@@ -248,7 +248,7 @@ private struct EducationFilePreviewDismiss: ViewModifier {
     }
 }
 
-private struct EducationQuickLookPreview: UIViewControllerRepresentable {
+struct EducationQuickLookPreview: UIViewControllerRepresentable {
     let url: URL
 
     func makeUIViewController(context: Context) -> UINavigationController {

@@ -1095,6 +1095,44 @@ describe("queued turn promote", () => {
     assert.equal(snap[1].queueId, "q-1");
     assert.equal(snap[1].content, "later");
   });
+
+  it("puts attached files on the message and drops the inline tag", () => {
+    const snap = snapshotMessages({
+      messages: [
+        stampMessage("user", "look at this\n[1 file: notes.pdf]", null, {
+          files: [{ name: "notes.pdf", mimeType: "application/pdf" }],
+        }),
+        stampMessage("user", "[1 file: old.png]"),
+      ],
+      turnQueue: [
+        {
+          bubble: "",
+          files: [{ name: "queued.txt", mimeType: "text/plain" }],
+          queueId: "q-files",
+        },
+      ],
+    });
+    assert.equal(snap[0].content, "look at this");
+    assert.deepEqual(snap[0].files, [{ name: "notes.pdf", mimeType: "application/pdf" }]);
+    assert.equal(snap[1].content, "");
+    assert.deepEqual(snap[1].files, [{ name: "old.png", mimeType: "" }]);
+    assert.equal(snap[2].queued, true);
+    assert.equal(snap[2].content, "");
+    assert.equal(snap[2].files[0].name, "queued.txt");
+    const transcript = formatVisibleTranscript(
+      {
+        messages: [
+          stampMessage("user", "", null, {
+            files: [{ name: "notes.pdf", mimeType: "application/pdf" }],
+          }),
+          stampMessage("user", ""),
+        ],
+      },
+      ""
+    );
+    assert.match(transcript, /Attached files: notes.pdf/);
+    assert.doesNotMatch(transcript, /\[1 file:/);
+  });
 });
 
 describe("Personal Agent end of turn", () => {

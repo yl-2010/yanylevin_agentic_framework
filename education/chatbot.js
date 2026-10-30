@@ -211,6 +211,134 @@
     return m ? m[1] : raw;
   }
 
+  const FILE_TAG_RE = /(?:^|\n)\[\d+ files?: ([^\]]+)\]\s*$/;
+  const FILE_FENCE_RE = /```chat-files\s*\n([\s\S]*?)\n```/g;
+  /** Local File bytes for a bubble the server has not accepted yet. */
+  const pendingLocalFiles = new WeakMap();
+
+  function normalizeMessageFiles(raw) {
+    if (!Array.isArray(raw)) return [];
+    const out = [];
+    for (const row of raw) {
+      const name = String(row?.name || "")
+        .replace(/\\/g, "/")
+        .split("/")
+        .pop()
+        .trim();
+      if (!name || name === "." || name === "..") continue;
+      out.push({ name, mimeType: String(row?.mimeType || "") });
+      if (out.length >= 16) break;
+    }
+    return out;
+  }
+
+  /**
+   * Text under the tiles, plus the files. Strips the old inline tag.
+   * @param {{ content?: string, files?: { name: string, mimeType?: string }[] }} msg
+   */
+  function presentMessage(msg) {
+    let text = String(msg?.content || "");
+    const fromFence = [];
+    text = text.replace(FILE_FENCE_RE, (_, body) => {
+      try {
+        fromFence.push(...normalizeMessageFiles(JSON.parse(String(body || ""))));
+      } catch {
+        /* drop the fence */
+      }
+      return "\n";
+    });
+    const tag = text.match(FILE_TAG_RE);
+    let fromTag = [];
+    if (tag) {
+      fromTag = normalizeMessageFiles(tag[1].split(", ").map((name) => ({ name })));
+      text = text.slice(0, tag.index).trim();
+    } else {
+      text = text.trim();
+    }
+    const structured = normalizeMessageFiles(msg?.files);
+    const files = structured.length ? structured : fromFence.length ? fromFence : fromTag;
+    if (files.length && (text === "(attachment)" || text === "(empty)")) text = "";
+    return { text, files };
+  }
+
+  async function openSentFile(file, localFile) {
+    const name = String(file?.name || "");
+    if (!name) return;
+    if (localFile instanceof File) {
+      const url = URL.createObjectURL(localFile);
+      const opened = window.open(url, "_blank", "noopener,noreferrer");
+      if (!opened) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return;
+    }
+    if (!sessionId || !window.YanMacApi) return;
+    const qs = new URLSearchParams({ sessionId, name });
+    try {
+      const res = await window.YanMacApi.macFetch(`${API}/agent/file?${qs}`, {
+        timeoutMs: 120_000,
+        headers: { Accept: "*/*" },
+      });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const opened = window.open(url, "_blank", "noopener,noreferrer");
+      if (!opened) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      /* leave the tile */
+    }
+  }
+
+  function appendSentFileTiles(turn, msg) {
+    const { files } = presentMessage(msg);
+    if (!files.length || msg.role !== "user") return;
+    const row = document.createElement("div");
+    row.className = "yan-chat-msg-files";
+    const locals = pendingLocalFiles.get(msg) || [];
+    for (const file of files) {
+      const tile = document.createElement("button");
+      tile.type = "button";
+      tile.className = "yan-chat-attach-tile";
+      tile.title = file.name;
+      tile.setAttribute("aria-label", `Open ${file.name}`);
+      const ext = document.createElement("span");
+      ext.className = "yan-chat-attach-tile-ext";
+      ext.setAttribute("aria-hidden", "true");
+      const extText = fileExtLabel(file.name);
+      ext.textContent = extText;
+      ext.classList.toggle("is-long", extText.length > 5);
+      const name = document.createElement("span");
+      name.className = "yan-chat-attach-tile-name";
+      name.setAttribute("aria-hidden", "true");
+      name.textContent = fileStem(file.name);
+      tile.appendChild(ext);
+      tile.appendChild(name);
+      const local = locals.find((f) => f && f.name === file.name) || null;
+      tile.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openSentFile(file, local);
+      });
+      row.appendChild(tile);
+      window.lgBindMagnetic?.(tile, 0.2);
+    }
+    turn.appendChild(row);
+  }
+
   function renderChips(composer) {
     const el = ensureChipsEl(composer);
     el.innerHTML = "";
@@ -1890,23 +2018,29 @@
   }
 
   function messageReuseKey(msg) {
+    const shown = presentMessage(msg);
     return JSON.stringify({
       role: msg.role,
-      content: String(msg.content || ""),
+      content: shown.text,
+      files: shown.files.map((f) => f.name),
       widgets: msg.widgets || null,
     });
   }
 
   function messagesFingerprint(list) {
     return JSON.stringify(
-      (list || []).map((m) => ({
-        role: m.role,
-        content: String(m.content || ""),
-        queued: Boolean(m.queued),
-        pending: Boolean(m.pending),
-        queueId: m.queued && m.queueId ? String(m.queueId) : "",
-        widgets: m.widgets || null,
-      }))
+      (list || []).map((m) => {
+        const shown = presentMessage(m);
+        return {
+          role: m.role,
+          content: shown.text,
+          files: shown.files.map((f) => f.name),
+          queued: Boolean(m.queued),
+          pending: Boolean(m.pending),
+          queueId: m.queued && m.queueId ? String(m.queueId) : "",
+          widgets: m.widgets || null,
+        };
+      })
     );
   }
 
@@ -2004,7 +2138,8 @@
     turn.className = `yan-chat-turn yan-chat-turn--${msg.role}`;
     turn.dataset.reuseKey = messageReuseKey(msg);
     syncQueuedTurn(turn, msg);
-    const text = String(msg.content || "");
+    if (msg.role === "user") appendSentFileTiles(turn, msg);
+    const text = presentMessage(msg).text;
     if (text.trim()) {
       const el = document.createElement("div");
       el.className = `yan-chat-bubble yan-chat-bubble--${msg.role}`;
@@ -2116,10 +2251,14 @@
    * @param {{ queued?: boolean, pending?: boolean }} [opts]
    */
   function appendBubble(role, text, opts = {}) {
-    /** @type {{ role: string, content: string, queued?: boolean, pending?: boolean }} */
+    /** @type {{ role: string, content: string, queued?: boolean, pending?: boolean, files?: { name: string, mimeType: string }[] }} */
     const msg = { role, content: text };
+    const files = normalizeMessageFiles(opts.files);
+    if (files.length) msg.files = files;
     if (opts.queued) msg.queued = true;
     else if (opts.pending) msg.pending = true;
+    const locals = (opts.localFiles || []).filter((f) => f instanceof File);
+    if (locals.length) pendingLocalFiles.set(msg, locals);
     messages.push(msg);
     renderMessagesDom({ forceScroll: true });
     persistLocal();
@@ -2198,7 +2337,7 @@
     const next = list
       .filter((m) => m && (m.role === "user" || m.role === "assistant"))
       .map((m) => {
-        /** @type {{ role: string, content: string, queued?: boolean, queueId?: string, widgets?: object[] }} */
+        /** @type {{ role: string, content: string, queued?: boolean, queueId?: string, widgets?: object[], files?: { name: string, mimeType: string }[] }} */
         const out = {
           role: String(m.role),
           content: String(m.content || ""),
@@ -2206,6 +2345,8 @@
         if (m.queued) out.queued = true;
         if (m.queued && m.queueId) out.queueId = String(m.queueId);
         if (Array.isArray(m.widgets) && m.widgets.length) out.widgets = m.widgets;
+        const files = normalizeMessageFiles(m.files);
+        if (files.length) out.files = files;
         return out;
       });
     // Sends the server has not accepted yet stay at the end.
@@ -2332,20 +2473,15 @@
     const originRect = composer.pill ? composer.pill.getBoundingClientRect() : null;
     if (state() !== "panel") root.classList.add("is-send-flight");
 
-    const label =
-      text +
-      (items.length
-        ? `${text ? "\n" : ""}[${items.length} file${items.length === 1 ? "" : "s"}: ${items
-            .map((f) => f.name)
-            .join(", ")}]`
-        : "");
     const willQueue = !fresh && sending && !interrupt;
     // Idle chat: show the turn faded until the server accepts it. No orb or
     // beam yet. A busy chat keeps the queued / interrupt path.
     const usePending = !sending;
-    const localMsg = appendBubble("user", label || "(attachment)", {
+    const localMsg = appendBubble("user", text, {
       queued: willQueue,
       pending: usePending,
+      files: items.map((f) => ({ name: f.name, mimeType: f.mimeType || "" })),
+      localFiles: items.map((f) => f.file).filter((f) => f instanceof File),
     });
     resetComposer(composer, { flush: false });
     setState("panel", { skipFocus: true });
@@ -3129,13 +3265,15 @@
       messages = local.messages
         .filter((m) => m && (m.role === "user" || m.role === "assistant"))
         .map((m) => {
-          /** @type {{ role: string, content: string, queued?: boolean, queueId?: string }} */
+          /** @type {{ role: string, content: string, queued?: boolean, queueId?: string, files?: { name: string, mimeType: string }[] }} */
           const out = {
             role: String(m.role),
             content: String(m.content || ""),
           };
           if (m.queued) out.queued = true;
           if (m.queued && m.queueId) out.queueId = String(m.queueId);
+          const files = normalizeMessageFiles(m.files);
+          if (files.length) out.files = files;
           return out;
         });
       preferPanel = Boolean(local.preferPanel) || messages.length > 0;

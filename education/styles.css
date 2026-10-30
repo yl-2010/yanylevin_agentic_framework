@@ -2321,6 +2321,17 @@ html[data-resolved-theme="light"] .yan-chat-attach-tile {
   line-height: 1.2;
   opacity: 0.8;
 }
+.yan-chat-msg-files {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-self: flex-end;
+  gap: 0.5rem;
+  max-width: 100%;
+}
+.yan-chat-msg-files .yan-chat-attach-tile {
+  pointer-events: auto;
+}
 .yan-chat-send {
   --lg-filter: none;
   --lg-tint-rgb: var(--chat-orange-rgb);

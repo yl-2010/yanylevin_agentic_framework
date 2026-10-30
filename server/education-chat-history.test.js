@@ -21,6 +21,7 @@ import {
   markChatHistoryRead,
   parseChatHistoryMessages,
   parseChatHistoryMeta,
+  splitChatMessageFiles,
   patchChatHistoryTitle,
   patchChatHistoryVisibility,
   persistChatHistory,
@@ -155,6 +156,46 @@ describe("format/parse markdown", () => {
     assert.doesNotMatch(md, /^ephemeral:/m);
     assert.match(md, /## User — 2026-08-15T18:00:00.000Z/);
     assert.match(md, /Added HW due Fri\./);
+  });
+
+  it("stores attached files as tiles data, not inline text", () => {
+    const md = formatChatHistoryMarkdown({
+      email: EMAIL,
+      sessionId: SID,
+      messages: [
+        {
+          role: "user",
+          content: "look at this",
+          at: "2026-08-15T18:00:00.000Z",
+          files: [{ name: "notes.pdf", mimeType: "application/pdf" }],
+        },
+      ],
+    });
+    assert.match(md, /```chat-files/);
+    assert.doesNotMatch(md, /\[1 file:/);
+    const messages = parseChatHistoryMessages(md);
+    assert.equal(messages[0].content, "look at this");
+    assert.deepEqual(messages[0].files, [{ name: "notes.pdf", mimeType: "application/pdf" }]);
+    const legacy = splitChatMessageFiles("look at this\n[2 files: a.pdf, b.png]");
+    assert.equal(legacy.content, "look at this");
+    assert.deepEqual(legacy.files.map((f) => f.name), ["a.pdf", "b.png"]);
+    const only = splitChatMessageFiles("[1 file: scan.pdf]");
+    assert.equal(only.content, "");
+    assert.equal(only.files[0].name, "scan.pdf");
+    const meta = parseChatHistoryMeta(
+      [
+        "# Personal Agent chat",
+        `session: ${SID}`,
+        `email: ${EMAIL}`,
+        "started: 2026-08-15T18:00:00.000Z",
+        "updated: 2026-08-15T18:00:00.000Z",
+        "",
+        "## User — 2026-08-15T18:00:00.000Z",
+        "[1 file: scan.pdf]",
+        "",
+      ].join("\n")
+    );
+    assert.equal(meta.preview, "scan.pdf");
   });
 
   it("treats a missing visibility line as showing", () => {

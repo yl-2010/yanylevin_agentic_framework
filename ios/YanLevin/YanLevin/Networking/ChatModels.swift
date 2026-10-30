@@ -1,5 +1,81 @@
 import Foundation
 
+struct ChatMessageFile: Identifiable, Equatable, Codable, Hashable {
+    var name: String
+    var mimeType: String
+    /// Bytes still on the phone for a send the server has not accepted. Not stored.
+    var localData: Data?
+
+    var id: String { name }
+
+    enum CodingKeys: String, CodingKey {
+        case name, mimeType
+    }
+
+    init(name: String, mimeType: String = "", localData: Data? = nil) {
+        self.name = name
+        self.mimeType = mimeType
+        self.localData = localData
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String.self, forKey: .name)
+        mimeType = try c.decodeIfPresent(String.self, forKey: .mimeType) ?? ""
+        localData = nil
+    }
+}
+
+enum ChatFileTag {
+    private static let fence = try? NSRegularExpression(
+        pattern: "```chat-files\\s*\\n([\\s\\S]*?)\\n```",
+        options: []
+    )
+    private static let legacy = try? NSRegularExpression(
+        pattern: "(?:^|\\n)\\[\\d+ files?: ([^\\]]+)\\]\\s*$",
+        options: []
+    )
+
+    static func split(_ raw: String) -> (text: String, files: [ChatMessageFile]) {
+        var text = raw
+        var fromFence: [ChatMessageFile] = []
+        if let fence {
+            let ns = text as NSString
+            let full = NSRange(location: 0, length: ns.length)
+            let matches = fence.matches(in: text, range: full)
+            for match in matches where match.numberOfRanges > 1 {
+                let body = ns.substring(with: match.range(at: 1))
+                if let data = body.data(using: .utf8),
+                   let rows = try? JSONDecoder().decode([ChatMessageFile].self, from: data)
+                {
+                    fromFence.append(contentsOf: rows)
+                }
+            }
+            text = fence.stringByReplacingMatches(in: text, range: full, withTemplate: "\n")
+        }
+        var fromTag: [ChatMessageFile] = []
+        if let legacy {
+            let ns = text as NSString
+            let full = NSRange(location: 0, length: ns.length)
+            if let match = legacy.firstMatch(in: text, range: full), match.numberOfRanges > 1 {
+                let names = ns.substring(with: match.range(at: 1))
+                fromTag = names
+                    .components(separatedBy: ", ")
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                    .map { ChatMessageFile(name: $0) }
+                text = ns.substring(with: NSRange(location: 0, length: match.range.location))
+            }
+        }
+        var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let files = fromFence.isEmpty ? fromTag : fromFence
+        if !files.isEmpty && (trimmed == "(attachment)" || trimmed == "(empty)") {
+            trimmed = ""
+        }
+        return (trimmed, files)
+    }
+}
+
 struct ChatMessage: Identifiable, Equatable, Codable {
     var id = UUID()
     var role: String
@@ -9,11 +85,26 @@ struct ChatMessage: Identifiable, Equatable, Codable {
     /// Server id for a waiting turn. Hold the bubble to interrupt with it.
     var queueId: String? = nil
     var widgets: [ChatWidget] = []
+    /// Files attached to this user message. Tiles sit above the text.
+    var files: [ChatMessageFile] = []
     /// Local send the server has not accepted yet. Never persisted.
     var pending: Bool = false
 
+    var bubbleText: String {
+        var text = ChatFileTag.split(content).text
+        if !displayFiles.isEmpty && (text == "(attachment)" || text == "(empty)") {
+            text = ""
+        }
+        return text
+    }
+
+    var displayFiles: [ChatMessageFile] {
+        if !files.isEmpty { return files }
+        return ChatFileTag.split(content).files
+    }
+
     enum CodingKeys: String, CodingKey {
-        case role, content, queued, queueId, widgets
+        case role, content, queued, queueId, widgets, files
     }
 
     init(
@@ -22,6 +113,7 @@ struct ChatMessage: Identifiable, Equatable, Codable {
         queued: Bool = false,
         queueId: String? = nil,
         widgets: [ChatWidget] = [],
+        files: [ChatMessageFile] = [],
         pending: Bool = false
     ) {
         self.role = role
@@ -29,6 +121,7 @@ struct ChatMessage: Identifiable, Equatable, Codable {
         self.queued = queued
         self.queueId = queueId
         self.widgets = widgets
+        self.files = files
         self.pending = pending
     }
 
@@ -40,6 +133,7 @@ struct ChatMessage: Identifiable, Equatable, Codable {
         let rawQueueId = try c.decodeIfPresent(String.self, forKey: .queueId)
         queueId = (rawQueueId?.isEmpty == false) ? rawQueueId : nil
         widgets = try c.decodeIfPresent([ChatWidget].self, forKey: .widgets) ?? []
+        files = try c.decodeIfPresent([ChatMessageFile].self, forKey: .files) ?? []
     }
 
     func encode(to encoder: Encoder) throws {
@@ -51,6 +145,7 @@ struct ChatMessage: Identifiable, Equatable, Codable {
             try c.encode(queueId, forKey: .queueId)
         }
         if !widgets.isEmpty { try c.encode(widgets, forKey: .widgets) }
+        if !files.isEmpty { try c.encode(files, forKey: .files) }
     }
 }
 
