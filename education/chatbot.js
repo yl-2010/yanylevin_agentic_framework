@@ -261,24 +261,75 @@
     return { text, files };
   }
 
-  async function openSentFile(file, localFile) {
-    const name = String(file?.name || "");
-    if (!name) return;
-    if (localFile instanceof File) {
-      const url = URL.createObjectURL(localFile);
-      const opened = window.open(url, "_blank", "noopener,noreferrer");
-      if (!opened) {
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = name;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      return;
+  function isRasterImageName(name) {
+    return /\.(png|jpe?g|gif|webp|heic|avif)$/i.test(String(name || ""));
+  }
+
+  function typeForFileName(name) {
+    const ext = String(name || "").toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] || "";
+    const map = {
+      pdf: "application/pdf",
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      gif: "image/gif",
+      webp: "image/webp",
+      heic: "image/heic",
+      avif: "image/avif",
+      txt: "text/plain; charset=utf-8",
+      md: "text/markdown; charset=utf-8",
+      csv: "text/csv; charset=utf-8",
+      json: "application/json; charset=utf-8",
+      html: "text/html; charset=utf-8",
+      htm: "text/html; charset=utf-8",
+      mp3: "audio/mpeg",
+      mp4: "video/mp4",
+      mov: "video/quicktime",
+    };
+    return map[ext] || "";
+  }
+
+  function sentFileHref(name) {
+    if (!sessionId || !name) return "";
+    const qs = new URLSearchParams({ sessionId, name });
+    return `${API}/agent/file?${qs}`;
+  }
+
+  /**
+   * Open a blob in a new tab. `noopener` makes window.open return null even
+   * when the tab opened, and a download attribute then saves the file.
+   */
+  function openBlobTab(blob) {
+    const url = URL.createObjectURL(blob);
+    const opened = window.open(url, "_blank");
+    if (opened) {
+      opened.opener = null;
+    } else {
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
     }
-    if (!sessionId || !window.YanMacApi) return;
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+
+  function openLocalSentFile(localFile) {
+    const type = localFile.type || typeForFileName(localFile.name);
+    const blob =
+      type && type !== localFile.type ? new Blob([localFile], { type }) : localFile;
+    openBlobTab(blob);
+  }
+
+  /**
+   * Same open as a todo file: pictures follow the link, everything else is a
+   * blob tab. The link itself is the fallback when this fetch cannot run.
+   */
+  async function openSentFile(file) {
+    const name = String(file?.name || "");
+    if (!name || !sessionId || !window.YanMacApi) return;
     const qs = new URLSearchParams({ sessionId, name });
     try {
       const res = await window.YanMacApi.macFetch(`${API}/agent/file?${qs}`, {
@@ -286,20 +337,14 @@
         headers: { Accept: "*/*" },
       });
       if (!res.ok) return;
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const opened = window.open(url, "_blank", "noopener,noreferrer");
-      if (!opened) {
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = name;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+      let blob = await res.blob();
+      const type = typeForFileName(name);
+      if (type && (!blob.type || blob.type === "application/octet-stream")) {
+        blob = new Blob([blob], { type });
       }
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      openBlobTab(blob);
     } catch {
-      /* leave the tile */
+      /* the tile link still opens the file */
     }
   }
 
@@ -310,11 +355,16 @@
     row.className = "yan-chat-msg-files";
     const locals = pendingLocalFiles.get(msg) || [];
     for (const file of files) {
-      const tile = document.createElement("button");
-      tile.type = "button";
+      const tile = document.createElement("a");
       tile.className = "yan-chat-attach-tile";
       tile.title = file.name;
       tile.setAttribute("aria-label", `Open ${file.name}`);
+      const href = sentFileHref(file.name);
+      if (href) {
+        tile.href = href;
+        tile.target = "_blank";
+        tile.rel = "noopener noreferrer";
+      }
       const ext = document.createElement("span");
       ext.className = "yan-chat-attach-tile-ext";
       ext.setAttribute("aria-hidden", "true");
@@ -329,9 +379,25 @@
       tile.appendChild(name);
       const local = locals.find((f) => f && f.name === file.name) || null;
       tile.addEventListener("click", (event) => {
+        if (
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey
+        ) {
+          return;
+        }
+        if (local instanceof File) {
+          event.preventDefault();
+          openLocalSentFile(local);
+          return;
+        }
+        // Pictures follow the link, same as a file on a todo. The new tab's
+        // address is the file itself.
+        if (href && isRasterImageName(file.name)) return;
         event.preventDefault();
-        event.stopPropagation();
-        openSentFile(file, local);
+        if (href) openSentFile(file);
       });
       row.appendChild(tile);
       window.lgBindMagnetic?.(tile, 0.2);

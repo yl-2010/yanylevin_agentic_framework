@@ -301,6 +301,28 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    if (route === "agent/file") {
+      if (method !== "GET") {
+        res.setHeader("Allow", "GET");
+        res.status(405).json({ ok: false, error: "method not allowed" });
+        return;
+      }
+      const q = new URLSearchParams();
+      for (const key of ["sessionId", "name"]) {
+        const raw = req.query?.[key];
+        const val = Array.isArray(raw) ? raw[0] : raw;
+        if (val != null && String(val).trim() !== "") q.set(key, String(val));
+      }
+      const qs = q.toString();
+      await forwardEducation(req, res, {
+        method: "GET",
+        path: `/api/jype/agent/file${qs ? `?${qs}` : ""}`,
+        timeoutMs: 120_000,
+        binary: true,
+      });
+      return;
+    }
+
     if (route === "agent/start") {
       if (method !== "POST") {
         res.setHeader("Allow", "POST");
