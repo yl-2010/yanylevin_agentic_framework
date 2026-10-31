@@ -24,6 +24,7 @@ import { canvasAssignmentIdFromLink, canvasCourseIdFromLink } from "./canvas-gra
 import { fetchAssignmentComments } from "./canvas-context.js";
 import { listClassEntriesForRoot } from "./education-data.js";
 import { objectDirId, resolveBookkeepingFile } from "./education-onedrive.js";
+import { listTopLevelProjects } from "./onedrive-projects.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OFFICE_EDIT_EXTS = new Set([
@@ -414,6 +415,35 @@ export async function findYanTodoByCanvasId(canvasId) {
         classId: entry.id,
         todoId: objectDirId(d.name),
         onedriveFolder: entry.onedriveFolder,
+      };
+    }
+  }
+  return findProjectTodoByCanvasId(want);
+}
+
+async function findProjectTodoByCanvasId(want) {
+  const projects = await listTopLevelProjects();
+  for (const project of projects) {
+    let dirs;
+    try {
+      dirs = await readdir(join(project.dir, "todos"), { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const d of dirs) {
+      if (!d.isDirectory() || d.name.startsWith(".")) continue;
+      const dir = join(project.dir, "todos", d.name);
+      const jsonPath = await resolveBookkeepingFile(dir, "todo.json");
+      const props = jsonPath ? await readJsonFile(jsonPath) : null;
+      if (!props || Number(props.canvasId) !== want) continue;
+      return {
+        path: jsonPath,
+        dir,
+        props,
+        classId: "",
+        projectId: project.id,
+        todoId: d.name,
+        onedriveFolder: project.folderName,
       };
     }
   }

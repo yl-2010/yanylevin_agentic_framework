@@ -29,7 +29,13 @@ import { scheduleOnedriveSnapshotRefresh } from "./education-onedrive-snapshot.j
 import { formatDeletedBlock, loadDeletedMarkdown } from "./education-match.js";
 import { gitAddCommitPush } from "./git-publish.js";
 import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
-import { attachCanvasComments, attachCanvasOverlay, canvasAssignmentIdFromLink } from "./canvas-grades.js";
+import {
+  attachCanvasComments,
+  attachCanvasOverlay,
+  canvasAssignmentIdFromLink,
+  courseMapTarget,
+  projectCourseIds,
+} from "./canvas-grades.js";
 import {
   createLaterAuthRetry,
   promptWithAuthRetry,
@@ -334,17 +340,26 @@ export function snapshotHasDashboardClass(snapshot, classNames) {
  * advisory, library, clubs, and extras are dropped (they are not stored).
  * @param {unknown[]} courses
  * @param {string[]} classNames
+ * @param {number[]} [extraIds] Canvas course ids kept even when the title is not a class
  */
-export function selectDashboardCanvasCourses(courses, classNames) {
+export function selectDashboardCanvasCourses(courses, classNames, extraIds = []) {
   const list = Array.isArray(courses) ? courses : [];
   const names = (classNames || []).map((n) => String(n || "").trim()).filter(Boolean);
+  const extras = new Set(
+    (Array.isArray(extraIds) ? extraIds : [])
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id))
+  );
   /** @type {object[]} */
   const keep = [];
   /** @type {object[]} */
   const skip = [];
   for (const c of list) {
     if (!c || typeof c !== "object") continue;
-    if (names.some((cn) => dashboardClassMatchesCanvasCourse(cn, c.name))) {
+    if (
+      extras.has(Number(c.id)) ||
+      names.some((cn) => dashboardClassMatchesCanvasCourse(cn, c.name))
+    ) {
       keep.push(c);
     } else {
       skip.push(c);
@@ -1290,7 +1305,11 @@ export async function fetchCanvasSnapshot(opts = {}) {
       fetchOpts
     );
     const visible = coursesRaw.filter((c) => c && !c.access_restricted_by_date);
-    const picked = selectDashboardCanvasCourses(visible, classNames);
+    const picked = selectDashboardCanvasCourses(
+      visible,
+      classNames,
+      projectCourseIds(courseMap)
+    );
     courses = picked.keep;
     skip = picked.skip;
   }
@@ -1535,6 +1554,7 @@ export function buildCanvasSyncPrompt({
     "Yan is a 2026-27 junior. Those academic dashboard classes are often missing from Canvas until school publishes them. That is expected.",
     "FIRST: map snapshot courses to Yan's class folders (OneDrive `.education` under the grade folder, skip free-period shells and fixtures). The snapshot already dropped non-dashboard enrollments. If ZERO dashboard classes appear in Canvas, STOP immediately. Do not invent Class of 2028, EPS Library, Iceland EBC, Graphic Design, or prior-year shells. Do not create todos. One short note is enough.",
     "If at least one class maps: set class.json canvasLink to that course gradebook (htmlUrl + /grades). Create or update todos for every Canvas assignment on those mapped classes only. Set canvasLink and canvasId. Tag CW/HW/QA/MA. Store name without a CW/HW/QA/MA prefix (HW: Signed Syllabus → Signed Syllabus). Use snapshot dueDate/dueTime.",
+    "A course-map value project:<id> is not a class. College Counseling 2028 is project:college-prep. Code already writes those assignments as College Prep todos and sets project.json canvasLink to the gradebook. Do not create a class for that course. Do not move those todos onto a class. Review their tags and dues on the project. Syllabus dates for that course go in the project dates folder.",
     "Pull major syllabus / calendar-event dates onto .date.json with canvasLink. OneDrive class bookkeeping is Finder-hidden: .todo.json, .date.json, .CONTEXT.md. Do not write a plain todo.json next to .todo.json.",
     "Do not create a date when that canvasId is already a class todo. MAs already show in Dates. Physics MA #2 (canvasId 40291676) and the Motion Research Symposium (canvasId 40291677) are todos only. The symposium stays due 2026-11-20 10:30 even though Canvas has no due.",
     "NEVER write done or completedAt from Canvas. New todos start done false. Updates leave those keys untouched. Page-load overlay paints completion in the API; you still must not persist it. Preserve finderHidden when it is already set.",
@@ -2186,9 +2206,10 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
     const fresh = newCanvasAssignments(seen, assignments);
     const changed = canvasWatchChanged(previous?.assignments, assignments);
     if (!changed && !fresh.length) {
-      const retry = assignments.filter(
-        (row) => pending.includes(String(row.id)) && !linkAgentInFlight.has(String(row.id))
-      );
+      const retry = assignments.filter((row) => {
+        if (courseMapTarget(map[String(row.courseId)])?.kind === "project") return false;
+        return pending.includes(String(row.id)) && !linkAgentInFlight.has(String(row.id));
+      });
       if (retry.length) {
         startCanvasLinkAgent({ dir, dateKey, hourKey, timezone, assignments: retry });
       }
@@ -2217,23 +2238,26 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
     );
 
     const createdRows = fresh.filter((row) => created.has(String(row.id)));
+    const classRows = createdRows.filter(
+      (row) => courseMapTarget(map[String(row.courseId)])?.kind !== "project"
+    );
     let files = null;
     if (createdRows.length || changed) {
       files = await pullCanvasAssignmentFiles(fetched.snapshot);
     }
-    if (createdRows.length) {
+    if (classRows.length) {
       const pendingNext = new Set(pending);
-      for (const row of createdRows) pendingNext.add(String(row.id));
+      for (const row of classRows) pendingNext.add(String(row.id));
       await writePendingLinkIds(dir, [...pendingNext]);
       console.log(
-        `[canvas-watch] new todos ${createdRows.map((row) => row.id).join(",")}`
+        `[canvas-watch] new todos ${classRows.map((row) => row.id).join(",")}`
       );
       startCanvasLinkAgent({
         dir,
         dateKey,
         hourKey,
         timezone,
-        assignments: createdRows,
+        assignments: classRows,
       });
     }
 
@@ -2241,7 +2265,7 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
       dateKey,
       hourKey,
       at: new Date().toISOString(),
-      status: createdRows.length ? "linking" : "updated",
+      status: classRows.length ? "linking" : "updated",
       assignments: assignments.length,
       newAssignments: createdRows.length,
       newIds: createdRows.map((row) => row.id),
@@ -2258,7 +2282,7 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
       ok: true,
       dateKey,
       hourKey,
-      status: createdRows.length ? "linking" : "updated",
+      status: classRows.length ? "linking" : "updated",
       courses: fetched.courses,
       assignments: fetched.assignments,
       newAssignments: createdRows.length,

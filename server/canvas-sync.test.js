@@ -489,6 +489,23 @@ describe("filterCanvasSnapshotToDashboard", () => {
     assert.equal(skip.length, 3);
   });
 
+  it("keeps a project-mapped course that is not a class", () => {
+    const { keep, skip } = selectDashboardCanvasCourses(
+      [
+        { id: 1, name: "American Literature (Fall) 2026-27:jsmith" },
+        { id: 3659529, name: "College Counseling 2028" },
+        { id: 3, name: "Class of 2028" },
+      ],
+      classNames,
+      [3659529]
+    );
+    assert.deepEqual(
+      keep.map((c) => c.id),
+      [1, 3659529]
+    );
+    assert.equal(skip.length, 1);
+  });
+
   it("strips assignments and events for dropped courses", () => {
     const slim = filterCanvasSnapshotToDashboard(
       {
@@ -534,6 +551,8 @@ describe("buildCanvasSyncPrompt", () => {
     });
     assert.match(prompt, /personal-canvas/);
     assert.match(prompt, /class\.json canvasLink to that course gradebook/);
+    assert.match(prompt, /project:college-prep/);
+    assert.match(prompt, /Do not create a class for that course/);
     assert.match(prompt, /Do not recreate a todo or date that looks like a manually deleted\.md row/);
     assert.match(prompt, /classes\/lit\/todos\/essay/);
     assert.match(prompt, /last-hourly-sync/);

@@ -10,9 +10,10 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { listTopLevelProjects, YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 import { withCloudRetry } from "./cloud-storage-io.js";
 import { stripHtml } from "./canvas-sync.js";
+import { classIdsFromCourseMap, courseMapTarget } from "./canvas-grades.js";
 import { classMeetingsBetween } from "./education-class-todo.js";
 import {
   classPeriodOnDate,
@@ -143,7 +144,7 @@ function parseDeletedTodos(markdown) {
   const out = [];
   for (const line of String(markdown || "").split("\n")) {
     const m = line.match(
-      /^\s*-\s+deleted\s+.+?\|\s*todo\s*\|\s*(.+?)\s*\|\s*on\s+([^|]+?)\s*\|\s*(class:[^|]+)\s*\|/i
+      /^\s*-\s+deleted\s+.+?\|\s*todo\s*\|\s*(.+?)\s*\|\s*on\s+([^|]+?)\s*\|\s*((?:class|project):[^|]+)\s*\|/i
     );
     if (!m) continue;
     const on = m[2].trim();
@@ -465,13 +466,51 @@ async function loadMappedClassEntries(mappedClassIds) {
   return (await listClassEntriesForRoot(YAN_ROOT)).filter((e) => mappedClassIds.has(e.id));
 }
 
+function slugifyProjectTodo(name, canvasId) {
+  const slug = String(name || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  return slug || `canvas-${canvasId}`;
+}
+
+function uniqueProjectSlug(base, occupied) {
+  const taken = new Set(occupied);
+  if (!taken.has(base)) return base;
+  let n = 2;
+  while (taken.has(`${base}-${n}`)) n += 1;
+  return `${base}-${n}`;
+}
+
+async function listProjectTodoDirs(projectDir) {
+  /** @type {{ dirName: string, objectDir: string, props: object|null, jsonPath: string }[]} */
+  const out = [];
+  let entries;
+  try {
+    entries = await cloudReaddir(join(projectDir, "todos"));
+  } catch {
+    return out;
+  }
+  for (const e of entries) {
+    if (!e.isDirectory() || e.name.startsWith(".")) continue;
+    const objectDir = join(projectDir, "todos", e.name);
+    const jsonPath = await resolveBookkeepingFile(objectDir, "todo.json");
+    if (!jsonPath) continue;
+    out.push({ dirName: e.name, objectDir, props: null, jsonPath });
+  }
+  return out;
+}
+
 async function loadContext() {
   const snapshot = JSON.parse(await readFile(join(CANVAS_DIR, "snapshot.json"), "utf8"));
   const courseMap = JSON.parse(await readFile(join(CANVAS_DIR, "course-map.json"), "utf8"));
   const schedule = JSON.parse(await readFile(join(YAN_ROOT, "schedule.json"), "utf8"));
   const deletedMarkdown = await loadDeletedMarkdown(YAN_ROOT);
   const deletedTodos = parseDeletedTodos(deletedMarkdown);
-  const mappedClassIds = new Set(Object.values(courseMap));
+  const mappedClassIds = new Set(classIdsFromCourseMap(courseMap));
   const entries = await loadMappedClassEntries(mappedClassIds);
   const classById = new Map(entries.map((e) => [e.id, e]));
   /** @type {Map<string, object>} */
@@ -486,7 +525,27 @@ async function loadContext() {
       /* skip */
     }
   }
-  return { snapshot, courseMap, schedule, deletedTodos, classById, classProps };
+  /** @type {Map<string, { id: string, dir: string }>} */
+  const projectById = new Map();
+  const projectIds = new Set();
+  for (const value of Object.values(courseMap)) {
+    const target = courseMapTarget(value);
+    if (target?.kind === "project") projectIds.add(target.id);
+  }
+  if (projectIds.size) {
+    for (const row of await listTopLevelProjects()) {
+      if (projectIds.has(row.id)) projectById.set(row.id, row);
+    }
+  }
+  return {
+    snapshot,
+    courseMap,
+    schedule,
+    deletedTodos,
+    classById,
+    classProps,
+    projectById,
+  };
 }
 
 /**
@@ -495,7 +554,7 @@ async function loadContext() {
 export async function applyCanvasHourlyTodos(opts = {}) {
   const dryRun = Boolean(opts.dryRun);
   const skipCreate = Boolean(opts.skipCreate);
-  const { snapshot, courseMap, schedule, deletedTodos, classById, classProps } =
+  const { snapshot, courseMap, schedule, deletedTodos, classById, classProps, projectById } =
     await loadContext();
   const mappedIds = new Set(Object.keys(courseMap).map(Number));
   const assignments = (snapshot.assignments || []).filter((a) =>
@@ -530,9 +589,146 @@ export async function applyCanvasHourlyTodos(opts = {}) {
     return bundle;
   }
 
+  /** @type {Set<string>} */
+  const linkedProjects = new Set();
+  const courseById = new Map(
+    (snapshot.courses || []).filter((c) => c?.id != null).map((c) => [Number(c.id), c])
+  );
+
+  async function ensureProjectCanvasLink(project) {
+    if (!project || linkedProjects.has(project.id)) return;
+    linkedProjects.add(project.id);
+    const courseId = Number(
+      Object.entries(courseMap).find(([, value]) => {
+        const target = courseMapTarget(value);
+        return target?.kind === "project" && target.id === project.id;
+      })?.[0]
+    );
+    const html = String(courseById.get(courseId)?.htmlUrl || "").replace(/\/$/, "");
+    if (!html.startsWith("http")) return;
+    const link = `${html}/grades`;
+    const path = join(project.dir, "project.json");
+    const props = await readCloudJson(path);
+    if (!props || props.canvasLink === link) return;
+    if (dryRun) {
+      log.push(`canvasLink ${project.id}`);
+      return;
+    }
+    props.canvasLink = link;
+    try {
+      await writeCloudJson(path, props);
+    } catch (err) {
+      errors.push(`canvasLink ${project.id}: ${err?.message || err}`);
+      return;
+    }
+    log.push(`canvasLink ${project.id}`);
+  }
+
+  /** @type {Map<string, { todos: Awaited<ReturnType<typeof listProjectTodoDirs>>, indexes: ReturnType<typeof buildTodoIndexes> }>} */
+  const todosByProject = new Map();
+  async function todosForProject(project) {
+    if (todosByProject.has(project.id)) return todosByProject.get(project.id);
+    const list = await listProjectTodoDirs(project.dir);
+    await hydrateTodos(list);
+    const bundle = { todos: list, indexes: buildTodoIndexes(list) };
+    todosByProject.set(project.id, bundle);
+    return bundle;
+  }
+
   for (const assignment of assignments) {
-    const classId = courseMap[String(assignment.courseId)];
-    if (!classId) continue;
+    const target = courseMapTarget(courseMap[String(assignment.courseId)]);
+    if (!target) continue;
+    if (target.kind === "project") {
+      const project = projectById.get(target.id);
+      if (!project) {
+        errors.push(`project ${target.id} missing for canvas ${assignment.id}`);
+        continue;
+      }
+      await ensureProjectCanvasLink(project);
+      const desired = desiredProps(assignment, target.id, null, schedule);
+      const parent = `project:${target.id}`;
+      const { todos, indexes } = await todosForProject(project);
+      const canvasId = String(assignment.id);
+      let existing =
+        indexes.byCanvasId.get(canvasId) ||
+        indexes.byCanvasLink.get(String(assignment.htmlUrl || "")) ||
+        null;
+      if (!existing) {
+        if (skipCreate) {
+          skipped += 1;
+          continue;
+        }
+        const candidate = {
+          parent,
+          name: desired.name,
+          dueDate: desired.dueDate || "",
+          dueTime: desired.dueTime || "",
+        };
+        if (looksDeleted(candidate, deletedTodos)) {
+          skipped += 1;
+          skippedIds.push(canvasId);
+          continue;
+        }
+        const occupied = todos.map((t) => t.dirName);
+        const folderId = uniqueProjectSlug(
+          slugifyProjectTodo(desired.name, assignment.id),
+          occupied
+        );
+        const objectDir = join(project.dir, "todos", folderId);
+        const jsonPath = join(objectDir, "todo.json");
+        const now = new Date().toISOString();
+        const payload = { ...desired, done: false, createdAt: now };
+        if (!dryRun) {
+          try {
+            await withCloudRetry(objectDir, () => mkdir(objectDir, { recursive: true }), {
+              attempts: 12,
+            });
+            await writeCloudJson(jsonPath, payload);
+          } catch (err) {
+            errors.push(`create ${parent} canvas ${assignment.id}: ${err?.message || err}`);
+            continue;
+          }
+        }
+        todos.push({ dirName: folderId, objectDir, props: payload, jsonPath });
+        Object.assign(indexes, buildTodoIndexes(todos));
+        created += 1;
+        createdIds.push(canvasId);
+        log.push(`create ${parent} ${folderId} canvas ${assignment.id}`);
+        continue;
+      }
+      const baseProps = await propsForTodo(existing);
+      if (!baseProps || typeof baseProps !== "object") {
+        errors.push(
+          `update ${parent} canvas ${assignment.id}: unreadable todo.json (${existing.dirName})`
+        );
+        continue;
+      }
+      const merged = { ...baseProps };
+      let changed = false;
+      for (const key of ["name", "tag", "dueDate", "dueTime", "canvasLink", "canvasId"]) {
+        if (desired[key] == null) continue;
+        const same =
+          key === "canvasId" ? String(merged[key] ?? "") === String(desired[key]) : merged[key] === desired[key];
+        if (!same) {
+          merged[key] = desired[key];
+          changed = true;
+        }
+      }
+      if (!changed) continue;
+      if (!dryRun) {
+        try {
+          await writeCloudJson(existing.jsonPath, merged);
+        } catch (err) {
+          errors.push(`update ${parent} canvas ${assignment.id}: ${err?.message || err}`);
+          continue;
+        }
+      }
+      updated += 1;
+      log.push(`update ${parent} ${existing.dirName} canvas ${assignment.id}`);
+      continue;
+    }
+
+    const classId = target.id;
     const entry = classById.get(classId);
     if (!entry || entry.source !== "onedrive") continue;
     const cls = classProps.get(classId) || { id: classId };

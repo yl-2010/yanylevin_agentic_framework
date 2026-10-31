@@ -84,14 +84,68 @@ export function canvasAssignmentIdFromLink(raw) {
   return m ? Number(m[1]) : null;
 }
 
+/**
+ * course-map values are class folder ids, or `project:<id>` for a project.
+ * @param {unknown} value
+ * @returns {{ kind: "class"|"project", id: string }|null}
+ */
+export function courseMapTarget(value) {
+  const raw = String(value || "").trim();
+  if (!raw || raw.includes("/") || raw.includes("..")) return null;
+  if (raw.startsWith("project:")) {
+    const id = raw.slice("project:".length).trim();
+    if (!id || id.includes(":")) return null;
+    return { kind: "project", id };
+  }
+  if (raw.includes(":")) return null;
+  return { kind: "class", id: raw };
+}
+
+/** @param {Record<string, string>|null|undefined} map */
+export function classIdsFromCourseMap(map) {
+  if (!map || typeof map !== "object") return [];
+  /** @type {string[]} */
+  const ids = [];
+  for (const value of Object.values(map)) {
+    const target = courseMapTarget(value);
+    if (target?.kind === "class") ids.push(target.id);
+  }
+  return ids;
+}
+
+/** Canvas course ids whose assignments land on a project. */
+export function projectCourseIds(map) {
+  if (!map || typeof map !== "object") return [];
+  /** @type {number[]} */
+  const ids = [];
+  for (const [courseId, value] of Object.entries(map)) {
+    const target = courseMapTarget(value);
+    const id = Number(courseId);
+    if (target?.kind === "project" && Number.isFinite(id)) ids.push(id);
+  }
+  return ids;
+}
+
 function invertCourseMap(map) {
   /** @type {Map<string, number>} */
   const out = new Map();
   if (!map || typeof map !== "object") return out;
   for (const [courseId, classId] of Object.entries(map)) {
     const id = Number(courseId);
-    const folder = String(classId || "").trim();
-    if (Number.isFinite(id) && folder) out.set(folder, id);
+    const target = courseMapTarget(classId);
+    if (Number.isFinite(id) && target?.kind === "class") out.set(target.id, id);
+  }
+  return out;
+}
+
+function invertProjectMap(map) {
+  /** @type {Map<string, number>} */
+  const out = new Map();
+  if (!map || typeof map !== "object") return out;
+  for (const [courseId, value] of Object.entries(map)) {
+    const id = Number(courseId);
+    const target = courseMapTarget(value);
+    if (Number.isFinite(id) && target?.kind === "project") out.set(target.id, id);
   }
   return out;
 }
@@ -143,6 +197,7 @@ function assignmentsById(snapshot) {
 export function attachCanvasGrades(tree, snapshot, courseMap = null) {
   if (!tree || !snapshot) return tree;
   const classByCanvas = invertCourseMap(courseMap);
+  const projectByCanvas = invertProjectMap(courseMap);
   const coursesById = new Map(
     (snapshot.courses || [])
       .filter((c) => c && c.id != null)
@@ -179,11 +234,26 @@ export function attachCanvasGrades(tree, snapshot, courseMap = null) {
     for (const t of cls.classOnlyTodos || []) paintTodo(t);
   };
 
+  const paintProject = (project) => {
+    if (!project || typeof project !== "object") return;
+    const fromLink = canvasCourseIdFromLink(project.canvasLink);
+    const fromMap = projectByCanvas.get(String(project.id || ""));
+    const courseId = fromLink != null ? fromLink : fromMap;
+    const course = courseId != null ? coursesById.get(Number(courseId)) : null;
+    const score = finiteFrom(course?.currentScore);
+    const hasPostedWork = (snapshot.assignments || []).some((row) =>
+      assignmentHasPostedScore(row, courseId)
+    );
+    if (score != null && hasPostedWork) {
+      project.canvasScore = score;
+      project.canvasScoreLabel = formatCourseScoreLabel(score);
+    }
+    for (const t of project.todos || []) paintTodo(t);
+  };
+
   for (const cls of tree.classes || []) paintClass(cls);
   for (const t of tree.todos || []) paintTodo(t);
-  for (const p of tree.projects || []) {
-    for (const t of p.todos || []) paintTodo(t);
-  }
+  for (const p of tree.projects || []) paintProject(p);
   return tree;
 }
 

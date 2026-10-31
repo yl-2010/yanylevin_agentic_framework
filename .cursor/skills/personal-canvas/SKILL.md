@@ -54,7 +54,7 @@ education/you@example.com/.canvas/
   modules.json / modules.md
   files.json / files.md
   seen-comment-ids.json # Express marks after a successful nightly agent
-  course-map.json       # Canvas course id → education class folder id (you maintain this on nightly; the new-assignment pass must not edit it)
+  course-map.json       # Canvas course id → class folder id, or project:<id> (you maintain this on nightly; the new-assignment pass must not edit it)
   last-agent-sync.json  # written by the nightly runner, not by you
   last-hourly-sync.json # written when the watch creates or updates something
   seen-assignment-ids.json # assignment ids already handled; a new id creates a todo, then starts Composer
@@ -89,10 +89,11 @@ Do not open `snapshot.json`. Do not map new classes, do not edit `course-map.jso
 
 1. Read each class `.education/class.json` on OneDrive (skip `_example-dummy`, skip `"freePeriod": true`).
 2. Read `course-map.json` if present.
-3. Match Canvas `courses[]` to those folders by name / course code (American Literature, Physics, Spanish 4, Data Science, US History, Calc, programming titles, PE Yoga, Independent Study, and similar). Fetch still asks Canvas for current and future enrollments, then **drops** anything that is not a dashboard class before writing the snapshot (9th/10th-year shells, Class of 2028, EPS Library, Iceland EBC, Graphic Design, clubs, advisory). Update `course-map.json` when you are confident.
-4. **Skip** any leftover Canvas course with no dashboard class. Do not create new class folders from Canvas. Do not store or import extras.
-5. If two dashboard classes could match one Canvas course, pick the obvious one or skip that course rather than guessing into the wrong folder.
-6. For each mapped class, set `canvasLink` on `class.json` to `{htmlUrl}/grades` (example `https://canvas.instructure.com/courses/3639020/grades`). Web and iOS class pages show the Canvas orb from this.
+3. Match Canvas `courses[]` to those folders by name / course code (American Literature, Physics, Spanish 4, Data Science, US History, Calc, programming titles, PE Yoga, Independent Study, and similar). Fetch still asks Canvas for current and future enrollments, then **drops** anything that is not a dashboard class or a `project:` row in `course-map.json` before writing the snapshot (9th/10th-year shells, Class of 2028, EPS Library, Iceland EBC, Graphic Design, clubs, advisory). Update `course-map.json` when you are confident.
+4. **Skip** any leftover Canvas course with no dashboard class and no `project:` map row. Do not create new class folders from Canvas. Do not store or import extras.
+5. A value `project:<id>` is not a class. College Counseling 2028 (`3659529`) is `project:college-prep`. Its assignments are College Prep todos. Do not create a class for it. Do not move those todos onto a class. Code creates and updates them, and sets `project.json` `canvasLink` to the gradebook. Nightly still reviews tags and dues on that project. Syllabus dates for that course go in the project `dates/` folder. Skip OneNote for it.
+6. If two dashboard classes could match one Canvas course, pick the obvious one or skip that course rather than guessing into the wrong folder.
+7. For each mapped class, set `canvasLink` on `class.json` to `{htmlUrl}/grades` (example `https://canvas.instructure.com/courses/3639020/grades`). Web and iOS class pages show the Canvas orb from this. The College Prep project page shows the same orb from `project.json`.
 
 ## Stop early (junior year not on Canvas yet)
 
@@ -102,11 +103,11 @@ Class of 2028, EPS Library, Iceland EBC, Graphic Design, and 9th/10th-year shell
 
 After the map step: if **zero** real dashboard classes match a Canvas course, **stop immediately**. Do not read syllabi, do not create todos or dates, do not import extras to look busy. The runner also skips spawning this agent when nothing maps, so a quiet night is only the HTTP fetch. One short reply is enough (`Junior year courses still not in Canvas`).
 
-When at least one class maps, sync **only** those mapped classes and continue below.
+When at least one class maps, sync **only** those mapped classes, plus the `project:` course, and continue below.
 
 ## Assignments → todos
 
-For every snapshot assignment whose `courseId` is mapped:
+For every snapshot assignment whose `courseId` maps to a class:
 
 - Match an existing todo in that class by `canvasId`, then `canvasLink`, then same **name + parent + dueDate**.
 - Create if none, unless it looks like a row in `education/you@example.com/deleted.md`. Judgement, not exact due clocks. `canvasId` is a strong hint; similar name + class in the same year is enough. Skip those. OneDrive folder name: `HW Sep 15 Title` (tag, due as `Mon D`, JSON name, spaces not kebab), unique in that class folder. Set `createdAt` now. `done: false` on create only. Express visibility sync will rename if the due date or title later changes.
@@ -131,9 +132,11 @@ For every snapshot assignment whose `courseId` is mapped:
 - MA still defaults `showInDates` on; do not turn that off unless Yan asked.
 - Copy a short markdown `description` from the snapshot when it helps (education-dashboard Description formatting: bold lead-ins, bullets, links). Do not dump the whole syllabus into every todo.
 
+Project-mapped assignments are already todos on that project. Review tags and dues there. Do not copy them onto a class.
+
 ## Syllabus and other dates → date.json
 
-Read each mapped course `syllabus` plus snapshot `events[]`. Create/update **important dates** (exams, concerts, trips, conferences, no-school mentioned in the syllabus, unit tests called out as calendar events). Skip routine class meetings.
+Read each mapped course `syllabus` plus snapshot `events[]`. Create/update **important dates** (exams, concerts, trips, conferences, no-school mentioned in the syllabus, unit tests called out as calendar events). Skip routine class meetings. For `project:college-prep`, those dates go in the College Prep `dates/` folder, not a class.
 
 - Match by `canvasId` / `canvasLink` / same name+date in that class folder. Also treat **similar names** on that date as the same event (advisor/advisory, stripped years). Update in place; never a second slug.
 - If that `canvasId` is already a class todo, skip the date. An MA already shows in Dates, so a second date is a duplicate. Physics MA #2 (40291676) and the symposium (40291677) are todos only.
@@ -199,7 +202,7 @@ Junk Canvas names get renamed when they land. `image-` plus a uuid, `image-` plu
 - **Never** delete an education todo/date because it disappeared from Canvas.
 - **Never** recreate a todo/date Yan already deleted (`deleted.md`). Judgement, not exact clocks.
 - **Never** touch fixtures (`"fixture": true` or ids starting `_example-`).
-- **Never** put Canvas rows on projects or user-level todos. Class folders only.
+- **Never** put Canvas rows on a project unless `course-map.json` says `project:<id>` for that course. User-level todos stay off Canvas. Other courses stay on class folders only.
 - **Never** mix this with Fitness OS gym logs.
 - **Never** put Canvas comments, pages, modules, or course-file dumps on the education UI.
 
@@ -251,7 +254,7 @@ On the nightly pass, teacher files Express downloads after you finish are not on
 
 ## Nightly review of the daytime watch
 
-Read `last-hourly-sync.json`. The watch creates new todos in code and starts Composer only to link that assignment. Walk mapped class todos against the **full** snapshot. Fix wrong tags, `HW:` prefixes left on names, Adv Calc HW dues pulled back to Canvas time, the American Lit Venn due pulled back to 2026-10-20, yoga CW `hiddenFromHome`, missing `canvasId`/`canvasLink`, duplicates, and course-map drift. A date that shares a `canvasId` with a todo is a duplicate. Remove the date, keep the todo, and add a `deleted.md` row. Then do the usual full map (new junior-year courses may have appeared). Then fold `comments-new.md` into class/todo `CONTEXT.md` as above.
+Read `last-hourly-sync.json`. The watch creates new todos in code and starts Composer only to link a class assignment. Project-mapped assignments skip that link pass. Walk mapped class todos, and the College Prep todos that came from Canvas, against the **full** snapshot. Fix wrong tags, `HW:` prefixes left on names, Adv Calc HW dues pulled back to Canvas time, the American Lit Venn due pulled back to 2026-10-20, yoga CW `hiddenFromHome`, missing `canvasId`/`canvasLink`, duplicates, and course-map drift. A date that shares a `canvasId` with a todo is a duplicate. Remove the date, keep the todo, and add a `deleted.md` row. Then do the usual full map (new junior-year courses may have appeared). Then fold `comments-new.md` into class/todo `CONTEXT.md` as above.
 
 ## After writes
 

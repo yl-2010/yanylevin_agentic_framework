@@ -289,6 +289,7 @@
   let projectsExpanded = false;
   /** Class comments panel: collapsed shows the 3 newest. */
   let classCommentsExpanded = false;
+  let projectCommentsExpanded = false;
   /** Home comments panel: same collapse, only the fresh window. */
   let homeCommentsExpanded = false;
   /** TODO panel: web starts fully expanded; collapsed shows 6 and hides type filters. */
@@ -390,6 +391,24 @@
     } catch {
       return "";
     }
+  }
+
+  function projectScoreLabel(project) {
+    return String(project?.canvasScoreLabel || "").trim();
+  }
+
+  function projectCanvasLink(project) {
+    const direct = normalizeCanvasLink(project && project.canvasLink);
+    if (direct) return direct;
+    const kids = [
+      ...flattenTodos(tree, { projectId: project && project.id }),
+      ...((project && project.dates) || []),
+    ];
+    for (const item of kids) {
+      const g = gradebookUrlFromCanvasLink(item && item.canvasLink);
+      if (g) return g;
+    }
+    return "";
   }
 
   function classCanvasLink(cls) {
@@ -1088,6 +1107,31 @@
       filterId: "lg-edu-class-comments",
       expandable: true,
       expanded: classCommentsExpanded,
+    });
+  }
+
+  function projectCommentsHtml(project) {
+    const rows = [];
+    flattenTodos(tree, { projectId: project.id }).forEach((t) => {
+      const comments = Array.isArray(t.canvasComments) ? t.canvasComments : [];
+      const tag = todoTagKey(t);
+      comments.forEach((row) => {
+        const text = String(row?.comment || "").trim();
+        if (!text) return;
+        rows.push({
+          ...row,
+          comment: text,
+          href: todoHref(t),
+          canvasLink: t.canvasLink || "",
+          todoNameHtml: taggedNameHtml(tag, t.name || t.id),
+        });
+      });
+    });
+    return commentsPanelHtml(rows, {
+      filterId: "lg-edu-project-comments",
+      expandable: true,
+      expanded: projectCommentsExpanded,
+      expandAttr: "data-project-comments-expand",
     });
   }
 
@@ -2892,11 +2936,17 @@
     const completed = sortCompletedTodos(todos.filter((t) => t.done));
     const name = escapeHtml(project.name || project.id);
     const projectDesc = String(project.description || "").trim();
+    const canvas = CFG.showGrades
+      ? canvasOrbHtml(projectCanvasLink(project), projectScoreLabel(project))
+      : "";
 
     appEl.innerHTML = `
-      <header class="edu-hero edu-hero--detail">
-        ${backLinkHtml(spaHome(), "lg-edu-back-project")}
-        <h1 class="edu-hero-title">${name}</h1>
+      <header class="edu-hero edu-hero--detail${canvas ? " edu-hero--detail-canvas" : ""}">
+        <div class="edu-hero-lead">
+          ${backLinkHtml(spaHome(), "lg-edu-back-project")}
+          <h1 class="edu-hero-title">${name}</h1>
+        </div>
+        ${canvas}
       </header>
       ${projectDesc ? markdownPanelHtml(projectDesc, "lg-edu-project-desc") : ""}
       <div class="edu-grid edu-grid--home">
@@ -2909,6 +2959,7 @@
           ${filesHtml(project.files, { scope: "project", id: project.id }, {
             filterPrefix: "lg-edu-project-file",
           })}
+          ${projectCommentsHtml(project)}
         </div>
       </div>
     `;
@@ -3972,6 +4023,14 @@
       if (homeCommentsToggle) {
         event.preventDefault();
         homeCommentsExpanded = !homeCommentsExpanded;
+        render();
+        return;
+      }
+
+      const projectCommentsToggle = t.closest?.("[data-project-comments-expand]");
+      if (projectCommentsToggle) {
+        event.preventDefault();
+        projectCommentsExpanded = !projectCommentsExpanded;
         render();
         return;
       }

@@ -393,9 +393,11 @@ struct EducationProject: Decodable, Identifiable, Hashable {
     let dates: [EducationDate]?
     let cases: [EducationCase]?
     let tier: String?
+    let canvasLink: String?
+    let canvasScoreLabel: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, filter, order, files, todos, dates, href, cases, tier
+        case id, name, filter, order, files, todos, dates, href, cases, tier, canvasLink, canvasScoreLabel
         case detail = "description"
     }
 
@@ -422,6 +424,21 @@ struct EducationProject: Decodable, Identifiable, Hashable {
         return raw == "/debate" || raw == "/debate/" || raw.hasPrefix("/debate?")
     }
 
+    var canvasURL: URL? {
+        if let direct = CanvasLMS.webURL(from: canvasLink) { return direct }
+        for todo in todos ?? [] {
+            if let url = CanvasLMS.gradebookURL(from: todo.canvasLink) { return url }
+        }
+        for date in dates ?? [] {
+            if let url = CanvasLMS.gradebookURL(from: date.canvasLink) { return url }
+        }
+        return nil
+    }
+
+    var scoreLabel: String {
+        (canvasScoreLabel ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     func mappingTodos(_ transform: (EducationTodo) -> EducationTodo) -> EducationProject {
         EducationProject(
             id: id,
@@ -434,7 +451,9 @@ struct EducationProject: Decodable, Identifiable, Hashable {
             todos: todos?.map(transform),
             dates: dates,
             cases: cases,
-            tier: tier
+            tier: tier,
+            canvasLink: canvasLink,
+            canvasScoreLabel: canvasScoreLabel
         )
     }
 }

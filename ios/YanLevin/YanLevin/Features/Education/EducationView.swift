@@ -1448,6 +1448,7 @@ struct ProjectDetailView: View {
     @State private var todoTypeFilters: Set<String> = EducationTodoFilter.load()
     @State private var datesExpanded = false
     @State private var dateFilters: Set<String> = EducationDateFilter.load()
+    @State private var commentsExpanded = false
 
     private static let collapsedTodoLimit = 6
 
@@ -1495,6 +1496,7 @@ struct ProjectDetailView: View {
                         VStack(alignment: .leading, spacing: 14) {
                             datesPanel
                             projectFilesPanel
+                            projectCommentsPanel
                         }
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
@@ -1502,6 +1504,7 @@ struct ProjectDetailView: View {
                     todosPanel
                     datesPanel
                     projectFilesPanel
+                    projectCommentsPanel
                     completedPanel
                 }
             }
@@ -1513,6 +1516,13 @@ struct ProjectDetailView: View {
         .ylPageBackground()
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if store.workspace != "jype", let url = liveProject.canvasURL {
+                ToolbarItem(placement: .topBarTrailing) {
+                    CanvasToolbarButton(webURL: url, scoreLabel: liveProject.scoreLabel)
+                }
+            }
+        }
         .refreshable {
             guard let token = auth.session?.token else { return }
             await store.load(token: token, live: true)
@@ -1587,6 +1597,36 @@ struct ProjectDetailView: View {
             onToggleFilter: toggleDateFilter,
             showFilters: store.workspace != "jype"
         )
+    }
+
+    @ViewBuilder
+    private var projectCommentsPanel: some View {
+        let all = projectCommentEntries
+        if !all.isEmpty {
+            EducationCommentsBox(
+                entries: commentsExpanded ? all : Array(all.prefix(3)),
+                expandable: true,
+                expanded: commentsExpanded,
+                onToggle: {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        commentsExpanded.toggle()
+                    }
+                },
+                use24Hour: use24Hour
+            )
+        }
+    }
+
+    private var projectCommentEntries: [EducationCommentEntry] {
+        projectTodos.flatMap { todo in
+            EducationCommentWhen.sorted(todo.canvasComments ?? []).map {
+                EducationCommentEntry(comment: $0, todo: todo)
+            }
+        }
+        .sorted { a, b in
+            if a.createdAt != b.createdAt { return a.createdAt > b.createdAt }
+            return a.id > b.id
+        }
     }
 
     @ViewBuilder

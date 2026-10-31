@@ -5,6 +5,7 @@ import {
   attachCanvasCompletion,
   attachCanvasGrades,
   assignmentLooksComplete,
+  courseMapTarget,
   formatAssignmentWork,
   formatCourseScoreLabel,
   trimScore,
@@ -159,6 +160,40 @@ describe("attachCanvasGrades", () => {
     );
     assert.equal(tree.classes[0].canvasScoreLabel, "97.5%");
     assert.equal(tree.classes[0].todos[0].canvasWork.display, "4/5");
+  });
+
+  it("paints a project gradebook when the course map says project:", () => {
+    const tree = {
+      projects: [
+        {
+          id: "college-prep",
+          todos: [{ id: "questionnaire", canvasId: 40394213 }],
+        },
+      ],
+    };
+    attachCanvasGrades(
+      tree,
+      {
+        courses: [{ id: 3659529, currentScore: 100 }],
+        assignments: [
+          {
+            id: 40394213,
+            courseId: 3659529,
+            score: 10,
+            pointsPossible: 10,
+            workflowState: "graded",
+          },
+        ],
+      },
+      { 3659529: "project:college-prep" }
+    );
+    assert.equal(tree.projects[0].canvasScoreLabel, "100%");
+    assert.equal(tree.projects[0].todos[0].canvasWork.display, "10/10");
+    assert.deepEqual(courseMapTarget("project:college-prep"), {
+      kind: "project",
+      id: "college-prep",
+    });
+    assert.deepEqual(courseMapTarget("physics"), { kind: "class", id: "physics" });
   });
 
   it("hides a 0% course total when nothing is scored yet", () => {
