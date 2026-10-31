@@ -86,8 +86,9 @@ describe("whatsapp mentions", () => {
         },
       }
     );
-    assert.match(jype, /who outranks whom/);
-    assert.match(jype, /WhatsApp reply or final bubble/);
+    assert.match(jype, /What you write is what gets sent/);
+    assert.match(jype, /inner circle/);
+    assert.match(jype, /The message starts at the answer/);
     assert.match(jype, /Called by Alex on WhatsApp, not Yan/);
     assert.match(jype, /alex-rivera/);
     assert.match(jype, /JYPE member/);

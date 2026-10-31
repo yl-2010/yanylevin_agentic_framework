@@ -87,8 +87,9 @@ describe("teams-mention trigger", () => {
     assert.match(block, /School Outlook still cannot send/);
     assert.doesNotMatch(block, /Apple Mail/);
     assert.match(block, /keep that same text/);
-    assert.match(block, /who outranks whom/);
-    assert.match(block, /Teams reply or final bubble/);
+    assert.match(block, /What you write is what gets sent/);
+    assert.match(block, /inner circle/);
+    assert.match(block, /The message starts at the answer/);
     assert.match(block, /before you start the work/);
     assert.match(block, /posted to this Teams chat immediately/);
     assert.match(block, /@agent and @agentg both do this/);
@@ -113,6 +114,8 @@ describe("teams-mention trigger", () => {
       guestCaller: { displayName: "Alex", slug: "alex-rivera" },
     });
     assert.match(guest, /Called by Alex \(not Yan\) on Teams/);
+    assert.match(guest, /That judgment is an inner thought/);
+    assert.match(guest, /What you write is what gets sent/);
     assert.doesNotMatch(guest, /Called from Teams\. This Personal Agent chat is otherwise normal/);
     const grade = formatTeamsOriginBlock(
       normalizeTeamsOrigin({
