@@ -98,7 +98,7 @@ function main() {
     for (const d of dangling) console.error(`dangling: ${d}`);
     if (staleIndex) console.error("stale: people/index.md");
     if (staleGraph) console.error("stale: people/graph.md");
-    process.exit(problems.length || staleIndex || staleGraph ? 1 : 0);
+    process.exit(problems.length || dangling.length || staleIndex || staleGraph ? 1 : 0);
   }
 
   fs.writeFileSync(INDEX_PATH, index);

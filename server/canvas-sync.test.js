@@ -1,6 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { computeDue } from "./canvas-hourly-apply.js";
+import {
+  canvasIdBlocksMatch,
+  computeDue,
+  folderDueConflicts,
+  folderNameMatchesTodo,
+} from "./canvas-hourly-apply.js";
 import {
   canvasDueSoonCount,
   courseScores,
@@ -660,5 +665,42 @@ describe("computeDue", () => {
       computeDue({ id: 40291677, dueDate: "", dueTime: "" }, "physics", null, null),
       { dueDate: "2026-11-20", dueTime: "10:30" }
     );
+  });
+});
+
+describe("canvas assignment identity", () => {
+  const today = {
+    name: "Read and annotate Walden, pp. 5-31. See details.",
+    dueDate: "2026-10-30",
+    canvasId: 40441631,
+  };
+  const journal = {
+    name: "Read and annotate Walden pp. 90-97, and Journal Entry 2",
+    dueDate: "2026-11-05",
+    canvasId: 40465301,
+  };
+  const todayFolder = "HW Oct 30 Read and annotate Walden, pp. 5-31. See details.";
+  const journalFolder = "HW Nov 5 Read and annotate Walden pp. 90-97, and Journal Entry 2";
+
+  it("does not treat a shared title prefix as the same assignment", () => {
+    assert.equal(folderNameMatchesTodo(todayFolder, journal), false);
+    assert.equal(folderNameMatchesTodo(journalFolder, today), false);
+  });
+
+  it("still matches a folder to its own assignment", () => {
+    assert.equal(folderNameMatchesTodo(todayFolder, today), true);
+    assert.equal(folderNameMatchesTodo(journalFolder, journal), true);
+  });
+
+  it("treats a different due day on the folder as a different assignment", () => {
+    assert.equal(folderDueConflicts(todayFolder, journal.dueDate), true);
+    assert.equal(folderDueConflicts(journalFolder, today.dueDate), true);
+    assert.equal(folderDueConflicts(todayFolder, today.dueDate), false);
+  });
+
+  it("refuses to move a todo onto a different canvas id", () => {
+    assert.equal(canvasIdBlocksMatch({ canvasId: 40441631 }, 40465301), true);
+    assert.equal(canvasIdBlocksMatch({ canvasId: 40441631 }, 40441631), false);
+    assert.equal(canvasIdBlocksMatch({}, 40465301), false);
   });
 });

@@ -26,6 +26,7 @@ import {
 } from "./education-match.js";
 import {
   classObjectFinderName,
+  formatFinderShortDate,
   listClassObjectDirs,
   objectDirId,
   resolveBookkeepingFile,
@@ -286,19 +287,51 @@ function hashNumbersConflict(a, b) {
   return na[1] !== nb[1];
 }
 
-function folderNameMatchesTodo(dirName, desired) {
+/**
+ * A todo that already belongs to a different Canvas assignment.
+ * Empty canvasId can still be claimed. A set id never moves.
+ * @param {object|null|undefined} props
+ * @param {unknown} canvasId
+ */
+export function canvasIdBlocksMatch(props, canvasId) {
+  const existing = String(props?.canvasId ?? "").trim();
+  if (!existing) return false;
+  const want = String(canvasId ?? "").trim();
+  if (!want) return false;
+  return existing !== want;
+}
+
+/**
+ * Folder title includes a due day (`HW Oct 30 …`). A different due day is a
+ * different assignment, even when the titles share a prefix.
+ * @param {string} dirName
+ * @param {unknown} dueDate
+ */
+export function folderDueConflicts(dirName, dueDate) {
+  const id = objectDirId(dirName) || String(dirName || "").replace(/^\./, "");
+  const m = id.match(/^(?:CW|HW|QA|MA)\s+([A-Za-z]{3})\s+(\d{1,2})\b/i);
+  if (!m) return false;
+  const want = formatFinderShortDate(dueDate);
+  if (!want) return false;
+  const got = `${m[1].slice(0, 1).toUpperCase()}${m[1].slice(1).toLowerCase()} ${Number(m[2])}`;
+  return got.toLowerCase() !== want.toLowerCase();
+}
+
+/**
+ * Fallback when a todo has no canvasId yet. Same assignment only.
+ * A shared opening ("Read and annotate Walden") is not a match.
+ * @param {string} dirName
+ * @param {{ name?: string, dueDate?: string }} desired
+ */
+export function folderNameMatchesTodo(dirName, desired) {
+  if (folderDueConflicts(dirName, desired?.dueDate)) return false;
   const id = objectDirId(dirName) || String(dirName || "").replace(/^\./, "");
   const stripped = id
     .replace(/^(CW|HW|QA|MA)\s+/i, "")
     .replace(/^[A-Za-z]{3}\s+\d{1,2}\s+/i, "")
     .trim();
-  if (hashNumbersConflict(stripped, desired.name)) return false;
-  if (namesAreSimilar(stripped, desired.name)) return true;
-  const needle = String(desired.name || "").toLowerCase();
-  if (needle.length >= 8 && stripped.toLowerCase().includes(needle.slice(0, 24))) {
-    return true;
-  }
-  return false;
+  if (hashNumbersConflict(stripped, desired?.name)) return false;
+  return namesAreSimilar(stripped, desired?.name);
 }
 
 async function findTodoDirByFolderScan(classFolder, desired) {
@@ -321,6 +354,7 @@ async function findTodoDirByFolderScan(classFolder, desired) {
       continue;
     }
     if (!props || typeof props !== "object") continue;
+    if (canvasIdBlocksMatch(props, desired?.canvasId)) continue;
     return { dirName: e.name, objectDir, props, jsonPath };
   }
   return null;
@@ -391,18 +425,19 @@ function findTodoMatch(todos, indexes, assignment, classId, desired) {
     dueDate: desired.dueDate || "",
     dueTime: desired.dueTime || "",
   };
-  const slim = todos
-    .filter((t) => t.props && typeof t.props === "object")
-    .map((t) => ({
-      parent,
-      name: String(t.props.name || ""),
-      dueDate: String(t.props.dueDate || ""),
-      dueTime: String(t.props.dueTime || ""),
-      _ref: t,
-    }));
+  const open = todos.filter(
+    (t) => t.props && typeof t.props === "object" && !canvasIdBlocksMatch(t.props, canvasId)
+  );
+  const slim = open.map((t) => ({
+    parent,
+    name: String(t.props.name || ""),
+    dueDate: String(t.props.dueDate || ""),
+    dueTime: String(t.props.dueTime || ""),
+    _ref: t,
+  }));
   const hit = findMatchingTodo(candidate, slim);
   if (hit?._ref) return hit._ref;
-  return todos.find((t) => folderNameMatchesTodo(t.dirName, desired)) || null;
+  return open.find((t) => folderNameMatchesTodo(t.dirName, desired)) || null;
 }
 
 async function loadMappedClassEntries(mappedClassIds) {

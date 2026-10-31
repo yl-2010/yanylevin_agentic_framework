@@ -501,7 +501,7 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
     let notes: String?
     let files: [EducationContextFile]?
     let kind: String?
-    let capsules: [EducationCapsule]?
+    var capsules: [EducationCapsule]?
     let citations: [EducationCitation]?
 
     enum CodingKeys: String, CodingKey {
@@ -639,6 +639,17 @@ struct EducationTodo: Decodable, Identifiable, Hashable {
         var copy = self
         copy.done = done
         copy.completedAt = completedAt
+        return copy
+    }
+
+    func withCapsuleVote(capsuleId: String, vote: String?) -> EducationTodo {
+        guard var list = capsules,
+              let idx = list.firstIndex(where: { $0.id == capsuleId }) else {
+            return self
+        }
+        list[idx].vote = vote
+        var copy = self
+        copy.capsules = list
         return copy
     }
 

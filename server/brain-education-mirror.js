@@ -271,7 +271,7 @@ async function collect() {
         fields: { order: row.props.order ?? null, tier: row.tier },
       }),
     );
-    await collectChildren(stubs, row.dir, `projects/${row.id}`, row.id);
+    await collectChildren(stubs, row.dir, `education/projects/${row.id}`, row.id);
   }
 
   for (const slug of listDirs(path.join(EDU_ROOT, "todos"))) {

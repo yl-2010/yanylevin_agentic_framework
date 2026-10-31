@@ -783,6 +783,8 @@ final class EducationStore: ObservableObject {
     private var lastEducationData: Data?
     /// Local checkoffs keep winning for 30s while Canvas/live overlay catches up.
     private var pendingTodoDone: [String: (done: Bool, at: Date)] = [:]
+    /// Local thumbs keep winning for 30s when a refresh still has the old vote.
+    private var pendingCapsuleVotes: [String: (vote: String?, at: Date)] = [:]
     private var lastOpenedProjectId: String?
     private var lastOpenedAt = Date.distantPast
     private var lastIngestedNavigateKey = ""
@@ -1137,7 +1139,7 @@ final class EducationStore: ObservableObject {
             if let err = res.error, res.classes == nil {
                 errorText = err
             }
-            let painted = applyPendingTodoDone(res)
+            let painted = applyPendingCapsuleVotes(applyPendingTodoDone(res))
             let stable = Self.stableEducationPayload(data)
             if lastEducationData != stable {
                 lastEducationData = stable
@@ -1316,6 +1318,28 @@ final class EducationStore: ObservableObject {
         projectId: String? = nil,
         token: String
     ) async {
+        let previous = currentCapsuleVote(
+            todoId: todoId,
+            capsuleId: capsuleId,
+            classId: classId,
+            projectId: projectId
+        )
+        rememberPendingCapsuleVote(
+            todoId: todoId,
+            capsuleId: capsuleId,
+            classId: classId,
+            projectId: projectId,
+            vote: vote
+        )
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+            applyLocalCapsuleVote(
+                todoId: todoId,
+                capsuleId: capsuleId,
+                classId: classId,
+                projectId: projectId,
+                vote: vote
+            )
+        }
         do {
             var query: [URLQueryItem] = []
             if let classId, !classId.isEmpty {
@@ -1331,10 +1355,166 @@ final class EducationStore: ObservableObject {
                 bearer: token,
                 query: query
             )
-            await load(token: token)
         } catch {
             errorText = error.localizedDescription
+            forgetPendingCapsuleVote(
+                todoId: todoId,
+                capsuleId: capsuleId,
+                classId: classId,
+                projectId: projectId
+            )
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+                applyLocalCapsuleVote(
+                    todoId: todoId,
+                    capsuleId: capsuleId,
+                    classId: classId,
+                    projectId: projectId,
+                    vote: previous
+                )
+            }
         }
+    }
+
+    private func pendingVoteKey(
+        todoId: String,
+        capsuleId: String,
+        classId: String?,
+        projectId: String?
+    ) -> String {
+        "\(pendingTodoKey(id: todoId, classId: classId, projectId: projectId))/\(capsuleId)"
+    }
+
+    private func rememberPendingCapsuleVote(
+        todoId: String,
+        capsuleId: String,
+        classId: String?,
+        projectId: String?,
+        vote: String?
+    ) {
+        pendingCapsuleVotes[pendingVoteKey(
+            todoId: todoId,
+            capsuleId: capsuleId,
+            classId: classId,
+            projectId: projectId
+        )] = (vote, Date())
+    }
+
+    private func forgetPendingCapsuleVote(
+        todoId: String,
+        capsuleId: String,
+        classId: String?,
+        projectId: String?
+    ) {
+        pendingCapsuleVotes.removeValue(forKey: pendingVoteKey(
+            todoId: todoId,
+            capsuleId: capsuleId,
+            classId: classId,
+            projectId: projectId
+        ))
+    }
+
+    private func currentCapsuleVote(
+        todoId: String,
+        capsuleId: String,
+        classId: String?,
+        projectId: String?
+    ) -> String? {
+        guard let tree else { return nil }
+        func vote(in todos: [EducationTodo]?) -> String? {
+            guard let todo = todos?.first(where: { $0.todoId == todoId }) else { return nil }
+            return todo.capsules?.first(where: { $0.id == capsuleId })?.voteKey
+        }
+        if let projectId, !projectId.isEmpty {
+            return vote(in: tree.projects?.first(where: { $0.id == projectId })?.todos)
+        }
+        if let classId, !classId.isEmpty {
+            let cls = tree.classes?.first(where: { $0.id == classId })
+            return vote(in: cls?.todos) ?? vote(in: cls?.classOnlyTodos)
+        }
+        return vote(in: tree.todos)
+    }
+
+    private func applyPendingCapsuleVotes(_ res: EducationTreeResponse) -> EducationTreeResponse {
+        let now = Date()
+        pendingCapsuleVotes = pendingCapsuleVotes.filter { now.timeIntervalSince($0.value.at) < 30 }
+        guard !pendingCapsuleVotes.isEmpty else { return res }
+        func paint(_ todo: EducationTodo, classId: String?, projectId: String?) -> EducationTodo {
+            var next = todo
+            for cap in todo.capsules ?? [] {
+                let key = pendingVoteKey(
+                    todoId: todo.todoId,
+                    capsuleId: cap.id,
+                    classId: classId,
+                    projectId: projectId
+                )
+                guard let pending = pendingCapsuleVotes[key] else { continue }
+                next = next.withCapsuleVote(capsuleId: cap.id, vote: pending.vote)
+            }
+            return next
+        }
+        let classes = res.classes?.map { cls in
+            cls.mappingTodos { paint($0, classId: cls.id, projectId: nil) }
+        }
+        let projects = res.projects?.map { project in
+            project.mappingTodos { paint($0, classId: nil, projectId: project.id) }
+        }
+        let userTodos = res.todos?.map { paint($0, classId: nil, projectId: nil) }
+        return EducationTreeResponse(
+            ok: res.ok,
+            email: res.email,
+            meta: res.meta,
+            schedule: res.schedule,
+            classes: classes,
+            projects: projects,
+            todos: userTodos,
+            dates: res.dates,
+            todayKey: res.todayKey,
+            activeClassIdsByDate: res.activeClassIdsByDate,
+            nowContext: res.nowContext,
+            error: res.error
+        )
+    }
+
+    private func applyLocalCapsuleVote(
+        todoId: String,
+        capsuleId: String,
+        classId: String?,
+        projectId: String?,
+        vote: String?
+    ) {
+        guard let tree else { return }
+        func mapTodo(_ t: EducationTodo) -> EducationTodo {
+            t.todoId == todoId ? t.withCapsuleVote(capsuleId: capsuleId, vote: vote) : t
+        }
+        let classKey = classId ?? ""
+        let projectKey = projectId ?? ""
+        let classes = tree.classes?.map { cls -> EducationClass in
+            guard !classKey.isEmpty, cls.id == classKey else { return cls }
+            return cls.mappingTodos(mapTodo)
+        }
+        let projects = tree.projects?.map { project -> EducationProject in
+            guard !projectKey.isEmpty, project.id == projectKey else { return project }
+            return project.mappingTodos(mapTodo)
+        }
+        let userTodos: [EducationTodo]? = {
+            if !classKey.isEmpty || !projectKey.isEmpty { return tree.todos }
+            return tree.todos?.map(mapTodo)
+        }()
+        self.tree = EducationTreeResponse(
+            ok: tree.ok,
+            email: tree.email,
+            meta: tree.meta,
+            schedule: tree.schedule,
+            classes: classes,
+            projects: projects,
+            todos: userTodos,
+            dates: tree.dates,
+            todayKey: tree.todayKey,
+            activeClassIdsByDate: tree.activeClassIdsByDate,
+            nowContext: tree.nowContext,
+            error: tree.error
+        )
+        treeEpoch += 1
     }
 
     /// Download a context file into a temp URL for Quick Look (caller owns cleanup).

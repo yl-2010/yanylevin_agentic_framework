@@ -25,8 +25,8 @@ Do not run the frontend-design "unique aesthetic" playbook. This is the existing
 
 **Colors.** Every page picks one of three themes. Never type brand hex into page CSS. Use `var(--accent)`, `var(--bloom-a)`, and the other tokens.
 
-- **Personal (default).** Load `/education/styles.css`. The page follows the personal color in `brand/palette.mjs`.
-- **JYPE.** Also load `/jype/styles.css` after it. The page follows the JYPE color.
+- **Personal (default).** Load `/education/styles.css` only. The page follows the personal color in `brand/palette.mjs`. Personal chat uses this unless Yan names another theme.
+- **JYPE.** Also load `/jype/styles.css` after it. The page follows the JYPE color. Use this for the JYPE agent, the JYPE site, or when Yan says JYPE theme.
 - **Unique color on yanylevin chrome.** Only when Yan asks for its own color. Load `/education/styles.css` for the glass and orbs. Then pin `--accent`, `--bloom-a`, `--bloom-b`, `--bloom-c`, `--bg-0`, and `--bg-1` with literal hex in the page CSS, in `:root`, the dark media query, and `html[data-resolved-theme="dark"]`. Copy the pattern from `mama-birthday-2026/styles.css`. That color stays fixed when the palette changes.
 
 Apply Unslop to every heading and sentence on the page. No em dashes.
@@ -48,7 +48,7 @@ When JYPE, close friends, or Yan ask for a study guide, large plan, or blueprint
 2. Nest it under the class or group folder (`spanish4/fall-qa-1`, `jype/what-to-do-with-particle`).
 3. Add a `sites[]` URL tile. JYPE agent, or Yan sending the URL to a JYPE member / JYPE group: `education/projects/jype/classes/<id>/class.json`. Yan making the page for himself: OneDrive `.education/class.json` only. Do not copy personal pages onto JYPE because the class is shared. Update that class’s public index if one exists. The `/notes` hub can list the page, but do not create a Notes project.
 4. Breadcrumb every page: Home · Notes · Class.
-5. After education CSS, also load `/jype/styles.css` so the page uses the JYPE red wash instead of lake teal.
+5. Theme follows who asked. Personal chat (`/education`, Yan's 1:1, this agent on the Mac) loads `/education/styles.css` only. That is the yanylevin theme. Do not load `/jype/styles.css` unless Yan says JYPE theme. JYPE agent pages, and pages Yan is making for the JYPE site, still load `/jype/styles.css` after education CSS. Yan, 2026-10-30.
 6. Reply with the live URL.
 
 Hub: `yanylevin.com/notes`. Homepage More and the gated Apps tile both point there. YL orb still goes home.

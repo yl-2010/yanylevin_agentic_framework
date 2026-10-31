@@ -185,6 +185,12 @@ If the user later asks to add that thing back, create it and **remove** the matc
 
 Nightly / Canvas / school-mail: if a proposed create looks like a row in `deleted.md`, skip it. Do not require the clock time or even the calendar day to match byte-for-byte. Same event in the same school year is enough. Next year's first day is a new event. Do not write `update <gone-path>`.
 
+### Due means a todo
+
+**Yan, 2026-10-30.** When he says something is due at a time, write a todo. Leave `showInDates` off, including an MA he just named. Do not create a `date.json`. Do not add an Apple Calendar event.
+
+Dates only when he says add date. That is a yanylevin Dates row. Apple Calendar only when he says add to calendar. Write both only when the same message names both. Canvas sync still defaults existing MAs into Dates. That path is not this rule.
+
 ### Time phrases
 
 When the user says a due/start time in natural language, resolve it like this:
@@ -240,6 +246,7 @@ Text-only and attachment turns both run on **grok-4.7 high** with Fast off. The 
 
 ## Actions
 
+- **Due time is a todo (Yan, 2026-10-30).** "X is due Tuesday" creates or updates a todo only. Leave `showInDates` off. Do not create a date. Do not touch Apple Calendar. Add date means a yanylevin Dates row. Add to calendar means Apple Calendar. Both only if he says both.
 - Parse natural language into class / project / todo / important date create/update/delete. When moving a todo or date into a class or project, write the new folder, then delete the old one. Do not leave empty `todos/<id>/` or `dates/<id>/` shells. Those make the brain education mirror warn about missing json. An intentional delete must append a `deleted.md` row first; a move must not. Nightly actions also creates `date.json` rows only for rare big dates (first/last day, orientation, advisor/parent conferences, out-of-school travel, a college visit Yan said he signed up for, graduation-scale milestones) listed in the 02:30 digest. Skip or update duplicates (same parent + date + similar name, not only exact `name`). Skip anything that looks like a `deleted.md` row (judgement, not exact clocks). Do not create dates for hangouts, dentist, picture day, picnic, spirit week, club meetings, or ordinary class events. Those can still go on Apple Calendar. Homework and other todos stay on the dashboard. Do not copy them onto Apple Calendar unless Yan asked for that item there. College spam and the weekly EPS college-visit list stay off both Dates and Apple Calendar. Only a visit Yan said he signed up for.
 - **College applications (Yan, 2026-10-03).** New college-app todos go on the College Prep project, folder `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/College Prep/todos/`. Display name is College Prep. Id is `college-prep`. No custom Dates filter. That includes PSAT practice, counselor talks, teacher thank-you cards, and teacher asks that are for the application. Ask Seeley about AP Physics tests is College Prep, not Physics.
 - Daily Briefing feedback (Yan): when he comments on news selection (more local, less politics, skip a beat, etc.), append a dated note to `education/you@example.com/daily-briefing/preferences.md`. Capsule thumbs are 3-way: up = more of this, down = less of this, neither (`vote: null`) = **neutral** (a real rating, not skipped/ignored). Do not attach briefing todos to a class/project or give them CW/HW/QA/MA tags. Compiling the brief itself is the daily-news skill.

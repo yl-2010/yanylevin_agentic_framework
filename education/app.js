@@ -275,6 +275,8 @@
   let treeFingerprint = "";
   /** Recent local checkoffs win over a slower Canvas overlay. */
   const localDoneLocks = new Map();
+  /** Recent thumbs win over a refresh that still has the old vote. */
+  const localVoteLocks = new Map();
   /** Entrance fade only on first paint after a real browser load. */
   let didEntrance = false;
   /** @type {Set<string>} */
@@ -3742,6 +3744,7 @@
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `data ${res.status}`);
     applyLocalDoneLocks(data);
+    applyLocalVoteLocks(data);
     const nextFp = fingerprintTree(data);
     if (tree && nextFp === treeFingerprint) return;
     tree = data;
@@ -3820,6 +3823,52 @@
       apply(tree.todos);
     }
     treeFingerprint = fingerprintTree(tree);
+    rememberLocalVote(todoId, capsuleId, nextVote, {
+      classId: wantClass,
+      projectId: wantProject,
+    });
+  }
+
+  function voteLockKey(todoId, capsuleId, scope) {
+    return `${doneLockKey(todoId, scope)}/${capsuleId}`;
+  }
+
+  function rememberLocalVote(todoId, capsuleId, nextVote, scope) {
+    localVoteLocks.set(voteLockKey(todoId, capsuleId, scope), {
+      vote: nextVote || null,
+      at: Date.now(),
+    });
+  }
+
+  function applyLocalVoteLocks(data) {
+    if (!data || typeof data !== "object") return data;
+    const now = Date.now();
+    for (const [key, lock] of localVoteLocks) {
+      if (now - lock.at > 30_000) localVoteLocks.delete(key);
+    }
+    if (!localVoteLocks.size) return data;
+    const paint = (todo, scope) => {
+      if (!todo || !Array.isArray(todo.capsules)) return;
+      for (const cap of todo.capsules) {
+        if (!cap || cap.id == null) continue;
+        const lock = localVoteLocks.get(
+          voteLockKey(todo.id, String(cap.id), scope)
+        );
+        if (!lock) continue;
+        cap.vote = lock.vote;
+      }
+    };
+    for (const cls of data.classes || []) {
+      const scope = { classId: cls.id, projectId: null };
+      for (const t of cls.todos || []) paint(t, scope);
+      for (const t of cls.classOnlyTodos || []) paint(t, scope);
+    }
+    for (const t of data.todos || []) paint(t, {});
+    for (const p of data.projects || []) {
+      const scope = { classId: null, projectId: p.id };
+      for (const t of p.todos || []) paint(t, scope);
+    }
+    return data;
   }
 
   function patchCapsuleVoteDom(todoId, capsuleId, nextVote) {
@@ -3877,10 +3926,13 @@
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `vote ${res.status}`);
     } catch (err) {
+      const key = voteLockKey(todoId, capsuleId, { classId, projectId });
+      localVoteLocks.delete(key);
       applyCapsuleVoteLocal(todoId, capsuleId, prev || null, {
         classId,
         projectId,
       });
+      localVoteLocks.delete(key);
       if (!patchCapsuleVoteDom(todoId, capsuleId, prev || null)) render();
       throw err;
     }

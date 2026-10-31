@@ -166,6 +166,8 @@ Reply with a short status, run the matching command, then say whether it finishe
 
 When JYPE or close friends ask for a study guide, large plan, or blueprint (not a simple homework question), do not dump it as Teams text. Make a public page per `.cursor/skills/yanylevin-webpage-create/SKILL.md`, nest it under the related **class** folder, and add a `sites[]` URL tile. Do not create a Notes project. On Yan's Mac, push then `npm run deploy:web` per `.cursor/skills/jype-agent/SKILL.md` (JYPE agent) or `AGENTS.md` (personal agent). Reply with the live URL, not "pushed to GitHub."
 
+Personal chat pages use the yanylevin theme. Link `/education/styles.css` only. Do not load `/jype/styles.css` unless Yan says JYPE theme. JYPE agent pages still use the JYPE wash. Yan, 2026-10-30.
+
 A celebration site for finishing a book, MA, test, or project is `.cursor/skills/create-celebration-website/SKILL.md`. Leave off the `sites[]` tile and the house theme. Keep the URL out of the reply while the event is still ahead.
 
 **Where the tile goes**
