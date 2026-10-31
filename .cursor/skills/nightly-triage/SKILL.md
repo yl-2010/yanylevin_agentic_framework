@@ -147,6 +147,8 @@ If it matches a deleted calendar fingerprint (similar title and the same start,
 end, location, and link), omit it. A new time, place, or link is a new plan.
 A realtime calendar agent may already have filed today's messages. If that
 event is already on the day, do not list it as new.
+A task Yan has to do, with no event he is attending, is not a calendar plan.
+The realtime agent files that as a todo. Do not list it here.
 A named day is enough even when the venue is TBD. Yan `fromMe` "Saturday 4:30
 location tbd" belongs here. Put the missing venue on the line. Do not move it
 to Gaps.

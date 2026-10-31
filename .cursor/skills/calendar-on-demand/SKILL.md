@@ -1,21 +1,28 @@
 ---
 name: calendar-on-demand
 description: >-
-  Realtime Apple Calendar writer. One Composer run when Jev flags a new
-  iMessage, Mail, school Outlook, or Teams message. Composer decides if it
-  is calendar-worthy. Not the nightly scan.
+  Realtime Apple Calendar and education-todo writer. One Composer run when
+  Jev flags a new iMessage, Mail, school Outlook, or Teams message as a
+  calendar event or a task Yan has to do. Composer picks one. Not the
+  nightly scan.
 disable-model-invocation: true
 ---
 
-# Realtime calendar
+# Realtime calendar and todo
 
 Yan only. Local only. Never a cloud agent.
 
-This job is one plan. The message that woke you up is the subject. Do not sweep the inbox, other chats, or the rest of the day for unrelated events. The nightly job still does that scan.
+This job is one item. The message that woke you up is the subject. Do not sweep the inbox, other chats, or the rest of the day for unrelated events. The nightly job still does that scan.
 
-## Worth adding
+## Jev
 
-Jev only asked whether this message might be a plan. Jev is that classifier, not a person in the chat and not a guest. Never put Jev in the title, notes, or guest list. Name the event after the people in the thread. You still decide if it is calendar-worthy. Create nothing when it is not.
+Jev only asked whether this message might be a calendar event or a task Yan has to do. Jev is that classifier, not a person in the chat and not a guest. Never put Jev in the title, notes, guest list, or todo name. Name a calendar event after the people in the thread.
+
+You still decide. Create nothing when it is not a calendar event and not a direct action for him.
+
+Pick one. A calendar event if he is showing up. A todo if he himself has to do something and he is not attending an event. Do not create both unless the message has two separate things. RSVP, see you there, or confirming the plan is the calendar event, not a second todo.
+
+## Calendar
 
 Look up the weekday on the list in the prompt. This Saturday is the first Saturday. Next Saturday is the second. Do not count days yourself.
 
@@ -28,6 +35,39 @@ Skip these even when they name a day:
 - Education todos, homework, Canvas, due dates, and other dashboard items. Those stay on the education dashboard. The calendar is events.
 - The EPS bell schedule, and "we should hang out" with no day.
 - EPS Ventures unless there is a signup confirmation.
+- A task he has to do, with no event he is attending. That is a todo, below.
+
+## Todo
+
+Only when the action is his. Reply with information, fill out a form, send a file, or finish a task someone asked him for.
+
+Skip these:
+
+- FYI, thanks, a newsletter, a passcode, or mail that only informs him.
+- Homework, Canvas, and due dates that already live on the education dashboard. Canvas sync already makes those todos.
+- College spam, and the weekly EPS college-visit list, unless he signed up.
+
+Set `dueDate` as `YYYY-MM-DD` and `dueTime` as `HH:MM` from the message. Use the weekday list. Do not leave either field blank. Do not use midnight.
+
+- A deadline clock in the message wins.
+- No clock, but a part of the day. Morning is `08:30`. After school, or "by Friday" with no clock, is `15:30` that day. Tonight is `20:00`.
+- ASAP or today, with no clock. Today at `15:30` when the message is still in the school day. Otherwise tomorrow at `08:30`.
+- Before a named event. Due before that start.
+
+Write a user-level todo at `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education/todos/<slug>/todo.json`.
+
+College application tasks go in `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/College Prep/todos/<slug>/todo.json`. That is PSAT, counselor, teacher recommendations, and a form that is for the application. A permission slip or a reply is user-level.
+
+Fields:
+
+- `name`. Plain text. The task, not the subject line pasted whole.
+- `description`. Short markdown. Who asked, what he has to do, and the link if the message has one.
+- `dueDate`, `dueTime`, `done` false, `createdAt` now as ISO, `showInDates` false.
+- No CW, HW, QA, or MA tag. No `date.json`. Do not also add that task to Apple Calendar.
+
+`<slug>` is a lowercase kebab of the name, unique in that folder. If an open todo in the prompt has a similar name, update that folder, including a new deadline. Similar means lowercase, years stripped, singular and plural treated as the same. Do not mint ` (2)`.
+
+If the task looks like a deleted todo row, skip it. Judgement, not the exact clock. Do not write `update` on a path that is already gone.
 
 ## Already there, or deleted
 
@@ -42,9 +82,9 @@ List the day with `node server/calendar-cli.js events`.
 
 ## Action log
 
-On `create`, `update`, and `delete`, add `--via calendar-on-demand`. List and get stay without it. The flag tells the CLI this is a Jev job, so a title that names Jev is refused. These writes do not get a card on the dashboard Actions rail. Yan already sees the change on the calendar.
+On calendar `create`, `update`, and `delete`, add `--via calendar-on-demand`. List and get stay without it. The flag tells the CLI this is a Jev job, so a title that names Jev is refused. These writes do not get a card on the dashboard Actions rail. Yan already sees the change on the calendar or on the education todo list.
 
-## Fields
+## Calendar fields
 
 Same write rules as the personal-calendar skill. Meeting URL goes on `--location`, `--url`, and one `--notes` line. PathIvy and Zoom registration links come from Mail.app message `source` when the plain body dropped the href. Do not leave location as the word virtual.
 

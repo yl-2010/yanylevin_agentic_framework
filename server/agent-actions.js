@@ -18,7 +18,7 @@ export const AGENT_ACTIONS_PATH = join(ROOT, "data", "agent-actions.jsonl");
 
 const AGENT_LABELS = {
   "home-agent": "Home agent",
-  "calendar-on-demand": "Calendar on demand",
+  "calendar-on-demand": "Calendar or todo",
   "nightly-actions": "Nightly actions",
 };
 

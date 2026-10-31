@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { classifyMailRow } from "./apple-mail-file.js";
@@ -11,10 +11,12 @@ import {
   considerCalendarMessage,
   enqueueCalendarThread,
   ingestCalendarRows,
+  loadActionTodoIndex,
   pollSchoolMailCalendar,
   resetCalendarOnDemandForTests,
   rowEligible,
   CALENDAR_ON_DEMAND_MODEL_SPEC,
+  CALENDAR_SIGNAL_QUESTION,
   CALENDAR_SIGNAL_THRESHOLD,
 } from "./calendar-on-demand.js";
 
@@ -25,6 +27,9 @@ function wait(ms) {
 describe("calendar signal", () => {
   it("uses a recall-biased threshold", () => {
     assert.equal(CALENDAR_SIGNAL_THRESHOLD, 0.35);
+    assert.match(String(CALENDAR_SIGNAL_QUESTION.instructions), /task he himself has to do/);
+    assert.match(String(CALENDAR_SIGNAL_QUESTION.criteria.true), /fill out a form/);
+    assert.match(String(CALENDAR_SIGNAL_QUESTION.criteria.false), /homework or Canvas/);
     assert.equal(calendarSignalYes({ noul: 0.35 }), true);
     assert.equal(calendarSignalYes({ noul: 0.34 }), false);
     assert.equal(calendarSignalYes({ probability: 0.9 }), true);
@@ -145,6 +150,16 @@ describe("calendar on-demand prompt", () => {
       thread: [],
       events: [],
       tombstones: [],
+      todos: [
+        {
+          name: "Reply to the form",
+          dueDate: "2026-10-31",
+          dueTime: "15:30",
+          parent: "user-level",
+          folder: "/tmp/todos/reply-to-the-form",
+        },
+      ],
+      deletedTodos: "- deleted 2026-09-02 12:11 | todo | Old ask | on 2026-09-15 08:30 | user-level | was todos/old-ask",
       skillText: "meeting links",
     });
     assert.match(prompt, /Do not sweep the inbox/);
@@ -154,6 +169,13 @@ describe("calendar on-demand prompt", () => {
     assert.match(prompt, /composer|Composer|personal-calendar/i);
     assert.match(prompt, /calendar-worthy/);
     assert.match(prompt, /Create nothing when it is not/);
+    assert.match(prompt, /Pick one/);
+    assert.match(prompt, /Do not create both/);
+    assert.match(prompt, /fill out a form/);
+    assert.match(prompt, /dueDate/);
+    assert.match(prompt, /College Prep/);
+    assert.match(prompt, /Open todos you may update/);
+    assert.match(prompt, /Reply to the form/);
     assert.match(prompt, /college spam/i);
     assert.match(prompt, /Do not move an existing event to another calendar/);
     assert.match(prompt, /signed up for that visit/);
@@ -201,6 +223,74 @@ describe("calendar on-demand prompt", () => {
     assert.equal(answer.calendar.noul, 0.2);
     assert.ok(questions.bucket);
     assert.ok(questions.calendar);
+  });
+});
+
+describe("action todo index", () => {
+  it("keeps open action todos and drops briefings, fixtures, and done rows", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "cal-todos-"));
+    const userTodos = join(dir, "todos");
+    const collegeTodos = join(dir, "college");
+    await mkdir(join(userTodos, "reply-to-sam"), { recursive: true });
+    await mkdir(join(userTodos, "2026-10-31-daily-briefing"), { recursive: true });
+    await mkdir(join(userTodos, "_example-buy-binder"), { recursive: true });
+    await mkdir(join(userTodos, "already-done"), { recursive: true });
+    await mkdir(join(collegeTodos, "ask-seeley"), { recursive: true });
+    await writeFile(
+      join(userTodos, "reply-to-sam", "todo.json"),
+      JSON.stringify({
+        name: "Reply to Sam",
+        dueDate: "2026-10-31",
+        dueTime: "15:30",
+        done: false,
+      })
+    );
+    await writeFile(
+      join(userTodos, "2026-10-31-daily-briefing", "todo.json"),
+      JSON.stringify({ name: "October 31st Daily Briefing", kind: "dailyBriefing", done: false })
+    );
+    await writeFile(
+      join(userTodos, "_example-buy-binder", "todo.json"),
+      JSON.stringify({ name: "Todo #5", dueDate: "2026-09-10", done: false })
+    );
+    await writeFile(
+      join(userTodos, "already-done", "todo.json"),
+      JSON.stringify({ name: "Send the form", done: true, dueDate: "2026-10-01" })
+    );
+    await writeFile(
+      join(collegeTodos, "ask-seeley", "todo.json"),
+      JSON.stringify({
+        name: "Ask Seeley about AP Physics tests",
+        dueDate: "2026-11-02",
+        dueTime: "15:00",
+        done: false,
+      })
+    );
+    await writeFile(
+      join(dir, "deleted.md"),
+      [
+        "# Manually deleted",
+        "- deleted 2026-09-02 12:11 | todo | Old ask | on 2026-09-15 | user-level | was todos/old-ask",
+        "- deleted 2026-09-05 18:40 | calendar | Mariners | on 2026-09-05 | Home | was abc",
+      ].join("\n")
+    );
+    try {
+      const index = await loadActionTodoIndex({
+        userTodosDir: userTodos,
+        collegeTodosDir: collegeTodos,
+        deletedDir: dir,
+      });
+      assert.deepEqual(
+        index.todos.map((row) => row.name),
+        ["Reply to Sam", "Ask Seeley about AP Physics tests"]
+      );
+      assert.equal(index.todos[0].parent, "user-level");
+      assert.equal(index.todos[1].parent, "project:college-prep");
+      assert.match(index.deleted, /Old ask/);
+      assert.doesNotMatch(index.deleted, /Mariners/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 

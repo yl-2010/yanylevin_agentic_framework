@@ -77,6 +77,7 @@ Skip these even when they name a day. For this list, unsure means skip:
 - The EPS bell schedule
 - "we should hang out" with no day named
 - A similar title already on that local day (duplicate check below). A realtime calendar agent may already have filed it. Leave it.
+- A task he has to do himself is a dashboard todo. Reply, form, send something, finish a task. The realtime agent files those when the message arrives. If an open user-level or College Prep todo already matches, leave it. Do not also put that task on Apple Calendar.
 - An identical deleted calendar event (similar title and the same start, end, location, and link). A new time, place, or link is a new event.
 - EPS Ventures outings unless Yan has a signup confirmation, a form receipt or he said he signed up. Student News / Weekly News announcements are not enough
 

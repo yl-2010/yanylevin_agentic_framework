@@ -263,7 +263,7 @@
         { edge: true },
         {
           id: "calendar-on-demand",
-          name: "Calendar",
+          name: "Calendar or todo",
           model: "Composer 2.5",
           kind: "after",
         },

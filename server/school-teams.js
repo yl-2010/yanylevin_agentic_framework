@@ -1484,7 +1484,7 @@ export async function fetchSchoolTeams(opts = {}) {
 }
 
 /**
- * Recent messages in one chat or channel, for the realtime calendar agent.
+ * Recent messages in one chat or channel, for the realtime calendar and todo agent.
  * @param {string} chatId
  * @param {{ limit?: number, session?: object, resolveSession?: typeof resolveSession, listChatMessages?: typeof listChatMessages, allowStale?: boolean }} [opts]
  */

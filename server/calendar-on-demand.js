@@ -1,14 +1,17 @@
 /**
- * Jev gate on new messages. A yes starts one Composer 2.5 run for that
- * thread, after a short debounce, and only for the plan the message is about.
+ * Jev gate on new messages. A yes means a calendar event or a task Yan
+ * has to do. That starts one Composer 2.5 run for the thread, after a
+ * short debounce. Composer picks the calendar or a todo.
  */
 
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AGENT_SENT_FOOTER } from "./imessage-mention.js";
 import { loadCalendarTombstones } from "./calendar-memory.js";
 import { addLocalDays, zonedParts } from "./calendar-cli.js";
+import { objectDirId, resolveBookkeepingFile } from "./education-onedrive.js";
+import { PERSONAL_PROJECTS, YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 import { noul, systemOne, typesafeConfig } from "./typesafe.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -28,9 +31,17 @@ export const CALENDAR_ON_DEMAND_MODEL_SPEC = {
   params: [{ id: "fast", value: "false" }],
 };
 
+/** Yes is a calendar event or a direct todo. Composer picks which. */
 export const CALENDAR_SIGNAL_QUESTION = noul(
-  "Could this message be a plan, event, meeting, invite, appointment, or a change to when or where something happens? Count maybes, a TBD venue, and a named day with no clock. Ignore a pure reaction, homework with no meeting, and a one-time passcode."
+  "Could this include a calendar event Yan might attend, or a task he himself has to do?",
+  {
+    true: "A plan, meeting, invite, appointment, or a change to when or where something happens. Or a direct action for him, such as reply with information, fill out a form, send something, or finish a task. Count maybes, a TBD venue, and a named day with no clock.",
+    false: "Nothing for the calendar and nothing he has to do. A reaction, thanks, a newsletter, a passcode, homework or Canvas with no meeting, college recruitment, or mail that only informs him.",
+  }
 );
+
+const USER_TODOS_DIR = join(YAN_EDUCATION_DIR, "todos");
+const COLLEGE_PREP_TODOS_DIR = join(PERSONAL_PROJECTS, "College Prep", "todos");
 
 /** @type {Map<string, { key: string, messages: object[], timer: ReturnType<typeof setTimeout>|null, run: Function|null }>} */
 const slots = new Map();
@@ -195,16 +206,107 @@ function clipPackMessage(source, message) {
   };
 }
 
+function isSkippedTodo(id, props) {
+  if (!props || typeof props !== "object") return true;
+  if (props.fixture === true) return true;
+  if (String(id || "").startsWith("_example-")) return true;
+  if (props.kind === "dailyBriefing") return true;
+  if (props.done === true) return true;
+  return false;
+}
+
 /**
- * @param {{
- *   source: string,
- *   messages: object[],
- *   thread?: object[],
- *   events?: object[],
- *   tombstones?: object[],
- *   skillText?: string,
- * }} pack
+ * Open user-level and College Prep todos, plus deleted todo rows.
+ * Daily briefings and fixtures stay out. Missing folders are empty.
+ * @param {{ userTodosDir?: string, collegeTodosDir?: string, deletedDir?: string }} [roots]
  */
+export async function loadActionTodoIndex(roots = {}) {
+  const userTodosDir = roots.userTodosDir || USER_TODOS_DIR;
+  const collegeTodosDir = roots.collegeTodosDir || COLLEGE_PREP_TODOS_DIR;
+  const deletedDir = roots.deletedDir || YAN_EDUCATION_DIR;
+  const todos = [
+    ...(await readOpenTodos(userTodosDir, "user-level")),
+    ...(await readOpenTodos(collegeTodosDir, "project:college-prep")),
+  ];
+  todos.sort((a, b) => {
+    const day = String(a.dueDate || "9999").localeCompare(String(b.dueDate || "9999"));
+    if (day) return day;
+    return String(a.name).localeCompare(String(b.name));
+  });
+  return {
+    todos: todos.slice(0, 80),
+    deleted: await readDeletedTodoLines(deletedDir),
+  };
+}
+
+/**
+ * @param {string} parentDir
+ * @param {string} parent
+ */
+async function readOpenTodos(parentDir, parent) {
+  /** @type {object[]} */
+  const out = [];
+  let names = [];
+  try {
+    const entries = await readdir(parentDir, { withFileTypes: true });
+    names = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  } catch (err) {
+    if (err?.code !== "ENOENT") {
+      console.error(
+        "[calendar-on-demand] todos",
+        parent,
+        err instanceof Error ? err.message : err
+      );
+    }
+    return out;
+  }
+  for (const dirName of names) {
+    const id = objectDirId(dirName);
+    if (!id) continue;
+    const folder = join(parentDir, dirName);
+    let props = null;
+    try {
+      const jsonPath = await resolveBookkeepingFile(folder, "todo.json");
+      if (!jsonPath) continue;
+      props = JSON.parse(await readFile(jsonPath, "utf8"));
+    } catch {
+      continue;
+    }
+    if (isSkippedTodo(id, props)) continue;
+    out.push({
+      name: String(props.name || id),
+      dueDate: typeof props.dueDate === "string" ? props.dueDate : "",
+      dueTime: typeof props.dueTime === "string" ? props.dueTime : "",
+      parent,
+      folder,
+    });
+  }
+  return out;
+}
+
+/**
+ * @param {string} deletedDir
+ */
+async function readDeletedTodoLines(deletedDir) {
+  try {
+    const path = await resolveBookkeepingFile(deletedDir, "deleted.md");
+    if (!path) return "";
+    const text = await readFile(path, "utf8");
+    return String(text || "")
+      .split("\n")
+      .filter((line) => line.includes("| todo |"))
+      .slice(-60)
+      .join("\n");
+  } catch (err) {
+    if (err?.code === "ENOENT") return "";
+    console.error(
+      "[calendar-on-demand] deleted todos",
+      err instanceof Error ? err.message : err
+    );
+    return "";
+  }
+}
+
 /**
  * Pacific dates with weekday names, today first. The model looks these up
  * instead of counting "next Saturday" from an ISO timestamp.
@@ -227,6 +329,18 @@ export function pacificWeekdayLines(now = new Date(), days = 21) {
   return lines.join("\n");
 }
 
+/**
+ * @param {{
+ *   source: string,
+ *   messages: object[],
+ *   thread?: object[],
+ *   events?: object[],
+ *   tombstones?: object[],
+ *   todos?: object[],
+ *   deletedTodos?: string,
+ *   skillText?: string,
+ * }} pack
+ */
 export function buildOnDemandPrompt(pack) {
   const source = pack.source;
   const triggers = (pack.messages || []).map((item) =>
@@ -254,11 +368,22 @@ export function buildOnDemandPrompt(pack) {
     location: row.location || "",
     url: row.url || "",
   }));
+  const todos = (pack.todos || []).slice(0, 80).map((row) => ({
+    name: row.name,
+    dueDate: row.dueDate || "",
+    dueTime: row.dueTime || "",
+    parent: row.parent || "",
+    folder: row.folder || "",
+  }));
+  const deletedTodos = String(pack.deletedTodos || "").trim();
   return [
     "Follow .cursor/skills/calendar-on-demand/SKILL.md and .cursor/skills/personal-calendar/SKILL.md.",
-    "You are the realtime calendar agent for Yan (you@example.com). Local only. Never spawn a Cursor cloud agent. ",
-    "One plan only: the event this message is about. Do not sweep the inbox, other chats, or the rest of the day for unrelated events.",
-    "Jev only asked whether this message might be a plan. Jev is that classifier, not a person in the chat and not a guest. Never put Jev in the title, notes, or guest list. Name the event after the people in the thread. You still decide if it is calendar-worthy. Create nothing when it is not. Add an event he is actually showing up for. A named day helps. Look up the weekday on the list below. This Saturday is the first Saturday. Next Saturday is the second. Do not count days yourself. TBD venue is fine when the plan is real. Look up the real start and end before you create. Pass --all-day only when the event has no clock (no school, a birthday, a holiday, a date-range delivery). A game, dinner, practice, appointment, or gym session gets that window, not the whole day. If you cannot find the time, create nothing for it. Do not move an existing event to another calendar. That resends invites, including a move on the same account. Pick the calendar only when you create. New events pick iCloud unless you are inviting someone, then Exchange. Skip college spam, including recruitment mail, Scoir, apply-now, and info sessions he did not register for. Skip the weekly EPS college-visit list unless Yan said he signed up for that visit. Skip education todos, homework, Canvas, due dates, and other dashboard items. Those stay on the education dashboard. The calendar is events. Also skip the EPS bell schedule, and EPS Ventures unless there is a signup confirmation.",
+    "You are the realtime calendar and todo agent for Yan (you@example.com). Local only. Never spawn a Cursor cloud agent. ",
+    "One item only: the plan or task this message is about. Do not sweep the inbox, other chats, or the rest of the day for unrelated events.",
+    "Jev only asked whether this message might be a calendar event or a task Yan has to do. Jev is that classifier, not a person in the chat and not a guest. Never put Jev in the title, notes, guest list, or todo name. Name a calendar event after the people in the thread. You still decide. Create nothing when it is not calendar-worthy and not a direct action for him.",
+    "Pick one. A calendar event if he is showing up. A todo if he himself has to do something and he is not attending an event. Do not create both unless the message has two separate things. RSVP, see you there, or confirming the plan is the calendar event, not a second todo.",
+    "Calendar. Add an event he is actually showing up for. A named day helps. Look up the weekday on the list below. This Saturday is the first Saturday. Next Saturday is the second. Do not count days yourself. TBD venue is fine when the plan is real. Look up the real start and end before you create. Pass --all-day only when the event has no clock (no school, a birthday, a holiday, a date-range delivery). A game, dinner, practice, appointment, or gym session gets that window, not the whole day. If you cannot find the time, create nothing for it. Do not move an existing event to another calendar. That resends invites, including a move on the same account. Pick the calendar only when you create. New events pick iCloud unless you are inviting someone, then Exchange. Skip college spam, including recruitment mail, Scoir, apply-now, and info sessions he did not register for. Skip the weekly EPS college-visit list unless Yan said he signed up for that visit. Skip education todos, homework, Canvas, due dates, and other dashboard items. Those stay on the education dashboard. The calendar is events. Also skip the EPS bell schedule, and EPS Ventures unless there is a signup confirmation.",
+    `Todo. Only when the action is his. Reply with information, fill out a form, send a file, or finish a task someone asked him for. Skip FYI, thanks, newsletters, passcodes, homework, Canvas, and due dates that already live on the education dashboard. Those stay education todos. Skip college spam and the weekly EPS college-visit list unless he signed up. Set dueDate as YYYY-MM-DD and dueTime as HH:MM from the message. A deadline clock wins. A named part of the day wins when there is no clock: morning 08:30, after school or by Friday with no clock 15:30, tonight 20:00. ASAP or today with no clock is today at 15:30 when the message is still in the school day, otherwise tomorrow at 08:30. Before a named event means due before that start. Do not leave dueDate or dueTime blank. Do not use midnight. Write a user-level todo at ${USER_TODOS_DIR}/<slug>/todo.json. College application tasks go in ${COLLEGE_PREP_TODOS_DIR}/<slug>/todo.json. Fields are name, description, dueDate, dueTime, done false, createdAt now as ISO, showInDates false. Description is short markdown: who asked, what he has to do, and the link if the message has one. No school tag. No date.json. Do not also add that task to Apple Calendar. If an open todo below has a similar name, update that folder, including a new deadline. Do not mint (2). If it looks like a deleted todo row, skip it.`,
     "Weekdays in America/Los_Angeles, today first:",
     pacificWeekdayLines(pack.now instanceof Date ? pack.now : new Date()),
     "If a similar event is already on that day and this message moves the time, place, or link, update that event. If the old one is only a tombstone and the new time, place, or link differs, create the new one. If create prints skipped deleted-identical, stop. Do not pass --force unless Yan explicitly asked for that exact event back.",
@@ -271,6 +396,10 @@ export function buildOnDemandPrompt(pack) {
     JSON.stringify(events, null, 2),
     "Deleted calendar fingerprints. Identical means similar title and the same start, end, location, and link. A new time, place, or link is a new event:",
     JSON.stringify(tombstones, null, 2),
+    "Open todos you may update. Similar name means update that folder. Daily briefings are omitted:",
+    JSON.stringify(todos, null, 2),
+    "Deleted todos. Skip a create that looks like one of these:",
+    deletedTodos || "None",
     "Personal calendar skill:",
     String(pack.skillText || "").trim(),
   ].join("\n\n");
@@ -299,6 +428,8 @@ async function defaultRunJob(job, deps) {
     thread: context.thread,
     events: context.events,
     tombstones: context.tombstones,
+    todos: context.todos,
+    deletedTodos: context.deletedTodos,
     skillText,
   });
   console.log(`[calendar-on-demand] run ${job.key} messages=${job.messages.length}`);
@@ -373,7 +504,21 @@ async function prefetchContext(job, deps) {
       err instanceof Error ? err.message : err
     );
   }
-  return { thread, events, tombstones };
+  let todos = [];
+  let deletedTodos = "";
+  try {
+    const index = deps.loadActionTodoIndex
+      ? await deps.loadActionTodoIndex()
+      : await loadActionTodoIndex();
+    todos = Array.isArray(index?.todos) ? index.todos : [];
+    deletedTodos = String(index?.deleted || "");
+  } catch (err) {
+    console.error(
+      "[calendar-on-demand] todos",
+      err instanceof Error ? err.message : err
+    );
+  }
+  return { thread, events, tombstones, todos, deletedTodos };
 }
 
 async function pump() {
@@ -635,7 +780,7 @@ export async function pollTeamsChannelCalendar(deps = {}) {
 export function startSchoolMailCalendarScheduler() {
   if (schoolTimer) return;
   if (!typesafeConfig().configured) {
-    console.warn("[calendar-on-demand] TYPESAFE_API_KEY missing; school mail calendar off");
+    console.warn("[calendar-on-demand] TYPESAFE_API_KEY missing; school mail calendar and todo off");
     return;
   }
   const tick = () => {
@@ -655,7 +800,7 @@ export function startSchoolMailCalendarScheduler() {
 export function startTeamsChannelCalendarScheduler() {
   if (channelTimer) return;
   if (!typesafeConfig().configured) {
-    console.warn("[calendar-on-demand] TYPESAFE_API_KEY missing; Teams channel calendar off");
+    console.warn("[calendar-on-demand] TYPESAFE_API_KEY missing; Teams channel calendar and todo off");
     return;
   }
   const tick = () => {
