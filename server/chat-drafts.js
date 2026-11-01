@@ -9,11 +9,25 @@ import { randomBytes } from "node:crypto";
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import express from "express";
+import { withCloudRetry } from "./cloud-storage-io.js";
 import { sanitizeSessionId } from "./education-chat-history.js";
 import { userEducationRoot } from "./education-data.js";
 import { canonicalizeEmail } from "./identity.js";
 import { notifyEducationClients } from "./education-events.js";
 import { normalizeJypeWorkspace } from "./jype.js";
+
+/** OneDrive File Provider returns errno -11 when overlapping reads hit a draft. */
+const CLOUD_ATTEMPTS = 8;
+
+/**
+ * @template T
+ * @param {string} path
+ * @param {() => Promise<T>} fn
+ * @returns {Promise<T>}
+ */
+function cloud(path, fn) {
+  return withCloudRetry(path, fn, { attempts: CLOUD_ATTEMPTS });
+}
 
 export const CHAT_DRAFTS_DIRNAME = ".chat-drafts";
 export const DRAFT_ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
@@ -227,9 +241,10 @@ function parseStoredDraft(raw, id) {
  * @returns {Promise<StoredDraft|null>}
  */
 async function readStoredDraft(root, id) {
+  const path = draftJsonPath(root, id);
   let raw;
   try {
-    raw = await readFile(draftJsonPath(root, id), "utf8");
+    raw = await cloud(path, () => readFile(path, "utf8"));
   } catch (err) {
     if (/** @type {any} */ (err)?.code === "ENOENT") return null;
     throw err;
@@ -247,11 +262,12 @@ async function readStoredDraft(root, id) {
  */
 async function writeStoredDraft(root, draft) {
   const dir = draftsDir(root);
-  await mkdir(dir, { recursive: true });
+  await cloud(dir, () => mkdir(dir, { recursive: true }));
   const final = draftJsonPath(root, draft.id);
   const tmp = `${final}.${randomBytes(4).toString("hex")}.tmp`;
-  await writeFile(tmp, `${JSON.stringify(draft, null, 2)}\n`, "utf8");
-  await rename(tmp, final);
+  const body = `${JSON.stringify(draft, null, 2)}\n`;
+  await cloud(tmp, () => writeFile(tmp, body, "utf8"));
+  await cloud(final, () => rename(tmp, final));
 }
 
 /**
@@ -311,8 +327,10 @@ function applySessionId(draft, sessionId) {
 }
 
 async function removeDraftFromDisk(root, id) {
-  await rm(draftJsonPath(root, id), { force: true });
-  await rm(draftFilesDir(root, id), { recursive: true, force: true });
+  const json = draftJsonPath(root, id);
+  const dir = draftFilesDir(root, id);
+  await cloud(json, () => rm(json, { force: true }));
+  await cloud(dir, () => rm(dir, { recursive: true, force: true }));
 }
 
 /**
@@ -320,9 +338,10 @@ async function removeDraftFromDisk(root, id) {
  * @returns {Promise<Draft[]>} newest first
  */
 export async function listDrafts(root) {
+  const dir = draftsDir(root);
   let names;
   try {
-    names = await readdir(draftsDir(root));
+    names = await cloud(dir, () => readdir(dir));
   } catch (err) {
     if (/** @type {any} */ (err)?.code === "ENOENT") return [];
     throw err;
@@ -409,9 +428,9 @@ export async function addDraftFile(root, idRaw, input) {
     const fileId = randomBytes(6).toString("base64url");
     const stored = `${fileId}-${name}`;
     const dir = draftFilesDir(root, id);
-    await mkdir(dir, { recursive: true });
+    await cloud(dir, () => mkdir(dir, { recursive: true }));
     const abs = join(dir, stored);
-    await writeFile(abs, data);
+    await cloud(abs, () => writeFile(abs, data));
     /** @type {StoredDraftFile} */
     const file = { id: fileId, name, mimeType, size: data.length, stored };
     draft.files.push(file);
@@ -420,7 +439,7 @@ export async function addDraftFile(root, idRaw, input) {
     try {
       await writeStoredDraft(root, draft);
     } catch (err) {
-      await rm(abs, { force: true });
+      await cloud(abs, () => rm(abs, { force: true }));
       throw err;
     }
     return {
@@ -447,7 +466,8 @@ export async function removeDraftFile(root, idRaw, fileIdRaw) {
     const file = draft.files.find((f) => f.id === fileId);
     if (file) {
       draft.files = draft.files.filter((f) => f.id !== fileId);
-      await rm(join(draftFilesDir(root, id), file.stored), { force: true });
+      const storedPath = join(draftFilesDir(root, id), file.stored);
+      await cloud(storedPath, () => rm(storedPath, { force: true }));
     }
     if (draftIsEmpty(draft)) {
       await removeDraftFromDisk(root, id);
@@ -488,7 +508,7 @@ export async function takeDraftFiles(root, idRaw) {
   for (const f of draft.files) {
     const path = join(draftFilesDir(root, id), f.stored);
     try {
-      const st = await stat(path);
+      const st = await cloud(path, () => stat(path));
       if (!st.isFile() || !st.size) continue;
       out.push({ id: f.id, name: f.name, mimeType: f.mimeType, size: st.size, path });
     } catch {
