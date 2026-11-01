@@ -191,6 +191,33 @@ async function forwardEducation(req, res, opts) {
   res.status(upstream.status).json(data);
 }
 
+function waldenPayload(chapter) {
+  const manifest = require("../private/walden/manifest.json");
+  const chapters = {
+    economy: require("../private/walden/economy.json"),
+    "where-i-lived": require("../private/walden/where-i-lived.json"),
+    reading: require("../private/walden/reading.json"),
+    sounds: require("../private/walden/sounds.json"),
+    solitude: require("../private/walden/solitude.json"),
+    visitors: require("../private/walden/visitors.json"),
+    "the-bean-field": require("../private/walden/the-bean-field.json"),
+    "the-village": require("../private/walden/the-village.json"),
+    "the-ponds": require("../private/walden/the-ponds.json"),
+    "baker-farm": require("../private/walden/baker-farm.json"),
+    "higher-laws": require("../private/walden/higher-laws.json"),
+    "brute-neighbors": require("../private/walden/brute-neighbors.json"),
+    "house-warming": require("../private/walden/house-warming.json"),
+    "former-inhabitants": require("../private/walden/former-inhabitants.json"),
+    "winter-animals": require("../private/walden/winter-animals.json"),
+    "the-pond-in-winter": require("../private/walden/the-pond-in-winter.json"),
+    spring: require("../private/walden/spring.json"),
+    conclusion: require("../private/walden/conclusion.json"),
+  };
+  if (!chapter) return manifest;
+  if (!Object.prototype.hasOwnProperty.call(chapters, chapter)) return null;
+  return chapters[chapter];
+}
+
 /** Normalize rewrite path: "data", "events", "todo/done", "agent/start", … */
 function routePath(req) {
   const raw = req.query?.p;
@@ -203,6 +230,28 @@ module.exports = async function handler(req, res) {
   try {
     const route = routePath(req);
     const method = req.method || "GET";
+
+    if (route === "walden" || route.startsWith("walden/")) {
+      if (method !== "GET") {
+        res.setHeader("Allow", "GET");
+        res.status(405).json({ ok: false, error: "method not allowed" });
+        return;
+      }
+      const session = readSession(req);
+      if (!session || session.access !== "full") {
+        res.status(401).json({ ok: false, error: "private" });
+        return;
+      }
+      const chapter = route.slice("walden".length).replace(/^\//, "");
+      const payload = waldenPayload(chapter);
+      if (!payload) {
+        res.status(404).json({ ok: false, error: "missing" });
+        return;
+      }
+      res.setHeader("Cache-Control", "private, no-store");
+      res.status(200).json(payload);
+      return;
+    }
 
     if (route === "data") {
       if (method !== "GET") {
