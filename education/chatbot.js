@@ -104,6 +104,9 @@
   const MAX_TOTAL_BYTES = 64 * 1024 * 1024;
   const MAX_QUEUED = 8;
   const POLL_MS = 2000;
+  /** Send button and a queued bubble. Hold, then release, to interrupt. */
+  const HOLD_MS = 1000;
+  const HOLD_LABEL = "one second";
 
   /** @type {HTMLElement|null} */
   let workingEl = null;
@@ -2068,7 +2071,7 @@
       submit.title = full && !sending
         ? `Queue full (max ${MAX_QUEUED}). Wait for a reply.`
         : sending
-          ? "Hold send or Enter 2 seconds to interrupt instead of queueing"
+          ? `Hold send or Enter ${HOLD_LABEL} to interrupt instead of queueing`
           : "";
     }
     if (historyComposer.sendBtn) {
@@ -2194,7 +2197,7 @@
       turn.classList.remove("is-interrupt-armed");
       return;
     }
-    turn.title = "Hold 2 seconds, then release, to interrupt with this message";
+    turn.title = `Hold ${HOLD_LABEL}, then release, to interrupt with this message`;
     if (msg.queueId) turn.dataset.queueId = String(msg.queueId);
     else delete turn.dataset.queueId;
   }
@@ -2815,10 +2818,11 @@
     });
   });
 
-  const HOLD_MS = 2000;
   let sendHoldTimer = null;
   let sendHoldArmed = false;
   let sendHoldConsumed = false;
+  /** Pointer that started the send-button hold. Null during an Enter hold. */
+  let sendHoldPointerId = null;
   let enterHoldActive = false;
   /** @type {ReturnType<typeof bindComposer>|null} */
   let enterComposer = null;
@@ -2829,12 +2833,14 @@
       sendHoldTimer = null;
     }
     sendHoldArmed = false;
+    sendHoldPointerId = null;
     threadComposer.sendBtn?.classList.remove("is-interrupt-armed");
   }
 
-  function startSendHold() {
+  function startSendHold(pointerId) {
     sendHoldConsumed = false;
     clearSendHold();
+    if (pointerId != null) sendHoldPointerId = pointerId;
     sendHoldTimer = window.setTimeout(() => {
       sendHoldTimer = null;
       if (!sending) return;
@@ -2934,16 +2940,7 @@
     sendBtn?.addEventListener("pointerdown", (event) => {
       if (event.button && event.button !== 0) return;
       if (event.shiftKey) return;
-      startSendHold();
-    });
-
-    sendBtn?.addEventListener("pointerup", (event) => {
-      finishInterruptHold(event);
-    });
-
-    sendBtn?.addEventListener("pointercancel", () => {
-      sendHoldConsumed = false;
-      clearSendHold();
+      startSendHold(event.pointerId);
     });
 
     sendBtn?.addEventListener("contextmenu", (event) => {
@@ -3124,12 +3121,28 @@
     else pendingQueueInterrupt = { index: hold.index, content: hold.content };
   }
 
+  function onSendHoldRelease(event) {
+    if (sendHoldPointerId == null) return;
+    // touchend has no pointerId. Safari's touch identifier is not the pointer
+    // id, so a touchend for this hold must still count.
+    if (event.pointerId != null && event.pointerId !== sendHoldPointerId) return;
+    finishInterruptHold(event);
+  }
+
+  // pointerup on the button is not enough: the finger leaves the circle, and
+  // iOS Safari fires pointercancel mid-hold then touchend on lift. Ending on
+  // cancel made the hold die before it could arm.
+  window.addEventListener("pointerup", onSendHoldRelease);
+  window.addEventListener("touchend", onSendHoldRelease);
+
   messagesEl?.addEventListener("pointerdown", onQueuePointerDown);
   window.addEventListener("pointermove", onQueuePointerMove);
   window.addEventListener("pointerup", onQueuePointerUp);
-  window.addEventListener("pointercancel", (event) => {
-    if (!queueHold || event.pointerId !== queueHold.pointerId) return;
-    endQueueHold();
+  window.addEventListener("touchend", () => {
+    if (!queueHold) return;
+    // Same as send: Safari's touch identifier is not the pointer id, and
+    // pointerup may never follow pointercancel. Lift still counts.
+    onQueuePointerUp({ pointerId: queueHold.pointerId });
   });
   messagesEl?.addEventListener("contextmenu", (event) => {
     const turn = event.target?.closest?.(".yan-chat-turn--queued");

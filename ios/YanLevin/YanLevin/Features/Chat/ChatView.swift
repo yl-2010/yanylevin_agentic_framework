@@ -34,6 +34,11 @@ private enum IMessageComposer {
     static let meltSpacing: CGFloat = 6
 }
 
+/// Send button and a queued bubble. Hold, then release, to interrupt.
+private enum InterruptHold {
+    static let seconds: Double = 1
+}
+
 private enum ChatAttachmentLimits {
     /// Match Mac personal-agent MAX_ATTACHMENT_BYTES / MAX_TOTAL_ATTACHMENT_BYTES.
     static let maxFileBytes = 64 * 1024 * 1024
@@ -118,6 +123,10 @@ struct ChatView: View {
     /// Vertical inset so body text + padding lands on iMessage’s 36pt single-line height.
     @State private var composerFieldVerticalPadding = ChatView.composerFieldVerticalPaddingValue()
     @State private var sendHoldArmed = false
+    /// Finger is down on send. The start time stays set until the button action
+    /// reads it, so a late gesture end cannot wipe the hold.
+    @State private var sendPressing = false
+    @State private var sendHoldBegan: Date?
 
     private static let historySwipeVelocityCommit: CGFloat = 520
     private static let historySwipeSpring = Animation.spring(response: 0.42, dampingFraction: 0.86)
@@ -1385,15 +1394,19 @@ struct ChatView: View {
     /// iMessage send: opaque orange, wider-than-tall continuous-corner capsule
     /// inside the field (radius = half height, `.continuous` smoothing gives
     /// Messages’ subtly-flattened squircle arcs — not a circle or plain oval).
-    /// Hold ≥ 2s while the Personal Agent is busy, then release, to interrupt
-    /// instead of queueing.
+    /// Hold one second while the Personal Agent is busy, then release, to interrupt
+    /// instead of queueing. Same duration as a queued bubble.
     private var composerSendButton: some View {
         let shape = RoundedRectangle(
             cornerRadius: IMessageComposer.sendHeight / 2,
             style: .continuous
         )
         return Button {
-            let interrupt = sendHoldArmed && usesEducation && isBusy
+            let began = sendHoldBegan
+            sendHoldBegan = nil
+            sendPressing = false
+            let held = began.map { Date().timeIntervalSince($0) } ?? 0
+            let interrupt = usesEducation && isBusy && (sendHoldArmed || held >= InterruptHold.seconds - 0.05)
             sendHoldArmed = false
             if interrupt {
                 YLHaptics.interrupt()
@@ -1421,7 +1434,7 @@ struct ChatView: View {
         .accessibilityLabel("Send")
         .accessibilityHint(
             usesEducation
-                ? "Send. Hold two seconds while working to interrupt instead of queueing."
+                ? "Send. Hold one second while working to interrupt instead of queueing."
                 : "Send"
         )
         .accessibilityAction(named: "Interrupt and send") {
@@ -1430,7 +1443,19 @@ struct ChatView: View {
             submitComposer(interrupt: true)
         }
         .simultaneousGesture(
-            LongPressGesture(minimumDuration: 2)
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !sendPressing {
+                        sendPressing = true
+                        sendHoldBegan = Date()
+                    }
+                }
+                .onEnded { _ in
+                    sendPressing = false
+                }
+        )
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: InterruptHold.seconds, maximumDistance: 12)
                 .onEnded { _ in
                     guard canSend, usesEducation, isBusy else { return }
                     sendHoldArmed = true
@@ -2085,9 +2110,9 @@ private struct ChatBubbleView: View, Equatable {
         usesEducation && msg.role == "user" && msg.queued
     }
 
-    /// Arms at 2 seconds (scale, haptic). Does not send until release.
+    /// Arms at one second (scale, haptic). Does not send until release.
     private var queueArmGesture: some Gesture {
-        LongPressGesture(minimumDuration: 2, maximumDistance: 12)
+        LongPressGesture(minimumDuration: InterruptHold.seconds, maximumDistance: 12)
             .onEnded { _ in
                 guard canQueueInterrupt else { return }
                 interruptArmed = true
@@ -2096,10 +2121,10 @@ private struct ChatBubbleView: View, Equatable {
             }
     }
 
-    /// The drag starts only after the 2 second press, so scrolling still wins
+    /// The drag starts only after the one second press, so scrolling still wins
     /// before that. Releasing then promotes the queued turn.
     private var queueReleaseGesture: some Gesture {
-        LongPressGesture(minimumDuration: 2, maximumDistance: 12)
+        LongPressGesture(minimumDuration: InterruptHold.seconds, maximumDistance: 12)
             .sequenced(before: DragGesture(minimumDistance: 0))
             .onEnded { value in
                 guard case .second(true, _) = value, canQueueInterrupt else {
