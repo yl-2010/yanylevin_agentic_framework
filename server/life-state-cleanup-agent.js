@@ -13,6 +13,7 @@ import {
   hmToMinutes,
   lifeStateCleanupHm,
   resolveBriefingTimezone,
+  schedulerWait,
 } from "./daily-briefing-agent.js";
 import {
   createLaterAuthRetry,
@@ -380,12 +381,23 @@ async function maybeRunMissed() {
 function armTimer(meta) {
   if (timer) clearTimeout(timer);
   const when = nextLifeStateCleanupAt(meta);
-  const delay = Math.max(1000, when.getTime() - Date.now());
-  const capped = Math.min(delay, 24 * 60 * 60 * 1000);
+  const wait = schedulerWait(when);
   console.log(
-    `[life-state-cleanup] next run ${when.toISOString()} (in ${Math.round(capped / 60000)} min)`
+    `[life-state-cleanup] next run ${when.toISOString()} (in ${Math.round(wait.delay / 60000)} min)${wait.fire ? "" : " recheck"}`
   );
   timer = setTimeout(() => {
+    if (!wait.fire) {
+      readMeta()
+        .then((m) => armTimer(m))
+        .catch((err) => {
+          console.error("[life-state-cleanup] reschedule failed", err);
+          timer = setTimeout(
+            () => startLifeStateCleanupScheduler(),
+            60 * 60 * 1000
+          );
+        });
+      return;
+    }
     runLifeStateCleanup()
       .catch((err) =>
         console.error("[life-state-cleanup] scheduled run failed", err)
@@ -401,7 +413,7 @@ function armTimer(meta) {
             );
           });
       });
-  }, capped);
+  }, wait.delay);
 }
 
 export function startLifeStateCleanupScheduler() {

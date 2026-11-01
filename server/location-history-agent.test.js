@@ -64,4 +64,26 @@ describe("location history schedule", () => {
     assert.equal(next.toISOString(), close.toISOString());
     assert.equal(close.toISOString(), "2026-08-17T06:00:00.000Z");
   });
+
+  it("does not schedule the repeated 1:00 or 1:30 after the clocks fall back", () => {
+    const la = { timezone: "America/Los_Angeles" };
+    const before = new Date("2026-11-01T07:40:00.000Z");
+    assert.equal(
+      nextLocalHmAt(la, "01:00", before).toISOString(),
+      "2026-11-01T08:00:00.000Z"
+    );
+    assert.equal(
+      nextLocalHmAt(la, "01:30", before).toISOString(),
+      "2026-11-01T08:30:00.000Z"
+    );
+    const secondHour = new Date("2026-11-01T09:10:00.000Z");
+    assert.equal(
+      nextLocalHmAt(la, "01:00", secondHour).toISOString(),
+      "2026-11-02T09:00:00.000Z"
+    );
+    assert.equal(
+      nextLocalHmAt(la, "01:30", secondHour).toISOString(),
+      "2026-11-02T09:30:00.000Z"
+    );
+  });
 });

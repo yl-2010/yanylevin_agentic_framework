@@ -11,6 +11,7 @@ import {
   formatScheduledUserBubble,
   futureAgentWait,
   listUpcomingFutureAgents,
+  parseRunAt,
   scheduleFutureAgent,
   selectDueFutureAgents,
 } from "./future-agents.js";
@@ -19,6 +20,19 @@ const YAN = "you@example.com";
 const JEFFERY = "friend@example.com";
 const RUN_AT = "2026-10-13T16:35:00.000Z";
 const NOW = Date.parse("2026-10-11T08:00:00.000Z");
+
+describe("parseRunAt", () => {
+  it("keeps the Pacific wall time when the offset is the other one", () => {
+    assert.equal(
+      parseRunAt("2026-10-13T09:35:00-07:00"),
+      "2026-10-13T16:35:00.000Z"
+    );
+    assert.equal(
+      parseRunAt("2026-12-01T09:35:00-07:00"),
+      "2026-12-01T17:35:00.000Z"
+    );
+  });
+});
 
 describe("future agent schedule", () => {
   it("formats the user bubble in Pacific time", () => {

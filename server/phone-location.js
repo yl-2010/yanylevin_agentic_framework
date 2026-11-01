@@ -71,9 +71,14 @@ function historyDirForWrite(opts = {}) {
 export function locationLogMonthKey(iso) {
   const ms = Date.parse(iso);
   const d = Number.isFinite(ms) ? new Date(ms) : new Date();
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(d);
+  const y = parts.find((p) => p.type === "year")?.value;
+  const m = parts.find((p) => p.type === "month")?.value;
+  return y && m ? `${y}-${m}` : "";
 }
 
 /** @param {string} dir @param {string} monthKey */

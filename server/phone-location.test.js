@@ -213,6 +213,7 @@ describe("write/readPhoneLocation", () => {
       assert.equal(await hasUnprocessedLocationPoints(historyDir), false);
       const month = locationLogMonthKey("2026-08-16T18:10:00.000Z");
       assert.equal(month, "2026-08");
+      assert.equal(locationLogMonthKey("2026-11-01T06:30:00.000Z"), "2026-10");
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

@@ -121,6 +121,78 @@ export function addDateKeyDays(dateKey, days) {
 }
 
 /**
+ * Wall-clock parts of an instant in `timeZone`.
+ * @param {number} utcMs
+ * @param {string} timeZone
+ */
+function zonedWallParts(utcMs, timeZone) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(utcMs));
+  const num = (type) => Number(parts.find((p) => p.type === type)?.value);
+  return {
+    y: num("year"),
+    m: num("month"),
+    d: num("day"),
+    hour: num("hour"),
+    minute: num("minute"),
+  };
+}
+
+/**
+ * Interpret YYYY-MM-DD HH:MM in `timeZone` as a UTC Date.
+ * A repeated hour (fall back) keeps the earlier instant, so 1:00 and 1:30
+ * happen once. A missing hour (spring forward) moves forward by the gap,
+ * so 2:30 becomes 3:30 instead of sliding back to 1:30.
+ * @param {string} dateKey
+ * @param {string} hm
+ * @param {string} [timeZone]
+ */
+export function zonedLocalToUtc(dateKey, hm, timeZone = DEFAULT_LOCAL_TZ) {
+  const tz = String(timeZone || DEFAULT_LOCAL_TZ);
+  const [y, mo, d] = String(dateKey)
+    .split("-")
+    .map((n) => Number(n));
+  const [hour, minute] = String(hm)
+    .split(":")
+    .map((n) => Number(n));
+  if (![y, mo, d, hour, minute].every((n) => Number.isFinite(n))) {
+    throw new Error(`bad zoned local ${dateKey} ${hm}`);
+  }
+  const wanted = Date.UTC(y, mo - 1, d, hour, minute);
+  let utc = wanted;
+  let prev = utc;
+  for (let i = 0; i < 4; i++) {
+    const got = zonedWallParts(utc, tz);
+    const actual = Date.UTC(got.y, got.m - 1, got.d, got.hour, got.minute);
+    if (actual === wanted) return new Date(utc);
+    prev = utc;
+    utc += wanted - actual;
+  }
+  return new Date(Math.max(utc, prev));
+}
+
+/**
+ * YYYY-MM in `timeZone` for an ISO instant. Log files follow the local month,
+ * so a 11pm Pacific sample stays in that month when UTC has already rolled.
+ * @param {unknown} iso
+ * @param {string} [timeZone]
+ */
+export function pacificMonthKey(iso, timeZone = DEFAULT_LOCAL_TZ) {
+  const ms = Date.parse(String(iso || ""));
+  const d = Number.isFinite(ms) ? new Date(ms) : new Date();
+  const parts = zonedWallParts(d.getTime(), String(timeZone || DEFAULT_LOCAL_TZ));
+  if (!parts.y || !parts.m) return "";
+  return `${parts.y}-${String(parts.m).padStart(2, "0")}`;
+}
+
+/**
  * Weekday of a YYYY-MM-DD calendar date. US zones share the same weekday.
  * @param {string} dateKey
  */

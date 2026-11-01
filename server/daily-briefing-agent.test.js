@@ -18,6 +18,7 @@ import {
   newsDraftPath,
   nextCompileAt,
   prefetchNightlyStatus,
+  schedulerWait,
   zonedLocalToUtc,
 } from "./daily-briefing-agent.js";
 
@@ -195,5 +196,33 @@ describe("zonedLocalToUtc", () => {
   it("maps 06:00 Chicago on a summer date", () => {
     const when = zonedLocalToUtc("2026-08-22", "06:00", "America/Chicago");
     assert.equal(when.toISOString(), "2026-08-22T11:00:00.000Z");
+  });
+
+  it("keeps the first 1:00 and 1:30 on the fall-back night", () => {
+    assert.equal(
+      zonedLocalToUtc("2026-11-01", "01:00", "America/Los_Angeles").toISOString(),
+      "2026-11-01T08:00:00.000Z"
+    );
+    assert.equal(
+      zonedLocalToUtc("2026-11-01", "01:30", "America/Los_Angeles").toISOString(),
+      "2026-11-01T08:30:00.000Z"
+    );
+  });
+
+  it("moves a missing 2:30 forward to 3:30 on the spring-forward morning", () => {
+    assert.equal(
+      zonedLocalToUtc("2026-03-08", "02:30", "America/Los_Angeles").toISOString(),
+      "2026-03-08T10:30:00.000Z"
+    );
+  });
+});
+
+describe("schedulerWait", () => {
+  it("does not fire a job when the next slot is more than 24 hours away", () => {
+    const when = new Date(Date.UTC(2026, 10, 2, 9, 0, 0));
+    const now = Date.UTC(2026, 10, 1, 8, 5, 0);
+    const wait = schedulerWait(when, now);
+    assert.equal(wait.fire, false);
+    assert.equal(wait.delay, 24 * 60 * 60 * 1000);
   });
 });

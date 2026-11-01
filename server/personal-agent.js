@@ -1061,7 +1061,7 @@ function futureAgentTools(sid, session) {
           runAt: {
             type: "string",
             description:
-              "ISO time with an offset, America/Los_Angeles. Example 2026-10-13T09:35:00-07:00. For a result ready at a bell, use the period end minus 5 minutes.",
+              "ISO clock time in America/Los_Angeles. Example 2026-12-01T09:35:00-08:00. An offset is optional. -07:00 and -08:00 are both read as that Pacific wall time, so do not keep summer's -07:00 after the clocks change. For a result ready at a bell, use the period end minus 5 minutes.",
           },
           prompt: {
             type: "string",

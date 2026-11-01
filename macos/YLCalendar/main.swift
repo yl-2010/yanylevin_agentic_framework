@@ -28,6 +28,10 @@ func iso(_ date: Date) -> String {
     ISO8601DateFormatter().string(from: date)
 }
 
+func pacificTimeZone() -> TimeZone {
+    TimeZone(identifier: "America/Los_Angeles") ?? .current
+}
+
 func parseDate(_ raw: String) -> Date? {
     let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
     if s.isEmpty { return nil }
@@ -38,11 +42,18 @@ func parseDate(_ raw: String) -> Date? {
     if let d = iso.date(from: s) { return d }
     let f = DateFormatter()
     f.locale = Locale(identifier: "en_US_POSIX")
-    f.timeZone = TimeZone(secondsFromGMT: 0)
-    f.dateFormat = "yyyy-MM-dd'T'HH:mm:ssXXXXX"
+    f.timeZone = pacificTimeZone()
+    f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
     if let d = f.date(from: s) { return d }
     f.dateFormat = "yyyy-MM-dd"
     return f.date(from: s)
+}
+
+func defaultEnd(start: Date, allDay: Bool) -> Date {
+    if !allDay { return start.addingTimeInterval(3600) }
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = pacificTimeZone()
+    return cal.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86400)
 }
 
 func argValue(_ args: [String], _ name: String) -> String? {
@@ -219,7 +230,7 @@ func cmdCreate(_ args: [String]) {
         fail("create requires --start ISO")
     }
     let allDay = (argValue(args, "--all-day") == "1" || args.contains("--all-day")) && argValue(args, "--all-day") != "0"
-    let end = argValue(args, "--end").flatMap(parseDate) ?? start.addingTimeInterval(allDay ? 86400 : 3600)
+    let end = argValue(args, "--end").flatMap(parseDate) ?? defaultEnd(start: start, allDay: allDay)
     let cal = requireCalendar(
         id: argValue(args, "--calendar-id"),
         title: argValue(args, "--calendar"),

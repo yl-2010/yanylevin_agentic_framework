@@ -14,6 +14,27 @@ import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { gitAddCommitPush } from "./git-publish.js";
 import { scheduleNowParts, scheduleTodayKey } from "./education-data.js";
+import { zonedLocalToUtc } from "./local-clock.js";
+
+export { zonedLocalToUtc };
+
+/** setTimeout cannot wait out a 25-hour fall-back day. Wake and recompute. */
+export const SCHEDULER_WAKE_CAP_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Delay until `when`. `fire` is false when the wait was capped, so the
+ * timer must recompute the slot instead of running the job early.
+ * @param {Date|number} when
+ * @param {number} [now]
+ */
+export function schedulerWait(when, now = Date.now()) {
+  const target = when instanceof Date ? when.getTime() : Number(when);
+  const delay = Math.max(1000, target - now);
+  if (delay > SCHEDULER_WAKE_CAP_MS) {
+    return { delay: SCHEDULER_WAKE_CAP_MS, fire: false };
+  }
+  return { delay, fire: true };
+}
 import {
   createLaterAuthRetry,
   promptWithAuthRetry,
@@ -220,47 +241,6 @@ export async function briefingExists(dateKey) {
   } catch {
     return false;
   }
-}
-
-/**
- * Interpret YYYY-MM-DD HH:MM in `tz` as a UTC Date.
- * @param {string} dateKey
- * @param {string} hm
- * @param {string} tz
- */
-export function zonedLocalToUtc(dateKey, hm, tz) {
-  const [y, mo, d] = String(dateKey)
-    .split("-")
-    .map((n) => Number(n));
-  const [hour, minute] = String(hm)
-    .split(":")
-    .map((n) => Number(n));
-  if (![y, mo, d, hour, minute].every((n) => Number.isFinite(n))) {
-    throw new Error(`bad zoned local ${dateKey} ${hm}`);
-  }
-  let utc = Date.UTC(y, mo - 1, d, hour, minute, 0);
-  for (let i = 0; i < 4; i++) {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-    }).formatToParts(new Date(utc));
-    const got = {
-      y: Number(parts.find((p) => p.type === "year")?.value),
-      m: Number(parts.find((p) => p.type === "month")?.value),
-      d: Number(parts.find((p) => p.type === "day")?.value),
-      hour: Number(parts.find((p) => p.type === "hour")?.value),
-      minute: Number(parts.find((p) => p.type === "minute")?.value),
-    };
-    const wanted = Date.UTC(y, mo - 1, d, hour, minute);
-    const actual = Date.UTC(got.y, got.m - 1, got.d, got.hour, got.minute);
-    utc += wanted - actual;
-  }
-  return new Date(utc);
 }
 
 export function addDaysToDateKey(dateKey, days) {
@@ -856,23 +836,25 @@ async function maybeRunMissed() {
 function armTimer(meta) {
   if (timer) clearTimeout(timer);
   const when = nextCompileAt(meta);
-  const delay = Math.max(1000, when.getTime() - Date.now());
-  const capped = Math.min(delay, 24 * 60 * 60 * 1000);
+  const wait = schedulerWait(when);
   console.log(
-    `[daily-briefing] next compile ${when.toISOString()} (in ${Math.round(capped / 60000)} min)`
+    `[daily-briefing] next compile ${when.toISOString()} (in ${Math.round(wait.delay / 60000)} min)${wait.fire ? "" : " recheck"}`
   );
   timer = setTimeout(() => {
-    runDailyBriefing()
-      .catch((err) => console.error("[daily-briefing] scheduled run failed", err))
-      .finally(() => {
-        readMeta()
-          .then((m) => armTimer(m))
-          .catch((err) => {
-            console.error("[daily-briefing] reschedule failed", err);
-            timer = setTimeout(() => startDailyBriefingScheduler(), 60 * 60 * 1000);
-          });
-      });
-  }, capped);
+    const job = wait.fire
+      ? runDailyBriefing().catch((err) =>
+          console.error("[daily-briefing] scheduled run failed", err)
+        )
+      : Promise.resolve();
+    job.finally(() => {
+      readMeta()
+        .then((m) => armTimer(m))
+        .catch((err) => {
+          console.error("[daily-briefing] reschedule failed", err);
+          timer = setTimeout(() => startDailyBriefingScheduler(), 60 * 60 * 1000);
+        });
+    });
+  }, wait.delay);
 }
 
 export function startDailyBriefingScheduler() {

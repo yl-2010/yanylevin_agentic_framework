@@ -22,6 +22,7 @@ import {
   hmToMinutes,
   nightlyAgentsHm,
   resolveBriefingTimezone,
+  schedulerWait,
   zonedLocalToUtc,
 } from "./daily-briefing-agent.js";
 import { listClassEntriesForRoot, scheduleTodayKey } from "./education-data.js";
@@ -2329,13 +2330,21 @@ async function maybeRunMissed() {
 function armTimer(meta, result = null) {
   if (timer) clearTimeout(timer);
   const when = nextCanvasSyncRetryAt(result, meta);
-  const delay = Math.max(1000, when.getTime() - Date.now());
-  const capped = Math.min(delay, 24 * 60 * 60 * 1000);
+  const wait = schedulerWait(when);
   const label = result?.reason === "in-flight" ? "retry" : "next agent";
   console.log(
-    `[canvas-sync] ${label} ${when.toISOString()} (in ${Math.round(capped / 60000)} min)`
+    `[canvas-sync] ${label} ${when.toISOString()} (in ${Math.round(wait.delay / 60000)} min)${wait.fire ? "" : " recheck"}`
   );
   timer = setTimeout(() => {
+    if (!wait.fire) {
+      readMeta()
+        .then((m) => armTimer(m))
+        .catch((err) => {
+          console.error("[canvas-sync] reschedule failed", err);
+          timer = setTimeout(() => startCanvasSyncScheduler(), 60 * 60 * 1000);
+        });
+      return;
+    }
     runCanvasSync({ force: true })
       .then((next) => {
         readMeta()
@@ -2354,7 +2363,7 @@ function armTimer(meta, result = null) {
             timer = setTimeout(() => startCanvasSyncScheduler(), 60 * 60 * 1000);
           });
       });
-  }, capped);
+  }, wait.delay);
 }
 
 function armHourlyTimer(meta, result = null, opts = {}) {

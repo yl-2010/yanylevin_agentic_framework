@@ -28,6 +28,7 @@ import { canonicalizeEmail, isJypeAccessEmail } from "./identity.js";
 import { LOCAL_SOCK } from "./local-ipc.js";
 import { WHATSAPP_AGENT_ENABLED } from "./whatsapp-mention.js";
 import { normalizeJypeWorkspace } from "./jype.js";
+import { zonedLocalToUtc } from "./local-clock.js";
 import { FUTURE_AGENTS_DIR } from "./onedrive-projects.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -62,8 +63,15 @@ function recordPath(sessionId, root) {
  * @param {unknown} raw
  * @returns {string}
  */
+const RUN_AT_WALL_RE =
+  /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$/i;
+
 export function parseRunAt(raw) {
   const s = String(raw || "").trim();
+  const wall = s.match(RUN_AT_WALL_RE);
+  if (wall && !/^z$/i.test(wall[3] || "")) {
+    return zonedLocalToUtc(wall[1], wall[2], "America/Los_Angeles").toISOString();
+  }
   const ms = Date.parse(s);
   if (!s || !Number.isFinite(ms)) {
     throw httpError("runAt must be an ISO time with a timezone offset", 400);

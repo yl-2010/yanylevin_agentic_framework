@@ -210,7 +210,7 @@ export function buildLocationHistoryPrompt({ dateKey, timezone, force }) {
     "Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} (timezone ${timezone}).`,
     `Raw log + output folder: ${hist}/.`,
-    "Read new log-YYYY-MM.jsonl lines after state.json lastProcessedReceivedAt.",
+    "Read new log-YYYY-MM.jsonl lines after state.json lastProcessedReceivedAt. Check the previous month file too. A late evening can sit in either file.",
     "Write places.md (stays) and trips.md (walk / bike / car / plane / uber / robotaxi / lyft).",
     "When merging a day, keep already-specific stay names (person's house, business, gym) for the same address. Do not revert them to a street number. Do not revert a chat-corrected bike trip back to walk. Watch cycling is one bike trip even if GPS split it into two walks. Context synthesis at 02:30 may have corrected those lines.",
     "Search Mail.app for Uber / robotaxi / Lyft receipts ONLY when a new stay is outside the Seattle metro (traveling). Skip mail entirely at home.",

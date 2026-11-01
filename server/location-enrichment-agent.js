@@ -13,6 +13,7 @@ import {
   hmToMinutes,
   nightlyAgentsHm,
   resolveBriefingTimezone,
+  schedulerWait,
 } from "./daily-briefing-agent.js";
 import {
   createLaterAuthRetry,
@@ -313,12 +314,23 @@ async function maybeRunMissed() {
 function armTimer(meta) {
   if (timer) clearTimeout(timer);
   const when = nextLocationEnrichmentAt(meta);
-  const delay = Math.max(1000, when.getTime() - Date.now());
-  const capped = Math.min(delay, 24 * 60 * 60 * 1000);
+  const wait = schedulerWait(when);
   console.log(
-    `[location-enrichment] next run ${when.toISOString()} (in ${Math.round(capped / 60000)} min)`
+    `[location-enrichment] next run ${when.toISOString()} (in ${Math.round(wait.delay / 60000)} min)${wait.fire ? "" : " recheck"}`
   );
   timer = setTimeout(() => {
+    if (!wait.fire) {
+      readMeta()
+        .then((m) => armTimer(m))
+        .catch((err) => {
+          console.error("[location-enrichment] reschedule failed", err);
+          timer = setTimeout(
+            () => startLocationEnrichmentScheduler(),
+            60 * 60 * 1000
+          );
+        });
+      return;
+    }
     runLocationEnrichment()
       .catch((err) =>
         console.error("[location-enrichment] scheduled run failed", err)
@@ -334,7 +346,7 @@ function armTimer(meta) {
             );
           });
       });
-  }, capped);
+  }, wait.delay);
 }
 
 export function startLocationEnrichmentScheduler() {

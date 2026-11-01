@@ -13,6 +13,7 @@ import {
   chatTitleRefreshHm,
   hmToMinutes,
   resolveBriefingTimezone,
+  schedulerWait,
   zonedLocalToUtc,
 } from "./daily-briefing-agent.js";
 import {
@@ -528,12 +529,23 @@ async function maybeRunMissed() {
 function armTimer(meta) {
   if (timer) clearTimeout(timer);
   const when = nextChatTitleRefreshAt(meta);
-  const delay = Math.max(1000, when.getTime() - Date.now());
-  const capped = Math.min(delay, 24 * 60 * 60 * 1000);
+  const wait = schedulerWait(when);
   console.log(
-    `[chat-title-refresh] next run ${when.toISOString()} (in ${Math.round(capped / 60000)} min)`
+    `[chat-title-refresh] next run ${when.toISOString()} (in ${Math.round(wait.delay / 60000)} min)${wait.fire ? "" : " recheck"}`
   );
   timer = setTimeout(() => {
+    if (!wait.fire) {
+      readMeta()
+        .then((m) => armTimer(m))
+        .catch((err) => {
+          console.error("[chat-title-refresh] reschedule failed", err);
+          timer = setTimeout(
+            () => startChatTitleRefreshScheduler(),
+            60 * 60 * 1000
+          );
+        });
+      return;
+    }
     runChatTitleRefresh()
       .catch((err) =>
         console.error("[chat-title-refresh] scheduled run failed", err)
@@ -549,7 +561,7 @@ function armTimer(meta) {
             );
           });
       });
-  }, capped);
+  }, wait.delay);
 }
 
 export function startChatTitleRefreshScheduler() {

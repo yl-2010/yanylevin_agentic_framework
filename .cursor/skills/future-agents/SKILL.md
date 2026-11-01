@@ -34,7 +34,7 @@ Do not say you will remember. If you did not call `schedule_future_agent` or the
 
 Inside a Personal Agent or JYPE chat, call `schedule_future_agent`.
 
-- `runAt`: ISO time with a Pacific offset, like `2026-10-13T09:35:00-07:00`.
+- `runAt`: ISO clock time in America/Los_Angeles, like `2026-10-13T09:35:00-07:00` or `2026-12-01T09:35:00-08:00`. The server keeps that clock time in Pacific if the offset is the other one.
 - `prompt`: the task, in plain words. This is the first user bubble, under the date line.
 - `context`: what the future agent cannot re-derive. The live URL, who asked, what you already finished, and that this turn started in JYPE Teams or an iMessage chat.
 

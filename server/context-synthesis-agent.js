@@ -22,6 +22,7 @@ import {
   contextSynthesisHm,
   hmToMinutes,
   resolveBriefingTimezone,
+  schedulerWait,
 } from "./daily-briefing-agent.js";
 import { chatHistoryDirRel, parseChatHistoryMeta } from "./education-chat-history.js";
 import { gitAddCommitPush } from "./git-publish.js";
@@ -1468,12 +1469,23 @@ async function maybeRunMissed() {
 function armTimer(meta) {
   if (timer) clearTimeout(timer);
   const when = nextContextSynthesisAt(meta);
-  const delay = Math.max(1000, when.getTime() - Date.now());
-  const capped = Math.min(delay, 24 * 60 * 60 * 1000);
+  const wait = schedulerWait(when);
   console.log(
-    `[context-synthesis] next run ${when.toISOString()} (in ${Math.round(capped / 60000)} min)`
+    `[context-synthesis] next run ${when.toISOString()} (in ${Math.round(wait.delay / 60000)} min)${wait.fire ? "" : " recheck"}`
   );
   timer = setTimeout(() => {
+    if (!wait.fire) {
+      readMeta()
+        .then((m) => armTimer(m))
+        .catch((err) => {
+          console.error("[context-synthesis] reschedule failed", err);
+          timer = setTimeout(
+            () => startContextSynthesisScheduler(),
+            60 * 60 * 1000
+          );
+        });
+      return;
+    }
     runContextSynthesis()
       .catch((err) =>
         console.error("[context-synthesis] scheduled run failed", err)
@@ -1489,7 +1501,7 @@ function armTimer(meta) {
             );
           });
       });
-  }, capped);
+  }, wait.delay);
 }
 
 export function startContextSynthesisScheduler() {

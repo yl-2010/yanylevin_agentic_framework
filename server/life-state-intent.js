@@ -258,11 +258,18 @@ export async function readLifeStateStore(dir, now = new Date()) {
   return slimLifeStateStore(raw, now);
 }
 
+function shiftMonthKey(key, delta) {
+  const [y, m] = String(key || "")
+    .split("-")
+    .map((n) => Number(n));
+  if (!y || !m) return "";
+  const dt = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
 function signalsMonthKeys(now) {
-  const iso = now.toISOString();
-  const d = new Date(now.getTime());
-  const prev = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1));
-  return [lifeStateLogMonthKey(iso), lifeStateLogMonthKey(prev.toISOString())];
+  const cur = lifeStateLogMonthKey(now.toISOString());
+  return [shiftMonthKey(cur, -1), cur, shiftMonthKey(cur, 1)].filter(Boolean);
 }
 
 /**

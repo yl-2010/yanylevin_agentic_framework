@@ -900,6 +900,8 @@ function rawStamp(iso) {
 }
 
 function monthKey(iso) {
+  const key = dateKeyInTz(String(iso || ""), HEALTH_TIMEZONE);
+  if (key) return key.slice(0, 7);
   const d = new Date(Date.parse(iso) || Date.now());
   const y = d.getUTCFullYear();
   const m = String(d.getUTCMonth() + 1).padStart(2, "0");

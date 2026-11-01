@@ -9,6 +9,7 @@ import {
   assessLifeStateHeartbeat,
   completeLifeStateRecord,
   formatLifeStateLocal,
+  lifeStateLogMonthKey,
   isCurrentLifeStateFresh,
   parseLifeStateRecord,
   readCurrentLifeState,
@@ -19,6 +20,12 @@ import {
   rewriteLifeStateDay,
   summarizeLifeStateDay,
 } from "./life-state.js";
+
+describe("lifeStateLogMonthKey", () => {
+  it("keeps a late Pacific evening in that month", () => {
+    assert.equal(lifeStateLogMonthKey("2026-11-01T06:30:00.000Z"), "2026-10");
+  });
+});
 
 const SAMPLE = {
   kind: "in_class",

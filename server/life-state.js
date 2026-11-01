@@ -3,7 +3,7 @@
  * Yan only. Does not git-commit.
  */
 
-import { appendFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { YAN_EMAIL, readPhoneLocation } from "./phone-location.js";
@@ -122,9 +122,7 @@ export function formatLifeStateLocal(date, timeZone = "America/Los_Angeles") {
 export function lifeStateLogMonthKey(iso) {
   const ms = Date.parse(iso);
   const d = Number.isFinite(ms) ? new Date(ms) : new Date();
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
+  return formatLifeStateLocal(d, "America/Los_Angeles").dateKey.slice(0, 7);
 }
 
 /**
@@ -765,9 +763,14 @@ async function writeLifeStateMonthLogs(dir, records) {
     list.push(row);
     byMonth.set(month, list);
   }
+  const keep = new Set();
   for (const [month, rows] of byMonth) {
     const body = `${rows.map((r) => JSON.stringify(r)).join("\n")}\n`;
     await writeFile(lifeStateLogPath(dir, month), body, "utf8");
+    keep.add(`log-${month}.jsonl`);
+  }
+  for (const name of await listLifeStateLogFiles(dir)) {
+    if (!keep.has(name)) await rm(join(dir, name), { force: true });
   }
 }
 

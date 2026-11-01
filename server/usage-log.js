@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { chatTitlesForSessions } from "./education-chat-history.js";
 import { canonicalizeEmail } from "./identity.js";
 
+import { zonedLocalToUtc } from "./local-clock.js";
 import { USAGE_DIR as ONEDRIVE_USAGE_DIR } from "./onedrive-projects.js";
 
 export const USAGE_DIR = ONEDRIVE_USAGE_DIR;
@@ -1213,7 +1214,11 @@ export async function resolveRange(query, now = Date.now()) {
     }
     if (!start) {
       const day = pacificDay(new Date(to).toISOString());
-      start = `${day.slice(0, 8)}01T00:00:00-07:00`;
+      start = zonedLocalToUtc(
+        `${day.slice(0, 8)}01`,
+        "00:00",
+        "America/Los_Angeles"
+      ).toISOString();
     }
     return { from: start, to: new Date(to).toISOString(), range };
   }
