@@ -368,8 +368,13 @@
 
   const STATIC_BOX_MAG_SCALE = 0.6;
 
+  function skipBoxMagnetic(el) {
+    return !el || el.hasAttribute("data-lg-still");
+  }
+
   function bindStaticBoxMagnetic(el) {
-    if (!el || !document.documentElement.classList.contains("lg-chrome")) return;
+    if (skipBoxMagnetic(el)) return;
+    if (!document.documentElement.classList.contains("lg-chrome")) return;
     bindMagnetic(el, 0.28 * STATIC_BOX_MAG_SCALE, { clamp: true });
   }
 
@@ -1913,11 +1918,10 @@ void main() {
       bindMagnetic(el, 0.28 * STATIC_BOX_MAG_SCALE, { clamp: true });
     });
     if (document.documentElement.classList.contains("lg-chrome")) {
-      document
-        .querySelectorAll(STATIC_BOX_SEL)
-        .forEach((el) =>
-          bindMagnetic(el, 0.28 * STATIC_BOX_MAG_SCALE, { clamp: true })
-        );
+      document.querySelectorAll(STATIC_BOX_SEL).forEach((el) => {
+        if (skipBoxMagnetic(el)) return;
+        bindMagnetic(el, 0.28 * STATIC_BOX_MAG_SCALE, { clamp: true });
+      });
     }
     syncMagneticFromPointer();
   }
