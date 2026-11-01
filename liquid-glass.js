@@ -349,6 +349,7 @@
   let glowRaf = 0;
 
   function isStaticContentBox(el) {
+    if (el.classList.contains("chapter-chip")) return false;
     return (
       el.classList.contains("edu-panel") ||
       el.classList.contains("edu-file-tile") ||
@@ -1521,6 +1522,9 @@ void main() {
       html.lg-cheap .yan-chat-panel,
       html.lg-cheap .yan-chat-bubble {
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12) !important;
+      }
+      html.lg-cheap .sheet.chapter-chip {
+        box-shadow: none !important;
       }
     `;
     document.head.appendChild(style);
