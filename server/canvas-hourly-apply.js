@@ -320,7 +320,7 @@ export function folderDueConflicts(dirName, dueDate) {
 
 /**
  * Fallback when a todo has no canvasId yet. Same assignment only.
- * A shared opening ("Read and annotate Walden") is not a match.
+ * A shared opening ("Read and annotate the chapter") is not a match.
  * @param {string} dirName
  * @param {{ name?: string, dueDate?: string }} desired
  */

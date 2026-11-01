@@ -17,6 +17,10 @@ data/chat-log.md
 data/login-log.md
 tmp/
 
+# Gitignored. A root .vercelignore stops the CLI from reading .gitignore,
+# so this prompt log was uploaded on every production deploy and served publicly.
+data/usage/
+
 # Local build junk. Vercel CLI does not honor nested gitignores, so the
 # electives scraper venv/cache was riding along in every production deploy.
 **/.venv/

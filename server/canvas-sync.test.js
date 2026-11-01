@@ -689,17 +689,17 @@ describe("computeDue", () => {
 
 describe("canvas assignment identity", () => {
   const today = {
-    name: "Read and annotate Walden, pp. 5-31. See details.",
+    name: "Read and annotate the chapter, pp. 5-31. See details.",
     dueDate: "2026-10-30",
-    canvasId: 40441631,
+    canvasId: 101,
   };
   const journal = {
-    name: "Read and annotate Walden pp. 90-97, and Journal Entry 2",
+    name: "Read and annotate the chapter pp. 90-97, and Journal Entry 2",
     dueDate: "2026-11-05",
-    canvasId: 40465301,
+    canvasId: 102,
   };
-  const todayFolder = "HW Oct 30 Read and annotate Walden, pp. 5-31. See details.";
-  const journalFolder = "HW Nov 5 Read and annotate Walden pp. 90-97, and Journal Entry 2";
+  const todayFolder = "HW Oct 30 Read and annotate the chapter, pp. 5-31. See details.";
+  const journalFolder = "HW Nov 5 Read and annotate the chapter pp. 90-97, and Journal Entry 2";
 
   it("does not treat a shared title prefix as the same assignment", () => {
     assert.equal(folderNameMatchesTodo(todayFolder, journal), false);
@@ -718,8 +718,8 @@ describe("canvas assignment identity", () => {
   });
 
   it("refuses to move a todo onto a different canvas id", () => {
-    assert.equal(canvasIdBlocksMatch({ canvasId: 40441631 }, 40465301), true);
-    assert.equal(canvasIdBlocksMatch({ canvasId: 40441631 }, 40441631), false);
-    assert.equal(canvasIdBlocksMatch({}, 40465301), false);
+    assert.equal(canvasIdBlocksMatch({ canvasId: 101 }, 102), true);
+    assert.equal(canvasIdBlocksMatch({ canvasId: 101 }, 101), false);
+    assert.equal(canvasIdBlocksMatch({}, 102), false);
   });
 });
