@@ -10,11 +10,11 @@ enum BrandPalette {
     static let personalLiveActivityLight = Color(red: 0xA8 / 255, green: 0x5A / 255, blue: 0x22 / 255)
     static let personalLiveActivityDark = Color(red: 0xE3 / 255, green: 0xA0 / 255, blue: 0x6A / 255)
     // agent
-    static let agentAccentLight = Color(red: 0x1A / 255, green: 0x1A / 255, blue: 0x1A / 255)
-    static let agentAccentDark = Color(red: 0xD4 / 255, green: 0xD4 / 255, blue: 0xD4 / 255)
-    static let agentPulseLight = Color(red: 0xBD / 255, green: 0xBD / 255, blue: 0xBD / 255)
-    static let agentPulseDark = Color(red: 0xE6 / 255, green: 0xE6 / 255, blue: 0xE6 / 255)
-    static let agentLiveActivity = Color(hue: 0 / 360, saturation: 0, brightness: 0.7)
+    static let agentAccentLight = Color(red: 0x35 / 255, green: 0x4D / 255, blue: 0x34 / 255)
+    static let agentAccentDark = Color(red: 0xA7 / 255, green: 0xC8 / 255, blue: 0xA5 / 255)
+    static let agentPulseLight = Color(red: 0xC7 / 255, green: 0xDC / 255, blue: 0xC6 / 255)
+    static let agentPulseDark = Color(red: 0xE3 / 255, green: 0xF0 / 255, blue: 0xE2 / 255)
+    static let agentLiveActivity = Color(hue: 117 / 360, saturation: 0.3, brightness: 0.7)
     // jype
     static let jypeAccentLight = Color(red: 0xC2 / 255, green: 0x27 / 255, blue: 0x3A / 255)
     static let jypeAccentDark = Color(red: 0xE0 / 255, green: 0x7A / 255, blue: 0x82 / 255)
