@@ -108,7 +108,9 @@
       path === "/dashboard" ||
       path.startsWith("/dashboard/") ||
       path === "/usage" ||
-      path.startsWith("/usage/")
+      path.startsWith("/usage/") ||
+      path === "/debate" ||
+      path.startsWith("/debate/")
     );
   }
 
