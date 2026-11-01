@@ -206,9 +206,7 @@ export function briefingFolderId(dateKey) {
 
 export function briefingTodoPath(dateKey) {
   return join(
-    REPO_ROOT,
-    "education",
-    BRIEFING_EMAIL,
+    YAN_EDUCATION_DIR,
     "todos",
     briefingFolderId(dateKey),
     "todo.json"
