@@ -7,6 +7,7 @@ import {
   AGENT_SENT_FOOTER,
   AGENT_VS_YAN_LINE,
   POSTED_TEXT_LINE,
+  replyReaderLine,
   isBareAgentMention,
   messageMentionsAgent,
   textHasAgentSentFooter,
@@ -154,7 +155,9 @@ export function formatWhatsAppOriginBlock(origin, opts = {}) {
     lines.push(
       `Read the surrounding thread before answering: ${threadCmd}`,
       AGENT_VS_YAN_LINE,
-      "The app and website thread is a normal Personal Agent chat.",
+      "",
+      "Your reply",
+      replyReaderLine(opts.guestCaller, "WhatsApp", chat),
       POSTED_TEXT_LINE,
       `Newlines work. When there is more than one point, put each on its own line with • or a dash. WhatsApp does not render markdown or KaTeX. Write equations in plain words, not $$. No @agent in the reply. Do not add ${footerPhrase}. The server appends that footer on WhatsApp only.`,
       "Keep the reply that lands in this chat short. A few sentences, or a short list. Answer and stop.",

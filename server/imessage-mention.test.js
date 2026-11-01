@@ -208,10 +208,10 @@ describe("imessage-mention", () => {
     assert.match(block, /does not render markdown/);
     assert.match(block, /server appends that footer on the iMessage only/);
     assert.match(block, /server delivers your final bubble/);
-    assert.match(block, /keep that same text/);
-    assert.match(block, /What you write is what gets sent/);
-    assert.match(block, /inner circle/);
-    assert.match(block, /The message starts at the answer/);
+    assert.doesNotMatch(block, /app and website keep/);
+    assert.match(block, /posted, word for word/);
+    assert.match(block, /not a note to Yan/);
+    assert.match(block, /Start with the answer/);
     assert.match(block, /full Personal Agent turn/);
     assert.match(block, /attachToReply/);
     assert.match(block, /native iMessage files/);
@@ -260,7 +260,7 @@ describe("imessage-mention", () => {
     assert.match(block, /A small file JYPE needs is fine/);
     assert.match(block, /LM Studio/);
     assert.match(block, /treat them as not close/);
-    assert.match(block, /That judgment is an inner thought/);
+    assert.match(block, /None of it goes in the reply/);
     assert.match(block, /different group chat than the one that called you/);
     assert.match(block, /JYPE \(iMessage or Teams\)/);
     assert.doesNotMatch(block, /Called from iMessage\. This Personal Agent chat is otherwise normal/);

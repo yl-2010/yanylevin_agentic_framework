@@ -9,6 +9,7 @@ import {
   guestCallerLines,
   AGENT_VS_YAN_LINE,
   POSTED_TEXT_LINE,
+  replyReaderLine,
   isBareAgentMention,
   isJypeThread,
   messageMentionsAgent,
@@ -88,7 +89,9 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
   const lines = [
     guestLines.length
       ? guestLines[0]
-      : "Called from Teams. This Personal Agent chat is otherwise normal (app and website bubbles, send_chat_message, tools).",
+      : deliver
+        ? "Called from Teams by Yan's own @agent. Your reply goes to that Teams chat."
+        : "Called from Teams. This Personal Agent chat is otherwise normal (app and website bubbles, send_chat_message, tools).",
     ...guestLines.slice(1),
     `- Teams chat: ${chat || "?"}${chatId && chatId !== chat ? ` (${chatId})` : ""}`,
   ];
@@ -106,12 +109,14 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
       `Read the surrounding thread before answering: ${threadCmd} (school Teams skill).`,
       speakerLine,
       "school-teams.js cannot attach a file. When the job is to get a PDF or other file into this Teams chat, open the Teams app and attach it with Cursor computer use (personal-computer skill). That step uses this turn's model. Do not run server/computer-use.js. Do not paste a file path into the chat. Do not email it instead. School Outlook still cannot send. An images field on a message has no pixels. Open that chat in the Teams app and look.",
-      "The app and website thread is a normal Personal Agent chat.",
+      "",
+      "Your reply",
+      replyReaderLine(opts.guestCaller, "Teams", chat),
       POSTED_TEXT_LINE,
-      `Markdown is fine, same as the app bubble. Bold, italic, lists, links, headings, code. Use a list, bold on the key fact, or a short heading when several points would otherwise sit in one paragraph. The server converts that markdown to Teams HTML so desktop and mobile keep newlines and formatting. Teams does not render KaTeX. Write equations in plain words, not $$. No HTML tags, no @agent. The app and website keep that same text as the end of the turn. Do not write Sent on Teams. Do not add ${footerPhrase}. The server appends that footer on the Teams message only, never in the app or website thread.`,
       "Keep the reply that lands in this chat short. A few sentences, or a short list. Answer and stop. Write at length only when they asked for a lot of text, such as an essay, a full explanation, or a drafted message. A study guide or plan still goes on a page. This chat gets the URL and one line.",
-      "On a long job, call send_chat_message with one short line of what you are about to do before you start the work. A new page, a study guide, or a big write counts. @agent and @agentg both do this. That message is posted to this Teams chat immediately. Markdown is fine on that line. Then do the work. Send another the same way only when this chat should hear something new. Do not send still working with no news. Quick answers stay one message, so skip send_chat_message. The server still sends your final bubble when you are done. Do not also send_chat_message that same final text.",
-      "The server delivers your final bubble to that same Teams chat. Do not also school-teams send that same final text."
+      `Markdown is fine. Use a list, bold on the key fact, or a short heading when several points would otherwise sit in one paragraph. The server converts it to Teams HTML. Teams does not render KaTeX. Write equations in plain words, not $$. No HTML tags, no @agent. Do not add ${footerPhrase}. The server appends that footer on Teams.`,
+      "The server delivers your final bubble to that same Teams chat. Do not also school-teams send that same final text.",
+      "On a long job, call send_chat_message with one short line of what you are about to do before you start the work. A new page, a study guide, or a big write counts. @agent and @agentg both do this. That message is posted to this Teams chat immediately. Send another only when this chat should hear something new. Quick answers stay one message, so skip send_chat_message. Do not also send_chat_message the final text."
     );
   } else {
     if (chatId) {

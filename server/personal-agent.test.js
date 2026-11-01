@@ -581,7 +581,8 @@ describe("Personal Agent skill files", () => {
     assert.match(schoolTeams, /\/\/ Sent by Yan's Personal Agent/);
     assert.match(schoolTeams, /JYPE \(iMessage or Teams\)/);
     assert.match(schoolTeams, /@agent/);
-    assert.match(schoolTeams, /keep that final bubble/);
+    assert.match(schoolTeams, /What gets sent/);
+    assert.match(schoolTeams, /no second copy written for Yan/);
     assert.match(schoolTeams, /before they start/);
     assert.match(schoolTeams, /posted to this Teams chat immediately/);
     assert.match(schoolTeams, /class channel/);
@@ -640,7 +641,8 @@ describe("Personal Agent skill files", () => {
     assert.match(imessage, /only `@agent`/);
     assert.match(imessage, /Apple Contacts/);
     assert.match(imessage, /From Name on iMessage/);
-    assert.match(imessage, /keep that final bubble/);
+    assert.match(imessage, /What gets sent/);
+    assert.match(imessage, /no second copy written for Yan/);
     assert.match(imessage, /before they start/);
     assert.match(imessage, /posted to this iMessage chat immediately/);
     assert.match(imessage, /never put it in Personal Agent app or website bubbles/);
@@ -688,7 +690,8 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /messages to himself/);
     assert.match(agent, /except the Class of 2028 Teams grade chat/);
     assert.match(agent, /only Yan, Alex, Example Friend, and Example Neighbor/);
-    assert.match(agent, /keep that final bubble/);
+    assert.match(agent, /What gets sent on an @agent/);
+    assert.match(agent, /Not to Yan about them/);
     assert.match(agent, /10 minutes after the reply finishes/);
     assert.match(agent, /fromMe/);
     assert.match(agent, /only `@agent`/);

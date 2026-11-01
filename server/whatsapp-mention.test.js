@@ -86,9 +86,8 @@ describe("whatsapp mentions", () => {
         },
       }
     );
-    assert.match(jype, /What you write is what gets sent/);
-    assert.match(jype, /inner circle/);
-    assert.match(jype, /The message starts at the answer/);
+    assert.match(jype, /posted, word for word/);
+    assert.match(jype, /Write to the people in Birthday/);
     assert.match(jype, /Called by Alex on WhatsApp, not Yan/);
     assert.match(jype, /alex-rivera/);
     assert.match(jype, /JYPE member/);

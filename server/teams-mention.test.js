@@ -86,10 +86,12 @@ describe("teams-mention trigger", () => {
     assert.match(block, /images field on a message has no pixels/);
     assert.match(block, /School Outlook still cannot send/);
     assert.doesNotMatch(block, /Apple Mail/);
-    assert.match(block, /keep that same text/);
-    assert.match(block, /What you write is what gets sent/);
-    assert.match(block, /inner circle/);
-    assert.match(block, /The message starts at the answer/);
+    assert.doesNotMatch(block, /app and website keep/);
+    assert.doesNotMatch(block, /normal Personal Agent chat/);
+    assert.match(block, /posted, word for word/);
+    assert.match(block, /not a note to Yan/);
+    assert.match(block, /Start with the answer/);
+    assert.ok(block.lastIndexOf("Your reply") > block.indexOf("school-teams.js thread"));
     assert.match(block, /before you start the work/);
     assert.match(block, /posted to this Teams chat immediately/);
     assert.match(block, /@agent and @agentg both do this/);
@@ -114,8 +116,8 @@ describe("teams-mention trigger", () => {
       guestCaller: { displayName: "Alex", slug: "alex-rivera" },
     });
     assert.match(guest, /Called by Alex \(not Yan\) on Teams/);
-    assert.match(guest, /That judgment is an inner thought/);
-    assert.match(guest, /What you write is what gets sent/);
+    assert.match(guest, /None of it goes in the reply/);
+    assert.match(guest, /posted, word for word/);
     assert.doesNotMatch(guest, /Called from Teams\. This Personal Agent chat is otherwise normal/);
     const grade = formatTeamsOriginBlock(
       normalizeTeamsOrigin({
