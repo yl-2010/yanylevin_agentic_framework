@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   canvasIdBlocksMatch,
   computeDue,
+  inferTag,
   folderDueConflicts,
   folderNameMatchesTodo,
 } from "./canvas-hourly-apply.js";
@@ -675,6 +676,31 @@ describe("applyPlannerOverrides", () => {
     ]);
     assert.equal(assignments[0].plannerComplete, false);
     assert.equal(assignments[0].plannerOverrideId, "9");
+  });
+});
+
+describe("inferTag", () => {
+  it("uses the highest title tag and does not fall through to points", () => {
+    assert.equal(
+      inferTag({
+        title: "[CW/HW] Breast Cancer Prediction",
+        pointsPossible: 30,
+        types: ["online_upload"],
+      }),
+      "HW"
+    );
+    assert.equal(
+      inferTag({
+        title: "CW/HW: Comparing Motion Diagrams",
+        pointsPossible: 1,
+        types: ["online_upload"],
+      }),
+      "HW"
+    );
+    assert.equal(
+      inferTag({ title: "Lab report", pointsPossible: 20, types: [] }),
+      "MA"
+    );
   });
 });
 

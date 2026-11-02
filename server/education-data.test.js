@@ -27,6 +27,7 @@ import {
   appendProjectFileLinks,
   resolveProjectLinkedFile,
   parseLinkedFiles,
+  highestTodoTag,
   stripTodoTagPrefix,
   uiPanelDateKeys,
   publicDebateCase,
@@ -1099,6 +1100,24 @@ describe("class highlight lead", () => {
   });
 });
 
+describe("highestTodoTag", () => {
+  it("keeps the highest tag when a title lists more than one", () => {
+    assert.equal(highestTodoTag("[CW/HW] Breast Cancer Prediction"), "HW");
+    assert.equal(highestTodoTag("CW/HW: Comparing Motion Diagrams"), "HW");
+    assert.equal(highestTodoTag("HW/QA: Reading check"), "QA");
+    assert.equal(highestTodoTag("[CW/HW/MA] Final"), "MA");
+    assert.equal(highestTodoTag("QA/HW: Oral"), "QA");
+  });
+
+  it("reads a single prefix and ignores titles with no tag", () => {
+    assert.equal(highestTodoTag("HW: Signed Syllabus"), "HW");
+    assert.equal(highestTodoTag("[CW] Aggregation & Penguin"), "CW");
+    assert.equal(highestTodoTag("MA #F2: Forces & Graphs of Motion"), "MA");
+    assert.equal(highestTodoTag("Summer Read"), "");
+    assert.equal(highestTodoTag("Mathematics of Constant Acceleration"), "");
+  });
+});
+
 describe("stripTodoTagPrefix", () => {
   it("drops HW:/CW:/QA:/MA: prefixes", () => {
     assert.equal(stripTodoTagPrefix("HW: Signed Syllabus"), "Signed Syllabus");
@@ -1116,6 +1135,10 @@ describe("stripTodoTagPrefix", () => {
     assert.equal(
       stripTodoTagPrefix("[CW] Aggregation & Penguin"),
       "Aggregation & Penguin"
+    );
+    assert.equal(
+      stripTodoTagPrefix("[CW/HW] Breast Cancer Prediction"),
+      "Breast Cancer Prediction"
     );
   });
 

@@ -18,8 +18,8 @@ import { classMeetingsBetween } from "./education-class-todo.js";
 import {
   classPeriodOnDate,
   listClassEntriesForRoot,
-  stripTodoTagPrefix,
 } from "./education-data.js";
+import { highestTodoTag, stripTodoTagPrefix } from "./todo-tags.js";
 import {
   findMatchingTodo,
   loadDeletedMarkdown,
@@ -47,9 +47,6 @@ const MAPPED_ONEDRIVE_FOLDERS = {
 
 const YAN_ROOT = YAN_EDUCATION_DIR;
 const CANVAS_DIR = join(YAN_ROOT, ".canvas");
-
-const TODO_TAG_PREFIX = /^(CW|HW|QA|MA)(?:\s*:\s*|\s+)/i;
-const COMBINED_TAG = /^CW\s*\/\s*HW\s*:/i;
 
 let cloudWriteChain = Promise.resolve();
 
@@ -95,16 +92,10 @@ function minutesToHm(minutes) {
 }
 
 function parseTagFromTitle(title) {
-  const raw = String(title || "").trim();
-  if (COMBINED_TAG.test(raw)) return "CW";
-  const bracket = raw.match(/^\[(CW|HW|QA|MA)\]/i);
-  if (bracket) return bracket[1].toUpperCase();
-  const m = raw.match(TODO_TAG_PREFIX);
-  if (m) return m[1].toUpperCase();
-  return "";
+  return highestTodoTag(title);
 }
 
-function inferTag(assignment) {
+export function inferTag(assignment) {
   const fromTitle = parseTagFromTitle(assignment.title);
   if (fromTitle) return fromTitle;
   const types = Array.isArray(assignment.types) ? assignment.types : [];

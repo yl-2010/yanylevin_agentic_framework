@@ -6,6 +6,7 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, extname, join, relative, resolve, sep } from "node:path";
 import { isTransientCloudError, withCloudRetry } from "./cloud-storage-io.js";
+import { stripTodoTagPrefix } from "./todo-tags.js";
 
 const PROPERTY_JSON = new Set([
   "class.json",
@@ -383,7 +384,6 @@ const FINDER_MONTHS = [
   "Dec",
 ];
 const FINDER_TODO_TAGS = new Set(["CW", "HW", "QA", "MA"]);
-const FINDER_TAG_PREFIX = /^(CW|HW|QA|MA)(?:\s*:\s*|\s+)/i;
 const FINDER_ILLEGAL = /[<>:"/\\|?*\u0000-\u001f]/g;
 
 /**
@@ -437,7 +437,7 @@ export function classObjectFinderName(kind, props) {
   const dateIso = kind === "todo" ? props?.dueDate : props?.date;
   const datePart = formatFinderShortDate(dateIso);
   const rawName = String(props?.name || props?.title || "").trim();
-  const stripped = rawName.replace(FINDER_TAG_PREFIX, "").trim() || rawName;
+  const stripped = stripTodoTagPrefix(rawName);
   const namePart = sanitizeFinderFolderName(stripped);
   const joined = sanitizeFinderFolderName(
     [tagPart, datePart, namePart].filter(Boolean).join(" ")

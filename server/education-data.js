@@ -52,6 +52,10 @@ import {
   FULL_ACCESS_EMAILS,
 } from "./identity.js";
 import { normalizeJypeWorkspace } from "./jype.js";
+import { stripTodoTagPrefix } from "./todo-tags.js";
+
+export { highestTodoTag, stripTodoTagPrefix } from "./todo-tags.js";
+
 import {
   JYPE_DIR,
   PERSONAL_PROJECTS,
@@ -1363,19 +1367,6 @@ async function fileCreatedAtIso(filePath) {
   } catch {
     return null;
   }
-}
-
-/** Leading CW/HW/QA/MA on Canvas titles. Tag lives on `tag`; UI paints it separately. */
-const TODO_TAG_PREFIX = /^(?:CW\s*\/\s*HW|(?:CW|HW|QA|MA))(?:\s*:\s*|\s+)/i;
-
-export function stripTodoTagPrefix(name) {
-  const raw = String(name || "").trim();
-  const stripped = raw
-    .replace(/^\[(CW|HW|QA|MA)\]\s*/i, "")
-    .replace(TODO_TAG_PREFIX, "")
-    .replace(/^[-–]\s+/, "")
-    .trim();
-  return stripped || raw;
 }
 
 /**

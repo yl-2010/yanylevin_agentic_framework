@@ -123,11 +123,12 @@ For every snapshot assignment whose `courseId` maps to a class:
 - **Always** set `canvasLink` to the assignment `htmlUrl`.
 - **Always** set `canvasId` to the Canvas assignment id (number or string).
 - **Always** tag schoolwork: `CW` | `HW` | `QA` | `MA` (do not leave mapped assignments untagged).
+  - A title that already lists tags uses those tags. More than one keeps the highest. Lowest to highest is CW, HW, QA, MA. `CW/HW:` and `[CW/HW]` are HW. Do not replace that with the points guess.
   - Quiz / check / reading quiz / `online_quiz` → `QA`
   - Test, exam, essay, paper, project, presentation, lab, performance → `MA`
   - In-class / classwork → `CW`
   - Default take-home work → `HW`
-  - High point values that look summative → `MA`
+  - High point values that look summative → `MA`, only when the title has no CW/HW/QA/MA tag
 - Store `name` **without** a CW/HW/QA/MA prefix. Canvas `HW: Signed Syllabus` becomes `Signed Syllabus`. Keep `#F2` / `Final` after the tag (`MA #F2: Forces` → `#F2: Forces`). The dashboard paints the tag in blue next to the title.
 - MA still defaults `showInDates` on; do not turn that off unless Yan asked.
 - Copy a short markdown `description` from the snapshot when it helps (education-dashboard Description formatting: bold lead-ins, bullets, links). Do not dump the whole syllabus into every todo.

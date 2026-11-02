@@ -349,6 +349,14 @@ describe("classObjectFinderName", () => {
     );
     assert.equal(
       classObjectFinderName("todo", {
+        name: "[CW/HW] Breast Cancer Prediction",
+        tag: "HW",
+        dueDate: "2026-11-02",
+      }),
+      "HW Nov 2 Breast Cancer Prediction"
+    );
+    assert.equal(
+      classObjectFinderName("todo", {
         name: '#F1: Motion in 1-Dimension',
         tag: "MA",
         dueDate: "2026-09-25",
