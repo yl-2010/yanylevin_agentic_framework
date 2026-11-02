@@ -38,6 +38,7 @@ const {
   encodeEducationFileQueryValue,
   decodeEducationFileQueryValue,
   contextFileOpensInline,
+  contextFileShouldDownload,
   contentDispositionForFile,
 } = require("../education/file-query.js");
 
@@ -170,12 +171,19 @@ describe("education file query", () => {
 });
 
 describe("context file open mode", () => {
-  it("shows pdf and text in a tab and downloads a notebook", () => {
+  it("downloads a notebook and leaves Office files inline", () => {
     assert.equal(contextFileOpensInline("notes.pdf"), true);
     assert.equal(contextFileOpensInline("read.txt"), true);
-    assert.equal(contextFileOpensInline("CW - ML fundamental classification.ipynb"), false);
-    assert.equal(contentDispositionForFile("essay.docx"), "attachment");
+    assert.equal(contextFileShouldDownload("CW - ML fundamental classification.ipynb"), true);
+    assert.equal(contextFileShouldDownload("essay.docx"), false);
+    assert.equal(contextFileShouldDownload("slides.pptx"), false);
+    assert.equal(contextFileShouldDownload("sheet.xlsx"), false);
+    assert.equal(contentDispositionForFile("essay.docx"), "inline");
     assert.equal(contentDispositionForFile("notes.pdf"), "inline");
+    assert.equal(
+      contentDispositionForFile("CW - ML fundamental classification.ipynb"),
+      "attachment"
+    );
   });
 });
 

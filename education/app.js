@@ -2643,8 +2643,8 @@
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const downloadName = fileQueryName(queryString);
-      const opensInline = window.YLFileQuery?.contextFileOpensInline?.(downloadName);
-      if (opensInline === false) {
+      const shouldDownload = window.YLFileQuery?.contextFileShouldDownload?.(downloadName);
+      if (shouldDownload === true) {
         const a = document.createElement("a");
         a.href = url;
         a.download = downloadName || "download";

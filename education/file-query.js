@@ -66,19 +66,25 @@
     return s.slice(i + 1).toLowerCase();
   }
 
-  /** Browser can show this in a tab. Notebooks and Office files download. */
+  /** Browser can show this in a tab. */
   function contextFileOpensInline(name) {
     return Object.prototype.hasOwnProperty.call(INLINE_EXT, fileExt(name));
   }
 
+  /** Jupyter notebooks have no browser viewer. Office and OneNote stay on their own open path. */
+  function contextFileShouldDownload(name) {
+    return fileExt(name) === "ipynb";
+  }
+
   function contentDispositionForFile(name) {
-    return contextFileOpensInline(name) ? "inline" : "attachment";
+    return contextFileShouldDownload(name) ? "attachment" : "inline";
   }
 
   return {
     encodeEducationFileQueryValue,
     decodeEducationFileQueryValue,
     contextFileOpensInline,
+    contextFileShouldDownload,
     contentDispositionForFile,
   };
 });
