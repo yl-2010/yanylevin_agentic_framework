@@ -42,5 +42,43 @@
     return text;
   }
 
-  return { encodeEducationFileQueryValue, decodeEducationFileQueryValue };
+  const INLINE_EXT = {
+    pdf: 1,
+    png: 1,
+    jpg: 1,
+    jpeg: 1,
+    gif: 1,
+    webp: 1,
+    heic: 1,
+    avif: 1,
+    txt: 1,
+    md: 1,
+    csv: 1,
+    json: 1,
+    html: 1,
+    htm: 1,
+  };
+
+  function fileExt(name) {
+    const s = String(name || "");
+    const i = s.lastIndexOf(".");
+    if (i < 0 || i === s.length - 1) return "";
+    return s.slice(i + 1).toLowerCase();
+  }
+
+  /** Browser can show this in a tab. Notebooks and Office files download. */
+  function contextFileOpensInline(name) {
+    return Object.prototype.hasOwnProperty.call(INLINE_EXT, fileExt(name));
+  }
+
+  function contentDispositionForFile(name) {
+    return contextFileOpensInline(name) ? "inline" : "attachment";
+  }
+
+  return {
+    encodeEducationFileQueryValue,
+    decodeEducationFileQueryValue,
+    contextFileOpensInline,
+    contentDispositionForFile,
+  };
 });

@@ -2642,6 +2642,18 @@
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
+      const downloadName = fileQueryName(queryString);
+      const opensInline = window.YLFileQuery?.contextFileOpensInline?.(downloadName);
+      if (opensInline === false) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = downloadName || "download";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        return;
+      }
       const opened = window.open(url, "_blank", "noopener,noreferrer");
       if (!opened) {
         const a = document.createElement("a");

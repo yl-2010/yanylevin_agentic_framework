@@ -74,7 +74,9 @@ function noteCloudReadMiss() {
   const box = cloudMissStore.getStore();
   if (box) box.misses += 1;
 }
-const { decodeEducationFileQueryValue } = require("../education/file-query.js");
+const { decodeEducationFileQueryValue, contentDispositionForFile } = require(
+  "../education/file-query.js"
+);
 
 const FILE_QUERY_KEYS = ["scope", "id", "classId", "projectId", "name", "source", "path"];
 
@@ -907,9 +909,10 @@ export function sendContextFile(res, file) {
   const encoded = encodeURIComponent(file.name);
   res.setHeader("Content-Type", type);
   res.setHeader("Content-Length", String(file.size));
+  const disposition = contentDispositionForFile(file.name);
   res.setHeader(
     "Content-Disposition",
-    `inline; filename="${ascii}"; filename*=UTF-8''${encoded}`
+    `${disposition}; filename="${ascii}"; filename*=UTF-8''${encoded}`
   );
   res.setHeader("Cache-Control", "private, no-store");
   createReadStream(file.path).pipe(res);

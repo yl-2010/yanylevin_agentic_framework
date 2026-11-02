@@ -37,6 +37,8 @@ const require = createRequire(import.meta.url);
 const {
   encodeEducationFileQueryValue,
   decodeEducationFileQueryValue,
+  contextFileOpensInline,
+  contentDispositionForFile,
 } = require("../education/file-query.js");
 
 describe("publishClassRows", () => {
@@ -164,6 +166,16 @@ describe("education file query", () => {
     });
     assert.equal(decoded.id, id);
     assert.equal(decoded.classId, "spanish-4");
+  });
+});
+
+describe("context file open mode", () => {
+  it("shows pdf and text in a tab and downloads a notebook", () => {
+    assert.equal(contextFileOpensInline("notes.pdf"), true);
+    assert.equal(contextFileOpensInline("read.txt"), true);
+    assert.equal(contextFileOpensInline("CW - ML fundamental classification.ipynb"), false);
+    assert.equal(contentDispositionForFile("essay.docx"), "attachment");
+    assert.equal(contentDispositionForFile("notes.pdf"), "inline");
   });
 });
 
