@@ -2520,23 +2520,11 @@
     return `${owner.scope || ""}:${owner.id || ""}:${owner.classId || ""}:${path}`;
   }
 
-  function isOneNoteLinkTile(file) {
-    return /^onenote:/i.test(String(file?.officeUri || "").trim());
-  }
-
-  function isOneNoteMoreFolder(file) {
-    return (
-      String(file?.kind || "") === "folder" &&
-      String(file?.path || "") === "onenote-more"
-    );
-  }
-
-  function folderBodyHtml(file, owner, filterId, childPrefix, pair) {
+  function folderBodyHtml(file, owner, filterId, childPrefix) {
     const name = String(file?.name || "").trim();
     const key = folderKey(owner, file);
     const open = expandedFolders.has(key);
     const children = filesHtml(file.files, owner, {
-      pair,
       filterPrefix: childPrefix,
     });
     return `<button type="button" class="edu-file-tile edu-file-folder" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
@@ -2553,61 +2541,40 @@
 
   /**
    * Liquid-glass file tiles (API order: filesTop, then newest mtime, then filesBottom).
-   * Folders expand in place; they do not navigate away.
-   * A main OneNote link followed by the onenote-more folder stacks in one full-width wrap.
+   * Folders expand in place. They do not navigate away.
+   * `pair` puts even tiles in the left column and odd tiles in the right.
+   * Each column is its own stack, so opening a folder only grows that column.
    * @param {{ name: string, kind?: string, source?: string, path?: string, files?: object[] }[]|null|undefined} files
    * @param {{ scope: string, id?: string, classId?: string, projectId?: string }} owner
    * @param {{ pair?: boolean, filterPrefix?: string }} [opts]
    */
+  function pairColumnsHtml(tiles) {
+    const cols = [[], []];
+    tiles.forEach((html, index) => {
+      cols[index % 2].push(
+        `<div class="edu-files-item" style="order:${index}">${html}</div>`
+      );
+    });
+    return `<div class="edu-files edu-files--pair"><div class="edu-files-col">${cols[0].join(
+      ""
+    )}</div><div class="edu-files-col">${cols[1].join("")}</div></div>`;
+  }
+
   function filesHtml(files, owner, { pair = false, filterPrefix = "lg-edu-file" } = {}) {
     const list = Array.isArray(files) ? files : [];
     if (!list.length) return "";
-    let skipNext = false;
     const tiles = list
       .map((f, i) => {
-        if (skipNext) {
-          skipNext = false;
-          return "";
-        }
         const name = String(f?.name || "").trim();
         if (!name) return "";
         const filterId = `${filterPrefix}-${i}`;
-        const next = list[i + 1];
-        if (
-          isOneNoteLinkTile(f) &&
-          isOneNoteMoreFolder(next) &&
-          String(next?.name || "").trim()
-        ) {
-          skipNext = true;
-          const href = String(f.url || f.webUrl || "").trim();
-          const officeUri = String(f.officeUri || "").trim();
-          const officeAttr = officeUri
-            ? ` data-edu-office="${escapeHtml(officeUri)}"`
-            : "";
-          const link = `<a class="edu-file-tile" href="${escapeHtml(
-            href
-          )}" target="_blank" rel="noopener noreferrer"${officeAttr} data-liquid-glass="rounded" data-filter-id="${escapeHtml(
-            filterId
-          )}" title="${escapeHtml(name)}"><span class="edu-file-name">${escapeHtml(
-            name
-          )}</span></a>`;
-          const folder = folderBodyHtml(
-            next,
-            owner,
-            `${filterPrefix}-${i + 1}`,
-            `${filterPrefix}-dir-${i + 1}`,
-            pair
-          );
-          return `<div class="edu-file-folder-wrap">${link}${folder}</div>`;
-        }
         const isFolder = String(f?.kind || "") === "folder";
         if (isFolder) {
           return `<div class="edu-file-folder-wrap">${folderBodyHtml(
             f,
             owner,
             filterId,
-            `${filterPrefix}-dir-${i}`,
-            pair
+            `${filterPrefix}-dir-${i}`
           )}</div>`;
         }
         const qs = contextFileQuery({
@@ -2655,10 +2622,10 @@
           name
         )}</span></a>`;
       })
-      .filter(Boolean)
-      .join("");
-    if (!tiles) return "";
-    return `<div class="edu-files${pair ? " edu-files--pair" : ""}">${tiles}</div>`;
+      .filter(Boolean);
+    if (!tiles.length) return "";
+    if (pair) return pairColumnsHtml(tiles);
+    return `<div class="edu-files">${tiles.join("")}</div>`;
   }
 
   async function openContextFile(queryString) {
@@ -3259,6 +3226,7 @@
       ? ` data-todo-project-id="${escapeHtml(t.projectId)}"`
       : "";
     const contextName = t.projectName || t.className;
+    const commentsHtml = commentBoxesHtml(t.canvasComments, t.canvasLink);
     const fileTiles = filesHtml(
       t.files,
       {
@@ -3267,7 +3235,10 @@
         classId: t.classId,
         projectId: t.projectId,
       },
-      { pair: true, filterPrefix: "lg-edu-todo-file" }
+      {
+        pair: isBriefing || !commentsHtml,
+        filterPrefix: "lg-edu-todo-file",
+      }
     );
 
     if (isBriefing) {
@@ -3303,7 +3274,7 @@
     appEl.innerHTML = detailShell(backHrefForItem(t), t.name || t.id, body, "lg-edu-todo-detail", {
       canvasLink: t.canvasLink,
       filesHtml: fileTiles,
-      commentsHtml: commentBoxesHtml(t.canvasComments, t.canvasLink),
+      commentsHtml,
       titleHtml: taggedNameHtml(tag, t.name || t.id),
       canvasScore: todoScoreLabel(t),
     });

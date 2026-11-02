@@ -1059,8 +1059,14 @@ a.edu-comment-body {
 }
 
 .edu-todo-split-files .edu-files--pair {
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   margin-top: 0;
+}
+
+.edu-todo-split-files .edu-files-col {
+  display: contents;
 }
 
 .edu-files {
@@ -1076,10 +1082,18 @@ a.edu-comment-body {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
   margin-top: 1rem;
+  align-items: start;
 }
 
-.edu-files--pair > .edu-file-folder-wrap {
-  grid-column: 1 / -1;
+.edu-files-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.edu-files-item {
+  min-width: 0;
 }
 
 .edu-file-folder-wrap {
@@ -1986,7 +2000,13 @@ a.edu-score {
   }
 
   .edu-files--pair {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .edu-files-col {
+    display: contents;
   }
 
   .edu-todo-split {

@@ -16,7 +16,7 @@ struct EducationFileOwner: Equatable {
 struct EducationContextFilesView: View {
     let files: [EducationContextFile]
     let owner: EducationFileOwner
-    /// When true (todo/date detail on wide layouts), pack two tiles per row.
+    /// When true (todo/date detail on wide layouts), even tiles go left and odd tiles go right.
     var pairColumns: Bool = false
     @ObservedObject var store: EducationStore
     @EnvironmentObject private var auth: AuthStore
@@ -26,30 +26,25 @@ struct EducationContextFilesView: View {
     @State private var openError: String?
     @State private var expandedIds: Set<String> = []
 
-    private var columns: [GridItem] {
-        if pairColumns {
-            return [
-                GridItem(.flexible(), spacing: 14),
-                GridItem(.flexible(), spacing: 14),
-            ]
-        }
-        return [GridItem(.flexible(), spacing: 14)]
-    }
-
     @ViewBuilder
     var body: some View {
         if files.isEmpty {
             EmptyView()
         } else {
-            LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
-                ForEach(files) { file in
-                    EducationContextFileCell(
-                        file: file,
-                        pairColumns: pairColumns,
-                        expandedIds: $expandedIds,
-                        openingName: openingName,
-                        onOpen: open
-                    )
+            Group {
+                if pairColumns {
+                    HStack(alignment: .top, spacing: 14) {
+                        fileColumn(0)
+                        fileColumn(1)
+                    }
+                } else {
+                    LazyVGrid(
+                        columns: [GridItem(.flexible(), spacing: 14)],
+                        alignment: .leading,
+                        spacing: 14
+                    ) {
+                        fileCells(files)
+                    }
                 }
             }
             .sheet(item: $previewItem) { item in
@@ -65,6 +60,27 @@ struct EducationContextFilesView: View {
                 Text(openError ?? "")
             }
             .modifier(EducationFilePreviewDismiss(previewItem: $previewItem))
+        }
+    }
+
+    /// Even indexes on the left, odd indexes on the right. Each side is its own stack.
+    private func fileColumn(_ side: Int) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            fileCells(files.enumerated().compactMap { index, file in
+                index % 2 == side ? file : nil
+            })
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func fileCells(_ columnFiles: [EducationContextFile]) -> some View {
+        ForEach(columnFiles) { file in
+            EducationContextFileCell(
+                file: file,
+                expandedIds: $expandedIds,
+                openingName: openingName,
+                onOpen: open
+            )
         }
     }
 
@@ -137,7 +153,6 @@ struct EducationContextFilesView: View {
 
 private struct EducationContextFileCell: View {
     let file: EducationContextFile
-    let pairColumns: Bool
     @Binding var expandedIds: Set<String>
     let openingName: String?
     let onOpen: (EducationContextFile) -> Void
@@ -152,7 +167,6 @@ private struct EducationContextFileCell: View {
                         ForEach(file.files ?? []) { child in
                             EducationContextFileCell(
                                 file: child,
-                                pairColumns: pairColumns,
                                 expandedIds: $expandedIds,
                                 openingName: openingName,
                                 onOpen: onOpen
@@ -163,9 +177,9 @@ private struct EducationContextFileCell: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .gridCellColumns(pairColumns ? 2 : 1)
         } else {
             fileButton
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
