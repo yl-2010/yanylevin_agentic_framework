@@ -79,7 +79,11 @@ Every page needs:
 6. Top-left YL squircle linking to `https://yanylevin.com/`
 7. Top-right empty circle, `aria-label="Toggle theme"`, `draggable="false"`
 8. Hidden SVG `<defs id="liquid-glass-defs">`
-9. Scripts, in this order: `/liquid-glass.js`, `/theme-orb.js`, `/yl-home-link.js`
+9. Scripts, in this order: `/liquid-glass.js`, `/theme-orb.js?v=owner-corners1`, `/yl-home-link.js`
+
+Do not paste the bottom dock or the chat circle into the page. `theme-orb.js` adds both when the Google session is `you@example.com`. Logged-out visitors and every other account keep the top two corners only.
+
+The bottom-left shape is the usage / home / dashboard L. The bottom-right shape is the agent chat circle. That chat is the personal agent, and the JYPE agent on `/jype/`. Pages that already have `#app-dock` or `#edu-chat` keep those. Celebration sites stay off this chrome. Object HTML stays off it too.
 
 Skeleton (keep the YL path exactly):
 
@@ -123,7 +127,7 @@ Skeleton (keep the YL path exactly):
       <defs id="liquid-glass-defs"></defs>
     </svg>
     <script src="/liquid-glass.js?v=chrome-perf9"></script>
-    <script src="/theme-orb.js?v=chrome-perf6"></script>
+    <script src="/theme-orb.js?v=owner-corners1"></script>
     <script src="/yl-home-link.js?v=3"></script>
   </body>
 </html>
@@ -215,6 +219,7 @@ If they stay `class="sheet"` only, `liquid-glass.js` did not treat them as stati
 - [ ] `vercel.json` trailing-slash redirect
 - [ ] Public files not only under `education/<email>/`
 - [ ] YL squircle, theme orb, Karla, education CSS, page CSS, three scripts, `liquid-glass-defs`
+- [ ] Bottom dock and chat left to `theme-orb.js`. They show only for Yan's Google session. Do not hardcode them
 - [ ] Content cards are `.sheet` with unique `data-filter-id`
 - [ ] Card enter animation is opacity only (no `transform`, no `both` fill)
 - [ ] Unslop on all copy

@@ -3,9 +3,13 @@
  * Draggable (snaps home near top-right); click toggles light/dark theme.
  * Theme is session-only.
  *
- * On education, dashboard, and usage, a logged-in L of glass squares sits in
- * the bottom-left. Drag the circle into the empty cell and it becomes a
- * square that still toggles the theme. Drag it back out and it is a circle.
+ * On education, dashboard, usage, and debate, a logged-in L of glass squares
+ * sits in the bottom-left. Drag the circle into the empty cell and it becomes
+ * a square that still toggles the theme. Drag it back out and it is a circle.
+ *
+ * Any other page with the top YL squircle and this circle grows the same
+ * bottom-left dock and the bottom-right agent chat when the Google session
+ * is you@example.com. Logged-out visitors stay on the top two only.
  */
 (() => {
   const el = document.querySelector(".c-tr");
@@ -283,17 +287,8 @@
   const YL_PATH =
     "M229.4,214.58c0,11.34-9.21,20.52-20.55,20.51l-117.33-.11c-2.66-.02-5.21-.49-7.64-1.48-9.37-3.58-14.91-14.5-12.23-24.2.17-.64.37-1.29.61-1.92,0,0,22.86-63.64,22.86-63.64L26.54,49.57c-6.68-9.17-4.66-22.01,4.51-28.69,9.17-6.67,22.01-4.65,28.68,4.51l52.17,71.64,23.93-66.63c3.8-10.58,15.47-16.08,26.05-12.28,10.59,3.81,16.09,15.47,12.28,26.05l-53.8,149.78,88.53.08c11.34.01,20.53,9.21,20.51,20.55Z";
 
-  function installAppDock() {
-    if (!appDockPage()) return;
-    const stage = document.getElementById("stage-full");
-    if (!stage || document.getElementById("app-dock")) return;
-
-    const dock = document.createElement("nav");
-    dock.id = "app-dock";
-    dock.className = "app-dock";
-    dock.setAttribute("aria-label", "Sites");
-    dock.hidden = true;
-    dock.innerHTML = `
+  function dockMarkup() {
+    return `
       <a class="corner social-orb dock-usage squircle" data-liquid-glass="squircle" data-filter-id="lg-dock-usage" href="/usage/" aria-label="Usage">
         <svg viewBox="0 0 24 24" aria-hidden="true" draggable="false"><path fill="currentColor" d="M4 13.2c0-.7.5-1.2 1.2-1.2h1.6c.7 0 1.2.5 1.2 1.2v6.1c0 .7-.5 1.2-1.2 1.2H5.2c-.7 0-1.2-.5-1.2-1.2v-6.1Zm6-8.4c0-.7.5-1.2 1.2-1.2h1.6c.7 0 1.2.5 1.2 1.2v14.5c0 .7-.5 1.2-1.2 1.2h-1.6c-.7 0-1.2-.5-1.2-1.2V4.8Zm6 4.2c0-.7.5-1.2 1.2-1.2h1.6c.7 0 1.2.5 1.2 1.2v10.3c0 .7-.5 1.2-1.2 1.2h-1.6c-.7 0-1.2-.5-1.2-1.2V9Z"/></svg>
       </a>
@@ -303,34 +298,36 @@
       <a class="corner social-orb dock-dash squircle" data-liquid-glass="squircle" data-filter-id="lg-dock-dash" href="/dashboard/" aria-label="Dashboard">
         <svg viewBox="0 0 24 24" aria-hidden="true" draggable="false"><g fill="currentColor"><rect x="2.2" y="3" width="4.4" height="18" rx="1.15"/><rect x="10" y="3" width="11.8" height="7.3" rx="1.15"/><rect x="10" y="13.7" width="11.8" height="7.3" rx="1.15"/></g></svg>
       </a>`;
-    document.body.appendChild(dock);
+  }
 
-    function markCurrent() {
-      const path = location.pathname.replace(/\/+$/, "") || "/";
-      const usage = dock.querySelector(".dock-usage");
-      const dash = dock.querySelector(".dock-dash");
-      if (usage) {
-        if (path === "/usage") usage.setAttribute("aria-current", "page");
-        else usage.removeAttribute("aria-current");
-      }
-      if (dash) {
-        if (path === "/dashboard") dash.setAttribute("aria-current", "page");
-        else dash.removeAttribute("aria-current");
-      }
+  function markDock(dock) {
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    const usage = dock.querySelector(".dock-usage");
+    const dash = dock.querySelector(".dock-dash");
+    if (usage) {
+      if (path === "/usage") usage.setAttribute("aria-current", "page");
+      else usage.removeAttribute("aria-current");
     }
+    if (dash) {
+      if (path === "/dashboard") dash.setAttribute("aria-current", "page");
+      else dash.removeAttribute("aria-current");
+    }
+  }
 
-    function sync() {
+  function watchStage(node) {
+    const stage = document.getElementById("stage-full");
+    if (!stage || !node) return;
+    const sync = () => {
       const on = !stage.hidden;
-      if (dock.hidden === !on) return;
-      dock.hidden = !on;
+      if (node.hidden === !on) return;
+      node.hidden = !on;
       if (!on) {
-        if (el._docked) snapOrbHome(el);
+        if (node.id === "app-dock" && el._docked) snapOrbHome(el);
         return;
       }
-      markCurrent();
+      if (node.id === "app-dock") markDock(node);
       if (typeof window.reinitLiquidGlass === "function") window.reinitLiquidGlass();
-    }
-
+    };
     sync();
     new MutationObserver(sync).observe(stage, {
       attributes: true,
@@ -338,5 +335,198 @@
     });
   }
 
+  function buildAppDock(hidden) {
+    const dock = document.createElement("nav");
+    dock.id = "app-dock";
+    dock.className = "app-dock";
+    dock.setAttribute("aria-label", "Sites");
+    dock.hidden = hidden;
+    dock.innerHTML = dockMarkup();
+    return dock;
+  }
+
+  function installAppDock() {
+    if (!appDockPage()) return;
+    const stage = document.getElementById("stage-full");
+    if (!stage || document.getElementById("app-dock")) return;
+    const dock = buildAppDock(true);
+    document.body.appendChild(dock);
+    watchStage(dock);
+  }
+
+  function ensureGlassDefs() {
+    if (document.getElementById("liquid-glass-defs")) return;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "liquid-glass-svg");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("focusable", "false");
+    svg.style.cssText = "position:absolute;width:0;height:0;overflow:hidden;pointer-events:none";
+    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    defs.id = "liquid-glass-defs";
+    svg.appendChild(defs);
+    document.body.appendChild(svg);
+  }
+
+  function ownerPad() {
+    if (document.getElementById("stage-full")) return;
+    if (document.getElementById("yl-owner-corners-css")) return;
+    document.documentElement.classList.add("yl-owner-corners");
+    const style = document.createElement("style");
+    style.id = "yl-owner-corners-css";
+    style.textContent =
+      "html.yl-owner-corners body{padding-bottom:calc(var(--corner-pad, 1.2rem) + var(--corner-orb, 120px) + 1.5rem)}";
+    document.head.appendChild(style);
+  }
+
+  function chatLabel() {
+    const path = location.pathname;
+    if (path === "/jype" || path.startsWith("/jype/")) return "JYPE agent";
+    return "Personal assistant";
+  }
+
+  function ensureChatWorkspace() {
+    if (window.YL_EDU) return;
+    const path = location.pathname;
+    if (path === "/jype" || path.startsWith("/jype/")) {
+      window.YL_EDU = {
+        basePath: "/jype",
+        apiPrefix: "/api/jype",
+        workspace: "jype",
+        title: "JYPE",
+      };
+    }
+  }
+
+  function chatMarkup(label) {
+    return `
+    <div id="edu-chat" class="yan-chat" data-state="closed">
+      <div class="yan-chat-column yan-chat-column--history">
+        <div class="yan-chat-panel" data-liquid-glass="rounded" data-filter-id="lg-owner-chat-panel" hidden aria-hidden="true" role="region" aria-label="Chat history">
+          <button type="button" class="yan-chat-close yan-chat-close--panel circle" data-liquid-glass="circle" data-filter-id="lg-owner-chat-x-panel" data-edu-chat-close-all aria-label="Close chat">
+            <svg viewBox="0 0 24 24" aria-hidden="true" style="transform: rotate(45deg)"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
+          </button>
+          <div class="yan-chat-history"></div>
+        </div>
+        <div class="yan-chat-pill corner circle c-br" data-liquid-glass="circle" data-filter-id="lg-owner-chat-pill">
+          <button type="button" class="yan-chat-launcher" aria-label="${label}" aria-expanded="false" aria-controls="edu-chat-input">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
+          </button>
+          <form class="yan-chat-form" action="#" autocomplete="off">
+            <label class="visually-hidden" for="edu-chat-input">Ask your agent</label>
+            <textarea id="edu-chat-input" class="yan-chat-input" name="q" rows="1" maxlength="32000" tabindex="-1" autocomplete="off" wrap="soft" aria-multiline="true"></textarea>
+            <button type="submit" class="yan-chat-send circle" data-liquid-glass="circle" data-filter-id="lg-owner-chat-send" aria-label="Send">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><g stroke="currentColor" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18.2V6.4"/><path d="M6.9 11.3L12 6.2L17.1 11.3"/></g></svg>
+            </button>
+          </form>
+        </div>
+      </div>
+      <div class="yan-chat-column yan-chat-column--thread" hidden>
+        <div class="yan-chat-panel" data-liquid-glass="rounded" data-filter-id="lg-owner-chat-panel-thread" hidden aria-hidden="true" role="region" aria-label="${label}">
+          <button type="button" class="yan-chat-close yan-chat-close--panel circle" data-liquid-glass="circle" data-filter-id="lg-owner-chat-x-thread" data-edu-chat-close-thread aria-label="Close this chat">
+            <svg viewBox="0 0 24 24" aria-hidden="true" style="transform: rotate(45deg)"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
+          </button>
+          <div class="yan-chat-messages" aria-live="polite"></div>
+        </div>
+        <div class="yan-chat-pill corner circle c-br" data-liquid-glass="circle" data-filter-id="lg-owner-chat-pill-thread">
+          <form class="yan-chat-form" action="#" autocomplete="off">
+            <label class="visually-hidden" for="edu-chat-thread-input">Continue this chat</label>
+            <textarea id="edu-chat-thread-input" class="yan-chat-input" name="q" rows="1" maxlength="32000" tabindex="-1" autocomplete="off" wrap="soft" aria-multiline="true"></textarea>
+            <button type="submit" class="yan-chat-send circle" data-liquid-glass="circle" data-filter-id="lg-owner-chat-send-thread" aria-label="Send">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><g stroke="currentColor" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18.2V6.4"/><path d="M6.9 11.3L12 6.2L17.1 11.3"/></g></svg>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function loadScript(src, type) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = src;
+      if (type) s.type = type;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error(src));
+      document.body.appendChild(s);
+    });
+  }
+
+  function loadOwnerChat() {
+    const sources = [
+      ["/js/mac-api.js", ""],
+      ["/js/chat-send-flight.js?v=1", ""],
+      ["https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js", ""],
+      ["/education/markdown.js?v=katex-2", ""],
+      ["/js/chat-orb.js?v=2", "module"],
+      ["/education/chatbot.js?v=chat-file-open", ""],
+    ];
+    if (!document.querySelector("link[href*='katex.min.css']")) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css";
+      link.crossOrigin = "anonymous";
+      document.head.appendChild(link);
+    }
+    return sources.reduce(
+      (chain, [src, type]) => chain.then(() => loadScript(src, type)),
+      Promise.resolve()
+    );
+  }
+
+  function installOwnerCorners() {
+    if (!document.querySelector("a.c-tl")) return;
+    const needsDock = !document.getElementById("app-dock");
+    const needsChat = !document.getElementById("edu-chat");
+    if (!needsDock && !needsChat) return;
+
+    fetch("/api/auth/session", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then((res) => res.json().catch(() => ({})))
+      .then((data) => {
+        const email = String(data && data.email ? data.email : "")
+          .trim()
+          .toLowerCase();
+        if (!data || !data.authenticated || email !== "you@example.com") return;
+
+        const stage = document.getElementById("stage-full");
+        const hold = Boolean(stage && stage.hidden);
+        let added = false;
+
+        if (!document.getElementById("app-dock")) {
+          const dock = buildAppDock(hold);
+          document.body.appendChild(dock);
+          if (stage) watchStage(dock);
+          else markDock(dock);
+          added = true;
+        }
+
+        if (!document.getElementById("edu-chat")) {
+          ensureChatWorkspace();
+          const holder = document.createElement("div");
+          holder.innerHTML = chatMarkup(chatLabel());
+          const chat = holder.firstElementChild;
+          if (hold) chat.hidden = true;
+          document.body.appendChild(chat);
+          if (stage) watchStage(chat);
+          added = true;
+          loadOwnerChat()
+            .then(() => {
+              if (typeof window.reinitLiquidGlass === "function") window.reinitLiquidGlass();
+            })
+            .catch(() => {});
+        }
+
+        ensureGlassDefs();
+        ownerPad();
+        if (added && typeof window.reinitLiquidGlass === "function") {
+          window.reinitLiquidGlass();
+        }
+      })
+      .catch(() => {});
+  }
+
   installAppDock();
+  installOwnerCorners();
 })();

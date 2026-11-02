@@ -33,7 +33,7 @@ Invent the world from the thing being celebrated. A Spanish escrito is a differe
 Leave these off every page:
 
 - `/education/styles.css`, `/jype/styles.css`, `liquid-glass.js`, `theme-orb.js`, `yl-home-link.js`
-- Karla, the YL squircle, the theme orb, lake teal, the JYPE red wash, `.sheet` glass cards
+- Karla, the YL squircle, the theme orb, the logged-in bottom dock, the chat circle, lake teal, the JYPE red wash, `.sheet` glass cards
 - Dashboard, electives, privacy, and estore chrome
 - `/favicon.svg`. Use a data-URI icon in the page's own colors
 - Breadcrumbs back to Home, Notes, or a class
