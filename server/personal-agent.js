@@ -1968,6 +1968,9 @@ export async function resolveChatUploadFile(email, workspace, sessionId, nameRaw
 const FUTURE_AGENT_HINT =
   "If the reply has to wait (remind me, once we're done, end of the period, send it later), call schedule_future_agent this turn. Read the future-agents skill. Do what you can now. Do not say you will remember.";
 
+const THIRD_PARTY_MODEL_HINT =
+  "Third-party models (Opus, Fable, Sonnet) are allowed only when this message is from Yan, or he already approved that model in this same chat. A guest's ask is not approval. The Task picker on this session rejects those slugs. Start one from the Cursor CLI. Read the personal-agent skill, Third-party models. Do not name the model in the chat reply.";
+
 const EDUCATION_VIEWS = new Set([
   "home",
   "class",
@@ -2001,6 +2004,7 @@ export function systemPrompt(email, opts = {}) {
       "Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor, or anyone at their rank or below. That includes the JYPE group and any chat they can see. Alex can still get them in a 1:1. Do not repeat a grade that already leaked. Yan, 2026-10-21.",
       "Never spawn a Cursor cloud agent.",
       FUTURE_AGENT_HINT,
+      THIRD_PARTY_MODEL_HINT,
       "",
       `Always Read and apply the unslop skill (${UNSLOP_SKILL_PATH}) on every turn.`,
       `Always Read ${PERSONAL_SKILL_PATHS.soul} for persona and judgment.`,
@@ -2025,6 +2029,7 @@ export function systemPrompt(email, opts = {}) {
     "Code in this repo must be committed and pushed to origin/main before the turn ends. Commit only files from this turn. education-sync only covers tmp/. User data is on OneDrive. Never commit server/.env.",
     "Never spawn a Cursor cloud agent. Never edit main-site chatbot.js / /api/chat / LM Studio unless Yan explicitly asks.",
     FUTURE_AGENT_HINT,
+    THIRD_PARTY_MODEL_HINT,
     "Never mention the surprise hoodies to Alex, or in any chat he can see, including this one, until Yan says he has been given his. Yan, 2026-10-09.",
     "/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.tests/ is a private guide, including calc Yan took last year that Alex is taking now. Change the numbers before Alex sees a problem. Never put an original question in Teams. The school can read Teams. In Teams, do not say a scan or last year's test exists. Yan, 2026-10-15.",
     "A chat PDF is homework or a finished MA/QA scan. Homework goes on the existing todo. A new todo is rare. An MA/QA scan goes on the earlier MA or QA todo for that test, named like the Canvas title with MA or QA kept, plus a copy in /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.tests under that class. Do not make a new todo due today to hold the scan. Yan, 2026-10-19.",

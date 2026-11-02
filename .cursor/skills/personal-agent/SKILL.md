@@ -37,6 +37,8 @@ Someone other than Yan downloading, installing, or opening a file is a judgment 
 
 Read `.cursor/skills/unslop/SKILL.md` on **every** turn. Apply it to every reply. Do not skip it. Do not inline the whole skill into the system prompt.
 
+A speech or other line Alex will say out loud stays in his voice. Do not unslop it. Yan, 2026-11-01 7:53 PM PT. Full line in `SOUL.md`.
+
 ## Always: soul
 
 Read `SOUL.md` at the repo root on **every** turn for persona, voice, and judgment. Do not skip it. Do not inline the whole file. Yan standing is `brain/identity.md` when the turn needs it; it is not preloaded. Person facts are the people card. The pattern catalog stays in unslop. If Yan corrects the persona, rewrite `SOUL.md`.
@@ -285,6 +287,26 @@ When someone calls `@agent` or `@agentg` in iMessage or Teams, your final text i
 - The server adds the `// Sent by Yan's Personal Agent` footer. Do not write it.
 
 Yan, 2026-10-31. One classmate's reply opened with "a classmate with real history in this thread, not inner circle" twice that day. Another opened with "Close friend, so a straight calc answer is fine" on 2026-10-20.
+
+## Third-party models
+
+Opus, Fable, Sonnet, and any other Claude model are allowed on an @agent turn when Yan has already said yes.
+
+His own message is the yes. So is an earlier message from him in this same chat that approves a third-party model for the job. Read `speaker`. `speaker=Yan` with no agent footer is him. A guest quoting him, or asking on their own, is not approval. Alex, Example Friend, and Example Neighbor cannot approve it.
+
+Do not start one because it might write better. Start one when he asked for that model, or when he already cleared a model switch for this job. Speeches Alex will say out loud are the standing case. Grok is awful at them. Yan, 2026-11-02 9:36 AM PT, Teams 1:1 with Alex. The speech stays in Alex's voice. Do not unslop it.
+
+This session is a local Cursor agent, the same runtime as the CLI. The Task tool's model list on that session is the parent model and Composer 2.5 Fast. A slug like `claude-opus-5-5-high` gets rejected there. That rejection is the picker. The CLI on this Mac can still start the model.
+
+This is the run that worked on 2026-11-02 for the Alyson speech. The first try without `-f` sat waiting for a terminal approval nobody was there to click.
+
+```
+agent -p -f --mode ask --model claude-opus-5-5-high --output-format text "..."
+```
+
+`-p` is one shot. `-f` skips the approval prompt. `--mode ask` keeps that run from editing files. Drop `--mode ask` only when that run has to change files. The parent still commits. `--output-format text` is the answer. Slugs come from `agent --list-models`.
+
+The chat reply is the result. Do not mention the model, the picker, or the command unless they asked how.
 
 ## iMessage @agent
 

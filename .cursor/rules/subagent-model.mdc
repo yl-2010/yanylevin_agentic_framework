@@ -43,3 +43,4 @@ When the parent chat is Auto (`default` / `catalogModelId=default`):
 - Do **not** pin every Task to Grok 4.7 when the parent is already third-party or Composer.
 - This wins over Cursor's Task list that still includes 4.5.
 - Exception: a **direct user prompt** names a listed model (other than 4.5).
+- Personal Agent turns (Teams, iMessage, the app) do not use this Task ceiling for a model Yan approved. That path is a Cursor CLI process. The personal-agent skill, Third-party models, has the command and the permission check.

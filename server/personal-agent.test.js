@@ -197,6 +197,7 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.includes(FOUR11_SKILL_PATH));
     assert.match(prompt, /Always Read and apply the unslop skill/);
     assert.match(prompt, /Never mention the surprise hoodies to Alex/);
+    assert.match(prompt, /Third-party models \(Opus, Fable, Sonnet\) are allowed only when this message is from Yan/);
     assert.match(prompt, /Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor/);
     assert.match(prompt, /Projects\/\.tests\/ is a private guide/);
     assert.match(prompt, /do not say a scan or last year's test exists/);
@@ -276,6 +277,7 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /Do not copy Yan's personal \/education sites onto JYPE/);
     assert.match(prompt, /npm run deploy:web yourself/);
     assert.match(prompt, /Never mention the surprise hoodies to Alex/);
+    assert.match(prompt, /Third-party models \(Opus, Fable, Sonnet\) are allowed only when this message is from Yan/);
     assert.match(prompt, /Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor/);
     assert.match(prompt, /Projects\/\.tests\/ is a private guide/);
     assert.match(prompt, /do not say a scan or last year's test exists/);
