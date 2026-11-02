@@ -5,16 +5,16 @@
  * Moving a message into a folder does not.
  * Teams and iMessage sends do not. Those already show in the chat.
  * Calendar writes do not, including nightly ones. Those already show on the calendar.
- * File stays on the Mac. data/agent-actions.jsonl is gitignored.
+ * The file lives on OneDrive with the other backend logs. Not in git.
  */
 
 import { appendFile, mkdir, readFile, stat } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { formatPacificTime } from "./chat-log.js";
+import { AGENT_ACTIONS_PATH } from "./onedrive-projects.js";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-export const AGENT_ACTIONS_PATH = join(ROOT, "data", "agent-actions.jsonl");
+export { AGENT_ACTIONS_PATH };
 
 const AGENT_LABELS = {
   "home-agent": "Home agent",

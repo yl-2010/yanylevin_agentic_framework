@@ -127,30 +127,68 @@ export async function resolveSchoolXlsxPath(candidates = SCHOOL_XLSX_CANDIDATES)
 }
 
 /**
+ * @param {string} path
+ */
+async function readSchoolWorkbook(path) {
+  const { stdout } = await execFileAsync("python3", ["-c", PYTHON, path], {
+    timeout: 30_000,
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  const parsed = JSON.parse(String(stdout || "").trim() || "{}");
+  if (!parsed || typeof parsed !== "object") {
+    return { ok: false, error: "school names parse failed", people: [] };
+  }
+  return parsed;
+}
+
+/**
+ * OneDrive lists Student Data Collection.xlsx before the bytes are local.
+ * `access` succeeds on that placeholder, then the zip read returns errno 11.
+ * Keep going so the July copy in Downloads can still load.
+ * An explicit `path` stays on that one file.
  * @param {{ path?: string, candidates?: string[] }} [opts]
  */
 export async function loadSchoolNames(opts = {}) {
-  const path = opts.path || (await resolveSchoolXlsxPath(opts.candidates));
-  if (!path) {
-    return { ok: false, error: "Student Data Collection.xlsx not found", people: [] };
-  }
-  try {
-    const { stdout } = await execFileAsync("python3", ["-c", PYTHON, path], {
-      timeout: 30_000,
-      maxBuffer: 8 * 1024 * 1024,
-    });
-    const parsed = JSON.parse(String(stdout || "").trim() || "{}");
-    if (!parsed || typeof parsed !== "object") {
-      return { ok: false, error: "school names parse failed", people: [] };
+  const candidates = opts.path
+    ? [opts.path]
+    : opts.candidates || SCHOOL_XLSX_CANDIDATES;
+  /** @type {{ ok: boolean, error?: string, people: unknown[] }} */
+  let last = {
+    ok: false,
+    error: "Student Data Collection.xlsx not found",
+    people: [],
+  };
+  for (const path of candidates) {
+    try {
+      await access(path);
+    } catch {
+      continue;
     }
-    return parsed;
-  } catch (err) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : String(err),
-      people: [],
-    };
+    try {
+      const parsed = await readSchoolWorkbook(path);
+      if (
+        parsed &&
+        parsed.ok !== false &&
+        Array.isArray(parsed.people) &&
+        parsed.people.length
+      ) {
+        return parsed;
+      }
+      last = {
+        ok: false,
+        error: (parsed && parsed.error) || "school names parse failed",
+        people: [],
+      };
+    } catch (err) {
+      last = {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+        people: [],
+      };
+    }
+    if (opts.path) return last;
   }
+  return last;
 }
 
 const isCli =

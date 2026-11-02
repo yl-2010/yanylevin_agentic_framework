@@ -28,6 +28,7 @@ export const FUTURE_AGENTS_DIR = join(YAN_BACKEND_DIR, "future-agents");
 export const STUDY_DIR = join(YAN_BACKEND_DIR, "study");
 export const CHAT_LOG_PATH = join(YAN_BACKEND_DIR, "chat-log.md");
 export const LOGIN_LOG_PATH = join(YAN_BACKEND_DIR, "login-log.md");
+export const AGENT_ACTIONS_PATH = join(YAN_BACKEND_DIR, "agent-actions.jsonl");
 export const YAN_MD_PATH = join(YAN_BACKEND_DIR, "yan.md");
 
 export const PROJECT_ROOTS = [PERSONAL_PROJECTS, SCHOOL_PROJECTS];

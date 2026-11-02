@@ -4,7 +4,7 @@ import { contactMatchesQuery, looksLikeBusinessContact } from "./contacts-read.j
 import { looksLikeNoreplyAddress } from "./mail-people-read.js";
 import { loadSchoolNames, resolveSchoolXlsxPath } from "./school-names-read.js";
 import { countNameMentions } from "./imessage-read.js";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
@@ -194,6 +194,25 @@ describe("people source helpers", () => {
       assert.equal(payload.people[0].id, "20285458");
       assert.equal(payload.people[1].kind, "teacher");
       assert.equal(payload.people[1].id, "102");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("skips an unreadable OneDrive workbook and reads the next copy", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "school-xlsx-"));
+    const placeholder = join(dir, "cloud.xlsx");
+    const local = join(dir, "downloads.xlsx");
+    try {
+      await writeFile(placeholder, "not a zip");
+      await execFileAsync("python3", ["-c", BUILD_XLSX, local, "inline"]);
+      const payload = await loadSchoolNames({
+        candidates: [placeholder, local],
+      });
+      assert.equal(payload.ok, true);
+      assert.equal(payload.count, 2);
+      assert.equal(payload.path, local);
+      assert.equal(payload.people[0].first, "Example Neighbor");
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

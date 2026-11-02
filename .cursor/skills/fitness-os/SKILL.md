@@ -23,7 +23,7 @@ Two entry points share this skill: **iOS Gym text input** (Cursor SDK local agen
 
 ```
 /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.fitness/<email>/
-  meta.json                 # email, displayName, timezone
+  meta.json                 # email, displayName, timezone; optional proClubCircuit (sets/reps/weekday)
   machines/<machineId>/
     machine.json            # id, name, order
     entries.json            # { entries: [{ id, weight, at }] }
