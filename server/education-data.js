@@ -421,27 +421,41 @@ async function readProjectsOpened(root) {
   return out;
 }
 
+/** How deep a todo, date, project, or class object folder may nest. */
+const CONTEXT_TREE_MAX_DEPTH = 8;
+
 /**
- * List dropped context files in an object folder.
- * Default order is newest mtime first (same name, then A-Z). Optional `filesTop` /
- * `filesBottom` pin names above or below that. Skips property JSON, nested
- * object dirs, dotfiles, and UI-hidden names (`context.md` and `deleted.md` by default, plus
- * `hiddenFiles`, minus `visibleFiles`).
+ * Project layout directories. They are object lists, not file folders.
+ * Only the root of a listing skips them. A content folder with the same
+ * name further down still expands.
+ */
+const OBJECT_LAYOUT_DIRS = new Set(["todos", "dates", "cases"]);
+
+/**
+ * A nested todo, date, case, class, or project. Its files belong on that
+ * object's page, not as a folder tile inside this one.
+ * @param {string} abs
+ */
+async function dirIsNestedObject(abs) {
+  for (const name of ["todo.json", "date.json", "case.json", "class.json", "project.json"]) {
+    if (await resolveBookkeepingFile(abs, name)) return true;
+  }
+  return false;
+}
+
+/**
  * @param {string} dir
  * @param {{
- *   hiddenNames?: Set<string>|string[],
- *   visibleNames?: Set<string>|string[],
- *   topNames?: string[]|Set<string>,
- *   bottomNames?: string[]|Set<string>,
- *   skipPin?: boolean,
+ *   hiddenSet: Set<string>,
+ *   visibleSet: Set<string>,
+ *   relPrefix: string,
+ *   depth: number,
  *   onedriveRoot?: string,
  *   onedriveWebRoot?: string,
- * }} [opts]
- * @returns {Promise<{ name: string, size: number, mtime: string, kind: string, source: string }[]>}
+ * }} opts
  */
-export async function listContextFiles(dir, opts = {}) {
-  /** @type {{ name: string, size: number, mtimeMs: number, mtime: string }[]} */
-  const out = [];
+async function listContextTree(dir, opts) {
+  if (opts.depth > CONTEXT_TREE_MAX_DEPTH) return [];
   let entries;
   try {
     entries = await withCloudRetry(dir, () => readdir(dir, { withFileTypes: true }));
@@ -454,58 +468,109 @@ export async function listContextFiles(dir, opts = {}) {
     }
     throw err;
   }
+
+  /** @type {{ name: string, size?: number, mtime: string, mtimeMs: number, kind: string, source: string, path: string, files?: object[] }[]} */
+  const out = [];
   for (const entry of entries) {
-    if (!entry.isFile()) continue;
     const safe = isSafeContextFileName(entry.name);
     if (!safe) continue;
-    const filePath = join(dir, entry.name);
+    const key = entry.name.toLowerCase();
+    if (opts.hiddenSet.has(key) && !opts.visibleSet.has(key)) continue;
+    if (opts.depth === 0 && OBJECT_LAYOUT_DIRS.has(key)) continue;
+    const abs = join(dir, entry.name);
+    const rel = opts.relPrefix ? `${opts.relPrefix}/${entry.name}` : entry.name;
     try {
-      const st = await stat(filePath);
-      if (!st.isFile()) continue;
-      out.push({
-        name: entry.name,
-        size: st.size,
-        mtimeMs: st.mtimeMs,
-        mtime: new Date(st.mtimeMs).toISOString(),
+      const st = await withCloudRetry(abs, () => stat(abs));
+      const mtimeMs = st.mtimeMs;
+      const mtime = new Date(mtimeMs).toISOString();
+      if (entry.isDirectory() || st.isDirectory()) {
+        if (await dirIsNestedObject(abs)) continue;
+        const files = await listContextTree(abs, {
+          ...opts,
+          relPrefix: rel,
+          depth: opts.depth + 1,
+        });
+        out.push({
+          name: entry.name,
+          kind: "folder",
+          source: "education",
+          path: rel,
+          size: 0,
+          mtime,
+          mtimeMs,
+          files,
+        });
+        continue;
+      }
+      if (!entry.isFile() && !st.isFile()) continue;
+      const urlTile = await urlTileFromDroppedFile(abs, entry.name, {
+        source: "education",
+        path: rel,
+        mtime,
+        mtimeMs,
       });
+      if (urlTile) {
+        out.push(urlTile);
+        continue;
+      }
+      out.push(
+        attachOfficeOpenFields(
+          {
+            name: entry.name,
+            size: st.size,
+            mtime,
+            mtimeMs,
+            kind: "file",
+            source: "education",
+            path: rel,
+          },
+          abs,
+          opts
+        )
+      );
     } catch {
       /* skip unreadable */
     }
   }
   out.sort((a, b) => b.mtimeMs - a.mtimeMs || a.name.localeCompare(b.name));
+  return out.map(({ mtimeMs, ...rest }) => rest);
+}
+
+/**
+ * List dropped context files in an object folder.
+ * Default order is newest mtime first (same name, then A-Z). Optional `filesTop` /
+ * `filesBottom` pin names above or below that. Subfolders expand in place, including
+ * nested folders. Skips property JSON, nested object dirs (`todo.json` and the
+ * rest), project `todos` / `dates` / `cases` at the root, dotfiles, and UI-hidden
+ * names (`context.md` and `deleted.md` by default, plus `hiddenFiles`, minus
+ * `visibleFiles`).
+ * @param {string} dir
+ * @param {{
+ *   hiddenNames?: Set<string>|string[],
+ *   visibleNames?: Set<string>|string[],
+ *   topNames?: string[]|Set<string>,
+ *   bottomNames?: string[]|Set<string>,
+ *   skipPin?: boolean,
+ *   onedriveRoot?: string,
+ *   onedriveWebRoot?: string,
+ * }} [opts]
+ * @returns {Promise<object[]>}
+ */
+export async function listContextFiles(dir, opts = {}) {
   const hiddenSet = toLowerNameSet(opts?.hiddenNames);
   const visibleSet = toLowerNameSet(opts?.visibleNames);
   for (const n of DEFAULT_UI_HIDDEN_FILES) {
     if (!visibleSet.has(n)) hiddenSet.add(n);
   }
   for (const n of visibleSet) hiddenSet.delete(n);
-  /** @type {{ name: string, size?: number, mtime: string, kind: string, source: string, url?: string }[]} */
-  const visible = [];
-  for (const f of out) {
-    if (hiddenSet.has(f.name.toLowerCase())) continue;
-    const abs = join(dir, f.name);
-    const urlTile = await urlTileFromDroppedFile(abs, f.name, {
-      source: "education",
-      mtime: f.mtime,
-    });
-    if (urlTile) {
-      visible.push(urlTile);
-      continue;
-    }
-    visible.push(
-      attachOfficeOpenFields(
-        {
-          name: f.name,
-          size: f.size,
-          mtime: f.mtime,
-          kind: "file",
-          source: "education",
-        },
-        abs,
-        opts
-      )
-    );
-  }
+  const visible = await listContextTree(dir, {
+    hiddenSet,
+    visibleSet,
+    relPrefix: "",
+    depth: 0,
+    onedriveRoot: opts?.onedriveRoot,
+    onedriveWebRoot: opts?.onedriveWebRoot,
+  });
   if (opts?.skipPin) return visible;
   return pinContextFileOrder(visible, opts?.topNames, opts?.bottomNames);
 }
@@ -593,12 +658,17 @@ export async function resolveContextFile(email, opts) {
     return resolveOnedriveContextFile(root, opts);
   }
 
+  const relFromPath = opts?.path ? isSafeRelativePath(opts.path) : null;
   const fileName = isSafeContextFileName(opts?.name);
-  if (!fileName) {
+  const rel = relFromPath || fileName;
+  if (!rel) {
     const err = new Error("invalid file name");
     err.status = 400;
     throw err;
   }
+  const leafName = basename(rel);
+  const downloadName =
+    fileName && fileName.toLowerCase() === leafName.toLowerCase() ? fileName : leafName;
 
   const scope = String(opts?.scope || "").trim().toLowerCase();
   const id = opts?.id != null && opts.id !== "" ? isSafeObjectId(opts.id) : null;
@@ -711,7 +781,7 @@ export async function resolveContextFile(email, opts) {
     throw err;
   }
 
-  const absFile = resolve(join(absFolder, fileName));
+  const absFile = resolve(join(absFolder, rel));
   if (absFile !== absFolder && !absFile.startsWith(absFolder + sep)) {
     const err = new Error("forbidden");
     err.status = 403;
@@ -719,13 +789,13 @@ export async function resolveContextFile(email, opts) {
   }
 
   const linkedTodoFile = async () => {
-    if (scope !== "todo" || !classFolderForLinks || !id) return null;
-    return resolveLinkedTodoFile(classFolderForLinks, id, fileName);
+    if (rel.includes("/") || scope !== "todo" || !classFolderForLinks || !id) return null;
+    return resolveLinkedTodoFile(classFolderForLinks, id, leafName);
   };
 
   const projectLinkedFile = async () => {
-    if (scope !== "todo" || !folder) return null;
-    return resolveProjectLinkedFile(root, folder, fileName);
+    if (rel.includes("/") || scope !== "todo" || !folder) return null;
+    return resolveProjectLinkedFile(root, folder, leafName);
   };
 
   let st;
@@ -740,8 +810,8 @@ export async function resolveContextFile(email, opts) {
           return await resolveOnedriveContextFile(root, {
             scope: "class",
             id,
-            name: fileName,
-            path: fileName,
+            name: leafName,
+            path: rel,
           });
         } catch {
           /* still missing */
@@ -761,8 +831,8 @@ export async function resolveContextFile(email, opts) {
         return await resolveOnedriveContextFile(root, {
           scope: "class",
           id,
-          name: fileName,
-          path: fileName,
+          name: leafName,
+          path: rel,
         });
       } catch {
         /* still missing */
@@ -775,7 +845,7 @@ export async function resolveContextFile(email, opts) {
 
   return {
     path: absFile,
-    name: fileName,
+    name: downloadName,
     size: st.size,
     mtime: new Date(st.mtimeMs).toISOString(),
   };
@@ -795,6 +865,7 @@ export function contentTypeForFileName(name) {
     ".txt": "text/plain; charset=utf-8",
     ".md": "text/markdown; charset=utf-8",
     ".csv": "text/csv; charset=utf-8",
+    ".ipynb": "application/x-ipynb+json",
     ".json": "application/json; charset=utf-8",
     ".html": "text/html; charset=utf-8",
     ".htm": "text/html; charset=utf-8",

@@ -646,6 +646,78 @@ describe("listContextFiles office open", () => {
   });
 });
 
+describe("listContextFiles nested folders", () => {
+  /** @type {string} */
+  let dir;
+
+  it("setup nested todo files", async () => {
+    dir = await mkdtemp(join(tmpdir(), "edu-nested-"));
+    await writeFile(join(dir, "prompt.docx"), "doc");
+    await mkdir(join(dir, "breastcancer prediction", "inner"), { recursive: true });
+    await mkdir(join(dir, "breastcancer prediction", ".ipynb_checkpoints"), {
+      recursive: true,
+    });
+    await writeFile(join(dir, "breastcancer prediction", "data.csv"), "a,b\n");
+    await writeFile(
+      join(dir, "breastcancer prediction", "brestcancerpred.ipynb"),
+      "{}"
+    );
+    await writeFile(
+      join(dir, "breastcancer prediction", "inner", "notes.txt"),
+      "hi"
+    );
+    await writeFile(
+      join(dir, "breastcancer prediction", ".ipynb_checkpoints", "brestcancerpred-checkpoint.ipynb"),
+      "{}"
+    );
+    await mkdir(join(dir, "todos", "HW 1"), { recursive: true });
+    await writeFile(join(dir, "todos", "HW 1", ".todo.json"), "{}");
+    await writeFile(join(dir, "todos", "HW 1", "sheet.pdf"), "pdf");
+    await mkdir(join(dir, "nested-todo"), { recursive: true });
+    await writeFile(join(dir, "nested-todo", ".todo.json"), "{}");
+    await writeFile(join(dir, "nested-todo", "secret.pdf"), "nope");
+    await writeFile(join(dir, "breastcancer prediction", "CONTEXT.md"), "model");
+    const older = new Date("2024-01-01T00:00:00Z");
+    const newer = new Date("2025-06-01T00:00:00Z");
+    await utimes(join(dir, "prompt.docx"), older, older);
+    await utimes(join(dir, "breastcancer prediction"), newer, newer);
+  });
+
+  it("keeps subfolders and hides object dirs, checkpoints, and context.md", async () => {
+    const files = await listContextFiles(dir);
+    assert.deepEqual(
+      files.map((f) => f.name),
+      ["breastcancer prediction", "prompt.docx"]
+    );
+    const folder = files[0];
+    assert.equal(folder.kind, "folder");
+    assert.equal(folder.source, "education");
+    assert.equal(folder.path, "breastcancer prediction");
+    assert.deepEqual(
+      folder.files.map((f) => f.name).sort(),
+      ["brestcancerpred.ipynb", "data.csv", "inner"]
+    );
+    const csv = folder.files.find((f) => f.name === "data.csv");
+    const notebook = folder.files.find((f) => f.name === "brestcancerpred.ipynb");
+    const inner = folder.files.find((f) => f.name === "inner");
+    assert.equal(csv.path, "breastcancer prediction/data.csv");
+    assert.equal(csv.kind, "file");
+    assert.equal(notebook.path, "breastcancer prediction/brestcancerpred.ipynb");
+    assert.equal(inner.kind, "folder");
+    assert.equal(inner.path, "breastcancer prediction/inner");
+    assert.deepEqual(
+      inner.files.map((f) => f.name),
+      ["notes.txt"]
+    );
+    assert.equal(inner.files[0].path, "breastcancer prediction/inner/notes.txt");
+    assert.equal(files[1].path, "prompt.docx");
+  });
+
+  it("cleanup nested todo files", async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+});
+
 describe("linkedFiles", () => {
   /** @type {string} */
   let classDir;
