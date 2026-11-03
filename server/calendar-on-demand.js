@@ -1,7 +1,7 @@
 /**
- * Jev gate on new messages. A yes means a calendar event or a task Yan
- * has to do. That starts one Composer 2.5 run for the thread, after a
- * short debounce. Composer picks the calendar or a todo.
+ * Jev gate on new messages. A yes means a calendar event or a specific
+ * task the message assigns to Yan. That starts one Composer 2.5 run for
+ * the thread, after a short debounce. Composer picks the calendar or a todo.
  * A text from either parent is calendar or nothing. Jev is not offered a
  * todo, and the run that follows only writes a calendar event.
  */
@@ -35,12 +35,12 @@ export const CALENDAR_ON_DEMAND_MODEL_SPEC = {
   params: [{ id: "fast", value: "false" }],
 };
 
-/** Yes is a calendar event or a direct todo. Composer picks which. */
+/** Yes is a calendar event or a specific assigned task. Composer picks which. */
 export const CALENDAR_SIGNAL_QUESTION = noul(
-  "Could this include a calendar event Yan might attend, or a task he himself has to do?",
+  "Could this include a calendar event Yan might attend, or a specific task the message assigns to him?",
   {
-    true: "A plan, meeting, invite, appointment, or a change to when or where something happens. Or a direct action for him, such as reply with information, fill out a form, send something, or finish a task. Count maybes, a TBD venue, and a named day with no clock.",
-    false: "Nothing for the calendar and nothing he has to do. A reaction, thanks, a newsletter, a passcode, homework or Canvas with no meeting, college recruitment, or mail that only informs him.",
+    true: "A plan, meeting, invite, appointment, or a change to when or where something happens. Count maybes, a TBD venue, and a named day with no clock. Or a specific task the message assigns to him. Fill out a named form, answer a direct question asked of him, send an email or file the message says he has to send, or do another concrete task someone told him to do. The action is named in the text. A suggestion, an FYI, or a maybe is not a task.",
+    false: "Nothing for the calendar and no specific task assigned to him. A reaction, thanks, a newsletter, a passcode, homework or Canvas with no meeting, college recruitment, or mail that only informs him. Also a suggestion, a nudge, an optional if-you-want, a question not asked of him, or a task for someone else.",
   }
 );
 
@@ -531,8 +531,8 @@ export function buildOnDemandPrompt(pack) {
     parts.push(
       "You are the realtime calendar and todo agent for Yan (you@example.com). Local only. Never spawn a Cursor cloud agent. ",
       "One item only: the plan or task this message is about. Do not sweep the inbox, other chats, or the rest of the day for unrelated events.",
-      "Jev only asked whether this message might be a calendar event or a task Yan has to do. Jev is that classifier, not a person in the chat and not a guest. Never put Jev in the title, notes, guest list, or todo name. Name a calendar event after the people in the thread. You still decide. Create nothing when it is not calendar-worthy and not a direct action for him.",
-      "Pick one. A calendar event if he is showing up. A todo if he himself has to do something and he is not attending an event. Do not create both unless the message has two separate things. RSVP, see you there, or confirming the plan is the calendar event, not a second todo."
+      "Jev only asked whether this message might be a calendar event or a specific task the message assigns to Yan. Jev is that classifier, not a person in the chat and not a guest. Never put Jev in the title, notes, guest list, or todo name. Name a calendar event after the people in the thread. You still decide. Create nothing when it is not calendar-worthy and not a specific task assigned to him.",
+      "Pick one. A calendar event if he is showing up. A todo only when the message assigns him a specific task and he is not attending an event. Do not create both unless the message has two separate things. RSVP, see you there, or confirming the plan is the calendar event, not a second todo. A vague follow-up is not that second thing."
     );
     if (mixedParent) {
       parts.push(
@@ -541,7 +541,7 @@ export function buildOnDemandPrompt(pack) {
     }
     parts.push(
       calendarLine,
-      `Todo. Only when the action is his. Reply with information, fill out a form, send a file, or finish a task someone asked him for. Skip FYI, thanks, newsletters, passcodes, homework, Canvas, and due dates that already live on the education dashboard. Those stay education todos. Skip college spam and the weekly EPS college-visit list unless he signed up. Set dueDate as YYYY-MM-DD and dueTime as HH:MM from the message. A deadline clock wins. A named part of the day wins when there is no clock: morning 08:30, after school or by Friday with no clock 15:30, tonight 20:00. ASAP or today with no clock is today at 15:30 when the message is still in the school day, otherwise tomorrow at 08:30. Before a named event means due before that start. Do not leave dueDate or dueTime blank. Do not use midnight. Write a user-level todo at ${USER_TODOS_DIR}/<slug>/todo.json. College application tasks go in ${COLLEGE_PREP_TODOS_DIR}/<slug>/todo.json. Fields are name, description, dueDate, dueTime, done false, createdAt now as ISO, showInDates false. Description is short markdown: who asked, what he has to do, and the link if the message has one. No school tag. No date.json. Do not also add that task to Apple Calendar. If an open todo below has a similar name, update that folder, including a new deadline. Do not mint (2). If it looks like a deleted todo row, skip it.`
+      `Todo. Only a specific task the message assigns to him. In a message, someone has to give him the task. In email, the mail has to give him a direct task, such as fill out a form, reply to a direct question asked of him, or send an email about something the mail says he has to email about. The action is named in the text. If you cannot point at that sentence, create no todo. Skip FYI, thanks, newsletters, passcodes, suggestions, nudges, let-me-know-if-you-want, questions not asked of him, tasks for someone else, homework, Canvas, and due dates that already live on the education dashboard. Those stay education todos. Do not invent a reply just because someone wrote. Skip college spam and the weekly EPS college-visit list unless he signed up. Set dueDate as YYYY-MM-DD and dueTime as HH:MM from the message. A deadline clock wins. A named part of the day wins when there is no clock: morning 08:30, after school or by Friday with no clock 15:30, tonight 20:00. ASAP or today with no clock is today at 15:30 when the message is still in the school day, otherwise tomorrow at 08:30. Before a named event means due before that start. Do not leave dueDate or dueTime blank. Do not use midnight. Write a user-level todo at ${USER_TODOS_DIR}/<slug>/todo.json. College application tasks go in ${COLLEGE_PREP_TODOS_DIR}/<slug>/todo.json. Fields are name, description, dueDate, dueTime, done false, createdAt now as ISO, showInDates false. Description is short markdown: who asked, what he has to do, and the link if the message has one. No school tag. No date.json. Do not also add that task to Apple Calendar. If an open todo below has a similar name, update that folder, including a new deadline. Do not mint (2). If it looks like a deleted todo row, skip it.`
     );
   }
   parts.push(

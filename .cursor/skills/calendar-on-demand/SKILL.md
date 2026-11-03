@@ -3,9 +3,9 @@ name: calendar-on-demand
 description: >-
   Realtime Apple Calendar and education-todo writer. One Composer run when
   Jev flags a new iMessage, Mail, school Outlook, or Teams message as a
-  calendar event or a task Yan has to do. Composer picks one. A text from
-  either parent is calendar or nothing, and that run does not write a todo.
-  Not the nightly scan.
+  calendar event or a specific task the message assigns to Yan. Composer
+  picks one. A text from either parent is calendar or nothing, and that run
+  does not write a todo. Not the nightly scan.
 disable-model-invocation: true
 ---
 
@@ -17,13 +17,13 @@ This job is one item. The message that woke you up is the subject. Do not sweep 
 
 ## Jev
 
-Jev only asked whether this message might be a calendar event or a task Yan has to do. Jev is that classifier, not a person in the chat and not a guest. Never put Jev in the title, notes, guest list, or todo name. Name a calendar event after the people in the thread.
+Jev only asked whether this message might be a calendar event or a specific task the message assigns to Yan. Jev is that classifier, not a person in the chat and not a guest. Never put Jev in the title, notes, guest list, or todo name. Name a calendar event after the people in the thread.
 
 A text from Rajasi Saha or Michael Levin is different. Jev only chooses calendar or nothing. It is not offered a todo.
 
-You still decide. Create nothing when it is not a calendar event and not a direct action for him.
+You still decide. Create nothing when it is not a calendar event and not a specific task the message assigns to him.
 
-Pick one. A calendar event if he is showing up. A todo if he himself has to do something and he is not attending an event. Do not create both unless the message has two separate things. RSVP, see you there, or confirming the plan is the calendar event, not a second todo.
+Pick one. A calendar event if he is showing up. A todo only when the message assigns him a specific task and he is not attending an event. Do not create both unless the message has two separate things. RSVP, see you there, or confirming the plan is the calendar event, not a second todo. A vague follow-up is not that second thing.
 
 ## Calendar
 
@@ -46,13 +46,24 @@ A text from Rajasi Saha or Michael Levin is a calendar event or nothing. If the 
 
 ## Todo
 
-Only when the action is his, and the text is not from a parent. Reply with information, fill out a form, send a file, or finish a task someone asked him for.
+A todo only when the message assigns Yan a specific task, and the text is not from a parent. The calendar rules above stay as they are.
 
-Skip these:
+He has to be the one who does it. The task has to be in the message, named, and his. If you cannot point at the sentence that tells him what to do, create nothing.
+
+Messages. Someone gives him the task. "Send me the photo tonight", "fill this out", "email the office the form". A chat that only mentions an idea, a maybe, or something he could do is not a task.
+
+Email. The mail gives him a direct task. Fill out a form. Reply to a direct question asked of him. Send an email about something the mail says he has to email about. Send a named file someone told him to send.
+
+Skip these, even when they sound useful:
 
 - FYI, thanks, a newsletter, a passcode, or mail that only informs him.
+- A suggestion, a nudge, "let me know if you want", "you should look at", or "we should".
+- A question that is not asked of him.
+- A task for someone else.
 - Homework, Canvas, and due dates that already live on the education dashboard. Canvas sync already makes those todos.
 - College spam, and the weekly EPS college-visit list, unless he signed up.
+
+Do not invent a follow-up. Someone writing to him is not "reply" unless they asked him a question or told him to reply. "This might matter" is not a todo.
 
 Set `dueDate` as `YYYY-MM-DD` and `dueTime` as `HH:MM` from the message. Use the weekday list. Do not leave either field blank. Do not use midnight.
 

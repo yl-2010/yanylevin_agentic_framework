@@ -31,9 +31,12 @@ function wait(ms) {
 describe("calendar signal", () => {
   it("uses a recall-biased threshold", () => {
     assert.equal(CALENDAR_SIGNAL_THRESHOLD, 0.35);
-    assert.match(String(CALENDAR_SIGNAL_QUESTION.instructions), /task he himself has to do/);
-    assert.match(String(CALENDAR_SIGNAL_QUESTION.criteria.true), /fill out a form/);
+    assert.match(String(CALENDAR_SIGNAL_QUESTION.instructions), /specific task the message assigns to him/);
+    assert.match(String(CALENDAR_SIGNAL_QUESTION.criteria.true), /Count maybes/);
+    assert.match(String(CALENDAR_SIGNAL_QUESTION.criteria.true), /direct question asked of him/);
+    assert.match(String(CALENDAR_SIGNAL_QUESTION.criteria.true), /A suggestion, an FYI, or a maybe is not a task/);
     assert.match(String(CALENDAR_SIGNAL_QUESTION.criteria.false), /homework or Canvas/);
+    assert.match(String(CALENDAR_SIGNAL_QUESTION.criteria.false), /question not asked of him/);
     assert.equal(calendarSignalYes({ noul: 0.35 }), true);
     assert.equal(calendarSignalYes({ noul: 0.34 }), false);
     assert.equal(calendarSignalYes({ probability: 0.9 }), true);
@@ -183,6 +186,11 @@ describe("calendar on-demand prompt", () => {
     assert.match(prompt, /Pick one/);
     assert.match(prompt, /Do not create both/);
     assert.match(prompt, /fill out a form/);
+    assert.match(prompt, /specific task the message assigns to him/);
+    assert.match(prompt, /direct question asked of him/);
+    assert.match(prompt, /If you cannot point at that sentence, create no todo/);
+    assert.match(prompt, /Do not invent a reply/);
+    assert.doesNotMatch(prompt, /Only when the action is his/);
     assert.match(prompt, /dueDate/);
     assert.match(prompt, /College Prep/);
     assert.match(prompt, /Open todos you may update/);
