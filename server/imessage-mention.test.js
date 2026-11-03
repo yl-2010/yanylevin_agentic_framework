@@ -10,6 +10,8 @@ import {
   isClassOf2028Thread,
   isGradeWideThread,
   isJypeThread,
+  isNoWaterThread,
+  NO_WATER_CHAT_ID,
   messageKey,
   messageForcesGrok,
   messageMentionsAgent,
@@ -61,6 +63,11 @@ describe("imessage-mention", () => {
     assert.equal(isJypeThread("JYPE"), true);
     assert.equal(isJypeThread("jype"), true);
     assert.equal(isJypeThread("Class of 2028"), false);
+    assert.equal(isNoWaterThread("🚱"), true);
+    assert.equal(isNoWaterThread("JYPE"), false);
+    assert.equal(isNoWaterThread({ chat: "🚱", chatId: "other" }), true);
+    assert.equal(isNoWaterThread({ chat: "renamed", chatId: NO_WATER_CHAT_ID }), true);
+    assert.equal(isNoWaterThread({ chat: "ebc", chatId: "chat-ebc" }), false);
     assert.equal(agentSentFooterFor({ platform: "teams" }), TEAMS_AGENT_SENT_FOOTER);
     assert.equal(agentSentFooterFor({ chat: "JYPE" }), TEAMS_AGENT_SENT_FOOTER);
     assert.equal(agentSentFooterFor({ platform: "email" }), AGENT_SENT_FOOTER);

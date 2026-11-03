@@ -12,6 +12,7 @@ import {
   isClassOf2028Thread,
   isGradeWideThread,
   isJypeThread,
+  isNoWaterThread,
   messageForcesGrok,
   normalizeIMessageOrigin,
   replyTargetForMessage,
@@ -532,6 +533,21 @@ export function isAllowedTeamsClassOf2028Caller(slug, fromName) {
   return TEAMS_CLASS_OF_2028_ALLOW_GIVEN.has(given);
 }
 
+/** Alex's iMessage number. Yan is fromMe and never reaches this check. */
+const NO_WATER_PRASHAM_PHONE = "4253625785";
+
+/**
+ * 🚱 iMessage group. Only Alex may @agent or @agentg. Everyone else is
+ * ignored, with no reply. Yan, 2026-11-03.
+ * @param {string} slug
+ * @param {string} handle
+ */
+export function isNoWaterAgentCaller(slug, handle) {
+  if (String(slug || "").trim() === "alex-rivera") return true;
+  const digits = phoneDigits(handle);
+  return digits.length >= 10 && digits.slice(-10) === NO_WATER_PRASHAM_PHONE;
+}
+
 function viewerLabels(raw) {
   if (!Array.isArray(raw)) return [];
   /** @type {string[]} */
@@ -762,6 +778,13 @@ export async function evaluateGuestMention(opts) {
     platform === "teams" &&
     isTeamsClassOf2028Chat(message) &&
     !isAllowedTeamsClassOf2028Caller(slug, fromName)
+  ) {
+    return { action: "ignore" };
+  }
+  if (
+    platform === "imessage" &&
+    isNoWaterThread(message) &&
+    !isNoWaterAgentCaller(slug, handle)
   ) {
     return { action: "ignore" };
   }

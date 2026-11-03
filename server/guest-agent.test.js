@@ -35,6 +35,7 @@ import {
   takeGuestSlot,
   isTeamsClassOf2028Chat,
   isAllowedTeamsClassOf2028Caller,
+  isNoWaterAgentCaller,
   withoutFast,
 } from "./guest-agent.js";
 
@@ -811,6 +812,78 @@ describe("evaluateGuestMention", () => {
     });
     assert.equal(laterDm.action, "start");
     assert.equal(laterDm.caller.audience.kind, "dm");
+  });
+
+  it("ignores @agent and @agentg in the no-water group except Alex", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "guest-nowater-"));
+    const statePath = join(dir, "limits.json");
+    const everette = {
+      platform: "imessage",
+      message: {
+        fromMe: false,
+        handle: "+15555550133",
+        chatId: "chat551676954820656246",
+        chat: "renamed",
+        text: "@agent how do I fix this",
+      },
+      contacts: [contact("Example Neighbor", "+15555550133")],
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    };
+    assert.equal((await evaluateGuestMention(everette)).action, "ignore");
+    everette.message = { ...everette.message, text: "@agentg who is that", chat: "🚱", chatId: "other" };
+    assert.equal((await evaluateGuestMention(everette)).action, "ignore");
+
+    const shivali = await evaluateGuestMention({
+      platform: "imessage",
+      message: {
+        fromMe: false,
+        handle: "+14259229452",
+        chat: "🚱",
+        chatId: "chat551676954820656246",
+        text: "@agent help me",
+      },
+      contacts: [contact("Shivali", "+14259229452")],
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(shivali.action, "ignore");
+
+    const prasham = await evaluateGuestMention({
+      platform: "imessage",
+      message: {
+        fromMe: false,
+        handle: "+15555550111",
+        chat: "🚱",
+        chatId: "chat551676954820656246",
+        text: "@agentg notes",
+      },
+      contacts: [contact("Alex", "+15555550111")],
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(prasham.action, "start");
+    assert.equal(prasham.caller.slug, "alex-rivera");
+    assert.equal(isNoWaterAgentCaller("", "+15555550100"), true);
+
+    const elsewhere = await evaluateGuestMention({
+      platform: "imessage",
+      message: {
+        fromMe: false,
+        handle: "+15555550133",
+        chat: "Example Neighbor",
+        chatId: "+15555550133",
+        text: "@agent hi",
+      },
+      contacts: [contact("Example Neighbor", "+15555550133")],
+      people: PEOPLE,
+      now: FIVE_PM,
+      statePath,
+    });
+    assert.equal(elsewhere.action, "start");
   });
 
   it("does not treat Yan fromMe as a guest", async () => {

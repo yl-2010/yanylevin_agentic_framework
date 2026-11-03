@@ -68,6 +68,22 @@ export function isJypeThread(threadLabel) {
   return /\bjype\b/i.test(String(threadLabel || ""));
 }
 
+/** iMessage group 🚱. chat.db chat_identifier, plus the display name. */
+export const NO_WATER_CHAT_ID = "chat551676954820656246";
+
+/**
+ * The 🚱 friend group. A string is the display name. A message matches the
+ * name or the stable chat id.
+ * @param {object|string|null|undefined} messageOrLabel
+ */
+export function isNoWaterThread(messageOrLabel) {
+  if (typeof messageOrLabel === "string") return messageOrLabel.trim() === "🚱";
+  if (!messageOrLabel || typeof messageOrLabel !== "object") return false;
+  const chatId = String(messageOrLabel.chatId || "").trim();
+  if (chatId === NO_WATER_CHAT_ID) return true;
+  return String(messageOrLabel.chat || "").trim() === "🚱";
+}
+
 /**
  * @param {object|null|undefined} origin
  */
