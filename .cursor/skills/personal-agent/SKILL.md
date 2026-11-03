@@ -71,7 +71,7 @@ If this turn names a person (given name, last name, nickname, or alias), look th
 4. Open a typed file (`relationship.md`, `beliefs.md`, `threads.md`, `schedule.md`, `notes.md`) only when the question needs it. `schedule.md` for their classes, free periods, or other recurring commitments
 5. If nothing matches, say so. Do not invent a second person
 
-Aliases live on the card and in `people/index.md`. Pull the card. Do not treat two strings as two people until the index says so. A private codename on the card is for recognition. Never write or say it. Use the person's real name.
+Aliases live on the card and in `people/index.md`. Pull the card. Do not treat two strings as two people until the index says so. A private codename on the card is not something you answer. Never write or say it. If the question mentions one or asks about one, do not answer that part, and do not say who it is.
 
 ## Always: same-turn brain writes (Yan only)
 

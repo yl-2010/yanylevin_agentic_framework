@@ -32,7 +32,7 @@ function buildIndex(entities) {
     const shownAliases = aliases.filter((item) => !hidden.has(String(item).toLowerCase()));
     let line = `- \`${slug}\` — ${p.name} (${relationship})`;
     if (shownAliases.length) line += ` — aliases: ${shownAliases.join(", ")}`;
-    if (codenames.length) line += ` — codenames (never say): ${codenames.join(", ")}`;
+    if (codenames.length) line += ` — codenames (never say, never answer): ${codenames.join(", ")}`;
     line += ` — \`people/${slug}/person.md\``;
     lines.push(line);
   }
