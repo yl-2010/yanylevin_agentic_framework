@@ -30,7 +30,10 @@ Not optional. Not "only if the question is about them."
    name, check `brain/people/index.md` (generated; slug, name, relationship,
    aliases) first.
 2. Aliases live on the card and in `people/index.md`. They are case-insensitive.
-   Pull the card; do not keep a second alias table here.
+   Pull the card; do not keep a second alias table here. A `codenames` field
+   is a private name Yan and Alex use. It stays in `aliases` so lookup
+   still hits. Know it. Never write or say it. Use the name on the card, in
+   chat, iMessage, Teams, WhatsApp, pages, and files you write.
 3. Several people can share a first name. Pull every matching card before
    answering; do not pick the first hit.
 4. Open a typed file (`relationship.md`, `beliefs.md`, `threads.md`,

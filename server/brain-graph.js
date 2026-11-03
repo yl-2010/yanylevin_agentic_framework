@@ -27,8 +27,12 @@ function buildIndex(entities) {
     const slug = p.id.replace(/^people\//, "");
     const relationship = p.fields.relationship || "?";
     const aliases = Array.isArray(p.fields.aliases) ? p.fields.aliases.filter(Boolean) : [];
+    const codenames = Array.isArray(p.fields.codenames) ? p.fields.codenames.filter(Boolean) : [];
+    const hidden = new Set(codenames.map((item) => String(item).toLowerCase()));
+    const shownAliases = aliases.filter((item) => !hidden.has(String(item).toLowerCase()));
     let line = `- \`${slug}\` — ${p.name} (${relationship})`;
-    if (aliases.length) line += ` — aliases: ${aliases.join(", ")}`;
+    if (shownAliases.length) line += ` — aliases: ${shownAliases.join(", ")}`;
+    if (codenames.length) line += ` — codenames (never say): ${codenames.join(", ")}`;
     line += ` — \`people/${slug}/person.md\``;
     lines.push(line);
   }
