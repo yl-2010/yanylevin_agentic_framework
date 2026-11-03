@@ -125,7 +125,9 @@ Stays/trips still vague, plus the evidence that names them. "None" if none.
 ## Suggested actions
 Sends Yan asked for, education todo/project writes, repo work. Each with its
 evidence quote. Do not put calendar plans or big dates here; they have their
-own sections. "None" if none.
+own sections. "None" if none. An iMessage from Rajasi Saha or Michael Levin
+is not a todo. Do not suggest one. A calendar plan is still fine when Yan is
+showing up.
 
 ## Calendar plans
 Any plan with a date that should go on Apple Calendar. Bias is include.
@@ -148,7 +150,9 @@ end, location, and link), omit it. A new time, place, or link is a new plan.
 A realtime calendar agent may already have filed today's messages. If that
 event is already on the day, do not list it as new.
 A task Yan has to do, with no event he is attending, is not a calendar plan.
-The realtime agent files that as a todo. Do not list it here.
+The realtime agent files that as a todo. Do not list it here. A text from
+Rajasi Saha or Michael Levin is the exception. Do not list a todo for it.
+A calendar plan is still fine when he is showing up.
 A named day is enough even when the venue is TBD. Yan `fromMe` "Saturday 4:30
 location tbd" belongs here. Put the missing venue on the line. Do not move it
 to Gaps.

@@ -3,8 +3,9 @@ name: calendar-on-demand
 description: >-
   Realtime Apple Calendar and education-todo writer. One Composer run when
   Jev flags a new iMessage, Mail, school Outlook, or Teams message as a
-  calendar event or a task Yan has to do. Composer picks one. Not the
-  nightly scan.
+  calendar event or a task Yan has to do. Composer picks one. A text from
+  either parent is calendar or nothing, and that run does not write a todo.
+  Not the nightly scan.
 disable-model-invocation: true
 ---
 
@@ -17,6 +18,8 @@ This job is one item. The message that woke you up is the subject. Do not sweep 
 ## Jev
 
 Jev only asked whether this message might be a calendar event or a task Yan has to do. Jev is that classifier, not a person in the chat and not a guest. Never put Jev in the title, notes, guest list, or todo name. Name a calendar event after the people in the thread.
+
+A text from Rajasi Saha or Michael Levin is different. Jev only chooses calendar or nothing. It is not offered a todo.
 
 You still decide. Create nothing when it is not a calendar event and not a direct action for him.
 
@@ -35,11 +38,15 @@ Skip these even when they name a day:
 - Education todos, homework, Canvas, due dates, and other dashboard items. Those stay on the education dashboard. The calendar is events.
 - The EPS bell schedule, and "we should hang out" with no day.
 - EPS Ventures unless there is a signup confirmation.
-- A task he has to do, with no event he is attending. That is a todo, below.
+- A task he has to do, with no event he is attending. That is a todo, below, unless the text is from a parent.
+
+## Parent texts
+
+A text from Rajasi Saha or Michael Levin is a calendar event or nothing. If the prompt says the text is from a parent, do not create a todo, do not update a todo, and do not write `todo.json`. A chore, a reply, or a form in that text is nothing. Calendar still applies when Yan is showing up.
 
 ## Todo
 
-Only when the action is his. Reply with information, fill out a form, send a file, or finish a task someone asked him for.
+Only when the action is his, and the text is not from a parent. Reply with information, fill out a form, send a file, or finish a task someone asked him for.
 
 Skip these:
 

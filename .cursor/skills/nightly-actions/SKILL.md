@@ -156,6 +156,9 @@ Do not git commit; the Node wrapper does that.
   todo done requires evidence Yan actually did it or said to mark it. If a
   suggested todo looks like a `deleted.md` row, skip unless a Directive is
   Yan explicitly asking to add it back (then create it and remove that row).
+  An iMessage from Rajasi Saha or Michael Levin never becomes a todo. Do not
+  create one and do not update one because of that text. A calendar event is
+  still fine when Yan is showing up.
 - **Repo/file work**: only what Yan asked for in the scanned context. Small
   and reversible at night; anything large or destructive gets a journal note
   proposing it instead.

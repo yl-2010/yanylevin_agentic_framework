@@ -2,6 +2,8 @@
  * Jev gate on new messages. A yes means a calendar event or a task Yan
  * has to do. That starts one Composer 2.5 run for the thread, after a
  * short debounce. Composer picks the calendar or a todo.
+ * A text from either parent is calendar or nothing. Jev is not offered a
+ * todo, and the run that follows only writes a calendar event.
  */
 
 import { readFile, readdir, writeFile } from "node:fs/promises";
@@ -12,7 +14,9 @@ import { loadCalendarTombstones } from "./calendar-memory.js";
 import { addLocalDays, zonedParts } from "./calendar-cli.js";
 import { objectDirId, resolveBookkeepingFile } from "./education-onedrive.js";
 import { PERSONAL_PROJECTS, YAN_EDUCATION_DIR } from "./onedrive-projects.js";
-import { noul, systemOne, typesafeConfig } from "./typesafe.js";
+import { parseFrontmatter, BRAIN_ROOT } from "./brain-lib.js";
+import { phoneDigits } from "./local-clock.js";
+import { choice, noul, systemOne, typesafeConfig } from "./typesafe.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -39,6 +43,26 @@ export const CALENDAR_SIGNAL_QUESTION = noul(
     false: "Nothing for the calendar and nothing he has to do. A reaction, thanks, a newsletter, a passcode, homework or Canvas with no meeting, college recruitment, or mail that only informs him.",
   }
 );
+
+/**
+ * Parent texts only. Calendar or nothing. No task option.
+ * A chore, a reply, or a form is nothing.
+ */
+export const PARENT_CALENDAR_QUESTION = choice(
+  "Is this a calendar event Yan might attend, or nothing? There is no task option.",
+  {
+    calendar:
+      "A plan, meeting, invite, appointment, or a change to when or where something happens. Count maybes, a TBD venue, and a named day with no clock.",
+    nothing:
+      "Not a calendar event. A chore, a reply, a form, a file to send, thanks, FYI, or anything he is not showing up for.",
+  }
+);
+
+const PARENT_TEXT_SLUGS = [
+];
+
+/** @type {{ at: number, set: Set<string> | null }} */
+let parentHandleCache = { at: 0, set: null };
 
 const USER_TODOS_DIR = join(YAN_EDUCATION_DIR, "todos");
 const COLLEGE_PREP_TODOS_DIR = join(PERSONAL_PROJECTS, "College Prep", "todos");
@@ -81,6 +105,7 @@ export function resetCalendarOnDemandForTests() {
   memorySeen.clear();
   inflight.clear();
   seenLoaded = false;
+  parentHandleCache = { at: 0, set: null };
 }
 
 /**
@@ -93,6 +118,110 @@ export function calendarSignalYes(answer) {
       : answer;
   const n = Number(raw);
   return Number.isFinite(n) && n >= CALENDAR_SIGNAL_THRESHOLD;
+}
+
+/**
+ * Parent calendar choice. Same recall floor as the noul gate.
+ * @param {unknown} answer
+ */
+export function parentCalendarYes(answer) {
+  const picked = String(answer && typeof answer === "object" ? answer.choice : "")
+    .trim()
+    .toLowerCase();
+  const confidence = Number(answer && typeof answer === "object" ? answer.confidence : NaN);
+  return picked === "calendar" && Number.isFinite(confidence) && confidence >= CALENDAR_SIGNAL_THRESHOLD;
+}
+
+/**
+ * Phone digits or lowercase email. Short junk stays blank.
+ * @param {unknown} raw
+ */
+export function parentHandleKey(raw) {
+  const s = String(raw || "").trim().toLowerCase();
+  if (!s) return "";
+  if (s.includes("@")) return s;
+  const digits = phoneDigits(s);
+  return digits.length >= 10 ? digits : "";
+}
+
+/**
+ * @param {Iterable<unknown>} values
+ */
+export function parentHandleSet(values) {
+  const set = new Set();
+  for (const value of values || []) {
+    const key = parentHandleKey(value);
+    if (key) set.add(key);
+  }
+  return set;
+}
+
+function handleInSet(raw, set) {
+  const key = parentHandleKey(raw);
+  return Boolean(key && set && set.has(key));
+}
+
+function isDirectChat(chatId, handle) {
+  const id = String(chatId || "").trim();
+  const h = String(handle || "").trim();
+  if (!id) return Boolean(h);
+  if (h && id.toLowerCase() === h.toLowerCase()) return true;
+  if (id.startsWith("+")) return true;
+  if (id.includes("@")) return true;
+  return false;
+}
+
+/**
+ * Incoming iMessage from either parent. Yan's own texts in that chat are not.
+ * @param {object|null|undefined} message
+ * @param {Set<string>} handleSet
+ */
+export function isParentIMessage(message, handleSet) {
+  if (!message || typeof message !== "object") return false;
+  if (message.fromMe === true || message.who === "yan") return false;
+  if (handleInSet(message.handle, handleSet)) return true;
+  const direct = isDirectChat(message.chatId, message.handle);
+  if (direct && handleInSet(message.chatId, handleSet)) return true;
+  return false;
+}
+
+function handlesFromPersonFields(fields) {
+  const emails = Array.isArray(fields?.emails) ? fields.emails : [];
+  const phones = Array.isArray(fields?.phones) ? fields.phones : [];
+  return [...phones, ...emails];
+}
+
+async function loadParentHandleSet() {
+  const now = Date.now();
+  if (parentHandleCache.set && now - parentHandleCache.at < 60_000) {
+    return parentHandleCache.set;
+  }
+  const set = new Set();
+  for (const slug of PARENT_TEXT_SLUGS) {
+    try {
+      const raw = await readFile(join(BRAIN_ROOT, "people", slug, "person.md"), "utf8");
+      const { fields } = parseFrontmatter(raw);
+      for (const value of handlesFromPersonFields(fields)) {
+        const key = parentHandleKey(value);
+        if (key) set.add(key);
+      }
+    } catch {
+      /* missing card */
+    }
+  }
+  parentHandleCache = { at: now, set };
+  return set;
+}
+
+/**
+ * @param {object} message
+ * @param {{ parentHandles?: Set<string> }} [deps]
+ */
+async function messageIsParentText(message, deps = {}) {
+  if (deps.parentHandles instanceof Set) {
+    return isParentIMessage(message, deps.parentHandles);
+  }
+  return isParentIMessage(message, await loadParentHandleSet());
 }
 
 /**
@@ -194,8 +323,8 @@ export function buildJevState(source, message) {
   };
 }
 
-function clipPackMessage(source, message) {
-  return {
+function clipPackMessage(source, message, calendarOnly) {
+  const row = {
     source,
     at: String(message?.at || message?.received || "").slice(0, 40),
     from: message?.fromMe
@@ -204,6 +333,8 @@ function clipPackMessage(source, message) {
     chat: String(message?.chat || message?.channel || message?.subject || "").slice(0, 180),
     text: String(message?.text || message?.body || message?.preview || "").slice(0, 2500),
   };
+  if (calendarOnly) row.calendarOnly = true;
+  return row;
 }
 
 function isSkippedTodo(id, props) {
@@ -339,12 +470,18 @@ export function pacificWeekdayLines(now = new Date(), days = 21) {
  *   todos?: object[],
  *   deletedTodos?: string,
  *   skillText?: string,
+ *   calendarOnly?: boolean,
  * }} pack
  */
 export function buildOnDemandPrompt(pack) {
   const source = pack.source;
+  const flags = (pack.messages || []).map((item) => item.calendarOnly === true);
+  const allParent = flags.length > 0 && flags.every(Boolean);
+  const someParent = flags.some(Boolean);
+  const calendarOnly = pack.calendarOnly === true || allParent;
+  const mixedParent = !calendarOnly && someParent;
   const triggers = (pack.messages || []).map((item) =>
-    clipPackMessage(source, item.message || item)
+    clipPackMessage(source, item.message || item, item.calendarOnly === true)
   );
   const thread = (pack.thread || [])
     .slice(-55)
@@ -376,14 +513,38 @@ export function buildOnDemandPrompt(pack) {
     folder: row.folder || "",
   }));
   const deletedTodos = String(pack.deletedTodos || "").trim();
-  return [
+  const calendarLine =
+    "Calendar. Add an event he is actually showing up for. A named day helps. Look up the weekday on the list below. This Saturday is the first Saturday. Next Saturday is the second. Do not count days yourself. TBD venue is fine when the plan is real. Look up the real start and end before you create. Pass --all-day only when the event has no clock (no school, a birthday, a holiday, a date-range delivery). A game, dinner, practice, appointment, or gym session gets that window, not the whole day. If you cannot find the time, create nothing for it. Do not move an existing event to another calendar. That resends invites, including a move on the same account. Pick the calendar only when you create. New events pick iCloud unless you are inviting someone, then Exchange. Skip college spam, including recruitment mail, Scoir, apply-now, and info sessions he did not register for. Skip the weekly EPS college-visit list unless Yan said he signed up for that visit. Skip education todos, homework, Canvas, due dates, and other dashboard items. Those stay on the education dashboard. The calendar is events. Also skip the EPS bell schedule, and EPS Ventures unless there is a signup confirmation.";
+  /** @type {string[]} */
+  const parts = [
     "Follow .cursor/skills/calendar-on-demand/SKILL.md and .cursor/skills/personal-calendar/SKILL.md.",
-    "You are the realtime calendar and todo agent for Yan (you@example.com). Local only. Never spawn a Cursor cloud agent. ",
-    "One item only: the plan or task this message is about. Do not sweep the inbox, other chats, or the rest of the day for unrelated events.",
-    "Jev only asked whether this message might be a calendar event or a task Yan has to do. Jev is that classifier, not a person in the chat and not a guest. Never put Jev in the title, notes, guest list, or todo name. Name a calendar event after the people in the thread. You still decide. Create nothing when it is not calendar-worthy and not a direct action for him.",
-    "Pick one. A calendar event if he is showing up. A todo if he himself has to do something and he is not attending an event. Do not create both unless the message has two separate things. RSVP, see you there, or confirming the plan is the calendar event, not a second todo.",
-    "Calendar. Add an event he is actually showing up for. A named day helps. Look up the weekday on the list below. This Saturday is the first Saturday. Next Saturday is the second. Do not count days yourself. TBD venue is fine when the plan is real. Look up the real start and end before you create. Pass --all-day only when the event has no clock (no school, a birthday, a holiday, a date-range delivery). A game, dinner, practice, appointment, or gym session gets that window, not the whole day. If you cannot find the time, create nothing for it. Do not move an existing event to another calendar. That resends invites, including a move on the same account. Pick the calendar only when you create. New events pick iCloud unless you are inviting someone, then Exchange. Skip college spam, including recruitment mail, Scoir, apply-now, and info sessions he did not register for. Skip the weekly EPS college-visit list unless Yan said he signed up for that visit. Skip education todos, homework, Canvas, due dates, and other dashboard items. Those stay on the education dashboard. The calendar is events. Also skip the EPS bell schedule, and EPS Ventures unless there is a signup confirmation.",
-    `Todo. Only when the action is his. Reply with information, fill out a form, send a file, or finish a task someone asked him for. Skip FYI, thanks, newsletters, passcodes, homework, Canvas, and due dates that already live on the education dashboard. Those stay education todos. Skip college spam and the weekly EPS college-visit list unless he signed up. Set dueDate as YYYY-MM-DD and dueTime as HH:MM from the message. A deadline clock wins. A named part of the day wins when there is no clock: morning 08:30, after school or by Friday with no clock 15:30, tonight 20:00. ASAP or today with no clock is today at 15:30 when the message is still in the school day, otherwise tomorrow at 08:30. Before a named event means due before that start. Do not leave dueDate or dueTime blank. Do not use midnight. Write a user-level todo at ${USER_TODOS_DIR}/<slug>/todo.json. College application tasks go in ${COLLEGE_PREP_TODOS_DIR}/<slug>/todo.json. Fields are name, description, dueDate, dueTime, done false, createdAt now as ISO, showInDates false. Description is short markdown: who asked, what he has to do, and the link if the message has one. No school tag. No date.json. Do not also add that task to Apple Calendar. If an open todo below has a similar name, update that folder, including a new deadline. Do not mint (2). If it looks like a deleted todo row, skip it.`,
+  ];
+  if (calendarOnly) {
+    parts.push(
+      "You are the realtime calendar agent for Yan (you@example.com). Local only. Never spawn a Cursor cloud agent. ",
+      "One item only: the plan this message is about. Do not sweep the inbox, other chats, or the rest of the day for unrelated events.",
+      "This text is from one of Yan's parents. Jev chose calendar or nothing. Nothing did not wake you. Jev is that classifier, not a person in the chat and not a guest. Never put Jev in the title, notes, or guest list. Name the event after the people in the thread. You still decide. Create nothing when he is not showing up.",
+      "Your only job is a calendar event if he is showing up. Do not create a todo. Do not update a todo. Do not write todo.json. A chore, a reply, a form, or a file to send is nothing.",
+      calendarLine
+    );
+  } else {
+    parts.push(
+      "You are the realtime calendar and todo agent for Yan (you@example.com). Local only. Never spawn a Cursor cloud agent. ",
+      "One item only: the plan or task this message is about. Do not sweep the inbox, other chats, or the rest of the day for unrelated events.",
+      "Jev only asked whether this message might be a calendar event or a task Yan has to do. Jev is that classifier, not a person in the chat and not a guest. Never put Jev in the title, notes, guest list, or todo name. Name a calendar event after the people in the thread. You still decide. Create nothing when it is not calendar-worthy and not a direct action for him.",
+      "Pick one. A calendar event if he is showing up. A todo if he himself has to do something and he is not attending an event. Do not create both unless the message has two separate things. RSVP, see you there, or confirming the plan is the calendar event, not a second todo."
+    );
+    if (mixedParent) {
+      parts.push(
+        "A trigger with calendarOnly true is a text from one of Yan's parents. That text is a calendar event or nothing. Do not create a todo from it. Do not update a todo from it. Do not write todo.json because of it."
+      );
+    }
+    parts.push(
+      calendarLine,
+      `Todo. Only when the action is his. Reply with information, fill out a form, send a file, or finish a task someone asked him for. Skip FYI, thanks, newsletters, passcodes, homework, Canvas, and due dates that already live on the education dashboard. Those stay education todos. Skip college spam and the weekly EPS college-visit list unless he signed up. Set dueDate as YYYY-MM-DD and dueTime as HH:MM from the message. A deadline clock wins. A named part of the day wins when there is no clock: morning 08:30, after school or by Friday with no clock 15:30, tonight 20:00. ASAP or today with no clock is today at 15:30 when the message is still in the school day, otherwise tomorrow at 08:30. Before a named event means due before that start. Do not leave dueDate or dueTime blank. Do not use midnight. Write a user-level todo at ${USER_TODOS_DIR}/<slug>/todo.json. College application tasks go in ${COLLEGE_PREP_TODOS_DIR}/<slug>/todo.json. Fields are name, description, dueDate, dueTime, done false, createdAt now as ISO, showInDates false. Description is short markdown: who asked, what he has to do, and the link if the message has one. No school tag. No date.json. Do not also add that task to Apple Calendar. If an open todo below has a similar name, update that folder, including a new deadline. Do not mint (2). If it looks like a deleted todo row, skip it.`
+    );
+  }
+  parts.push(
     "Weekdays in America/Los_Angeles, today first:",
     pacificWeekdayLines(pack.now instanceof Date ? pack.now : new Date()),
     "If a similar event is already on that day and this message moves the time, place, or link, update that event. If the old one is only a tombstone and the new time, place, or link differs, create the new one. If create prints skipped deleted-identical, stop. Do not pass --force unless Yan explicitly asked for that exact event back.",
@@ -395,14 +556,18 @@ export function buildOnDemandPrompt(pack) {
     "Calendar window (yesterday through about three weeks):",
     JSON.stringify(events, null, 2),
     "Deleted calendar fingerprints. Identical means similar title and the same start, end, location, and link. A new time, place, or link is a new event:",
-    JSON.stringify(tombstones, null, 2),
-    "Open todos you may update. Similar name means update that folder. Daily briefings are omitted:",
-    JSON.stringify(todos, null, 2),
-    "Deleted todos. Skip a create that looks like one of these:",
-    deletedTodos || "None",
-    "Personal calendar skill:",
-    String(pack.skillText || "").trim(),
-  ].join("\n\n");
+    JSON.stringify(tombstones, null, 2)
+  );
+  if (!calendarOnly) {
+    parts.push(
+      "Open todos you may update. Similar name means update that folder. Daily briefings are omitted:",
+      JSON.stringify(todos, null, 2),
+      "Deleted todos. Skip a create that looks like one of these:",
+      deletedTodos || "None"
+    );
+  }
+  parts.push("Personal calendar skill:", String(pack.skillText || "").trim());
+  return parts.join("\n\n");
 }
 
 async function defaultRunJob(job, deps) {
@@ -431,6 +596,7 @@ async function defaultRunJob(job, deps) {
     todos: context.todos,
     deletedTodos: context.deletedTodos,
     skillText,
+    calendarOnly: job.calendarOnly === true,
   });
   console.log(`[calendar-on-demand] run ${job.key} messages=${job.messages.length}`);
   return run({
@@ -506,17 +672,19 @@ async function prefetchContext(job, deps) {
   }
   let todos = [];
   let deletedTodos = "";
-  try {
-    const index = deps.loadActionTodoIndex
-      ? await deps.loadActionTodoIndex()
-      : await loadActionTodoIndex();
-    todos = Array.isArray(index?.todos) ? index.todos : [];
-    deletedTodos = String(index?.deleted || "");
-  } catch (err) {
-    console.error(
-      "[calendar-on-demand] todos",
-      err instanceof Error ? err.message : err
-    );
+  if (job.calendarOnly !== true) {
+    try {
+      const index = deps.loadActionTodoIndex
+        ? await deps.loadActionTodoIndex()
+        : await loadActionTodoIndex();
+      todos = Array.isArray(index?.todos) ? index.todos : [];
+      deletedTodos = String(index?.deleted || "");
+    } catch (err) {
+      console.error(
+        "[calendar-on-demand] todos",
+        err instanceof Error ? err.message : err
+      );
+    }
   }
   return { thread, events, tombstones, todos, deletedTodos };
 }
@@ -562,10 +730,12 @@ export function enqueueCalendarThread(item, deps = {}) {
   const snapshotDeps = deps;
   slot.timer = setTimeout(() => {
     slots.delete(key);
+    const messages = slot.messages.slice();
     queue.push({
       key,
       source: item.source,
-      messages: slot.messages.slice(),
+      messages,
+      calendarOnly: messages.length > 0 && messages.every((row) => row.calendarOnly === true),
       run: slot.run,
       deps: snapshotDeps,
     });
@@ -581,6 +751,7 @@ export function enqueueCalendarThread(item, deps = {}) {
  */
 export async function considerCalendarMessage(source, message, deps = {}) {
   if (!rowEligible(source, message)) return { ok: true, skipped: "noise" };
+  const parent = source === "imessage" && (await messageIsParentText(message, deps));
   let answer = deps.calendarAnswer;
   if (answer == null) {
     if (!typesafeConfig().configured && !deps.systemOne) {
@@ -589,12 +760,13 @@ export async function considerCalendarMessage(source, message, deps = {}) {
     const run = deps.systemOne || systemOne;
     const result = await run({
       state: buildJevState(source, message),
-      questions: { calendar: CALENDAR_SIGNAL_QUESTION },
+      questions: { calendar: parent ? PARENT_CALENDAR_QUESTION : CALENDAR_SIGNAL_QUESTION },
     });
     answer = result?.answers?.calendar;
   }
-  if (!calendarSignalYes(answer)) return { ok: true, skipped: "no-signal" };
-  enqueueCalendarThread({ source, message }, deps);
+  const yes = parent ? parentCalendarYes(answer) : calendarSignalYes(answer);
+  if (!yes) return { ok: true, skipped: "no-signal" };
+  enqueueCalendarThread({ source, message, calendarOnly: parent }, deps);
   console.log(`[calendar-on-demand] queued ${threadKey(source, message)}`);
   return { ok: true, queued: true };
 }

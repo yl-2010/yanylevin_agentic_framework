@@ -11,13 +11,17 @@ import {
   considerCalendarMessage,
   enqueueCalendarThread,
   ingestCalendarRows,
+  isParentIMessage,
   loadActionTodoIndex,
+  parentCalendarYes,
+  parentHandleSet,
   pollSchoolMailCalendar,
   resetCalendarOnDemandForTests,
   rowEligible,
   CALENDAR_ON_DEMAND_MODEL_SPEC,
   CALENDAR_SIGNAL_QUESTION,
   CALENDAR_SIGNAL_THRESHOLD,
+  PARENT_CALENDAR_QUESTION,
 } from "./calendar-on-demand.js";
 
 function wait(ms) {
@@ -33,6 +37,13 @@ describe("calendar signal", () => {
     assert.equal(calendarSignalYes({ noul: 0.35 }), true);
     assert.equal(calendarSignalYes({ noul: 0.34 }), false);
     assert.equal(calendarSignalYes({ probability: 0.9 }), true);
+    assert.equal(PARENT_CALENDAR_QUESTION.type, "choice");
+    assert.equal(PARENT_CALENDAR_QUESTION.criteria.todo, undefined);
+    assert.match(String(PARENT_CALENDAR_QUESTION.instructions), /no task option/);
+    assert.equal(parentCalendarYes({ choice: "calendar", confidence: 0.35 }), true);
+    assert.equal(parentCalendarYes({ choice: "calendar", confidence: 0.34 }), false);
+    assert.equal(parentCalendarYes({ choice: "nothing", confidence: 0.9 }), false);
+    assert.equal(parentCalendarYes({ noul: 0.9 }), false);
     assert.equal(CALENDAR_ON_DEMAND_MODEL_SPEC.id, "composer-2.5");
     assert.equal(CALENDAR_ON_DEMAND_MODEL_SPEC.params[0].value, "false");
   });
@@ -186,6 +197,141 @@ describe("calendar on-demand prompt", () => {
     assert.doesNotMatch(prompt, /Do not invent a clock/);
     assert.match(prompt, /\d{4}-\d{2}-\d{2} (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/);
     assert.doesNotMatch(prompt, /Bias is add/);
+  });
+
+  it("drops todos when the text is from a parent", () => {
+    const prompt = buildOnDemandPrompt({
+      source: "imessage",
+      calendarOnly: true,
+      messages: [
+        {
+          calendarOnly: true,
+          message: { text: "Fill out the form tonight", chat: "Family", handle: "+15555550199" },
+        },
+      ],
+      thread: [],
+      events: [],
+      tombstones: [],
+      todos: [{ name: "Reply to the form", dueDate: "2026-10-31", folder: "/tmp/todos/reply" }],
+      deletedTodos: "- deleted | todo | Old ask",
+      skillText: "meeting links",
+    });
+    assert.match(prompt, /from one of Yan's parents/);
+    assert.match(prompt, /Do not create a todo/);
+    assert.match(prompt, /Do not write todo\.json/);
+    assert.match(prompt, /Fill out the form tonight/);
+    assert.match(prompt, /"calendarOnly": true/);
+    assert.doesNotMatch(prompt, /Write a user-level todo/);
+    assert.doesNotMatch(prompt, /Open todos you may update/);
+    assert.doesNotMatch(prompt, /Reply to the form/);
+    assert.doesNotMatch(prompt, /Pick one/);
+  });
+
+  it("keeps todos for the other text in a mixed thread", () => {
+    const prompt = buildOnDemandPrompt({
+      source: "imessage",
+      messages: [
+        { calendarOnly: true, message: { text: "dinner saturday", chat: "Family" } },
+        { message: { text: "send the form", chat: "Family" } },
+      ],
+      thread: [],
+      events: [],
+      tombstones: [],
+      todos: [],
+      deletedTodos: "",
+      skillText: "",
+    });
+    assert.match(prompt, /calendarOnly true is a text from one of Yan's parents/);
+    assert.match(prompt, /Write a user-level todo/);
+    assert.match(prompt, /Pick one/);
+  });
+});
+
+describe("parent texts", () => {
+  const handles = parentHandleSet(["+1 (555) 555-0199", "mom@example.com"]);
+
+  it("matches a parent handle and ignores Yan in that chat", () => {
+    const mom = { fromMe: false, handle: "+15555550199", chatId: "chat849", chat: "Family" };
+    assert.equal(isParentIMessage(mom, handles), true);
+    assert.equal(
+      isParentIMessage({ ...mom, fromMe: true, who: "yan" }, handles),
+      false
+    );
+    assert.equal(
+      isParentIMessage(
+        { fromMe: false, handle: "mom@example.com", chatId: "mom@example.com", chat: "Mom" },
+        handles
+      ),
+      true
+    );
+    assert.equal(
+      isParentIMessage(
+        { fromMe: false, handle: "+15555550100", chatId: "chat849", chat: "Family" },
+        handles
+      ),
+      false
+    );
+  });
+
+
+  it("asks Jev for calendar or nothing and does not start a todo run", async () => {
+    resetCalendarOnDemandForTests();
+    /** @type {object[]} */
+    const asked = [];
+    /** @type {object[]} */
+    const ran = [];
+    const deps = {
+      debounceMs: 20,
+      parentHandles: handles,
+      runJob: async (job) => ran.push(job),
+      systemOne: async (req) => {
+        asked.push(req.questions.calendar);
+        const text = String(req.state.text);
+        if (text.includes("Saturday")) {
+          return { answers: { calendar: { choice: "calendar", confidence: 0.8 } } };
+        }
+        return { answers: { calendar: { choice: "nothing", confidence: 0.9 } } };
+      },
+    };
+    const mom = {
+      id: 9,
+      chatId: "chat849",
+      chat: "Family",
+      handle: "+15555550199",
+      fromMe: false,
+    };
+    const yes = await considerCalendarMessage(
+      "imessage",
+      { ...mom, text: "Saturday at 6" },
+      deps
+    );
+    const no = await considerCalendarMessage(
+      "imessage",
+      { ...mom, id: 10, text: "please fill out this form" },
+      deps
+    );
+    const yan = await considerCalendarMessage(
+      "imessage",
+      { ...mom, id: 11, fromMe: true, text: "I should reply tonight" },
+      {
+        ...deps,
+        systemOne: async (req) => {
+          asked.push(req.questions.calendar);
+          return { answers: { calendar: { noul: 0.1 } } };
+        },
+      }
+    );
+    assert.equal(yes.queued, true);
+    assert.equal(no.skipped, "no-signal");
+    assert.equal(yan.skipped, "no-signal");
+    assert.equal(asked[0].type, "choice");
+    assert.equal(asked[0].criteria.todo, undefined);
+    assert.equal(asked[1].type, "choice");
+    assert.equal(asked[2].type, "noul");
+    await wait(50);
+    assert.equal(ran.length, 1);
+    assert.equal(ran[0].calendarOnly, true);
+    resetCalendarOnDemandForTests();
   });
 
   it("lists next Saturday as Oct 10 when today is Wed Sep 30", () => {
