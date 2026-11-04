@@ -97,7 +97,7 @@ No new group chats. Sending to an existing named group is allowed. SMS (green bu
 
 ## @agent
 
-Yan `fromMe` texts that contain `@agent` or `@Agent` (any chat, including groups and to himself) start a Personal Agent session on the Studio. `@agentg` is the same session with a different model.
+Yan `fromMe` texts that contain `@agent` or `@Agent` (any chat, including groups and to himself) start a Personal Agent session on the Studio. `@agentg` is the same session with a different model. The iMessage group 🚱 does not. @agent and @agentg there get no session and no reply, including from Yan and Alex. Yan, 2026-11-03.
 
 `@agent` and `@agentg` replies in this chat stay short. A few sentences, or a short list. Answer and stop. Write at length only when they asked for a lot of text. A study guide or plan still goes on a page. The text gets the URL and one line. When there is more than one point, put each on its own line with • or a dash. iMessage will not show bold or italic.
 

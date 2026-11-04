@@ -79,7 +79,7 @@ College application tasks go in `/Users/you/Library/CloudStorage/OneDrive-Person
 Fields:
 
 - `name`. Plain text. The task, not the subject line pasted whole.
-- `description`. Short markdown. Who asked, what he has to do, and the link if the message has one.
+- `description`. Short markdown. Who asked, what he has to do, and the link if the message has one. `fromName` and `chatName` are the person on that phone or email. Use that name. A name that only appears in the message text is not who the chat is with.
 - `dueDate`, `dueTime`, `done` false, `createdAt` now as ISO, `showInDates` false.
 - No CW, HW, QA, or MA tag. No `date.json`. Do not also add that task to Apple Calendar.
 

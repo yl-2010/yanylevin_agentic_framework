@@ -13,6 +13,7 @@ import {
   ingestCalendarRows,
   isParentIMessage,
   loadActionTodoIndex,
+  loadHandleNameMap,
   parentCalendarYes,
   parentHandleSet,
   pollSchoolMailCalendar,
@@ -252,6 +253,54 @@ describe("calendar on-demand prompt", () => {
     assert.match(prompt, /calendarOnly true is a text from one of Yan's parents/);
     assert.match(prompt, /Write a user-level todo/);
     assert.match(prompt, /Pick one/);
+  });
+
+  it("names the phone from the brain card, not a name in the text", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "handle-names-"));
+    try {
+      await mkdir(join(dir, "alex-rivera"));
+      await writeFile(
+        join(dir, "alex-rivera", "person.md"),
+        `---
+name: Alex Rivera
+phones: ["+15555550100"]
+emails: ["you@example.com"]
+---
+`
+      );
+      const handleNames = await loadHandleNameMap(dir);
+      const prompt = buildOnDemandPrompt({
+        source: "imessage",
+        messages: [
+          {
+            message: {
+              text: "Alr I'll bring it tmmr",
+              chat: "+15555550100",
+              fromMe: true,
+            },
+          },
+        ],
+        thread: [
+          {
+            text: "Example Neighbor Spanish oral is out",
+            chat: "JYPE",
+            from: "+15555550100",
+          },
+        ],
+        events: [],
+        tombstones: [],
+        todos: [],
+        deletedTodos: "",
+        handleNames,
+        skillText: "",
+      });
+      assert.match(prompt, /"chatName": "Alex Rivera"/);
+      assert.match(prompt, /"fromName": "Alex Rivera"/);
+      assert.match(prompt, /not who the chat is with/);
+      assert.match(prompt, /Example Neighbor Spanish oral is out/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 

@@ -35,7 +35,6 @@ import {
   takeGuestSlot,
   isTeamsClassOf2028Chat,
   isAllowedTeamsClassOf2028Caller,
-  isNoWaterAgentCaller,
   withoutFast,
 } from "./guest-agent.js";
 
@@ -814,7 +813,7 @@ describe("evaluateGuestMention", () => {
     assert.equal(laterDm.caller.audience.kind, "dm");
   });
 
-  it("ignores @agent and @agentg in the no-water group except Alex", async () => {
+  it("ignores @agent and @agentg in the no-water group, including Alex", async () => {
     const dir = await mkdtemp(join(tmpdir(), "guest-nowater-"));
     const statePath = join(dir, "limits.json");
     const everette = {
@@ -865,9 +864,7 @@ describe("evaluateGuestMention", () => {
       now: FIVE_PM,
       statePath,
     });
-    assert.equal(prasham.action, "start");
-    assert.equal(prasham.caller.slug, "alex-rivera");
-    assert.equal(isNoWaterAgentCaller("", "+15555550100"), true);
+    assert.equal(prasham.action, "ignore");
 
     const elsewhere = await evaluateGuestMention({
       platform: "imessage",

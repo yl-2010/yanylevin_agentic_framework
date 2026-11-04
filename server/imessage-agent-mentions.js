@@ -11,6 +11,7 @@ import {
   evaluateGuestMention,
 } from "./guest-agent.js";
 import {
+  isNoWaterThread,
   messageKey,
   shouldTriggerIMessageAgent,
 } from "./imessage-mention.js";
@@ -156,6 +157,8 @@ export async function pollIMessageAgentMentions(deps = {}) {
     seen.add(key);
     /** @type {object} */
     const message = { ...hit };
+    // 🚱 is off for everyone, including Yan. Yan, 2026-11-03.
+    if (isNoWaterThread(message)) continue;
     if (!message.chatGuid) {
       try {
         const guid =

@@ -63,6 +63,8 @@ const PARENT_TEXT_SLUGS = [
 
 /** @type {{ at: number, set: Set<string> | null }} */
 let parentHandleCache = { at: 0, set: null };
+/** @type {Map<string, { at: number, map: Map<string, string> }>} */
+const handleNameCache = new Map();
 
 const USER_TODOS_DIR = join(YAN_EDUCATION_DIR, "todos");
 const COLLEGE_PREP_TODOS_DIR = join(PERSONAL_PROJECTS, "College Prep", "todos");
@@ -106,6 +108,7 @@ export function resetCalendarOnDemandForTests() {
   inflight.clear();
   seenLoaded = false;
   parentHandleCache = { at: 0, set: null };
+  handleNameCache.clear();
 }
 
 /**
@@ -323,6 +326,66 @@ export function buildJevState(source, message) {
   };
 }
 
+/**
+ * Phone digits and emails to the person name on that brain card.
+ * First slug in alpha order wins a shared handle.
+ * @param {string} [peopleDir]
+ */
+export async function loadHandleNameMap(peopleDir = join(BRAIN_ROOT, "people")) {
+  const now = Date.now();
+  const cached = handleNameCache.get(peopleDir);
+  if (cached && now - cached.at < 60_000) return cached.map;
+  const map = new Map();
+  let slugs = [];
+  try {
+    slugs = await readdir(peopleDir);
+  } catch {
+    handleNameCache.set(peopleDir, { at: now, map });
+    return map;
+  }
+  slugs.sort();
+  for (const slug of slugs) {
+    if (!slug || slug.startsWith(".")) continue;
+    try {
+      const raw = await readFile(join(peopleDir, slug, "person.md"), "utf8");
+      const { fields } = parseFrontmatter(raw);
+      const name = String(fields?.name || "").trim();
+      if (!name) continue;
+      for (const value of handlesFromPersonFields(fields)) {
+        const key = parentHandleKey(value);
+        if (key && !map.has(key)) map.set(key, name);
+      }
+    } catch {
+      /* index.md and cards without person.md */
+    }
+  }
+  handleNameCache.set(peopleDir, { at: now, map });
+  return map;
+}
+
+/**
+ * @param {object} row
+ * @param {Map<string, string> | undefined} handleNames
+ */
+function applyHandleNames(row, handleNames) {
+  if (!(handleNames instanceof Map)) return row;
+  const fromName = nameForHandle(row.from, handleNames);
+  const chatName = nameForHandle(row.chat, handleNames);
+  if (fromName) row.fromName = fromName;
+  if (chatName) row.chatName = chatName;
+  return row;
+}
+
+/**
+ * @param {unknown} raw
+ * @param {Map<string, string>} handleNames
+ */
+function nameForHandle(raw, handleNames) {
+  const key = parentHandleKey(raw);
+  if (!key) return "";
+  return handleNames.get(key) || "";
+}
+
 function clipPackMessage(source, message, calendarOnly) {
   const row = {
     source,
@@ -480,12 +543,16 @@ export function buildOnDemandPrompt(pack) {
   const someParent = flags.some(Boolean);
   const calendarOnly = pack.calendarOnly === true || allParent;
   const mixedParent = !calendarOnly && someParent;
+  const handleNames = pack.handleNames instanceof Map ? pack.handleNames : undefined;
   const triggers = (pack.messages || []).map((item) =>
-    clipPackMessage(source, item.message || item, item.calendarOnly === true)
+    applyHandleNames(
+      clipPackMessage(source, item.message || item, item.calendarOnly === true),
+      handleNames
+    )
   );
   const thread = (pack.thread || [])
     .slice(-55)
-    .map((row) => clipPackMessage(source, row));
+    .map((row) => applyHandleNames(clipPackMessage(source, row), handleNames));
   const events = (pack.events || []).slice(0, 80).map((ev) => ({
     id: ev.id,
     title: ev.title,
@@ -549,6 +616,7 @@ export function buildOnDemandPrompt(pack) {
     pacificWeekdayLines(pack.now instanceof Date ? pack.now : new Date()),
     "If a similar event is already on that day and this message moves the time, place, or link, update that event. If the old one is only a tombstone and the new time, place, or link differs, create the new one. If create prints skipped deleted-identical, stop. Do not pass --force unless Yan explicitly asked for that exact event back.",
     "Put a join or register URL on --location, --url, and a one-line --notes. PathIvy and Zoom registration links come from Mail.app message source when the body dropped the href.",
+    "fromName and chatName are the person on that phone or email, from their brain card. Use that name on the todo or the event. A name that only appears in the message text is not who the chat is with.",
     `Trigger (${source}):`,
     JSON.stringify(triggers, null, 2),
     "Thread around it (may be empty):",
@@ -595,6 +663,7 @@ async function defaultRunJob(job, deps) {
     tombstones: context.tombstones,
     todos: context.todos,
     deletedTodos: context.deletedTodos,
+    handleNames: context.handleNames,
     skillText,
     calendarOnly: job.calendarOnly === true,
   });
@@ -686,7 +755,18 @@ async function prefetchContext(job, deps) {
       );
     }
   }
-  return { thread, events, tombstones, todos, deletedTodos };
+  let handleNames = new Map();
+  try {
+    handleNames = deps.loadHandleNameMap
+      ? await deps.loadHandleNameMap()
+      : await loadHandleNameMap();
+  } catch (err) {
+    console.error(
+      "[calendar-on-demand] handle names",
+      err instanceof Error ? err.message : err
+    );
+  }
+  return { thread, events, tombstones, todos, deletedTodos, handleNames };
 }
 
 async function pump() {

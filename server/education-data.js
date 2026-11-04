@@ -19,6 +19,7 @@ import {
   findSnapshotTodo,
   mergeClassRows,
   patchSnapshotTodo,
+  pruneGoneSnapshotObjects,
   readOnedriveSnapshot,
   registerOnedriveSnapshotBuilder,
   scheduleOnedriveSnapshotRefresh,
@@ -3351,7 +3352,9 @@ export async function rebuildOnedriveSnapshot(email) {
   }
   const prev = await readOnedriveSnapshot(email);
   const incomplete = box.misses > 0;
-  const rows = mergeClassRows(prev?.rows, captured.rows, { incomplete });
+  const rows = await pruneGoneSnapshotObjects(
+    mergeClassRows(prev?.rows, captured.rows, { incomplete })
+  );
   const sourceClasses = mergeClassRows(prev?.sourceClasses, captured.sourceClasses, {
     incomplete,
   }).map((row) => {

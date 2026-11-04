@@ -68,7 +68,7 @@ export function isJypeThread(threadLabel) {
   return /\bjype\b/i.test(String(threadLabel || ""));
 }
 
-/** iMessage group 🚱. chat.db chat_identifier, plus the display name. */
+/** iMessage group 🚱. Agent is off in this chat. chat.db chat_identifier, plus the display name. */
 export const NO_WATER_CHAT_ID = "chat551676954820656246";
 
 /**

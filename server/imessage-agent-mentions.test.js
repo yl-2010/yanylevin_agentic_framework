@@ -200,4 +200,39 @@ describe("imessage-agent-mentions poller", () => {
     assert.match(limited[0].text, /hourly rate limit/);
     assert.equal(limited[0].platform, "imessage");
   });
+
+  it("does not start @agent in the no-water group, including from Yan", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "imessage-agent-"));
+    const statePath = join(dir, "state.json");
+    await saveMentionState(
+      { lastAt: "2026-09-08T17:30:00.000Z", seenIds: [] },
+      statePath
+    );
+    /** @type {object[]} */
+    const started = [];
+    const result = await pollIMessageAgentMentions({
+      statePath,
+      now: () => new Date("2026-09-08T17:36:12.000Z"),
+      recentMessages: async () => [
+        {
+          id: 11,
+          guid: "NW1",
+          fromMe: true,
+          text: "@agent hi",
+          at: "2026-09-08 17:36:10",
+          chat: "renamed",
+          chatId: "chat551676954820656246",
+          handle: "+14255550100",
+        },
+      ],
+      evaluateGuestMention: async () => {
+        throw new Error("no-water should not reach guest evaluate");
+      },
+      startFromMessage: async (message) => {
+        started.push(message);
+      },
+    });
+    assert.equal(result.started, 0);
+    assert.equal(started.length, 0);
+  });
 });

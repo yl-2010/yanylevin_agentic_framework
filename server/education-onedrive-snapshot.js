@@ -5,7 +5,7 @@
  * each, and the dashboard used to do that before it could paint.
  */
 
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { canonicalizeEmail } from "./identity.js";
@@ -139,6 +139,67 @@ export function mergeClassRows(prevRows, nextRows, { incomplete = false } = {}) 
     if (row?.id && !seen.has(String(row.id))) out.push(row);
   }
   return out;
+}
+
+/**
+ * A missing json file is a deleted todo or date.
+ * A CloudStorage deadlock is not. Keep the item when stat fails for any other reason.
+ * @param {string} path
+ */
+async function snapshotJsonExists(path) {
+  try {
+    const st = await stat(path);
+    return st.isFile();
+  } catch (err) {
+    const code = err && /** @type {{ code?: string }} */ (err).code;
+    if (code === "ENOENT" || code === "ENOTDIR") return false;
+    return true;
+  }
+}
+
+/**
+ * Drop todos and dates whose json file is gone.
+ * An incomplete walk keeps the previous list, so a deleted folder would
+ * stay on the dashboard. A failed CloudStorage read keeps the item.
+ * @param {object[]|null|undefined} rows
+ * @param {(path: string) => Promise<boolean>} [exists]
+ */
+export async function pruneGoneSnapshotObjects(rows, exists = snapshotJsonExists) {
+  const list = Array.isArray(rows) ? rows : [];
+  /** @type {object[]} */
+  const out = [];
+  for (const row of list) {
+    if (!row || typeof row !== "object") {
+      out.push(row);
+      continue;
+    }
+    out.push({
+      ...row,
+      todos: await keepLiveSnapshotObjects(row.todos, exists),
+      dates: await keepLiveSnapshotObjects(row.dates, exists),
+    });
+  }
+  return out;
+}
+
+/**
+ * @param {unknown} items
+ * @param {(path: string) => Promise<boolean>} exists
+ */
+async function keepLiveSnapshotObjects(items, exists) {
+  const list = Array.isArray(items) ? items : [];
+  /** @type {object[]} */
+  const kept = [];
+  for (const item of list) {
+    const path =
+      item && typeof item === "object" ? String(item._jsonPath || "").trim() : "";
+    if (!path) {
+      kept.push(item);
+      continue;
+    }
+    if (await exists(path)) kept.push(item);
+  }
+  return kept;
 }
 
 /**

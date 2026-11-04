@@ -312,7 +312,7 @@ The chat reply is the result. Do not mention the model, the picker, or the comma
 
 Express polls iMessages for `@agent` / `@Agent`.
 
-Yan `fromMe` texts (any chat, including groups and to himself) start a normal Personal Agent chat (app and website). The first user bubble is that iMessage. Live context says it came from iMessage.
+Yan `fromMe` texts (any chat, including groups and to himself) start a normal Personal Agent chat (app and website). The first user bubble is that iMessage. Live context says it came from iMessage. The iMessage group 🚱 is the exception. @agent and @agentg there do not start a session and do not get a reply, including from Yan and Alex. Yan, 2026-11-03.
 
 Other people in Apple Contacts can also call `@agent` in a 1:1 or any group. Not in Contacts: ignore, no reply. The first user bubble looks like:
 

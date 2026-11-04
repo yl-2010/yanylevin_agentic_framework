@@ -7,6 +7,7 @@ import {
   findSnapshotTodo,
   mergeClassRows,
   patchSnapshotTodo,
+  pruneGoneSnapshotObjects,
   readOnedriveSnapshot,
   resetOnedriveSnapshotState,
   writeOnedriveSnapshot,
@@ -57,6 +58,65 @@ describe("onedrive class snapshot", () => {
     assert.deepEqual(todos, ["hw-1", "hw-2"]);
     assert.equal(merged[0].todos.find((todo) => todo.id === "hw-2").name, "Two renamed");
     assert.equal(merged[0].files.length, 2);
+  });
+
+  it("drops a deleted todo that an incomplete walk put back", async () => {
+    const prevRows = [
+      {
+        id: "us-history",
+        todos: [
+          {
+            id: "quiz",
+            name: "Reading Quiz",
+            done: false,
+            _jsonPath: "/tmp/gone/.todo.json",
+          },
+          {
+            id: "hw",
+            name: "Homework",
+            done: false,
+            _jsonPath: "/tmp/hw/.todo.json",
+          },
+        ],
+        dates: [],
+        files: [],
+      },
+    ];
+    const nextRows = [
+      {
+        id: "us-history",
+        todos: [
+          {
+            id: "hw",
+            name: "Homework",
+            done: true,
+            _jsonPath: "/tmp/hw/.todo.json",
+          },
+        ],
+        dates: [],
+        files: [],
+      },
+    ];
+    const merged = mergeClassRows(prevRows, nextRows, { incomplete: true });
+    const pruned = await pruneGoneSnapshotObjects(merged, async (path) => path.includes("/hw/"));
+    assert.deepEqual(
+      pruned[0].todos.map((todo) => todo.id),
+      ["hw"]
+    );
+    assert.equal(pruned[0].todos[0].done, true);
+  });
+
+  it("keeps a todo when the file read failed but the file is still there", async () => {
+    const rows = [
+      {
+        id: "physics",
+        todos: [{ id: "hw-1", _jsonPath: "/tmp/hw-1/.todo.json" }],
+        dates: [{ id: "d1" }],
+      },
+    ];
+    const pruned = await pruneGoneSnapshotObjects(rows, async () => true);
+    assert.equal(pruned[0].todos.length, 1);
+    assert.equal(pruned[0].dates.length, 1);
   });
 
   it("drops a removed todo after a clean walk", () => {
