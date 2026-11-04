@@ -60,9 +60,11 @@ Category, in this order:
 
 Pass both flags. The calendars are named with the account so three Family calendars are not the same title. Exchange Personal is still titled Calendar, because that is the Outlook default invites land on.
 
+`iCloud Levin and Saha Family` is the shared iCloud calendar. Adi, Michael, and Rajasi already have it, so a new family event shows up for them. The private calendar named iCloud Family was removed on 2026-11-04. Do not create that one again.
+
 - Solo personal: `--calendar "iCloud Personal" --source iCloud`
 - Solo school or work: `--calendar "iCloud School/Work" --source iCloud`
-- Solo family: `--calendar "iCloud Family" --source iCloud`
+- Solo family: `--calendar "iCloud Levin and Saha Family" --source iCloud`
 - Inviting someone, personal: `--calendar Calendar --source Exchange --attendees email`
 - Inviting someone, school or work: `--calendar "Outlook School/Work" --source Exchange --attendees email`
 - Inviting someone, family: `--calendar "Outlook Family" --source Exchange --attendees email`

@@ -98,7 +98,7 @@ const SLOT_TITLES = {
   iCloud: {
     Personal: ["iCloud Personal", "Personal", "Home"],
     "School/Work": ["iCloud School/Work", "School/Work", "Work"],
-    Family: ["iCloud Family", "Family"],
+    Family: ["iCloud Levin and Saha Family", "Family", "iCloud Family"],
   },
   Exchange: {
     Personal: ["Calendar", "Outlook Personal", "Personal"],
