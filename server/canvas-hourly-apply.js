@@ -1,8 +1,10 @@
 /**
  * Apply Canvas snapshot assignments to Yan's mapped OneDrive class todos.
- * The hourly watch uses this for due, name, and tag updates. It does not
- * touch done, canvasFiles, linkedFiles, or sites. New todos are the
- * new-assignment agent, so the watch passes skipCreate.
+ * The hourly watch uses this for due, name, tag, and description updates.
+ * It does not touch done, canvasFiles, linkedFiles, or sites. A description
+ * update keeps the full Canvas body and any line the todo already had that
+ * Canvas does not. New todos are the new-assignment agent, so the watch
+ * passes skipCreate.
  *
  *   node server/canvas-hourly-apply.js [--dry-run]
  */
@@ -12,7 +14,7 @@ import { dirname, join, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { listTopLevelProjects, YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 import { withCloudRetry } from "./cloud-storage-io.js";
-import { stripHtml } from "./canvas-sync.js";
+import { canvasDescriptionUpdate, formatAssignmentDescription } from "./canvas-sync.js";
 import { classIdsFromCourseMap, courseMapTarget } from "./canvas-grades.js";
 import { classMeetingsBetween } from "./education-class-todo.js";
 import {
@@ -96,6 +98,7 @@ function parseTagFromTitle(title) {
 }
 
 export function inferTag(assignment) {
+  if (Number(assignment?.id) === 40468349) return "HW";
   const fromTitle = parseTagFromTitle(assignment.title);
   if (fromTitle) return fromTitle;
   const types = Array.isArray(assignment.types) ? assignment.types : [];
@@ -208,6 +211,9 @@ export function computeDue(assignment, classId, cls, schedule) {
   if (id === 40440348) {
     return { dueDate: "2026-10-29", dueTime: "12:25" };
   }
+  if (id === 40468349) {
+    return { dueDate: "2026-11-04", dueTime: "12:25" };
+  }
   if (classId === "advanced-calculus" && inferTag(assignment) === "HW") {
     const shifted = advCalcHwDue(assignment, cls, schedule);
     if (shifted) return shifted;
@@ -227,7 +233,7 @@ function desiredProps(assignment, classId, cls, schedule) {
   const tag = inferTag(assignment);
   const name = stripTodoTagPrefix(assignment.title);
   const due = computeDue(assignment, classId, cls, schedule);
-  const desc = stripHtml(assignment.description, 2000);
+  const desc = formatAssignmentDescription(assignment.description);
   /** @type {Record<string, unknown>} */
   const props = {
     name,
@@ -705,6 +711,11 @@ export async function applyCanvasHourlyTodos(opts = {}) {
           changed = true;
         }
       }
+      const nextDescription = canvasDescriptionUpdate(merged.description, desired.description);
+      if (nextDescription) {
+        merged.description = nextDescription;
+        changed = true;
+      }
       if (!changed) continue;
       if (!dryRun) {
         try {
@@ -828,6 +839,11 @@ export async function applyCanvasHourlyTodos(opts = {}) {
         changed = true;
       }
     }
+    const nextDescription = canvasDescriptionUpdate(merged.description, desired.description);
+    if (nextDescription) {
+      merged.description = nextDescription;
+      changed = true;
+    }
     if (classId === "pe-yoga" && desired.tag === "CW") {
       const hide = yogaShouldHide(merged.name, merged.tag, merged);
       if (hide === true && merged.hiddenFromHome !== true) {
@@ -846,7 +862,7 @@ export async function applyCanvasHourlyTodos(opts = {}) {
     }
     updated += 1;
     const diffKeys = [];
-    for (const key of ["name", "tag", "dueDate", "dueTime", "canvasLink", "canvasId", "hiddenFromHome"]) {
+    for (const key of ["name", "tag", "dueDate", "dueTime", "canvasLink", "canvasId", "description", "hiddenFromHome"]) {
       const cur = baseProps[key];
       const next = merged[key];
       const same = key === "canvasId" ? String(cur ?? "") === String(next ?? "") : cur === next;

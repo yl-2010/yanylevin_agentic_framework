@@ -36,6 +36,9 @@ import {
   nextCanvasHourlyAt,
   canvasHourKey,
   applyPlannerOverrides,
+  canvasHtmlToMarkdown,
+  canvasDescriptionUpdate,
+  formatAssignmentDescription,
 } from "./canvas-sync.js";
 import {
   contextSynthesisHm,
@@ -559,6 +562,8 @@ describe("buildCanvasSyncPrompt", () => {
     assert.match(prompt, /last-hourly-sync/);
     assert.match(prompt, /Fix mistakes/);
     assert.match(prompt, /40440348/);
+    assert.match(prompt, /40468349/);
+    assert.match(prompt, /stays HW/);
     assert.match(prompt, /2026-10-29 12:25/);
     assert.match(prompt, /comments-new\.md/);
     assert.match(prompt, /pages\.md/);
@@ -701,6 +706,15 @@ describe("inferTag", () => {
       inferTag({ title: "Lab report", pointsPossible: 20, types: [] }),
       "MA"
     );
+    assert.equal(
+      inferTag({
+        id: 40468349,
+        title: "SP1 presentation problem",
+        pointsPossible: 0,
+        types: [],
+      }),
+      "HW"
+    );
   });
 });
 
@@ -709,6 +723,20 @@ describe("computeDue", () => {
     assert.deepEqual(
       computeDue({ id: 40291677, dueDate: "", dueTime: "" }, "physics", null, null),
       { dueDate: "2026-11-20", dueTime: "10:30" }
+    );
+    assert.deepEqual(
+      computeDue(
+        {
+          id: 40468349,
+          dueDate: "2026-11-04",
+          dueTime: "23:59",
+          title: "SP1 presentation problem",
+        },
+        "advanced-calculus",
+        null,
+        null
+      ),
+      { dueDate: "2026-11-04", dueTime: "12:25" }
     );
   });
 });
@@ -747,5 +775,86 @@ describe("canvas assignment identity", () => {
     assert.equal(canvasIdBlocksMatch({ canvasId: 101 }, 102), true);
     assert.equal(canvasIdBlocksMatch({ canvasId: 101 }, 101), false);
     assert.equal(canvasIdBlocksMatch({}, 102), false);
+  });
+});
+
+describe("canvas assignment descriptions", () => {
+  const walden = `<p><span>HW: Read and annotate Walden pp. 90-97 (Solitude chapter). </span><span>&nbsp;The annotations should again </span><span>be extensive.</span></p>
+<p><strong>Entry 2: Focus on Sight</strong></p>
+<p><strong>Task:</strong> Visit your area <strong>during the day</strong>.</p>
+<ul><li>Take a picture.</li><li>Submit on Canvas.</li></ul>`;
+
+  it("keeps paragraphs, bold, and lists", () => {
+    const md = canvasHtmlToMarkdown(walden);
+    assert.match(md, /^HW: Read and annotate Walden pp\. 90-97 \(Solitude chapter\)\. The annotations should again be extensive\./);
+    assert.match(md, /\*\*Entry 2: Focus on Sight\*\*/);
+    assert.match(md, /\*\*Task:\*\* Visit your area \*\*during the day\*\*\./);
+    assert.match(md, /^- Take a picture\.\n- Submit on Canvas\./m);
+    assert.equal(md.includes("<"), false);
+  });
+
+  it("pulls a bold marker back to the start of the word", () => {
+    assert.equal(
+      canvasHtmlToMarkdown("<p>Y<strong>ou are encouraged</strong> to bring notes.</p>"),
+      "**You are encouraged** to bring notes."
+    );
+  });
+
+  it("keeps the https link when Canvas jams an onenote url onto it", () => {
+    const md = canvasHtmlToMarkdown(
+      '<p>See <a href="https://example.com/doc&amp;end%20onenote:https://example.com/page">the book</a>.</p>'
+    );
+    assert.equal(md, "See [the book](https://example.com/doc).");
+  });
+
+  it("keeps links and does not flatten them", () => {
+    const md = canvasHtmlToMarkdown(
+      '<p>Complete the <a href="https://tinyurl.com/EPSAccommodations">scheduling form</a> at least two school days ahead.</p>'
+    );
+    assert.equal(
+      md,
+      "Complete the [scheduling form](https://tinyurl.com/EPSAccommodations) at least two school days ahead."
+    );
+  });
+
+  it("keeps table cells", () => {
+    const md = canvasHtmlToMarkdown(
+      "<table><tr><th>Item</th><th>Points</th></tr><tr><td>Thesis</td><td>10</td></tr></table>"
+    );
+    assert.match(md, /\| Item \| Points \|/);
+    assert.match(md, /\| Thesis \| 10 \|/);
+  });
+
+  it("turns a one-line copy into the formatted body", () => {
+    const md = formatAssignmentDescription(walden);
+    const flat = "HW: Read and annotate Walden pp. 90-97 (Solitude chapter). The annotations should again be extensive. Entry 2: Focus on Sight Task: Visit your area during the day. Take a picture. Submit on Canvas.";
+    const next = canvasDescriptionUpdate(flat, md);
+    assert.match(next, /\*\*Entry 2: Focus on Sight\*\*/);
+    assert.match(next, /^- Take a picture\./m);
+  });
+
+  it("leaves a structured description that already has the Canvas sentences", () => {
+    const md = "**Read** pp. 1 to 4.\n\nBring a pencil. This sentence is long enough to count as its own instruction.";
+    const current = "**Read** pp. 1 to 4.\n\nBring a pencil. This sentence is long enough to count as its own instruction.\n\nLunstrum extended this by email.";
+    assert.equal(canvasDescriptionUpdate(current, md), "");
+  });
+
+  it("keeps a unique sentence that shared a paragraph with the assignment", () => {
+    const md =
+      "This exam covers graphs of motion, constant acceleration, and forces. Bring a double-sided page of notes.";
+    const current =
+      "This exam covers graphs of motion, constant acceleration, and forces. The printed syllabus still says Oct 19 and 20.";
+    const next = canvasDescriptionUpdate(current, md);
+    assert.match(next, /graphs of motion/);
+    assert.match(next, /printed syllabus still says Oct 19 and 20/);
+  });
+
+  it("restores missing Canvas text and keeps a line Canvas does not have", () => {
+    const md = "Read pages 90 to 97 and annotate the solitude chapter in full.\n\n- Upload the photo.\n- Pitch it in class tomorrow morning.";
+    const current = "**Short version.** Read pages 90 to 97.\n\nLunstrum extended this by email.";
+    const next = canvasDescriptionUpdate(current, md);
+    assert.match(next, /Upload the photo/);
+    assert.match(next, /Lunstrum extended this by email/);
+    assert.equal(next.includes("Short version"), false);
   });
 });

@@ -126,6 +126,8 @@ Mirror the layout of `classes/_example-dummy/` (and `projects/_example-dummy/` f
 
 When the field is set, **always write markdown**. Never a single run-on paragraph when there is more than one fact. Use `**lead-ins**`, bullets, links, and blank lines.
 
+A Canvas assignment description keeps the full assignment body. Format it. Do not shorten it. A line that is not in Canvas, such as an extension or a corrected due, stays.
+
 Copy the shape of `education/you@example.com/dates/fall-orientation-day-1/date.json`.
 
 ### Todo identity (never collide)

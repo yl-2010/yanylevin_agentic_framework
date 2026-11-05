@@ -146,6 +146,409 @@ export function stripHtml(html, max = 4000) {
   return text.slice(0, max);
 }
 
+/** Safety cap so a pasted syllabus cannot blow up snapshot.json. Real assignment bodies fit. */
+export const CANVAS_DESCRIPTION_MAX = 80000;
+
+const CANVAS_BLOCK_TAGS = new Set([
+  "p",
+  "div",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "ul",
+  "ol",
+  "table",
+  "blockquote",
+  "hr",
+  "pre",
+  "li",
+]);
+
+function decodeCanvasEntities(raw) {
+  return String(raw || "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&#160;/gi, " ")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&#(\d+);/g, (_, n) => {
+      const code = Number(n);
+      return Number.isFinite(code) ? String.fromCodePoint(code) : _;
+    })
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&amp;/gi, "&");
+}
+
+function canvasAttr(raw, name) {
+  const re = new RegExp(`\\b${name}\\s*=\\s*(["'])([\\s\\S]*?)\\1`, "i");
+  const match = String(raw || "").match(re);
+  return match ? decodeCanvasEntities(match[2]).trim() : "";
+}
+
+function parseCanvasHtml(src) {
+  const root = { type: "el", name: "root", attrs: {}, children: [] };
+  const stack = [root];
+  const re = /<\/?([a-zA-Z][a-zA-Z0-9]*)\b([^>]*)>|([^<]+)/g;
+  let match;
+  while ((match = re.exec(src))) {
+    if (match[3] != null) {
+      const text = decodeCanvasEntities(match[3]);
+      if (text) stack[stack.length - 1].children.push({ type: "text", text });
+      continue;
+    }
+    const name = match[1].toLowerCase();
+    const closing = match[0].startsWith("</");
+    const selfClosing =
+      /\/>$/.test(match[0]) || ["br", "hr", "img", "col", "wbr"].includes(name);
+    if (closing) {
+      while (stack.length > 1) {
+        const top = stack[stack.length - 1].name;
+        if (top === name) {
+          stack.pop();
+          break;
+        }
+        if (["p", "li", "td", "th", "tr", "h1", "h2", "h3", "h4", "h5", "h6"].includes(top)) {
+          stack.pop();
+          continue;
+        }
+        break;
+      }
+      continue;
+    }
+    const node = {
+      type: "el",
+      name,
+      attrs: {
+        href: canvasAttr(match[2], "href"),
+        src: canvasAttr(match[2], "src"),
+        alt: canvasAttr(match[2], "alt"),
+      },
+      children: [],
+    };
+    stack[stack.length - 1].children.push(node);
+    if (!selfClosing) stack.push(node);
+  }
+  return root.children;
+}
+
+function wrapCanvasMark(marker, text) {
+  const core = String(text || "").replace(/\s+/g, " ").trim();
+  if (!core) return "";
+  const lead = /^\s/.test(text) ? " " : "";
+  const trail = /\s$/.test(text) ? " " : "";
+  return `${lead}${marker}${core}${marker}${trail}`;
+}
+
+function renderCanvasInline(nodes) {
+  let out = "";
+  for (const node of nodes || []) {
+    if (node.type === "text") {
+      out += node.text.replace(/\s+/g, " ");
+      continue;
+    }
+    out += renderCanvasInlineEl(node);
+  }
+  return out.replace(/[ \t]{2,}/g, " ");
+}
+
+function renderCanvasInlineEl(node) {
+  const name = node.name;
+  if (name === "br") return "\n";
+  if (name === "strong" || name === "b") return wrapCanvasMark("**", renderCanvasInline(node.children));
+  if (name === "em" || name === "i") return wrapCanvasMark("*", renderCanvasInline(node.children));
+  if (name === "a") return renderCanvasLink(node);
+  if (name === "img") return renderCanvasImage(node);
+  if (name === "ul" || name === "ol") return `\n${renderCanvasList(node, name === "ol", 0)}\n`;
+  if (name === "table") return `\n${renderCanvasTable(node)}\n`;
+  if (name === "hr") return "\n\n---\n\n";
+  return renderCanvasInline(node.children);
+}
+
+function cleanCanvasHref(href) {
+  let h = String(href || "").trim();
+  h = h.replace(/(?:%20|\s+)onenote:[\s\S]*$/i, "");
+  h = h.replace(/&end$/i, "");
+  const space = h.search(/\s/);
+  if (space > 0) h = h.slice(0, space);
+  return h;
+}
+
+function renderCanvasLink(node) {
+  const href = cleanCanvasHref(node.attrs.href);
+  const text = renderCanvasInline(node.children).replace(/\s+/g, " ").trim();
+  if (!href) return text;
+  if (!/^(https?:|mailto:)/i.test(href)) return text || href;
+  const label = (text || href).replace(/[\[\]]/g, "");
+  return `[${label}](${href})`;
+}
+
+/** Canvas sometimes opens bold one letter into a word, as in Y<strong>ou. */
+function repairSplitBold(md) {
+  let out = "";
+  let open = false;
+  for (let i = 0; i < md.length; i++) {
+    if (!md.startsWith("**", i)) {
+      out += md[i];
+      continue;
+    }
+    const prev = i > 0 ? md[i - 1] : "";
+    const next = md[i + 2] || "";
+    const mid = /[A-Za-z0-9]/.test(prev) && /[A-Za-z0-9]/.test(next);
+    if (!open && mid) {
+      let j = out.length - 1;
+      while (j >= 0 && /[A-Za-z0-9]/.test(out[j])) j -= 1;
+      out = `${out.slice(0, j + 1)}**${out.slice(j + 1)}`;
+      open = true;
+      i += 1;
+      continue;
+    }
+    if (open && mid) {
+      i += 2;
+      let k = i;
+      while (k < md.length && /[A-Za-z0-9]/.test(md[k])) k += 1;
+      out += `${md.slice(i, k)}**`;
+      i = k - 1;
+      open = false;
+      continue;
+    }
+    open = !open;
+    out += "**";
+    i += 1;
+  }
+  return out;
+}
+
+function renderCanvasImage(node) {
+  const src = String(node.attrs.src || "").trim();
+  if (!/^https?:/i.test(src)) return "";
+  const alt = String(node.attrs.alt || "image").replace(/[\[\]]/g, "").trim() || "image";
+  return `![${alt}](${src})`;
+}
+
+function renderCanvasList(node, ordered, depth) {
+  const indent = "  ".repeat(depth);
+  let n = 1;
+  const lines = [];
+  for (const child of node.children || []) {
+    if (child.type !== "el" || child.name !== "li") continue;
+    const nested = [];
+    const inlineNodes = [];
+    for (const item of child.children || []) {
+      if (item.type === "el" && (item.name === "ul" || item.name === "ol")) nested.push(item);
+      else inlineNodes.push(item);
+    }
+    const text = renderCanvasInline(inlineNodes).replace(/\n+/g, " ").trim();
+    const marker = ordered ? `${n}. ` : "- ";
+    n += 1;
+    if (text || nested.length) lines.push(`${indent}${marker}${text}`);
+    for (const sub of nested) {
+      const block = renderCanvasList(sub, sub.name === "ol", depth + 1);
+      if (block) lines.push(block);
+    }
+  }
+  return lines.join("\n");
+}
+
+function renderCanvasTable(node) {
+  const rows = [];
+  const walk = (n) => {
+    if (!n || n.type !== "el") return;
+    if (n.name === "tr") {
+      const cells = [];
+      for (const cell of n.children || []) {
+        if (cell.type !== "el" || (cell.name !== "td" && cell.name !== "th")) continue;
+        cells.push(
+          renderCanvasInline(cell.children)
+            .replace(/\|/g, "\\|")
+            .replace(/\n+/g, " ")
+            .trim()
+        );
+      }
+      if (cells.some(Boolean)) rows.push(cells);
+      return;
+    }
+    for (const child of n.children || []) walk(child);
+  };
+  walk(node);
+  if (!rows.length) return "";
+  const width = Math.max(...rows.map((row) => row.length));
+  const pad = (row) => {
+    const cells = row.slice();
+    while (cells.length < width) cells.push("");
+    return cells;
+  };
+  const header = pad(rows[0]);
+  const lines = [
+    `| ${header.join(" | ")} |`,
+    `| ${header.map(() => "---").join(" | ")} |`,
+  ];
+  for (const row of rows.slice(1)) {
+    lines.push(`| ${pad(row).join(" | ")} |`);
+  }
+  return lines.join("\n");
+}
+
+function renderCanvasBlocks(nodes) {
+  const blocks = [];
+  let inline = "";
+  const flush = () => {
+    const text = inline.replace(/[ \t]+\n/g, "\n").replace(/[ \t]{2,}/g, " ").trim();
+    inline = "";
+    if (text) blocks.push(text.replace(/^\*([^\s*])/, "\\*$1"));
+  };
+  for (const node of nodes || []) {
+    if (node.type === "text") {
+      inline += node.text.replace(/\s+/g, " ");
+      continue;
+    }
+    if (!CANVAS_BLOCK_TAGS.has(node.name)) {
+      inline += renderCanvasInlineEl(node);
+      continue;
+    }
+    flush();
+    const block = renderCanvasBlockEl(node);
+    if (block) blocks.push(block);
+  }
+  flush();
+  return blocks.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function renderCanvasBlockEl(node) {
+  const name = node.name;
+  if (name === "ul" || name === "ol") return renderCanvasList(node, name === "ol", 0);
+  if (name === "table") return renderCanvasTable(node);
+  if (name === "hr") return "---";
+  if (name === "blockquote") {
+    const inner = renderCanvasBlocks(node.children);
+    if (!inner) return "";
+    return inner
+      .split("\n")
+      .map((line) => (line.trim() ? `> ${line}` : ">"))
+      .join("\n");
+  }
+  if (name === "li") {
+    const text = renderCanvasInline(node.children).replace(/\n+/g, " ").trim();
+    return text ? `- ${text}` : "";
+  }
+  const heading = /^h([1-6])$/.exec(name);
+  const text = renderCanvasInline(node.children).replace(/[ \t]+\n/g, "\n").replace(/[ \t]{2,}/g, " ").trim();
+  if (!text) return "";
+  const safe = text.replace(/^\*([^\s*])/, "\\*$1");
+  if (heading) return `${"#".repeat(Number(heading[1]))} ${safe}`;
+  return safe;
+}
+
+/**
+ * Canvas assignment HTML to markdown. Keeps the words, links, lists, and emphasis.
+ * @param {unknown} html
+ * @param {number} [max]
+ */
+export function canvasHtmlToMarkdown(html, max = CANVAS_DESCRIPTION_MAX) {
+  const src = String(html || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<!--[\s\S]*?-->/g, "");
+  if (!src.trim()) return "";
+  let md = /<[a-z][^>]*>/i.test(src) ? renderCanvasBlocks(parseCanvasHtml(src)) : src.replace(/\r\n/g, "\n").trim();
+  md = repairSplitBold(md).replace(/\n{3,}/g, "\n\n").trim();
+  const cap = Number(max);
+  if (Number.isFinite(cap) && cap > 0 && md.length > cap) return md.slice(0, cap).trim();
+  return md;
+}
+
+/**
+ * Snapshot rows are already markdown. A live Canvas payload is still HTML.
+ * @param {unknown} raw
+ */
+export function formatAssignmentDescription(raw) {
+  return canvasHtmlToMarkdown(raw, CANVAS_DESCRIPTION_MAX);
+}
+
+function plainCanvasText(raw) {
+  return String(raw || "")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[*_#>`\\]/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function canvasSentences(plain) {
+  return String(plain || "")
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.trim())
+    .filter((part) => part.length >= 40);
+}
+
+function descriptionCoversCanvas(currentPlain, nextPlain) {
+  const parts = canvasSentences(nextPlain);
+  if (!parts.length) {
+    return currentPlain.includes(nextPlain) || nextPlain.includes(currentPlain);
+  }
+  return parts.every((part) => currentPlain.includes(part));
+}
+
+function canvasWordSet(plain) {
+  return new Set(String(plain || "").split(/[^a-z0-9']+/).filter((word) => word.length > 3));
+}
+
+function extraDescriptionParagraphs(current, nextPlain) {
+  const words = canvasWordSet(nextPlain);
+  const extras = [];
+  const seen = new Set();
+  const chunks = String(current || "")
+    .split(/\n+/)
+    .flatMap((part) => part.split(/(?<=[.!?])\s+/));
+  for (const part of chunks) {
+    const trimmed = part.trim();
+    if (trimmed.length < 20) continue;
+    const plain = plainCanvasText(trimmed);
+    if (!plain || nextPlain.includes(plain) || seen.has(plain)) continue;
+    const tokens = [...canvasWordSet(plain)];
+    if (tokens.length < 3) continue;
+    const overlap = tokens.filter((word) => words.has(word)).length / tokens.length;
+    if (overlap >= 0.45) continue;
+    seen.add(plain);
+    extras.push(trimmed);
+  }
+  return extras;
+}
+
+/**
+ * Full Canvas markdown, unless the todo already has that text in a structured description.
+ * Lines that are not in Canvas (an extension, a corrected due) stay at the end.
+ * Returns "" when the stored description should be left alone.
+ * @param {unknown} current
+ * @param {unknown} formatted
+ */
+export function canvasDescriptionUpdate(current, formatted) {
+  const next = String(formatted || "").trim();
+  const cur = String(current || "").trim();
+  if (!next || next === cur) return "";
+  if (!cur) return next;
+  const curPlain = plainCanvasText(cur);
+  const nextPlain = plainCanvasText(next);
+  if (!curPlain) return next;
+  const structured = /\n/.test(cur);
+  if (curPlain === nextPlain) return structured ? "" : next;
+  if (
+    structured &&
+    nextPlain.length + 80 < curPlain.length &&
+    nextPlain.length < curPlain.length * 0.6
+  ) {
+    return "";
+  }
+  if (structured && descriptionCoversCanvas(curPlain, nextPlain)) return "";
+  const extras = extraDescriptionParagraphs(cur, nextPlain);
+  return extras.length ? `${next}\n\n${extras.join("\n\n")}` : next;
+}
+
 function looksLikeFilename(raw) {
   const s = String(raw || "").trim();
   if (!s || s.length > 180) return false;
@@ -1033,7 +1436,7 @@ function assignmentRow(item, course, timeZone) {
     plannerOverrideId: clip(item?.planner_override?.id, 24),
     types,
     files,
-    description: stripHtml(html, 1500),
+    description: formatAssignmentDescription(html),
   };
 }
 
@@ -1551,10 +1954,11 @@ export function buildCanvasSyncPrompt({
     `Snapshot: ${CANVAS_REL}/snapshot.json (also assignments.md). Optional map: ${CANVAS_REL}/course-map.json.`,
     `Agent context dumps: ${CANVAS_REL}/comments.md, comments-new.md, pages.md, modules.md, files.md (and the matching .json). Teacher comments show on the todo page from the live overlay. Pages, modules, and course files stay off the UI.`,
     "Read comments-new.md. Fold new teacher comments into that class or todo .CONTEXT.md on OneDrive (Finder-hidden, and hidden from the education UI). Skip a comment already in .CONTEXT.md. Do not copy comments into .todo.json description. Do not create dashboard tiles from pages, modules, or course files. Use those dumps when writing todo descriptions or class .CONTEXT.md if they explain the work.",
-    `New-assignment log: ${CANVAS_REL}/last-hourly-sync.json. Read it. Fix mistakes the daytime Composer pass made when it created a new todo (wrong tags, HW: prefixes left on names, Adv Calc HW dues pulled back to Canvas time, Data Science number/stat visual due pulled back to 2026-11-18, American Lit Venn due pulled back to 2026-10-20, yoga CW hiddenFromHome, missing canvasId, duplicate todos, course-map drift). Day 12 problem set (canvasId 40440347) stays 2026-10-27 09:55. Yan set that to the start of Tuesday calc. Do not shift it to the previous period C. Review problems from MA 2 (canvasId 40440348) stays 2026-10-29 12:25. Yan put that back on the original Thursday. Do not shift it to the previous period C. Due and title updates on todos that already exist are applied in code each hour. Review those too.`,
+    `New-assignment log: ${CANVAS_REL}/last-hourly-sync.json. Read it. Fix mistakes the daytime Composer pass made when it created a new todo (wrong tags, HW: prefixes left on names, Adv Calc HW dues pulled back to Canvas time, Data Science number/stat visual due pulled back to 2026-11-18, American Lit Venn due pulled back to 2026-10-20, yoga CW hiddenFromHome, missing canvasId, duplicate todos, course-map drift). Day 12 problem set (canvasId 40440347) stays 2026-10-27 09:55. Yan set that to the start of Tuesday calc. Do not shift it to the previous period C. Review problems from MA 2 (canvasId 40440348) stays 2026-10-29 12:25. Yan put that back on the original Thursday. Do not shift it to the previous period C. SP1 presentation problem (canvasId 40468349) stays HW, due 2026-11-04 12:25. Yan said it was homework. Do not retag it MA because the title says presentation. Do not shift it to the previous period C. Due and title updates on todos that already exist are applied in code each hour. Review those too.`,
     "Yan is a 2026-27 junior. Those academic dashboard classes are often missing from Canvas until school publishes them. That is expected.",
     "FIRST: map snapshot courses to Yan's class folders (OneDrive `.education` under the grade folder, skip free-period shells and fixtures). The snapshot already dropped non-dashboard enrollments. If ZERO dashboard classes appear in Canvas, STOP immediately. Do not invent Class of 2028, EPS Library, Iceland EBC, Graphic Design, or prior-year shells. Do not create todos. One short note is enough.",
     "If at least one class maps: set class.json canvasLink to that course gradebook (htmlUrl + /grades). Create or update todos for every Canvas assignment on those mapped classes only. Set canvasLink and canvasId. Tag CW/HW/QA/MA. A title with more than one tag keeps the highest. Order is CW, then HW, then QA, then MA, so CW/HW and [CW/HW] are HW. Do not use the points guess when the title already has a tag. Store name without a CW/HW/QA/MA prefix (HW: Signed Syllabus → Signed Syllabus, [CW/HW] Breast Cancer Prediction → Breast Cancer Prediction). Use snapshot dueDate/dueTime.",
+    "Todo descriptions keep the full Canvas assignment body. The snapshot description is already markdown (paragraphs, lists, bold, links). Do not summarize it and do not drop a sentence, number, name, or link. Do not paste the course syllabus into a todo. Rewrite a description only to make those same words easier to scan. If the todo already has a line Canvas does not, such as an extension or a corrected due, keep that line.",
     "A course-map value project:<id> is not a class. College Counseling 2028 is project:college-prep. Code already writes those assignments as College Prep todos and sets project.json canvasLink to the gradebook. Do not create a class for that course. Do not move those todos onto a class. Review their tags and dues on the project. Syllabus dates for that course go in the project dates folder.",
     "Pull major syllabus / calendar-event dates onto .date.json with canvasLink. OneDrive class bookkeeping is Finder-hidden: .todo.json, .date.json, .CONTEXT.md. Do not write a plain todo.json next to .todo.json.",
     "Do not create a date when that canvasId is already a class todo. MAs already show in Dates. Physics MA #2 (canvasId 40291676) and the Motion Research Symposium (canvasId 40291677) are todos only. The symposium stays due 2026-11-20 10:30 even though Canvas has no due.",
@@ -1604,7 +2008,7 @@ export function canvasAssignmentBrief(assignment) {
     htmlUrl: assignment.htmlUrl || "",
     pointsPossible: assignment.pointsPossible,
     types: Array.isArray(assignment.types) ? assignment.types : [],
-    description: stripHtml(assignment.description, 1200),
+    description: formatAssignmentDescription(assignment.description),
   };
 }
 
