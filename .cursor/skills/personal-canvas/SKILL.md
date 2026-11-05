@@ -15,7 +15,7 @@ disable-model-invocation: true
 
 EPS Canvas is `https://canvas.instructure.com`. A student API token lives in `server/.env` (`CANVAS_ACCESS_TOKEN`). Never print or commit the token.
 
-This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how dashboard classes line up with Canvas courses, then write education todos/dates. Nightly model: **grok-4.7 xhigh** (reasoning_effort=xhigh, fast=false, context=256k). Express polls Canvas about every 30 seconds and creates a new todo in code. That poll does not start a model. A new assignment then starts **composer-2.5** (fast=false) only to attach OneNote pages and files for that assignment.
+This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how dashboard classes line up with Canvas courses, then write education todos/dates. Nightly model: **grok-4.7 high** (reasoning_effort=high, fast=false, context=256k). Express polls Canvas about every 30 seconds and creates a new todo in code. That poll does not start a model. A new assignment then starts **composer-2.5** (fast=false) only to attach OneNote pages and files for that assignment.
 
 ## When to run
 

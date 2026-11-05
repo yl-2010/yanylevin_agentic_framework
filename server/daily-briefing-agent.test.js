@@ -67,11 +67,11 @@ describe("briefing model specs", () => {
     ]);
   });
 
-  it("agent recap uses grok-4.7 xhigh", () => {
+  it("agent recap uses grok-4.7 high", () => {
     assert.equal(AGENT_RECAP_MODEL_SPEC.id, "grok-4.7");
     assert.deepEqual(AGENT_RECAP_MODEL_SPEC.params, [
       { id: "context", value: "256k" },
-      { id: "reasoning_effort", value: "xhigh" },
+      { id: "reasoning_effort", value: "high" },
       { id: "fast", value: "false" },
     ]);
   });

@@ -276,11 +276,11 @@ describe("nightly phase prompts", () => {
     assert.ok(NIGHTLY_GIT_PATHS.includes("server"));
   });
 
-  it("uses grok-4.7 xhigh for the actions phase", () => {
+  it("uses grok-4.7 high for the actions phase", () => {
     assert.equal(NIGHTLY_ACTIONS_MODEL_SPEC.id, "grok-4.7");
     assert.deepEqual(NIGHTLY_ACTIONS_MODEL_SPEC.params, [
       { id: "context", value: "256k" },
-      { id: "reasoning_effort", value: "xhigh" },
+      { id: "reasoning_effort", value: "high" },
       { id: "fast", value: "false" },
     ]);
   });

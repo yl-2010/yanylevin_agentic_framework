@@ -30,6 +30,10 @@ import {
   sendContextFile,
 } from "./education-data.js";
 import {
+  readCelebrationState,
+  toggleCelebrationSign,
+} from "./jype-celebration-state.js";
+import {
   ingestTokenMatches,
   isYanLocationUser,
   writePhoneLocation,
@@ -1164,6 +1168,34 @@ app.get("/api/jype/data", requireJypeUser, async (req, res) => {
     res.status(err.status || 500).json({
       ok: false,
       error: err.message || "jype data failed",
+    });
+  }
+});
+
+app.get("/api/jype/celebration/:siteId", async (req, res) => {
+  try {
+    const state = await readCelebrationState(req.params.siteId);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, siteId: req.params.siteId, ...state });
+  } catch (err) {
+    console.error("[/api/jype/celebration GET]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "celebration read failed",
+    });
+  }
+});
+
+app.post("/api/jype/celebration/:siteId/sign", requireJypeUser, async (req, res) => {
+  try {
+    const result = await toggleCelebrationSign(req.params.siteId, req.user.email);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, siteId: req.params.siteId, ...result });
+  } catch (err) {
+    console.error("[/api/jype/celebration sign]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "celebration sign failed",
     });
   }
 });

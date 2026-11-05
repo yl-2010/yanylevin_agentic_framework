@@ -139,7 +139,7 @@
         {
           id: "canvas",
           name: "Canvas LMS sync",
-          model: "Grok 4.7 xhigh",
+          model: "Grok 4.7 high",
           kind: "clock",
         },
       ],
@@ -188,7 +188,7 @@
         {
           id: "actions",
           name: "Nightly actions",
-          model: "Grok 4.7 xhigh",
+          model: "Grok 4.7 high",
           kind: "after",
           optional: true,
         },
@@ -239,7 +239,7 @@
         {
           id: "briefing-recap",
           name: "Agent recap",
-          model: "Grok 4.7 xhigh",
+          model: "Grok 4.7 high",
           kind: "after",
         },
         { edge: true },

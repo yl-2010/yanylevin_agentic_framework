@@ -1,7 +1,7 @@
 /**
  * Morning Daily Briefing: 3-phase local Cursor SDK pipeline.
  *   1. news        Grok 4.7 xhigh  draft news capsules
- *   2. agent-recap Grok 4.7 xhigh  overnight agent recap card
+ *   2. agent-recap Grok 4.7 high   overnight agent recap card
  *   3. unslop      Composer 2.5   unslop + write todo.json + taste.md
  * Yan only.
  */
@@ -100,7 +100,7 @@ export const AGENT_RECAP_MODEL_SPEC = {
   id: process.env.CURSOR_AGENT_RECAP_MODEL || "grok-4.7",
   params: [
     { id: "context", value: "256k" },
-    { id: "reasoning_effort", value: "xhigh" },
+    { id: "reasoning_effort", value: "high" },
     { id: "fast", value: "false" },
   ],
 };

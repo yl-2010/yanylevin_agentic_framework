@@ -16,6 +16,37 @@ function macApiBase() {
   return String(raw).replace(/\/$/, "");
 }
 
+/** Public read for JYPE celebration sync (pledge state is not secret). */
+async function forwardCelebrationGet(req, res, siteId) {
+  res.setHeader("Cache-Control", "no-store");
+  const url = `${macApiBase()}/api/jype/celebration/${encodeURIComponent(siteId)}`;
+  try {
+    const upstream = await fetch(url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(15_000),
+    });
+    const text = await upstream.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      res.status(502).json({
+        ok: false,
+        error: `Mac API returned non-JSON (${upstream.status})`,
+      });
+      return;
+    }
+    res.status(upstream.status).json(data);
+  } catch (err) {
+    console.error("[jype-api celebration GET]", err);
+    res.status(502).json({
+      ok: false,
+      error: err instanceof Error ? err.message : "celebration read failed",
+    });
+  }
+}
+
 /** Max JSON body for Personal Agent messages with base64 attachments (~4.5MB Vercel limit). */
 const MAX_JSON_BODY = 4_500_000;
 
@@ -203,6 +234,23 @@ module.exports = async function handler(req, res) {
   try {
     const route = routePath(req);
     const method = req.method || "GET";
+
+    const celebrationGet = /^celebration\/([^/]+)$/.exec(route);
+    if (celebrationGet && method === "GET") {
+      await forwardCelebrationGet(req, res, celebrationGet[1]);
+      return;
+    }
+
+    const celebrationSign = /^celebration\/([^/]+)\/sign$/.exec(route);
+    if (celebrationSign && method === "POST") {
+      await forwardEducation(req, res, {
+        method: "POST",
+        path: `/api/jype/celebration/${encodeURIComponent(celebrationSign[1])}/sign`,
+        body: {},
+        timeoutMs: 15_000,
+      });
+      return;
+    }
 
     if (route === "data") {
       if (method !== "GET") {
