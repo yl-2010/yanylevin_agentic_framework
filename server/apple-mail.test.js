@@ -20,6 +20,7 @@ import {
   listMailSince,
   parseEmlx,
   shouldSkipMailbox,
+  withWatchLabel,
   wrapEmlx,
 } from "./apple-mail.js";
 
@@ -274,5 +275,69 @@ describe("apple-mail dump end-to-end", () => {
     });
     assert.equal(needle.count, 1);
     assert.match(needle.messages[0].subject, /Robotaxi/);
+  });
+
+  it("treats a Gmail INBOX label on All Mail as the inbox", async () => {
+    const kept = withWatchLabel(
+      {
+        id: 1,
+        mailboxUrl: "imap://GMAIL-UUID/[Gmail]/All Mail",
+        mailboxName: "All Mail",
+      },
+      [
+        { url: "imap://GMAIL-UUID/[Gmail]/Important", name: "Important" },
+        { url: "imap://GMAIL-UUID/INBOX", name: "INBOX" },
+      ]
+    );
+    assert.equal(kept.mailboxUrl, "imap://GMAIL-UUID/INBOX");
+    const archived = withWatchLabel(
+      {
+        id: 2,
+        mailboxUrl: "imap://GMAIL-UUID/[Gmail]/All Mail",
+        mailboxName: "All Mail",
+      },
+      []
+    );
+    assert.match(archived.mailboxUrl, /All Mail/);
+    const filed = withWatchLabel(
+      { id: 3, mailboxUrl: "imap://ICLOUD/Security", mailboxName: "Security" },
+      [{ url: "imap://ICLOUD/INBOX", name: "INBOX" }]
+    );
+    assert.match(filed.mailboxUrl, /Security/);
+
+    const root = await mkdtemp(join(tmpdir(), "apple-mail-gmail-label-"));
+    const mailRoot = join(root, "Mail");
+    const db = join(root, "Envelope Index");
+    const uuid = "9F21D157-E8EB-4142-8D54-CF78634B529F";
+    await mkdir(join(mailRoot, uuid, "[Gmail]"), { recursive: true });
+    const unix = Date.parse("2026-11-04T18:15:35Z") / 1000;
+    await execFileAsync("sqlite3", [
+      db,
+      `
+      CREATE TABLE messages (ROWID INTEGER PRIMARY KEY, sender INTEGER, subject INTEGER, date_received REAL, mailbox INTEGER, deleted INTEGER);
+      CREATE TABLE subjects (ROWID INTEGER PRIMARY KEY, subject TEXT);
+      CREATE TABLE addresses (ROWID INTEGER PRIMARY KEY, address TEXT);
+      CREATE TABLE mailboxes (ROWID INTEGER PRIMARY KEY, url TEXT);
+      CREATE TABLE labels (message_id INTEGER, mailbox_id INTEGER);
+      INSERT INTO addresses VALUES (1, 'noreply-accounts@google.com');
+      INSERT INTO subjects VALUES (1, 'You shared some Google Account data with Redfin');
+      INSERT INTO subjects VALUES (2, 'Archived newsletter');
+      INSERT INTO mailboxes VALUES (1, 'imap://${uuid}/[Gmail]/All%20Mail');
+      INSERT INTO mailboxes VALUES (2, 'imap://${uuid}/INBOX');
+      INSERT INTO messages VALUES (1, 1, 1, ${unix}, 1, 0);
+      INSERT INTO messages VALUES (2, 1, 2, ${unix}, 1, 0);
+      INSERT INTO labels VALUES (1, 2);
+      `,
+    ]);
+
+    const listed = await listMailSince({
+      mailRoot,
+      envelopeDb: db,
+      since: "2026-11-04T00:00:00.000Z",
+    });
+    assert.equal(listed.count, 1);
+    assert.equal(listed.messages[0].subject, "You shared some Google Account data with Redfin");
+    assert.equal(listed.messages[0].folder, "INBOX");
+    assert.equal(listed.messages[0].account, "Google");
   });
 });

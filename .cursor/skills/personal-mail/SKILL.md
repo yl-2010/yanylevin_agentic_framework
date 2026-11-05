@@ -23,7 +23,7 @@ node server/apple-mail.js since --since 2026-10-22T09:30:08.350Z --from tesla.co
 
 JSON on stdout: `account`, `folder`, `received`, `from`, `subject`. Inbox and junk, all three accounts. Do not pass a date filter to AppleScript. `whose date received` on Exchange asks the server about a 6,443-message inbox and stalls. The overnight job has been killing that call and leaving `mailSince` on October 22. A subject search with no date is the same stall if you loop several needles. One message body is still AppleScript, and only after the index already found that subject.
 
-College-admissions spam, routine sign-in alerts, Sign in with Google or Apple data-sharing notices, and verification codes (2FA, OTP, one-time passcodes) are filed by `server/apple-mail-file.js` (Jev only) into iCloud mailboxes **Colleges** and **Security**, then marked read. Inbox/junk from every Mail.app account. Do not rebuild that with Grok or Composer.
+College-admissions spam, routine sign-in alerts, Sign in with Google or Apple data-sharing notices, and verification codes (2FA, OTP, one-time passcodes) are filed by `server/apple-mail-file.js` (Jev only) into iCloud mailboxes **Colleges** and **Security**, then marked read. Inbox/junk from every Mail.app account. Gmail stores those messages in All Mail and hangs INBOX on them as a label. The filer treats that label as the inbox. Do not rebuild that with Grok or Composer.
 
 EPS / school mail lives in Microsoft 365 `owner@school.example`. Read that with `.cursor/skills/personal-school-mail/SKILL.md` (`node server/school-mail.js`). Do not hunt school notices in Mail.app. Do not add the school account here.
 

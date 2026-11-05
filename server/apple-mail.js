@@ -109,6 +109,33 @@ export function isFiledMailbox(url, name) {
   return folder === "colleges" || folder === "college" || folder === "security";
 }
 
+function watchLabelRank(box) {
+  return folderKey(box?.url, box?.name) === "inbox" ? 0 : 1;
+}
+
+/**
+ * Gmail keeps the message in All Mail and hangs INBOX on it as a label.
+ * The row's mailbox is All Mail, so a mailbox-only check skips the inbox.
+ * A watch label (inbox, junk, spam) becomes the mailbox the filer moves from.
+ * Mail already in Colleges or Security stays there.
+ * @param {{ mailboxUrl?: string, mailboxName?: string }} row
+ * @param {{ url?: string, name?: string }[]} [labels]
+ */
+export function withWatchLabel(row, labels) {
+  const url = String(row?.mailboxUrl || "");
+  const name = String(row?.mailboxName || "");
+  if (isWatchMailbox(url, name) || isFiledMailbox(url, name)) return row;
+  const hit = (Array.isArray(labels) ? labels : [])
+    .filter((box) => isWatchMailbox(box?.url, box?.name))
+    .sort((a, b) => watchLabelRank(a) - watchLabelRank(b))[0];
+  if (!hit) return row;
+  return {
+    ...row,
+    mailboxUrl: String(hit.url || ""),
+    mailboxName: String(hit.name || hit.url || ""),
+  };
+}
+
 export function accountFromMailbox(url) {
   const u = decodeURIComponent(String(url || "")).toLowerCase();
   if (u.startsWith("ews://") || u.includes("ews://")) return "Exchange";
@@ -408,6 +435,49 @@ async function columnNames(db, table) {
   return rows.map((r) => String(r.name || ""));
 }
 
+/**
+ * Rewrite All Mail rows that still carry an INBOX, Junk, or Spam label.
+ * @param {string} db
+ * @param {object[]} rows
+ */
+export async function annotateWatchLabels(db, rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  const tables = await tableNames(db);
+  if (!tables.includes("labels") || !tables.includes("mailboxes")) return list;
+  const need = list.filter((row) => {
+    const url = String(row?.mailboxUrl || "");
+    const name = String(row?.mailboxName || "");
+    return !isWatchMailbox(url, name) && !isFiledMailbox(url, name);
+  });
+  const ids = [...new Set(need.map((row) => Number(row.id)).filter((id) => id > 0))];
+  if (!ids.length) return list;
+  const mailboxCols = await columnNames(db, "mailboxes");
+  const nameExpr = mailboxCols.includes("name") ? "COALESCE(mb.name, mb.url)" : "mb.url";
+  /** @type {Map<number, {url: string, name: string}[]>} */
+  const byId = new Map();
+  const chunk = 400;
+  for (let i = 0; i < ids.length; i += chunk) {
+    const slice = ids.slice(i, i + chunk);
+    const found = await sqliteJson(
+      db,
+      `SELECT l.message_id as id, mb.url as url, ${nameExpr} as name
+       FROM labels l
+       JOIN mailboxes mb ON mb.ROWID = l.mailbox_id
+       WHERE l.message_id IN (${slice.join(",")})`
+    );
+    for (const lab of found) {
+      const id = Number(lab.id);
+      const url = String(lab.url || "");
+      const name = String(lab.name || "");
+      if (!isWatchMailbox(url, name)) continue;
+      const arr = byId.get(id) || [];
+      arr.push({ url, name });
+      byId.set(id, arr);
+    }
+  }
+  return list.map((row) => withWatchLabel(row, byId.get(Number(row.id)) || []));
+}
+
 export async function listEnvelopeMessages(db, opts = {}) {
   const tables = await tableNames(db);
   if (!tables.includes("messages")) {
@@ -598,7 +668,10 @@ export async function listRecentAppleMail(opts = {}) {
   const snapshot = await snapshotEnvelopeDb(envelopeDb);
   let rows;
   try {
-    rows = await listEnvelopeMessages(snapshot, { sinceIso });
+    rows = await annotateWatchLabels(
+      snapshot,
+      await listEnvelopeMessages(snapshot, { sinceIso })
+    );
   } finally {
     await rm(snapshot, { force: true }).catch(() => {});
     await rm(`${snapshot}-wal`, { force: true }).catch(() => {});
@@ -676,10 +749,13 @@ export async function listMailSince(opts = {}) {
   const snapshot = await snapshotEnvelopeDb(envelopeDb);
   let rows;
   try {
-    rows = await listEnvelopeMessages(snapshot, {
-      sinceIso,
-      includeRecipients: false,
-    });
+    rows = await annotateWatchLabels(
+      snapshot,
+      await listEnvelopeMessages(snapshot, {
+        sinceIso,
+        includeRecipients: false,
+      })
+    );
   } finally {
     await rm(snapshot, { force: true }).catch(() => {});
     await rm(`${snapshot}-wal`, { force: true }).catch(() => {});
