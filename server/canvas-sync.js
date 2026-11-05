@@ -14,7 +14,7 @@
  * Pages, modules, and course files stay off the education UI.
  */
 
-import { mkdir, open, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, open, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
@@ -56,6 +56,7 @@ const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
 const LOCK_PATH = "/tmp/yanylevin-canvas-sync.lock";
 export const CANVAS_LOCK_STALE_MS = 90 * 60 * 1000;
 export const CANVAS_LOCK_RETRY_MS = 3 * 60 * 1000;
+const LOCK_HEARTBEAT_MS = 10 * 60 * 1000;
 const SKILL_PATH = ".cursor/skills/personal-canvas/SKILL.md";
 
 export const CANVAS_SYNC_MODEL_SPEC = {
@@ -1954,7 +1955,7 @@ export function buildCanvasSyncPrompt({
     `Snapshot: ${CANVAS_REL}/snapshot.json (also assignments.md). Optional map: ${CANVAS_REL}/course-map.json.`,
     `Agent context dumps: ${CANVAS_REL}/comments.md, comments-new.md, pages.md, modules.md, files.md (and the matching .json). Teacher comments show on the todo page from the live overlay. Pages, modules, and course files stay off the UI.`,
     "Read comments-new.md. Fold new teacher comments into that class or todo .CONTEXT.md on OneDrive (Finder-hidden, and hidden from the education UI). Skip a comment already in .CONTEXT.md. Do not copy comments into .todo.json description. Do not create dashboard tiles from pages, modules, or course files. Use those dumps when writing todo descriptions or class .CONTEXT.md if they explain the work.",
-    `New-assignment log: ${CANVAS_REL}/last-hourly-sync.json. Read it. Fix mistakes the daytime Composer pass made when it created a new todo (wrong tags, HW: prefixes left on names, Adv Calc HW dues pulled back to Canvas time, Data Science number/stat visual due pulled back to 2026-11-18, American Lit Venn due pulled back to 2026-10-20, yoga CW hiddenFromHome, missing canvasId, duplicate todos, course-map drift). Day 12 problem set (canvasId 40440347) stays 2026-10-27 09:55. Yan set that to the start of Tuesday calc. Do not shift it to the previous period C. Review problems from MA 2 (canvasId 40440348) stays 2026-10-29 12:25. Yan put that back on the original Thursday. Do not shift it to the previous period C. SP1 presentation problem (canvasId 40468349) stays HW, due 2026-11-04 12:25. Yan said it was homework. Do not retag it MA because the title says presentation. Do not shift it to the previous period C. Due and title updates on todos that already exist are applied in code each hour. Review those too.`,
+    `New-assignment log: ${CANVAS_REL}/last-hourly-sync.json. Read it. Fix mistakes the daytime Composer pass made when it created a new todo (wrong tags, HW: prefixes left on names, Adv Calc HW dues pulled back to Canvas time, Data Science number/stat visual due pulled back to 2026-11-18, American Lit Venn due pulled back to 2026-10-20, yoga CW hiddenFromHome, missing canvasId, duplicate todos, course-map drift). Day 12 problem set (canvasId 40440347) stays 2026-10-27 09:55. Yan set that to the start of Tuesday calc. Do not shift it to the previous period C. Review problems from MA 2 (canvasId 40440348) stays 2026-10-29 12:25. Yan put that back on the original Thursday. Do not shift it to the previous period C. SP1 presentation problem (canvasId 40468349) stays HW, due 2026-11-04 12:25. Yan said it was homework. Do not retag it MA because the title says presentation. Do not shift it to the previous period C. Independent Research Project Preliminary Data Collection and Analysis (canvasId 40476875) stays HW. Yan said it was homework on 2026-11-05. Do not retag it MA because the title says project. Due and title updates on todos that already exist are applied in code each hour. Review those too.`,
     "Yan is a 2026-27 junior. Those academic dashboard classes are often missing from Canvas until school publishes them. That is expected.",
     "FIRST: map snapshot courses to Yan's class folders (OneDrive `.education` under the grade folder, skip free-period shells and fixtures). The snapshot already dropped non-dashboard enrollments. If ZERO dashboard classes appear in Canvas, STOP immediately. Do not invent Class of 2028, EPS Library, Iceland EBC, Graphic Design, or prior-year shells. Do not create todos. One short note is enough.",
     "If at least one class maps: set class.json canvasLink to that course gradebook (htmlUrl + /grades). Create or update todos for every Canvas assignment on those mapped classes only. Set canvasLink and canvasId. Tag CW/HW/QA/MA. A title with more than one tag keeps the highest. Order is CW, then HW, then QA, then MA, so CW/HW and [CW/HW] are HW. Do not use the points guess when the title already has a tag. Store name without a CW/HW/QA/MA prefix (HW: Signed Syllabus → Signed Syllabus, [CW/HW] Breast Cancer Prediction → Breast Cancer Prediction). Use snapshot dueDate/dueTime.",
@@ -2342,6 +2343,15 @@ async function releaseLock(handle) {
   await rm(LOCK_PATH, { force: true });
 }
 
+/** A long Grok run does not rewrite the lock. Touch it so a 90-minute stale check cannot start a second one. */
+function startLockHeartbeat() {
+  const beat = setInterval(() => {
+    utimes(LOCK_PATH, new Date(), new Date()).catch(() => {});
+  }, LOCK_HEARTBEAT_MS);
+  if (typeof beat.unref === "function") beat.unref();
+  return beat;
+}
+
 /**
  * Fetch snapshot then (unless fetchOnly) run the Grok 4.7 high sync agent.
  * @param {{ force?: boolean, fetchOnly?: boolean }} [opts]
@@ -2383,6 +2393,7 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
     return { ok: true, skipped: true, reason: "in-flight", dateKey };
   }
 
+  const heartbeat = handle ? startLockHeartbeat() : null;
   try {
     const fetched = await fetchCanvasSnapshot({ timeZone: timezone });
     if (!fetched.ok) return fetched;
@@ -2498,6 +2509,7 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
       files,
     };
   } finally {
+    if (heartbeat) clearInterval(heartbeat);
     if (handle) await releaseLock(handle);
   }
 }
@@ -2725,7 +2737,7 @@ async function maybeRunMissed() {
     const last = await readLastAgentSync(canvasDir());
     if (last?.dateKey === now.dateKey) return;
     console.log(`[canvas-sync] missed-job recovery for ${now.dateKey}`);
-    await runCanvasSync({ force: true });
+    await runCanvasSync();
   } catch (err) {
     console.error("[canvas-sync] missed-job recovery failed", err);
   }
@@ -2749,7 +2761,7 @@ function armTimer(meta, result = null) {
         });
       return;
     }
-    runCanvasSync({ force: true })
+    runCanvasSync()
       .then((next) => {
         readMeta()
           .then((m) => armTimer(m, next))
