@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   formatTeamsOriginBlock,
+  formatTeamsThreadPreview,
   jypeComposerScheduleLine,
   JYPE_TEAMS_CHAT_ID,
   normalizeTeamsOrigin,
@@ -96,6 +97,7 @@ describe("teams-mention trigger", () => {
     assert.match(block, /posted to this Teams chat immediately/);
     assert.match(block, /@agent and @agentg both do this/);
     assert.match(block, /Do the work before you answer/);
+    assert.doesNotMatch(block, /Recent thread, oldest first/);
     assert.match(block, /school-onenote\.js/);
     assert.match(block, /Do not say you cannot open OneNote/);
     assert.match(block, /Keep the reply that lands in this chat short/);
@@ -173,6 +175,56 @@ describe("teams-mention trigger", () => {
       { chat: "", chatId: JYPE_TEAMS_CHAT_ID }
     );
     assert.match(byId, /open that person's roster/);
+  });
+
+  it("puts the recent thread in the prompt, oldest first", () => {
+    const preview = formatTeamsThreadPreview([
+      {
+        messageType: "message",
+        speaker: "Yan",
+        atLocal: "9:22 AM",
+        text: "open it now",
+      },
+      {
+        messageType: "systemEventMessage",
+        speaker: "Teams",
+        text: "joined",
+      },
+      {
+        messageType: "message",
+        speaker: "Alex",
+        atLocal: "9:19 AM",
+        text: "  notas   de clase  ",
+      },
+    ]);
+    assert.equal(
+      preview,
+      "- 9:19 AM Alex: notas de clase\n- 9:22 AM Yan: open it now"
+    );
+    const block = formatTeamsOriginBlock(
+      {
+        chat: "JYPE",
+        chatId: "19:abc",
+        text: "@agent",
+        threadPreview: preview,
+      },
+      { deliverFinal: true }
+    );
+    assert.match(block, /Recent thread, oldest first/);
+    assert.ok(block.indexOf("notas de clase") < block.indexOf("open it now"));
+    assert.ok(
+      block.indexOf("Recent thread") > block.indexOf("school-teams.js thread")
+    );
+    const later = formatTeamsOriginBlock(
+      {
+        chat: "JYPE",
+        chatId: "19:abc",
+        text: "@agent",
+        threadPreview: preview,
+      },
+      { deliverFinal: false }
+    );
+    assert.match(later, /9:19 AM Alex: notas de clase/);
   });
 
   it("tells the agent a bare @agent is not the task", () => {

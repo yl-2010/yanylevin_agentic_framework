@@ -965,10 +965,10 @@ describe("evaluateGuestMention", () => {
     assert.equal(stranger.action, "ignore");
   });
 
-  it("uses Grok for the JYPE Teams group and still skips the hourly cap", async () => {
+  it("uses Composer 2.5 for the JYPE Teams group and still skips the hourly cap", async () => {
     const dir = await mkdtemp(join(tmpdir(), "guest-jype-teams-"));
     const statePath = join(dir, "limits.json");
-    assert.equal(jypeMentionModelSpec("teams").id, "grok-4.7");
+    assert.equal(jypeMentionModelSpec("teams").id, "composer-2.5");
     assert.equal(jypeMentionModelSpec("imessage").id, "grok-4.7");
     const base = {
       platform: "teams",
@@ -987,15 +987,10 @@ describe("evaluateGuestMention", () => {
     for (let i = 0; i < FRIEND_HOURLY_LIMIT + 3; i += 1) {
       const decision = await evaluateGuestMention(base);
       assert.equal(decision.action, "start");
-      assert.equal(decision.caller.model.id, "grok-4.7");
+      assert.equal(decision.caller.model.id, "composer-2.5");
       assert.equal(
         decision.caller.model.params.find((p) => p.id === "fast")?.value,
         "false"
-      );
-      assert.equal(
-        decision.caller.model.params.find((p) => p.id === "reasoning_effort")
-          ?.value,
-        "high"
       );
       assert.equal(decision.caller.workspace, "jype");
     }

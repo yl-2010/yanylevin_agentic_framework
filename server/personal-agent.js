@@ -69,9 +69,10 @@ import {
   POSTED_TEXT_LINE,
   stripAgentSentFooter,
 } from "./imessage-mention.js";
-import { sendTeamsMessage } from "./school-teams.js";
+import { runSchoolTeams, sendTeamsMessage } from "./school-teams.js";
 import {
   formatTeamsOriginBlock,
+  formatTeamsThreadPreview,
   jypeComposerScheduleLine,
   normalizeTeamsOrigin,
 } from "./teams-mention.js";
@@ -2544,7 +2545,7 @@ function guestAgentCreateOpts(guest) {
   };
 }
 
-/** @agent iMessage/Teams first turn. JYPE group is Grok. @agentg is Grok. */
+/** @agent iMessage/Teams first turn. JYPE Teams group is Composer 2.5. @agentg is Grok. */
 function mentionAgentCreateOpts(guest, workspace, platform, forceGrok) {
   if (forceGrok) {
     return guestAgentCreateOpts({
@@ -2749,6 +2750,39 @@ export async function startAgentFromIMessageMention(message) {
 }
 
 /**
+ * The Nov 5 agent worker writes a big shell result to a file. Composer reads
+ * the start of that file, which is the people card, and answers before it
+ * sees the thread. Put the recent messages in the prompt first.
+ * @param {object} origin
+ */
+async function attachTeamsThreadPreview(origin) {
+  const chatId = String(origin?.chatId || origin?.to || "").trim();
+  if (!chatId || origin.threadPreview) return;
+  try {
+    const result = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("timed out")), 8000);
+      runSchoolTeams(["thread", "--chat", chatId, "--limit", "16"]).then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (err) => {
+          clearTimeout(timer);
+          reject(err);
+        }
+      );
+    });
+    const preview = formatTeamsThreadPreview(result?.messages);
+    if (preview) origin.threadPreview = preview;
+  } catch (err) {
+    console.error(
+      "[personal-agent] teams thread preview",
+      err instanceof Error ? err.message : err
+    );
+  }
+}
+
+/**
  * New Personal Agent thread whose first user message is a Teams chat that
  * mentioned @agent. Same 10-minute UI hide as iMessage @agent unless Yan
  * continues from web or iOS.
@@ -2770,6 +2804,7 @@ export async function startAgentFromTeamsMention(message) {
     err.status = 400;
     throw err;
   }
+  await attachTeamsThreadPreview(origin);
   const workspace = originIsJypeThread(origin) ? "jype" : "";
   const forceGrok = messageForcesGrok(raw);
   const startEmail =

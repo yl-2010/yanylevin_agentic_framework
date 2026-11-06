@@ -152,12 +152,8 @@ describe("Personal Agent models", () => {
       },
       false
     );
-    assert.equal(teamsJype.id, "grok-4.7");
-    assert.equal(
-      teamsJype.params.find((p) => p.id === "reasoning_effort")?.value,
-      "high"
-    );
-    assert.equal(teamsJype.params.find((p) => p.id === "fast")?.value, "false");
+    assert.equal(teamsJype.id, "composer-2.5");
+    assert.deepEqual(teamsJype.params, [{ id: "fast", value: "false" }]);
     const imessageJype = guestTurnModelSpec(
       {
         imessageDeliverFinal: true,

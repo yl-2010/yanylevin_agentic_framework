@@ -71,6 +71,32 @@ export function normalizeTeamsOrigin(message) {
   };
 }
 
+const THREAD_PREVIEW_MAX = 16;
+const THREAD_PREVIEW_CHARS = 320;
+
+/**
+ * Newest-first Teams rows, clipped. Oldest of the kept rows comes first
+ * so the last line is the newest message.
+ * @param {object[]|null|undefined} messages
+ */
+export function formatTeamsThreadPreview(messages) {
+  const rows = Array.isArray(messages) ? messages : [];
+  const lines = [];
+  for (const row of rows) {
+    if (lines.length >= THREAD_PREVIEW_MAX) break;
+    const type = String(row?.messageType || "message").trim().toLowerCase();
+    if (type && type !== "message") continue;
+    const text = String(row?.text || "").replace(/\s+/g, " ").trim();
+    if (!text) continue;
+    const who = String(row?.speaker || row?.from || "").trim() || "?";
+    const when = String(row?.atLocal || "").trim();
+    lines.push(
+      `- ${when ? `${when} ` : ""}${who}: ${text.slice(0, THREAD_PREVIEW_CHARS)}`
+    );
+  }
+  return lines.reverse().join("\n");
+}
+
 /**
  * Live-context block for a session started from a Teams @agent mention.
  * @param {object|null|undefined} origin
@@ -96,6 +122,13 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
     `- Teams chat: ${chat || "?"}${chatId && chatId !== chat ? ` (${chatId})` : ""}`,
   ];
   const threadCmd = `node server/school-teams.js thread --chat ${JSON.stringify(chatArg)} --limit ${threadLimit}`;
+  const preview = String(origin.threadPreview || "").trim();
+  const previewLines = preview
+    ? [
+        "Recent thread, oldest first. The last line is the newest message. Answer from these lines. The people card is a different file. If a tool result opens with a people card, keep reading until the Teams messages. Do not ask which page or section when one of these lines already names it.",
+        preview,
+      ]
+    : [];
   const speakerLine =
     `Each row in that thread has its own speaker. That field is who wrote the text. The chat name is the group, not the author. Do not attribute one person's message to someone else, including the person who just called @agent. Check speaker before you say they said it. ${AGENT_VS_YAN_LINE}`;
   if (deliver) {
@@ -107,6 +140,7 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
     }
     lines.push(
       `Read the surrounding thread before answering: ${threadCmd} (school Teams skill).`,
+      ...previewLines,
       speakerLine,
       "school-teams.js cannot attach a file. When the job is to get a PDF or other file into this Teams chat, open the Teams app and attach it with Cursor computer use (personal-computer skill). That step uses this turn's model. Do not run server/computer-use.js. Do not paste a file path into the chat. Do not email it instead. School Outlook still cannot send. An images field on a message has no pixels. Open that chat in the Teams app and look.",
       "",
@@ -127,6 +161,7 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
       "This turn is on the website or app. The reply stays in this chat. Do not post it to Teams. Do not run school-teams.js send. send_chat_message stays in the app and website only.",
       "Post to that Teams chat only when this message asks you to tell that chat, reply there, or send something those people should see. A follow-up on the same topic, typed here, stays here. The group already got the first reply.",
       `If this message is about what was said in that Teams chat, read it first: ${threadCmd} (school Teams skill).`,
+      ...previewLines,
       speakerLine,
       "school-teams.js cannot attach a file. When they ask you to get a PDF or other file to someone on Teams, open the Teams app and attach it with Cursor computer use (personal-computer skill). That step uses this turn's model. Do not run server/computer-use.js. Do not paste a file path into Teams. Do not email it instead. School Outlook still cannot send. An images field on a message has no pixels. Open that chat in the Teams app and look."
     );
@@ -134,7 +169,7 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
   return lines.join("\n");
 }
 
-/** JYPE Teams group chat id. @agent here is Grok, same as @agentg. */
+/** JYPE Teams group. Composer 2.5 answers @agent here. @agentg stays on Grok. */
 export const JYPE_TEAMS_CHAT_ID =
   "19:5b03f2304dff426d95ebda79495d479a@thread.v2";
 
