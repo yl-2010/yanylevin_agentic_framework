@@ -2511,6 +2511,7 @@
     set("classId", opts.classId);
     set("projectId", opts.projectId);
     set("source", opts.source);
+    set("rel", opts.path);
     set("path", opts.path);
     return q.toString();
   }
@@ -2643,10 +2644,22 @@
    * `noopener` also makes window.open return null when the tab did open,
    * and the old fallback then set download on a PDF.
    */
-  async function openContextFile(queryString, tab) {
+  function fileTabFallback(tab, fallbackHref) {
+    if (tab && !tab.closed && fallbackHref) {
+      try {
+        tab.location = fallbackHref;
+        return;
+      } catch {
+        /* close below */
+      }
+    }
+    closeFileTab(tab);
+  }
+
+  async function openContextFile(queryString, tab, fallbackHref) {
     const mac = window.YanMacApi;
     if (!mac?.macFetch || !queryString) {
-      closeFileTab(tab);
+      fileTabFallback(tab, fallbackHref);
       return;
     }
     try {
@@ -2656,7 +2669,7 @@
       });
       if (!res.ok) {
         console.error("[edu-file]", res.status);
-        closeFileTab(tab);
+        fileTabFallback(tab, fallbackHref);
         return;
       }
       let blob = await res.blob();
@@ -2707,7 +2720,7 @@
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err) {
       console.error("[edu-file]", err);
-      closeFileTab(tab);
+      fileTabFallback(tab, fallbackHref);
     }
   }
 
@@ -4190,7 +4203,7 @@
           const tab = window.open("about:blank", "_blank");
           if (!tab) return;
           event.preventDefault();
-          if (qs) openContextFile(qs, tab);
+          if (qs) openContextFile(qs, tab, fileBtn.href);
           else closeFileTab(tab);
           return;
         }

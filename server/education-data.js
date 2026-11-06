@@ -79,7 +79,7 @@ const { decodeEducationFileQueryValue, contentDispositionForFile } = require(
   "../education/file-query.js"
 );
 
-const FILE_QUERY_KEYS = ["scope", "id", "classId", "projectId", "name", "source", "path"];
+const FILE_QUERY_KEYS = ["scope", "id", "classId", "projectId", "name", "source", "path", "rel"];
 
 /** Undo ylb64 query values from a dragged file link. Plain ids pass through. */
 export function decodeEducationFileQuery(opts) {
@@ -614,7 +614,7 @@ async function resolveOnedriveContextFile(root, opts) {
     throw err;
   }
 
-  const rel = isSafeRelativePath(opts?.path || opts?.name);
+  const rel = isSafeRelativePath(opts?.rel || opts?.path || opts?.name);
   if (!rel) {
     const err = new Error("invalid file name");
     err.status = 400;
@@ -665,7 +665,13 @@ export async function resolveContextFile(email, opts) {
     return resolveOnedriveContextFile(root, opts);
   }
 
-  const relFromPath = opts?.path ? isSafeRelativePath(opts.path) : null;
+  // `rel` is the folder path. Vercel's `/api/education/:path*` rewrite
+  // overwrites a query param named path, so a clicked link arrived as path=file.
+  const relFromPath = opts?.rel
+    ? isSafeRelativePath(opts.rel)
+    : opts?.path
+      ? isSafeRelativePath(opts.path)
+      : null;
   const fileName = isSafeContextFileName(opts?.name);
   const rel = relFromPath || fileName;
   if (!rel) {
@@ -901,7 +907,38 @@ export function contentTypeForFileName(name) {
  * @param {import('express').Response} res
  * @param {{ path: string, name: string, size: number }} file
  */
-export function sendContextFile(res, file) {
+function cloudReadDelay(ms) {
+  return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
+}
+
+/**
+ * Stream a file. OneDrive File Provider returns EDEADLK (errno -11) when a
+ * read overlaps another CloudStorage read. An unhandled stream error kills
+ * the process, and Cloudflare then says the origin is down.
+ * @param {import('express').Response} res
+ * @param {string} filePath
+ */
+function pipeContextFile(res, filePath) {
+  return new Promise((resolvePipe, rejectPipe) => {
+    const stream = createReadStream(filePath);
+    let settled = false;
+    const finish = (err) => {
+      if (settled) return;
+      settled = true;
+      if (err) {
+        stream.destroy();
+        rejectPipe(err);
+        return;
+      }
+      resolvePipe();
+    };
+    stream.on("error", finish);
+    stream.on("end", () => finish());
+    stream.pipe(res);
+  });
+}
+
+export async function sendContextFile(res, file) {
   const type = contentTypeForFileName(file.name);
   const ascii = String(file.name)
     .replace(/[^\x20-\x7E]/g, "_")
@@ -916,7 +953,39 @@ export function sendContextFile(res, file) {
     `${disposition}; filename="${ascii}"; filename*=UTF-8''${encoded}`
   );
   res.setHeader("Cache-Control", "private, no-store");
-  createReadStream(file.path).pipe(res);
+
+  const attempts = isCloudStoragePath(file.path) ? 4 : 1;
+  const send = async () => {
+    let last;
+    for (let i = 0; i < attempts; i++) {
+      if (res.headersSent || res.writableEnded) break;
+      try {
+        await pipeContextFile(res, file.path);
+        return;
+      } catch (err) {
+        last = err;
+        if (res.headersSent || !isTransientCloudError(err) || i === attempts - 1) throw err;
+        await cloudReadDelay(40 * (i + 1));
+      }
+    }
+    throw last;
+  };
+
+  try {
+    if (isCloudStoragePath(file.path)) await runCloudStorageIo(send);
+    else await send();
+  } catch (err) {
+    console.error(
+      "[education-file] read",
+      file?.name,
+      err?.code || err?.message || err
+    );
+    if (!res.headersSent) {
+      res.status(500).json({ ok: false, error: "file read failed" });
+      return;
+    }
+    if (!res.writableEnded) res.destroy();
+  }
 }
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");

@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, writeFile, utimes, rm, stat } from "node:fs/promises";
+import { Writable } from "node:stream";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
@@ -31,6 +32,7 @@ import {
   stripTodoTagPrefix,
   uiPanelDateKeys,
   publicDebateCase,
+  sendContextFile,
 } from "./education-data.js";
 
 const require = createRequire(import.meta.url);
@@ -1345,5 +1347,50 @@ describe("publicDebateCase", () => {
         assert.ok(card.quote.length > 40);
       }
     }
+  });
+});
+
+describe("sendContextFile", () => {
+  function mockRes() {
+    const chunks = [];
+    const res = new Writable({
+      write(chunk, _enc, cb) {
+        res.headersSent = true;
+        chunks.push(Buffer.from(chunk));
+        cb();
+      },
+    });
+    res.headersSent = false;
+    res.setHeader = () => {};
+    res.statusCode = 0;
+    res.body = null;
+    res.status = (code) => {
+      res.statusCode = code;
+      return res;
+    };
+    res.json = (body) => {
+      res.body = body;
+    };
+    res.chunks = () => Buffer.concat(chunks);
+    return res;
+  }
+
+  it("writes the file and survives a missing path", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "edu-file-"));
+    const file = join(dir, "notes.pdf");
+    await writeFile(file, Buffer.from("%PDF-1.4 test"));
+    const ok = mockRes();
+    await sendContextFile(ok, { path: file, name: "notes.pdf", size: 13 });
+    assert.equal(ok.chunks().toString(), "%PDF-1.4 test");
+
+    const missing = mockRes();
+    await sendContextFile(missing, {
+      path: join(dir, "gone.pdf"),
+      name: "gone.pdf",
+      size: 1,
+    });
+    assert.equal(missing.statusCode, 500);
+    assert.equal(missing.body?.error, "file read failed");
+    await rm(dir, { recursive: true, force: true });
   });
 });

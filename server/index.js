@@ -841,8 +841,9 @@ app.get("/api/education/file", requireEducationUser, async (req, res) => {
       name: req.query?.name,
       source: req.query?.source,
       path: req.query?.path,
+      rel: req.query?.rel,
     });
-    sendContextFile(res, file);
+    await sendContextFile(res, file);
   } catch (err) {
     console.error("[/api/education/file]", err);
     if (!res.headersSent) {
@@ -1146,7 +1147,7 @@ app.get("/api/education/agent/file", requireEducationUser, async (req, res) => {
       req.query?.sessionId,
       req.query?.name
     );
-    sendContextFile(res, file);
+    await sendContextFile(res, file);
   } catch (err) {
     console.error("[/api/education/agent/file]", err);
     if (!res.headersSent) {
@@ -1210,9 +1211,10 @@ app.get("/api/jype/file", requireJypeUser, async (req, res) => {
       name: req.query?.name,
       source: req.query?.source,
       path: req.query?.path,
+      rel: req.query?.rel,
       workspace: "jype",
     });
-    sendContextFile(res, file);
+    await sendContextFile(res, file);
   } catch (err) {
     console.error("[/api/jype/file]", err);
     if (!res.headersSent) {
@@ -1498,7 +1500,7 @@ app.get("/api/jype/agent/file", requireJypeUser, async (req, res) => {
       req.query?.sessionId,
       req.query?.name
     );
-    sendContextFile(res, file);
+    await sendContextFile(res, file);
   } catch (err) {
     console.error("[/api/jype/agent/file]", err);
     if (!res.headersSent) {
