@@ -2628,9 +2628,27 @@
     return `<div class="edu-files">${tiles.join("")}</div>`;
   }
 
-  async function openContextFile(queryString) {
+  function closeFileTab(tab) {
+    if (!tab || tab.closed) return;
+    try {
+      tab.close();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /**
+   * `tab` is a blank window opened in the click, before any await.
+   * Opening after the file fetch loses the click, and the browser drops it.
+   * `noopener` also makes window.open return null when the tab did open,
+   * and the old fallback then set download on a PDF.
+   */
+  async function openContextFile(queryString, tab) {
     const mac = window.YanMacApi;
-    if (!mac?.macFetch || !queryString) return;
+    if (!mac?.macFetch || !queryString) {
+      closeFileTab(tab);
+      return;
+    }
     try {
       const res = await mac.macFetch(`${API}/file?${queryString}`, {
         timeoutMs: 120_000,
@@ -2638,13 +2656,15 @@
       });
       if (!res.ok) {
         console.error("[edu-file]", res.status);
+        closeFileTab(tab);
         return;
       }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      let blob = await res.blob();
       const downloadName = fileQueryName(queryString);
       const shouldDownload = window.YLFileQuery?.contextFileShouldDownload?.(downloadName);
       if (shouldDownload === true) {
+        closeFileTab(tab);
+        const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
         a.download = downloadName || "download";
@@ -2654,16 +2674,32 @@
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
         return;
       }
-      const opened = window.open(url, "_blank", "noopener,noreferrer");
-      if (!opened) {
+      const type = blob.type || "";
+      if (!type || type === "application/octet-stream") {
+        const ext = String(downloadName || "").split(".").pop()?.toLowerCase();
+        const mime =
+          ext === "pdf"
+            ? "application/pdf"
+            : ext === "html" || ext === "htm"
+              ? "text/html"
+              : "";
+        if (mime) blob = new Blob([blob], { type: mime });
+      }
+      const url = URL.createObjectURL(blob);
+      let opened = tab && !tab.closed ? tab : null;
+      if (!opened) opened = window.open(url, "_blank");
+      else opened.location = url;
+      if (opened) {
+        try {
+          opened.opener = null;
+        } catch {
+          /* blob navigation may already drop the handle */
+        }
+      } else {
         const a = document.createElement("a");
         a.href = url;
         a.target = "_blank";
         a.rel = "noopener noreferrer";
-        const cd = res.headers.get("Content-Disposition") || "";
-        const m = cd.match(/filename\*=UTF-8''([^;]+)|filename="([^"]+)"/i);
-        const raw = m ? decodeURIComponent(m[1] || m[2] || "") : "";
-        if (raw) a.download = raw;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -2671,6 +2707,7 @@
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err) {
       console.error("[edu-file]", err);
+      closeFileTab(tab);
     }
   }
 
@@ -4143,8 +4180,22 @@
         // Pictures follow the link. The new tab's address is the file itself,
         // so dragging that picture into another tab still shows it.
         if (qs && isRasterImageName(fileQueryName(qs))) return;
+        const name = qs ? fileQueryName(qs) : "";
+        const shouldDownload =
+          window.YLFileQuery?.contextFileShouldDownload?.(name) === true;
+        // PDF and HTML open a copy. The blank tab has to start in this click.
+        // After the file fetch, the browser treats window.open as a popup and
+        // drops it, so the click looks dead. Cmd-click still uses the link.
+        if (!shouldDownload) {
+          const tab = window.open("about:blank", "_blank");
+          if (!tab) return;
+          event.preventDefault();
+          if (qs) openContextFile(qs, tab);
+          else closeFileTab(tab);
+          return;
+        }
         event.preventDefault();
-        if (qs) openContextFile(qs);
+        if (qs) openContextFile(qs, null);
         return;
       }
 
