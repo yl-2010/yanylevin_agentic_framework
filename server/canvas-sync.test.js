@@ -564,6 +564,7 @@ describe("buildCanvasSyncPrompt", () => {
     assert.match(prompt, /40440348/);
     assert.match(prompt, /40468349/);
     assert.match(prompt, /40476875/);
+    assert.match(prompt, /40481133/);
     assert.match(prompt, /stays HW/);
     assert.match(prompt, /2026-10-29 12:25/);
     assert.match(prompt, /comments-new\.md/);
@@ -722,6 +723,15 @@ describe("inferTag", () => {
         title: "Independent Research Project - Preliminary Data Collection and Analysis",
         pointsPossible: 20,
         types: ["online_upload"],
+      }),
+      "HW"
+    );
+    assert.equal(
+      inferTag({
+        id: 40481133,
+        title: "STUDY GUIDE: MA Oral Final: Stereotypes Project 2026",
+        pointsPossible: 0,
+        types: ["not_graded"],
       }),
       "HW"
     );

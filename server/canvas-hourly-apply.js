@@ -100,6 +100,7 @@ function parseTagFromTitle(title) {
 export function inferTag(assignment) {
   if (Number(assignment?.id) === 40468349) return "HW";
   if (Number(assignment?.id) === 40476875) return "HW";
+  if (Number(assignment?.id) === 40481133) return "HW";
   const fromTitle = parseTagFromTitle(assignment.title);
   if (fromTitle) return fromTitle;
   const types = Array.isArray(assignment.types) ? assignment.types : [];
