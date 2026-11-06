@@ -2015,6 +2015,7 @@ export function systemPrompt(email, opts = {}) {
       `- EPS student IDs / school photos: ${FOUR11_SKILL_PATH}`,
       `- Click-through / login pages (skip static fetch): ${PERSONAL_SKILL_PATHS.browser}`,
       `- Mac apps, Arc if Chrome fails. Cursor computer use, same model as this turn: ${PERSONAL_SKILL_PATHS.computer}`,
+      `- School OneNote class notebooks, when the question names a page or section: ${PERSONAL_SKILL_PATHS.schoolOnenote}`,
       `- Future agents (schedule a later run): ${PERSONAL_SKILL_PATHS.futureAgents}`,
       `- Celebration site: ${PERSONAL_SKILL_PATHS.celebration}`,
       "File uploads can be stored in the matching JYPE class or project folder.",
@@ -2543,7 +2544,7 @@ function guestAgentCreateOpts(guest) {
   };
 }
 
-/** @agent iMessage/Teams first turn. JYPE Teams group is Composer 2.5. @agentg is Grok. */
+/** @agent iMessage/Teams first turn. JYPE group is Grok. @agentg is Grok. */
 function mentionAgentCreateOpts(guest, workspace, platform, forceGrok) {
   if (forceGrok) {
     return guestAgentCreateOpts({

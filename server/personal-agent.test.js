@@ -152,8 +152,12 @@ describe("Personal Agent models", () => {
       },
       false
     );
-    assert.equal(teamsJype.id, "composer-2.5");
-    assert.deepEqual(teamsJype.params, [{ id: "fast", value: "false" }]);
+    assert.equal(teamsJype.id, "grok-4.7");
+    assert.equal(
+      teamsJype.params.find((p) => p.id === "reasoning_effort")?.value,
+      "high"
+    );
+    assert.equal(teamsJype.params.find((p) => p.id === "fast")?.value, "false");
     const imessageJype = guestTurnModelSpec(
       {
         imessageDeliverFinal: true,
@@ -289,6 +293,7 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /Teams reply does not hide the lines above it/);
     assert.match(prompt, /Yan, then Alex, then Example Friend and Example Neighbor as equals, then the agent/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.jypeAgent));
+    assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.schoolOnenote));
     assert.ok(prompt.includes(FOUR11_SKILL_PATH));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.browser));
     assert.match(prompt, /schedule_future_agent/);

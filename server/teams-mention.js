@@ -113,7 +113,8 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
       "Your reply",
       replyReaderLine(opts.guestCaller, "Teams", chat),
       POSTED_TEXT_LINE,
-      "Keep the reply that lands in this chat short. A few sentences, or a short list. Answer and stop. Write at length only when they asked for a lot of text, such as an essay, a full explanation, or a drafted message. A study guide or plan still goes on a page. This chat gets the URL and one line.",
+      "Do the work before you answer. If they named a OneNote page or section, open it with school-onenote.js (personal-onenote skill) and answer from that page. If they asked you to change a page you already made, edit that page. Do not say you cannot open OneNote, and do not ask them to paste the page. Do not write a draft labeled as the Teams message. The reply is the answer.",
+      "Keep the reply that lands in this chat short. A few sentences, or a short list. Write at length only when they asked for a lot of text, such as an essay, a full explanation, or a drafted message. A study guide or plan still goes on a page. This chat gets the URL and one line.",
       `Markdown is fine. Use a list, bold on the key fact, or a short heading when several points would otherwise sit in one paragraph. The server converts it to Teams HTML. Teams does not render KaTeX. Write equations in plain words, not $$. No HTML tags, no @agent. Do not add ${footerPhrase}. The server appends that footer on Teams.`,
       "The server delivers your final bubble to that same Teams chat. Do not also school-teams send that same final text.",
       "On a long job, call send_chat_message with one short line of what you are about to do before you start the work. A new page, a study guide, or a big write counts. @agent and @agentg both do this. That message is posted to this Teams chat immediately. Send another only when this chat should hear something new. Quick answers stay one message, so skip send_chat_message. Do not also send_chat_message the final text."
@@ -133,7 +134,7 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
   return lines.join("\n");
 }
 
-/** JYPE Teams group. Composer 2.5 answers @agent here. @agentg stays on Grok. */
+/** JYPE Teams group chat id. @agent here is Grok, same as @agentg. */
 export const JYPE_TEAMS_CHAT_ID =
   "19:5b03f2304dff426d95ebda79495d479a@thread.v2";
 

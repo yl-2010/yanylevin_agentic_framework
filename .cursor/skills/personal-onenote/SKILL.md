@@ -1,19 +1,21 @@
 ---
 name: personal-onenote
 description: >-
-  Read Yan's EPS Microsoft 365 OneNote / Class Notebooks
-  (owner@school.example) via node server/school-onenote.js. Use when Yan
-  asks about school work that lives in a Class Notebook (agenda, HW
-  instructions, maps, day packets, grammar refs), or when a job names a
-  notebook or page. Yan only. Never a default nightly source. Never for
-  Alex.
+  Read EPS Class Notebooks (owner@school.example) via
+  node server/school-onenote.js. Use when a school question lives in a
+  Class Notebook, or when a job names a notebook or page. Yan's personal
+  chat, and a JYPE group question that names a class page. Not Alex's
+  personal chat. Never a default nightly source.
 disable-model-invocation: true
 ---
 
-# School OneNote, Yan only
+# School OneNote
 
-**Gate:** signed-in / default user is `you@example.com`. If the user is
-Alex, skip this whole skill.
+**Gate:** Yan only on a personal chat. A JYPE group question that names a
+class page or section may open that class Content Library section.
+Alex's personal `/education` chat skips this skill. Leave other
+students' private sections alone. Do not open Yan's private section unless
+Yan asked.
 
 Account: `owner@school.example`. Same Chrome login as school Outlook
 (`~/.yanylevin/school-mail/chrome-profile`). No Azure app. No API key.

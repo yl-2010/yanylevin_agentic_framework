@@ -639,14 +639,13 @@ function getCachedPeople(deps = {}) {
 }
 
 /**
- * JYPE group @agent. Teams group chat is Composer 2.5, Fast off.
- * iMessage JYPE stays on Grok.
- * @param {string} platform
+ * JYPE group @agent. Grok 4.7, Fast off, on Teams and iMessage.
+ * Teams stayed on Composer 2.5 until 2026-11-06. After that night's
+ * Composer outage it finished the turn as a short reply and skipped the work.
+ * @param {string} [_platform]
  */
-export function jypeMentionModelSpec(platform) {
-  return platform === "teams"
-    ? copyModelSpec(GUEST_COMPOSER_SPEC)
-    : copyModelSpec(GUEST_GROK_SPEC);
+export function jypeMentionModelSpec(_platform) {
+  return copyModelSpec(GUEST_GROK_SPEC);
 }
 
 function guestModelSpec(useGrok, slug, name) {
