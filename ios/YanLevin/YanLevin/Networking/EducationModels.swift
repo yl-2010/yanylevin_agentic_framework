@@ -477,14 +477,18 @@ struct EducationCanvasWork: Decodable, Hashable {
 struct EducationCanvasComment: Decodable, Hashable, Identifiable {
     let id: Int
     let createdAt: String
+    /// When the student could see it. Canvas posted_at if the teacher released it later than createdAt.
+    let visibleAt: String
     let comment: String
 
-    enum CodingKeys: String, CodingKey { case id, createdAt, comment }
+    enum CodingKeys: String, CodingKey { case id, createdAt, visibleAt, comment }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(Int.self, forKey: .id)
         createdAt = (try c.decodeIfPresent(String.self, forKey: .createdAt) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        visibleAt = (try c.decodeIfPresent(String.self, forKey: .visibleAt) ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         comment = (try c.decodeIfPresent(String.self, forKey: .comment) ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)

@@ -324,14 +324,16 @@ function eachEducationTodo(tree, fn) {
 
 /**
  * Teacher submission comments for the todo page. Drops Yan's own notes.
- * Newest first. Clears canvasComments when a Canvas todo has none left.
+ * Newest first. visibleAt is when the student could see it (Canvas posted_at
+ * when the teacher released it after writing). Clears canvasComments when a
+ * Canvas todo has none left.
  * Does not write files.
  * @param {object} tree
  * @param {object[]|null|undefined} comments
  */
 export function attachCanvasComments(tree, comments) {
   if (!tree) return tree;
-  /** @type {Map<number, { id: number, createdAt: string, comment: string }[]>} */
+  /** @type {Map<number, { id: number, createdAt: string, visibleAt: string, comment: string }[]>} */
   const byAssignment = new Map();
   const seen = new Set();
   for (const row of Array.isArray(comments) ? comments : []) {
@@ -343,9 +345,11 @@ export function attachCanvasComments(tree, comments) {
     if (seen.has(id)) continue;
     seen.add(id);
     const bucket = byAssignment.get(assignmentId) || [];
+    const createdAt = String(row.createdAt || "");
     bucket.push({
       id,
-      createdAt: String(row.createdAt || ""),
+      createdAt,
+      visibleAt: String(row.visibleAt || createdAt),
       comment: text,
     });
     byAssignment.set(assignmentId, bucket);

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   commentRow,
+  commentVisibleAt,
   newComments,
   pageRow,
   moduleRow,
@@ -38,11 +39,39 @@ describe("commentRow", () => {
     assert.equal(row.own, false);
     assert.equal(row.comment, "Nice diagram.");
     assert.equal(row.assignmentId, 40335975);
+    assert.equal(row.createdAt, "2026-09-18T20:00:00Z");
+    assert.equal(row.visibleAt, "2026-09-18T20:00:00Z");
+    assert.equal(row.postedAt, undefined);
     assert.equal(
       commentRow({ id: 2, comment: "Line one<br>Line two" })?.comment,
       "Line one\nLine two"
     );
     assert.equal(commentRow({ id: 1, comment: "   " }), null);
+  });
+
+  it("starts visibility at Canvas release when that is later than the write time", () => {
+    assert.equal(
+      commentVisibleAt("2026-11-04T22:48:31Z", "2026-11-07T06:05:59Z"),
+      "2026-11-07T06:05:59Z"
+    );
+    assert.equal(
+      commentVisibleAt("2026-11-08T18:00:00Z", "2026-11-07T06:05:59Z"),
+      "2026-11-08T18:00:00Z"
+    );
+    assert.equal(commentVisibleAt("2026-11-04T22:48:31Z", ""), "2026-11-04T22:48:31Z");
+    const row = commentRow(
+      {
+        id: 84942469,
+        author_id: 44,
+        author_name: "Teacher",
+        comment: "Nice work.",
+        created_at: "2026-11-04T22:48:31Z",
+      },
+      { postedAt: "2026-11-07T06:05:59Z" }
+    );
+    assert.equal(row.createdAt, "2026-11-04T22:48:31Z");
+    assert.equal(row.postedAt, "2026-11-07T06:05:59Z");
+    assert.equal(row.visibleAt, "2026-11-07T06:05:59Z");
   });
 });
 

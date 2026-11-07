@@ -305,12 +305,36 @@ describe("attachCanvasComments", () => {
       },
     ]);
     assert.deepEqual(tree.classes[0].todos[0].canvasComments, [
-      { id: 3, createdAt: "2026-09-29T20:30:05Z", comment: "later" },
-      { id: 2, createdAt: "2026-09-28T20:30:05Z", comment: "earlier" },
+      { id: 3, createdAt: "2026-09-29T20:30:05Z", visibleAt: "2026-09-29T20:30:05Z", comment: "later" },
+      { id: 2, createdAt: "2026-09-28T20:30:05Z", visibleAt: "2026-09-28T20:30:05Z", comment: "earlier" },
     ]);
     assert.equal(tree.classes[0].todos[1].canvasComments, undefined);
     assert.deepEqual(tree.todos[0].canvasComments, [
-      { id: 5, createdAt: "2026-09-01T00:00:00Z", comment: "on link" },
+      { id: 5, createdAt: "2026-09-01T00:00:00Z", visibleAt: "2026-09-01T00:00:00Z", comment: "on link" },
+    ]);
+  });
+
+  it("keeps the release time when Canvas posted the comment after it was written", () => {
+    const tree = {
+      classes: [{ todos: [{ id: "qa", canvasId: 40264902 }] }],
+    };
+    attachCanvasComments(tree, [
+      {
+        id: 84942469,
+        assignmentId: 40264902,
+        own: false,
+        createdAt: "2026-11-04T22:48:31Z",
+        visibleAt: "2026-11-07T06:05:59Z",
+        comment: "Nice work.",
+      },
+    ]);
+    assert.deepEqual(tree.classes[0].todos[0].canvasComments, [
+      {
+        id: 84942469,
+        createdAt: "2026-11-04T22:48:31Z",
+        visibleAt: "2026-11-07T06:05:59Z",
+        comment: "Nice work.",
+      },
     ]);
   });
 

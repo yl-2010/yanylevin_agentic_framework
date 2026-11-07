@@ -459,7 +459,8 @@ enum EducationScheduleHelper {
         return true
     }
 
-    /// Home dashboard window. 24h when that calendar day has schedule blocks, otherwise 48h.
+    /// Home dashboard window, measured from when the comment became visible.
+    /// 24h when that calendar day has schedule blocks, otherwise 48h.
     static func homeCommentIsFresh(
         postedAt: Date,
         schedule: EducationSchedule?,

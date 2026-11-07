@@ -279,7 +279,8 @@ struct EducationView: View {
             (todo.canvasComments ?? []).compactMap { comment -> EducationCommentEntry? in
                 let text = comment.comment.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !text.isEmpty else { return nil }
-                guard let posted = EducationCommentWhen.date(from: comment.createdAt) else { return nil }
+                let since = comment.visibleAt.isEmpty ? comment.createdAt : comment.visibleAt
+                guard let posted = EducationCommentWhen.date(from: since) else { return nil }
                 guard EducationScheduleHelper.homeCommentIsFresh(
                     postedAt: posted,
                     schedule: schedule,
@@ -289,7 +290,7 @@ struct EducationView: View {
             }
         }
         .sorted { a, b in
-            if a.createdAt != b.createdAt { return a.createdAt > b.createdAt }
+            if a.visibleAt != b.visibleAt { return a.visibleAt > b.visibleAt }
             return a.id > b.id
         }
     }
@@ -2531,6 +2532,7 @@ private struct EducationCommentEntry: Identifiable {
     let id: Int
     let listKey: String
     let createdAt: String
+    let visibleAt: String
     let text: String
     let todo: EducationTodo?
     let canvasURL: URL?
@@ -2539,6 +2541,8 @@ private struct EducationCommentEntry: Identifiable {
         id = comment.id
         listKey = "\(todo?.id ?? "")-\(comment.id)"
         createdAt = comment.createdAt
+        let released = comment.visibleAt.trimmingCharacters(in: .whitespacesAndNewlines)
+        visibleAt = released.isEmpty ? comment.createdAt : released
         text = comment.comment
         self.todo = todo
         self.canvasURL = canvasURL ?? todo?.canvasURL

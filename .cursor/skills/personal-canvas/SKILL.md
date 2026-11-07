@@ -149,7 +149,7 @@ Read each mapped course `syllabus` plus snapshot `events[]`. Create/update **imp
 
 ## Comments, pages, modules, course files
 
-Full fetch (nightly, `--fetch-only`, manual sync) writes those dumps. The :00 watch does not. Pages, modules, and course files stay off `/education` and iOS. Teacher comments are the exception. The live overlay paints them on the todo page, on the same 10 second Canvas pull as grades. Do not copy comments into `todo.json` `description`. Do not download course-file dumps into OneDrive class folders (assignment attachments still use `canvas-files.js pull`).
+Full fetch (nightly, `--fetch-only`, manual sync) writes those dumps. The :00 watch does not. Pages, modules, and course files stay off `/education` and iOS. Teacher comments are the exception. The live overlay paints them on the todo page, on the same 10 second Canvas pull as grades. Home starts its 24 or 48 hour window when the student can see the comment. That is the submission `posted_at` when the teacher releases it after writing it. The card still shows the write time. Do not copy comments into `todo.json` `description`. Do not download course-file dumps into OneDrive class folders (assignment attachments still use `canvas-files.js pull`).
 
 **Comments.** The todo page shows teacher comments (not Yan's own). Read `comments.md` anytime Yan asks what a teacher said, or `canvas-files.js comments --canvas-id <id>` for a live pull. Nightly / manual: read `comments-new.md`. Fold new teacher comments into that class or todo OneDrive `CONTEXT.md` (hidden from tiles). Skip if that comment is already there. Skip Yan's own comments unless they matter. One short dated line per comment is enough (`2026-09-18 Seeley on Average Speed Write-up: …`).
 

@@ -46,6 +46,22 @@ function commentPlainText(html, max = COMMENT_MAX) {
     .slice(0, max);
 }
 
+/**
+ * Home freshness starts when the student can see the comment.
+ * Canvas stamps created_at when the teacher writes it, and posted_at
+ * on the submission when they release it. A late release wins.
+ * @param {unknown} createdAt
+ * @param {unknown} postedAt
+ */
+export function commentVisibleAt(createdAt, postedAt) {
+  const createdMs = Date.parse(String(createdAt || ""));
+  const postedMs = Date.parse(String(postedAt || ""));
+  if (Number.isFinite(postedMs) && (!Number.isFinite(createdMs) || postedMs > createdMs)) {
+    return String(postedAt);
+  }
+  return String(createdAt || "");
+}
+
 export function commentRow(raw, extra = {}) {
   const id = Number(raw?.id);
   const text = commentPlainText(raw?.comment || raw?.body || "");
@@ -64,7 +80,9 @@ export function commentRow(raw, extra = {}) {
     160
   );
   const courseId = Number(extra.courseId);
-  return {
+  const createdAt = String(raw?.created_at || raw?.edited_at || "");
+  const postedAt = String(extra.postedAt || raw?.posted_at || "").trim();
+  const row = {
     id,
     assignmentId: Number.isFinite(assignmentId) ? assignmentId : null,
     assignment,
@@ -73,9 +91,12 @@ export function commentRow(raw, extra = {}) {
     authorId: Number.isFinite(authorId) ? authorId : null,
     author,
     own: extra.selfUserId != null && authorId === Number(extra.selfUserId),
-    createdAt: String(raw?.created_at || raw?.edited_at || ""),
+    createdAt,
+    visibleAt: commentVisibleAt(createdAt, postedAt),
     comment: text,
   };
+  if (postedAt) row.postedAt = postedAt;
+  return row;
 }
 
 /**
@@ -456,6 +477,7 @@ async function fetchCourseComments(base, token, course, selfUserId, fetchOpts) {
         assignment,
         assignmentName: assignment?.name,
         selfUserId,
+        postedAt: sub?.posted_at || "",
       });
       if (row) out.push(row);
     }
@@ -684,6 +706,7 @@ export async function fetchAssignmentComments(base, token, opts) {
         assignmentId,
         assignmentName: opts.assignmentName || "",
         selfUserId,
+        postedAt: data?.posted_at || "",
       })
     )
     .filter(Boolean);

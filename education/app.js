@@ -1011,8 +1011,13 @@
     return formatDetailWhen(dateStr, timeStr);
   }
 
-  function commentSort(a, b) {
-    const byTime = String(b?.createdAt || "").localeCompare(String(a?.createdAt || ""));
+  function commentStamp(row, key = "createdAt") {
+    if (key === "visibleAt") return String(row?.visibleAt || row?.createdAt || "");
+    return String(row?.[key] || "");
+  }
+
+  function commentSort(a, b, key = "createdAt") {
+    const byTime = commentStamp(b, key).localeCompare(commentStamp(a, key));
     if (byTime !== 0) return byTime;
     return (Number(b?.id) || 0) - (Number(a?.id) || 0);
   }
@@ -1042,13 +1047,13 @@
 
   function commentsPanelHtml(
     rows,
-    { filterId, expandable = false, expanded = false, expandAttr = "" } = {}
+    { filterId, expandable = false, expanded = false, expandAttr = "", sortKey = "createdAt" } = {}
   ) {
     const list = (Array.isArray(rows) ? rows : []).filter((row) =>
       String(row?.comment || "").trim()
     );
     if (!list.length) return "";
-    list.sort(commentSort);
+    list.sort((a, b) => commentSort(a, b, sortKey));
     const visible = expandable && !expanded ? list.slice(0, 3) : list;
     const body = visible
       .map((row, i) => {
@@ -1159,7 +1164,7 @@
     return isSchoolDay(parts, schedule) && dayHasScheduleBlocks(parts, schedule);
   }
 
-  /** School-day comments last 24h. Any day without blocks lasts 48h. */
+  /** Window starts when the comment becomes visible. School-day release lasts 24h. A day without blocks lasts 48h. */
   function homeCommentStillVisible(iso, schedule, nowMs = Date.now()) {
     const ms = Date.parse(String(iso || ""));
     if (!Number.isFinite(ms)) return false;
@@ -1175,7 +1180,7 @@
       const tag = todoTagKey(t);
       comments.forEach((row) => {
         const text = String(row?.comment || "").trim();
-        if (!text || !homeCommentStillVisible(row?.createdAt, schedule)) return;
+        if (!text || !homeCommentStillVisible(commentStamp(row, "visibleAt"), schedule)) return;
         rows.push({
           ...row,
           comment: text,
@@ -1190,6 +1195,7 @@
       expandable: true,
       expanded: homeCommentsExpanded,
       expandAttr: "data-home-comments-expand",
+      sortKey: "visibleAt",
     });
   }
 
