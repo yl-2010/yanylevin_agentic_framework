@@ -13,7 +13,7 @@ import { AGENT_SENT_FOOTER } from "./imessage-mention.js";
 import { loadCalendarTombstones } from "./calendar-memory.js";
 import { addLocalDays, zonedParts } from "./calendar-cli.js";
 import { objectDirId, resolveBookkeepingFile } from "./education-onedrive.js";
-import { PERSONAL_PROJECTS, YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { listTopLevelProjects, PERSONAL_PROJECTS, YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 import { parseFrontmatter, BRAIN_ROOT } from "./brain-lib.js";
 import { phoneDigits } from "./local-clock.js";
 import { choice, noul, systemOne, typesafeConfig } from "./typesafe.js";
@@ -39,8 +39,8 @@ export const CALENDAR_ON_DEMAND_MODEL_SPEC = {
 export const CALENDAR_SIGNAL_QUESTION = noul(
   "Could this include a calendar event Yan might attend, or a specific task the message assigns to him?",
   {
-    true: "A plan, meeting, invite, appointment, or a change to when or where something happens. Count maybes, a TBD venue, and a named day with no clock. Or a specific task the message assigns to him. Fill out a named form, answer a direct question asked of him, send an email or file the message says he has to send, or do another concrete task someone told him to do. The action is named in the text. A suggestion, an FYI, or a maybe is not a task.",
-    false: "Nothing for the calendar and no specific task assigned to him. A reaction, thanks, a newsletter, a passcode, homework or Canvas with no meeting, college recruitment, or mail that only informs him. Also a suggestion, a nudge, an optional if-you-want, a question not asked of him, or a task for someone else.",
+    true: "A plan, meeting, invite, appointment, or a change to when or where something happens. Count maybes, a TBD venue, and a named day with no clock. Or a specific task the message assigns to him. Fill out a named form, answer a direct question asked of him, send an email or file the message says he has to send, or do another concrete task someone told him to do. The action is named in the text. A suggestion, an FYI, or a maybe is not a task. A call to @agent or @agentg is not a task for him. A calendar plan in that same message still counts.",
+    false: "Nothing for the calendar and no specific task assigned to him. A reaction, thanks, a newsletter, a passcode, homework or Canvas with no meeting, college recruitment, or mail that only informs him. Also a suggestion, a nudge, an optional if-you-want, a question not asked of him, or a task for someone else. Also a call to @agent or @agentg with no plan he is showing up for. Making a site, a page, or any other job handed to the agent is not his task.",
   }
 );
 
@@ -228,6 +228,15 @@ async function messageIsParentText(message, deps = {}) {
 }
 
 /**
+ * @agent / @agentg already starts a personal-agent turn. This watcher must
+ * not also file that job as Yan's education todo.
+ * @param {unknown} text
+ */
+export function isAgentInstruction(text) {
+  return /(^|\s)@agentg?\b/i.test(String(text || ""));
+}
+
+/**
  * @param {string} source
  * @param {object|null|undefined} message
  */
@@ -240,6 +249,7 @@ export function rowEligible(source, message) {
     const text = String(message.text || "").trim();
     if (!text) return false;
     if (text.toLowerCase().includes(AGENT_SENT_FOOTER.toLowerCase())) return false;
+    if (isAgentInstruction(text)) return false;
     return true;
   }
   if (source === "teams" || source === "teams-channel") {
@@ -248,6 +258,7 @@ export function rowEligible(source, message) {
     const text = String(message.text || "").trim();
     if (!text) return false;
     if (text.toLowerCase().includes(AGENT_SENT_FOOTER.toLowerCase())) return false;
+    if (isAgentInstruction(text)) return false;
     return true;
   }
   const subject = String(message.subject || "").trim();
@@ -410,18 +421,58 @@ function isSkippedTodo(id, props) {
 }
 
 /**
- * Open user-level and College Prep todos, plus deleted todo rows.
+ * Main and hidden projects the todo agent may write into.
+ * Backend stays out. A fixture id stays out.
+ * @param {{ roots?: string[] }} [opts]
+ */
+export async function projectTodoTargets(opts = {}) {
+  const rows = await listTopLevelProjects({ includeBackend: false, roots: opts.roots });
+  return rows
+    .filter((row) => row.props?.fixture !== true && !String(row.id || "").startsWith("_example"))
+    .map((row) => ({
+      id: row.id,
+      name: String(row.props?.name || row.folderName || row.id).replace(/^\.+/, ""),
+      todosDir: join(row.dir, "todos"),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Open user-level and project todos, plus deleted todo rows.
  * Daily briefings and fixtures stay out. Missing folders are empty.
- * @param {{ userTodosDir?: string, collegeTodosDir?: string, deletedDir?: string }} [roots]
+ * A scoped test passes collegeTodosDir or projectDirs and does not scan live projects.
+ * @param {{ userTodosDir?: string, collegeTodosDir?: string, projectDirs?: { id: string, name: string, todosDir: string }[], deletedDir?: string }} [roots]
  */
 export async function loadActionTodoIndex(roots = {}) {
   const userTodosDir = roots.userTodosDir || USER_TODOS_DIR;
-  const collegeTodosDir = roots.collegeTodosDir || COLLEGE_PREP_TODOS_DIR;
   const deletedDir = roots.deletedDir || YAN_EDUCATION_DIR;
-  const todos = [
-    ...(await readOpenTodos(userTodosDir, "user-level")),
-    ...(await readOpenTodos(collegeTodosDir, "project:college-prep")),
-  ];
+  const scoped =
+    roots.userTodosDir != null || roots.collegeTodosDir != null || roots.projectDirs != null;
+  /** @type {{ id: string, name: string, todosDir: string }[]} */
+  let projects = [];
+  if (Array.isArray(roots.projectDirs)) {
+    projects = roots.projectDirs
+      .filter((row) => row && row.id && row.todosDir)
+      .map((row) => ({
+        id: String(row.id),
+        name: String(row.name || row.id),
+        todosDir: String(row.todosDir),
+      }));
+  } else if (roots.collegeTodosDir) {
+    projects = [
+      {
+        id: "college-prep",
+        name: "College Prep",
+        todosDir: roots.collegeTodosDir,
+      },
+    ];
+  } else if (!scoped) {
+    projects = await projectTodoTargets();
+  }
+  const todos = [...(await readOpenTodos(userTodosDir, "user-level"))];
+  for (const project of projects) {
+    todos.push(...(await readOpenTodos(project.todosDir, `project:${project.id}`)));
+  }
   todos.sort((a, b) => {
     const day = String(a.dueDate || "9999").localeCompare(String(b.dueDate || "9999"));
     if (day) return day;
@@ -430,6 +481,11 @@ export async function loadActionTodoIndex(roots = {}) {
   return {
     todos: todos.slice(0, 80),
     deleted: await readDeletedTodoLines(deletedDir),
+    projects: projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      todosDir: project.todosDir,
+    })),
   };
 }
 
@@ -608,8 +664,20 @@ export function buildOnDemandPrompt(pack) {
     }
     parts.push(
       calendarLine,
-      `Todo. Only a specific task the message assigns to him. In a message, someone has to give him the task. In email, the mail has to give him a direct task, such as fill out a form, reply to a direct question asked of him, or send an email about something the mail says he has to email about. The action is named in the text. If you cannot point at that sentence, create no todo. Skip FYI, thanks, newsletters, passcodes, suggestions, nudges, let-me-know-if-you-want, questions not asked of him, tasks for someone else, homework, Canvas, and due dates that already live on the education dashboard. Those stay education todos. Do not invent a reply just because someone wrote. Skip college spam and the weekly EPS college-visit list unless he signed up. Set dueDate as YYYY-MM-DD and dueTime as HH:MM from the message. A deadline clock wins. A named part of the day wins when there is no clock: morning 08:30, after school or by Friday with no clock 15:30, tonight 20:00. ASAP or today with no clock is today at 15:30 when the message is still in the school day, otherwise tomorrow at 08:30. Before a named event means due before that start. Do not leave dueDate or dueTime blank. Do not use midnight. Write a user-level todo at ${USER_TODOS_DIR}/<slug>/todo.json. College application tasks go in ${COLLEGE_PREP_TODOS_DIR}/<slug>/todo.json. Fields are name, description, dueDate, dueTime, done false, createdAt now as ISO, showInDates false. Description is short markdown: who asked, what he has to do, and the link if the message has one. No school tag. No date.json. Do not also add that task to Apple Calendar. If an open todo below has a similar name, update that folder, including a new deadline. Do not mint (2). If it looks like a deleted todo row, skip it.`
+      `Todo. Only a specific task the message assigns to him. In a message, someone has to give him the task. In email, the mail has to give him a direct task, such as fill out a form, reply to a direct question asked of him, or send an email about something the mail says he has to email about. The action is named in the text. If you cannot point at that sentence, create no todo. Skip FYI, thanks, newsletters, passcodes, suggestions, nudges, let-me-know-if-you-want, questions not asked of him, tasks for someone else, homework, Canvas, and due dates that already live on the education dashboard. Those stay education todos. Skip a call to @agent or @agentg, even if it only shows up in the thread. That message is already the agent's job, from Yan or from anyone else. Do not write a todo for it. Making a site or a page counts, including a get well site and a chem site. Do not invent a reply just because someone wrote. Skip college spam and the weekly EPS college-visit list unless he signed up. Set dueDate as YYYY-MM-DD and dueTime as HH:MM from the message. A deadline clock wins. A named part of the day wins when there is no clock: morning 08:30, after school or by Friday with no clock 15:30, tonight 20:00. ASAP or today with no clock is today at 15:30 when the message is still in the school day, otherwise tomorrow at 08:30. Before a named event means due before that start. Do not leave dueDate or dueTime blank. Do not use midnight. If the message is clearly about a project, write the todo in that project's todos folder. A debate task goes on Debate. College application tasks go in ${COLLEGE_PREP_TODOS_DIR}/<slug>/todo.json. Write a user-level todo at ${USER_TODOS_DIR}/<slug>/todo.json only when it matches no project. Do not invent a project. Fields are name, description, dueDate, dueTime, done false, createdAt now as ISO, showInDates false. Description is short markdown: who asked, what he has to do, and the link if the message has one. No school tag. No date.json. Do not also add that task to Apple Calendar. If an open todo below has a similar name, update that folder, including a new deadline. Do not mint (2). If it looks like a deleted todo row, skip it.`
     );
+    const projectLines = (Array.isArray(pack.projects) ? pack.projects : [])
+      .filter((row) => row && row.id && row.todosDir)
+      .map(
+        (row) =>
+          `- ${row.name || row.id} (${row.id}): ${row.todosDir}/<slug>/todo.json`
+      )
+      .join("\n");
+    if (projectLines) {
+      parts.push(
+        `Projects. Write the todo under the matching one. User-level is the fallback:\n${projectLines}`
+      );
+    }
   }
   parts.push(
     "Weekdays in America/Los_Angeles, today first:",
@@ -663,6 +731,7 @@ async function defaultRunJob(job, deps) {
     tombstones: context.tombstones,
     todos: context.todos,
     deletedTodos: context.deletedTodos,
+    projects: context.projects,
     handleNames: context.handleNames,
     skillText,
     calendarOnly: job.calendarOnly === true,
@@ -741,6 +810,7 @@ async function prefetchContext(job, deps) {
   }
   let todos = [];
   let deletedTodos = "";
+  let projects = [];
   if (job.calendarOnly !== true) {
     try {
       const index = deps.loadActionTodoIndex
@@ -748,6 +818,7 @@ async function prefetchContext(job, deps) {
         : await loadActionTodoIndex();
       todos = Array.isArray(index?.todos) ? index.todos : [];
       deletedTodos = String(index?.deleted || "");
+      projects = Array.isArray(index?.projects) ? index.projects : [];
     } catch (err) {
       console.error(
         "[calendar-on-demand] todos",
@@ -766,7 +837,7 @@ async function prefetchContext(job, deps) {
       err instanceof Error ? err.message : err
     );
   }
-  return { thread, events, tombstones, todos, deletedTodos, handleNames };
+  return { thread, events, tombstones, todos, deletedTodos, projects, handleNames };
 }
 
 async function pump() {

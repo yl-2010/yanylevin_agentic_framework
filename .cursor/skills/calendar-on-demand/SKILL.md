@@ -50,6 +50,8 @@ A todo only when the message assigns Yan a specific task, and the text is not fr
 
 He has to be the one who does it. The task has to be in the message, named, and his. If you cannot point at the sentence that tells him what to do, create nothing.
 
+A call to @agent or @agentg is not his task. Yan telling the agent to make a get well site, or Alex telling it to make a chem site, is the agent's job. The same for any other job handed to the agent, including a page. Do not write a todo. This watcher does not run on those chat messages. If one shows up in the thread around a different message, still do not file it.
+
 Messages. Someone gives him the task. "Send me the photo tonight", "fill this out", "email the office the form". A chat that only mentions an idea, a maybe, or something he could do is not a task.
 
 Email. The mail gives him a direct task. Fill out a form. Reply to a direct question asked of him. Send an email about something the mail says he has to email about. Send a named file someone told him to send.
@@ -72,9 +74,13 @@ Set `dueDate` as `YYYY-MM-DD` and `dueTime` as `HH:MM` from the message. Use the
 - ASAP or today, with no clock. Today at `15:30` when the message is still in the school day. Otherwise tomorrow at `08:30`.
 - Before a named event. Due before that start.
 
-Write a user-level todo at `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education/todos/<slug>/todo.json`.
+Write the todo on the project the message is about. A debate email is a Debate todo. College application tasks stay College Prep. User-level is only when it matches no project. Do not invent a project.
 
-College application tasks go in `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/College Prep/todos/<slug>/todo.json`. That is PSAT, counselor, teacher recommendations, and a form that is for the application. A permission slip or a reply is user-level.
+The prompt lists each project and its todos folder. Write `<slug>/todo.json` there.
+
+User-level, when nothing matches, is `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education/todos/<slug>/todo.json`.
+
+College application tasks go in `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/College Prep/todos/<slug>/todo.json`. That is PSAT, counselor, teacher recommendations, and a form that is for the application. A permission slip or a reply that is not about a project stays user-level.
 
 Fields:
 

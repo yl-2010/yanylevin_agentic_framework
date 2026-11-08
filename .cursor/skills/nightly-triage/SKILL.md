@@ -152,6 +152,8 @@ event is already on the day, do not list it as new.
 A task Yan has to do, with no event he is attending, is not a calendar plan.
 The realtime agent files that as a todo. Do not list it here. A text from
 Rajasi Saha or Michael Levin is the exception. Do not list a todo for it.
+A call to @agent or @agentg is not his task either. Do not list a todo for
+making a site, a page, or any other job they handed the agent.
 A calendar plan is still fine when he is showing up.
 A named day is enough even when the venue is TBD. Yan `fromMe` "Saturday 4:30
 location tbd" belongs here. Put the missing venue on the line. Do not move it

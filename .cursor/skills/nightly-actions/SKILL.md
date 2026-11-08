@@ -77,7 +77,7 @@ Skip these even when they name a day. For this list, unsure means skip:
 - The EPS bell schedule
 - "we should hang out" with no day named
 - A similar title already on that local day (duplicate check below). A realtime calendar agent may already have filed it. Leave it.
-- A task he has to do himself is a dashboard todo. Reply, form, send something, finish a task. The realtime agent files those when the message arrives. If an open user-level or College Prep todo already matches, leave it. Do not also put that task on Apple Calendar.
+- A task he has to do himself is a dashboard todo. Reply, form, send something, finish a task. The realtime agent files those when the message arrives. If an open user-level or College Prep todo already matches, leave it. Do not also put that task on Apple Calendar. A call to @agent or @agentg is not that task. Do not file a todo for it. Making a site or a page, including a get well site or a chem site, stays the agent's job.
 - An identical deleted calendar event (similar title and the same start, end, location, and link). A new time, place, or link is a new event.
 - EPS Ventures outings unless Yan has a signup confirmation, a form receipt or he said he signed up. Student News / Weekly News announcements are not enough
 
@@ -158,7 +158,8 @@ Do not git commit; the Node wrapper does that.
   Yan explicitly asking to add it back (then create it and remove that row).
   An iMessage from Rajasi Saha or Michael Levin never becomes a todo. Do not
   create one and do not update one because of that text. A calendar event is
-  still fine when Yan is showing up.
+  still fine when Yan is showing up. A call to @agent or @agentg never becomes
+  a todo either. That work is already the agent's, including a site or a page.
 - **Repo/file work**: only what Yan asked for in the scanned context. Small
   and reversible at night; anything large or destructive gets a journal note
   proposing it instead.

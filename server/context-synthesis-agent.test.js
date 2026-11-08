@@ -218,7 +218,9 @@ describe("nightly phase prompts", () => {
       assert.match(prompt, /Do not write update <gone-path>/);
     }
     assert.match(triage, /Rajasi Saha or Michael Levin is a calendar plan or nothing/);
+    assert.match(triage, /@agent or @agentg is not his task/);
     assert.match(actions, /Rajasi Saha or Michael Levin never becomes a todo/);
+    assert.match(actions, /@agent or @agentg never becomes a todo/);
   });
 
   it("actions is biased to add calendar plans and skip ordinary education dates", () => {
@@ -233,6 +235,7 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /Big dates/);
     assert.match(prompt, /biased to add/);
     assert.match(prompt, /Rajasi Saha or Michael Levin never becomes a todo/);
+    assert.match(prompt, /@agent or @agentg never becomes a todo/);
     assert.match(prompt, /Skip college spam/);
     assert.match(prompt, /weekly EPS college-visit list/);
     assert.match(prompt, /education todos/);

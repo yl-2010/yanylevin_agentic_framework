@@ -14,11 +14,13 @@ import {
   isParentIMessage,
   loadActionTodoIndex,
   loadHandleNameMap,
+  projectTodoTargets,
   parentCalendarYes,
   parentHandleSet,
   pollSchoolMailCalendar,
   resetCalendarOnDemandForTests,
   rowEligible,
+  isAgentInstruction,
   CALENDAR_ON_DEMAND_MODEL_SPEC,
   CALENDAR_SIGNAL_QUESTION,
   CALENDAR_SIGNAL_THRESHOLD,
@@ -38,6 +40,8 @@ describe("calendar signal", () => {
     assert.match(String(CALENDAR_SIGNAL_QUESTION.criteria.true), /A suggestion, an FYI, or a maybe is not a task/);
     assert.match(String(CALENDAR_SIGNAL_QUESTION.criteria.false), /homework or Canvas/);
     assert.match(String(CALENDAR_SIGNAL_QUESTION.criteria.false), /question not asked of him/);
+    assert.match(String(CALENDAR_SIGNAL_QUESTION.criteria.false), /@agent or @agentg/);
+    assert.match(String(CALENDAR_SIGNAL_QUESTION.criteria.true), /@agent or @agentg is not a task/);
     assert.equal(calendarSignalYes({ noul: 0.35 }), true);
     assert.equal(calendarSignalYes({ noul: 0.34 }), false);
     assert.equal(calendarSignalYes({ probability: 0.9 }), true);
@@ -62,6 +66,15 @@ describe("calendar signal", () => {
     assert.equal(rowEligible("imessage", { text: "Saturday at 4", fromMe: true }), true);
     assert.equal(rowEligible("teams", { messageType: "message", text: "meet at 3" }), true);
     assert.equal(rowEligible("apple-mail", { subject: "Dinner", body: "" }), true);
+    assert.equal(isAgentInstruction("@agent make a get well site"), true);
+    assert.equal(isAgentInstruction("From Alex on Teams:\n\n@agentg make a chem site"), true);
+    assert.equal(isAgentInstruction("send the form tonight"), false);
+    assert.equal(rowEligible("teams", { text: "@agent make a get well site" }), false);
+    assert.equal(
+      rowEligible("imessage", { text: "@agentg make a chem site", fromMe: true }),
+      false
+    );
+    assert.equal(rowEligible("teams", { text: "send the form tonight" }), true);
   });
 });
 
@@ -190,6 +203,8 @@ describe("calendar on-demand prompt", () => {
     assert.match(prompt, /specific task the message assigns to him/);
     assert.match(prompt, /direct question asked of him/);
     assert.match(prompt, /If you cannot point at that sentence, create no todo/);
+    assert.match(prompt, /Skip a call to @agent or @agentg/);
+    assert.match(prompt, /get well site and a chem site/);
     assert.match(prompt, /Do not invent a reply/);
     assert.doesNotMatch(prompt, /Only when the action is his/);
     assert.match(prompt, /dueDate/);
@@ -253,6 +268,40 @@ describe("calendar on-demand prompt", () => {
     assert.match(prompt, /calendarOnly true is a text from one of Yan's parents/);
     assert.match(prompt, /Write a user-level todo/);
     assert.match(prompt, /Pick one/);
+    assert.match(prompt, /clearly about a project/);
+    assert.match(prompt, /A debate task goes on Debate/);
+  });
+
+  it("names the project folder when the task belongs there", () => {
+    const prompt = buildOnDemandPrompt({
+      source: "school-mail",
+      messages: [
+        {
+          message: {
+            text: "Record a speech and share it with the captains",
+            subject: "Practice This Week",
+          },
+        },
+      ],
+      thread: [],
+      events: [],
+      tombstones: [],
+      todos: [],
+      projects: [
+        {
+          id: "debate",
+          name: "Debate",
+          todosDir:
+            "$HOME/Documents/Projects/Debate/todos",
+        },
+      ],
+      deletedTodos: "",
+      skillText: "",
+    });
+    assert.match(prompt, /Projects\. Write the todo under the matching one/);
+    assert.match(prompt, /Debate \(debate\)/);
+    assert.match(prompt, /Projects\/Debate\/todos\/<slug>\/todo\.json/);
+    assert.match(prompt, /only when it matches no project/);
   });
 
   it("names the phone from the brain card, not a name in the text", async () => {
@@ -489,8 +538,58 @@ describe("action todo index", () => {
       );
       assert.equal(index.todos[0].parent, "user-level");
       assert.equal(index.todos[1].parent, "project:college-prep");
+      assert.equal(index.projects[0].id, "college-prep");
       assert.match(index.deleted, /Old ask/);
       assert.doesNotMatch(index.deleted, /Mariners/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("includes a project todo and skips a backend project", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "cal-projects-"));
+    const userTodos = join(dir, "user-todos");
+    const debateTodos = join(dir, "Debate", "todos", "record-speech");
+    const roots = join(dir, "roots");
+    const debateRoot = join(roots, "Debate");
+    const backendRoot = join(roots, ".backend");
+    await mkdir(debateTodos, { recursive: true });
+    await mkdir(join(debateRoot), { recursive: true });
+    await mkdir(join(backendRoot), { recursive: true });
+    await writeFile(
+      join(debateTodos, "todo.json"),
+      JSON.stringify({
+        name: "Record and share online-tournament speech video",
+        dueDate: "2026-11-11",
+        dueTime: "15:30",
+        done: false,
+      })
+    );
+    await writeFile(
+      join(debateRoot, "project.json"),
+      JSON.stringify({ name: "Debate", id: "debate", tier: "main" })
+    );
+    await writeFile(
+      join(backendRoot, "project.json"),
+      JSON.stringify({ name: "Backend", id: "backend", tier: "backend" })
+    );
+    try {
+      const targets = await projectTodoTargets({ roots: [roots] });
+      assert.deepEqual(
+        targets.map((row) => row.id),
+        ["debate"]
+      );
+      const index = await loadActionTodoIndex({
+        userTodosDir: userTodos,
+        projectDirs: targets.map((row) => ({
+          ...row,
+          todosDir: row.id === "debate" ? join(dir, "Debate", "todos") : row.todosDir,
+        })),
+        deletedDir: dir,
+      });
+      assert.equal(index.todos.length, 1);
+      assert.equal(index.todos[0].parent, "project:debate");
+      assert.equal(index.projects[0].name, "Debate");
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
