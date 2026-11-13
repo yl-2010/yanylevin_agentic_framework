@@ -431,17 +431,9 @@ struct EducationView: View {
     }
 
     private func debateCasePair(_ debateCase: EducationCase) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 6) {
             debateCaseSideRow(debateCase, side: "aff", label: "Aff")
-            Rectangle()
-                .fill(YLTheme.fg(colorScheme).opacity(0.12))
-                .frame(height: 1)
             debateCaseSideRow(debateCase, side: "neg", label: "Neg")
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(YLTheme.fg(colorScheme).opacity(0.12), lineWidth: 1)
         }
     }
 
@@ -457,8 +449,9 @@ struct EducationView: View {
                     .foregroundStyle(YLTheme.muted(colorScheme))
             }
             .padding(.vertical, 10)
-            .padding(.horizontal, 8)
-            .contentShape(Rectangle())
+            .padding(.horizontal, 14)
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .ylGlassRounded(cornerRadius: 14)
         }
         .buttonStyle(.plain)
         .ylHapticNavigation()
@@ -816,8 +809,11 @@ struct CaseDetailView: View {
                    !resolution.isEmpty {
                     Text("\(sideKey == "neg" ? "I negate" : "I affirm") \(resolution)")
                         .font(.subheadline)
-                        .foregroundStyle(YLTheme.muted(colorScheme))
+                        .foregroundStyle(YLTheme.fg(colorScheme))
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .glassPanel(cornerRadius: 18)
                 }
                 if let speech = bodySide, speech.hasBody {
                     if isWide, hasBlockfile {
@@ -862,18 +858,12 @@ struct CaseDetailView: View {
         } label: {
             Text(label)
                 .font(.caption.weight(.bold))
-                .foregroundStyle(
-                    on
-                        ? YLTheme.accent(colorScheme, palette: palette)
-                        : YLTheme.muted(colorScheme)
-                )
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    on
-                        ? YLTheme.accent(colorScheme, palette: palette).opacity(0.16)
-                        : YLTheme.fg(colorScheme).opacity(0.06),
-                    in: Capsule()
+                .foregroundStyle(on ? Color.white : YLTheme.muted(colorScheme))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 9)
+                .contentShape(Capsule())
+                .ylGlassCapsule(
+                    tint: on ? YLTheme.accent(colorScheme, palette: palette).opacity(0.7) : nil
                 )
         }
         .buttonStyle(.plain)

@@ -2,18 +2,17 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   LIFE_STATE_INTERVAL_MS,
-  LIFE_STATE_MODEL_SPEC,
+  LIFE_STATE_MODEL,
   buildLifeStatePrompt,
-  lifeStateModelSpec,
+  lifeStateModelId,
   msUntilNextLifeStateTick,
+  parseLifeStateGuessText,
 } from "./life-state-agent.js";
 
 describe("life-state model", () => {
-  it("uses composer-2.5 with Fast off", () => {
-    assert.equal(LIFE_STATE_MODEL_SPEC.id, "composer-2.5");
-    const spec = lifeStateModelSpec();
-    assert.equal(spec.id, "composer-2.5");
-    assert.deepEqual(spec.params, [{ id: "fast", value: "false" }]);
+  it("uses local gpt-oss", () => {
+    assert.equal(LIFE_STATE_MODEL, "openai/gpt-oss-20b");
+    assert.equal(lifeStateModelId(), "openai/gpt-oss-20b");
   });
 });
 
@@ -37,18 +36,18 @@ describe("life-state tick alignment", () => {
 });
 
 describe("life-state prompt", () => {
-  it("points at the skill, snapshot, and append CLI", () => {
-    const prompt = buildLifeStatePrompt({
-      dateKey: "2026-09-11",
-      timezone: "America/Los_Angeles",
-      snapshotPath: "/tmp/yanylevin-life-state-snapshot.json",
-    });
-    assert.match(prompt, /life-state skill/);
-    assert.match(prompt, /Never spawn a Cursor cloud agent/);
-    assert.match(prompt, /yanylevin-life-state-snapshot\.json/);
-    assert.match(prompt, /life-state\.js append/);
-    assert.match(prompt, /Do not git commit/);
-    assert.match(prompt, /Do not open Mail/);
-    assert.doesNotMatch(prompt, /Health sleep hours are real/);
+  it("tells gpt-oss not to copy the last sample or invent a drive", () => {
+    const prompt = buildLifeStatePrompt();
+    assert.match(prompt, /one JSON object only/);
+    assert.match(prompt, /gpt-oss-20b/);
+    assert.match(prompt, /Screen sessions in this snapshot win/);
+    assert.match(prompt, /Do not copy the previous activity/);
+    assert.match(prompt, /Do not pick driving/);
+  });
+
+  it("parses the first JSON object", () => {
+    const parsed = parseLifeStateGuessText('sure\n{"kind":"at_home","activity":"home"}\n');
+    assert.equal(parsed.kind, "at_home");
+    assert.equal(parseLifeStateGuessText("no json"), null);
   });
 });

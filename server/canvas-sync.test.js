@@ -287,13 +287,9 @@ describe("nextCanvasSyncRetryAt", () => {
 });
 
 describe("canvas sync model", () => {
-  it("uses grok-4.7 high with fast off", () => {
-    assert.equal(CANVAS_SYNC_MODEL_SPEC.id, "grok-4.7");
-    assert.deepEqual(CANVAS_SYNC_MODEL_SPEC.params, [
-      { id: "context", value: "256k" },
-      { id: "reasoning_effort", value: "high" },
-      { id: "fast", value: "false" },
-    ]);
+  it("uses composer-2.5 with Fast off", () => {
+    assert.equal(CANVAS_SYNC_MODEL_SPEC.id, "composer-2.5");
+    assert.deepEqual(CANVAS_SYNC_MODEL_SPEC.params, [{ id: "fast", value: "false" }]);
   });
 });
 
@@ -627,7 +623,7 @@ describe("buildCanvasNewAssignmentPrompt", () => {
         },
       ],
     });
-    assert.match(prompt, /new assignment pass/);
+    assert.match(prompt, /new-assignment\.md/);
     assert.match(prompt, /40440347/);
     assert.match(prompt, /already created the todo/);
     assert.match(prompt, /Do not open snapshot\.json/);

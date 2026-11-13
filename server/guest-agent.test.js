@@ -716,7 +716,7 @@ describe("evaluateGuestMention", () => {
       statePath,
     });
     assert.equal(groupPrasham.action, "start");
-    assert.equal(groupPrasham.caller.model.id, "grok-4.7");
+    assert.equal(groupPrasham.caller.model.id, "composer-2.5");
     assert.equal(groupPrasham.caller.audience.kind, "group");
     assert.equal(groupPrasham.caller.audience.threadLabel, "Class of 2028");
     assert.equal(groupPrasham.caller.audience.gradeWide, true);
@@ -1010,7 +1010,7 @@ describe("evaluateGuestMention", () => {
       statePath,
     });
     assert.equal(dm.action, "start");
-    assert.equal(dm.caller.model.id, "grok-4.7");
+    assert.equal(dm.caller.model.id, "composer-2.5");
     assert.equal(dm.caller.workspace, undefined);
   });
 

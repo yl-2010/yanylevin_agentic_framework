@@ -353,6 +353,7 @@
     return (
       el.classList.contains("edu-panel") ||
       el.classList.contains("edu-file-tile") ||
+      el.classList.contains("edu-case-side") ||
       el.classList.contains("dash-login") ||
       el.classList.contains("dash-entry") ||
       el.classList.contains("dash-agent") ||
@@ -365,7 +366,7 @@
   }
 
   const STATIC_BOX_SEL =
-    ".edu-panel.lg-static, .edu-file-tile.lg-static, .dash-login.lg-static, .dash-entry.lg-static, .dash-agent.lg-static, .yan-chat-widget.lg-static, .yan-chat-map-ios.lg-static, .yan-chat-bubble.lg-static, .sheet.lg-static, .glass-pill.lg-static";
+    ".edu-panel.lg-static, .edu-file-tile.lg-static, .edu-case-side.lg-static, .dash-login.lg-static, .dash-entry.lg-static, .dash-agent.lg-static, .yan-chat-widget.lg-static, .yan-chat-map-ios.lg-static, .yan-chat-bubble.lg-static, .sheet.lg-static, .glass-pill.lg-static";
 
   const STATIC_BOX_MAG_SCALE = 0.6;
 
@@ -1908,7 +1909,7 @@ void main() {
       .querySelectorAll(".stat-tile")
       .forEach((el) => bindMagnetic(el, 0.28));
     document
-      .querySelectorAll(".edu-vote")
+      .querySelectorAll(".edu-vote, .edu-filter")
       .forEach((el) => bindMagnetic(el, 0.28));
     document.querySelectorAll(".yan-chat-pill").forEach((el) => {
       bindMagnetic(el, 0.18);

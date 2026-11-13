@@ -1,17 +1,9 @@
 /**
  * One-shot thread titles for Personal Agent chats.
- * Isolated Cursor agent — never injected into the live chat thread.
+ * Local gpt-oss. Never injected into the live chat thread.
  */
 
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import {
-  createLocalCursorAgent,
-  disposeCursorAgent,
-  reloadCursorApiKeyFromEnv,
-  requireCursorApiKey,
-} from "./cursor-sdk-auth.js";
-import { logSdkResult, personFromEmail } from "./usage-log.js";
+import { chatCompletions } from "./lmstudio.js";
 import {
   applyChatTitleStarter,
   CHAT_GUEST_WRAP_RE,
@@ -24,13 +16,8 @@ import {
   withScheduledTitlePrefix,
 } from "./education-chat-history.js";
 
-const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-
 const TITLE_TIMEOUT_MS = 40_000;
-export const TITLE_MODEL = {
-  id: "composer-2.5",
-  params: [{ id: "fast", value: "true" }],
-};
+export const TITLE_MODEL = "openai/gpt-oss-20b";
 
 /** Shared with the 01:30 full-transcript refresh job. */
 export const CHAT_TITLE_STYLE = `Keyword-style chat list title, not a sentence.
@@ -263,58 +250,21 @@ export async function generateAndStoreChatTitle(opts) {
  * @param {string} [email]
  * @returns {Promise<string>}
  */
-async function generateTitleWithAgent(firstPrompt, email) {
+async function generateTitleWithAgent(firstPrompt) {
   const seed = String(firstPrompt || "").trim();
   if (!seed) return "";
-
-  await reloadCursorApiKeyFromEnv();
-  requireCursorApiKey();
-
-  const agent = await createLocalCursorAgent({
-    model: TITLE_MODEL,
-    cwd: REPO_ROOT,
-  });
-  try {
-    const run = await Promise.race([
-      agent.send(`${TITLE_PROMPT}${seed.slice(0, 800)}`),
-      new Promise((_, reject) => {
-        setTimeout(
-          () => reject(new Error("title agent timed out")),
-          TITLE_TIMEOUT_MS
-        );
-      }),
-    ]);
-    let content = "";
-    if (run && typeof run.stream === "function") {
-      /** @type {string[]} */
-      const chunks = [];
-      for await (const event of run.stream()) {
-        if (event?.type === "assistant" && event.message?.content) {
-          for (const block of event.message.content) {
-            if (block?.type === "text" && typeof block.text === "string") {
-              chunks.push(block.text);
-            }
-          }
-        }
-      }
-      content = chunks.join("");
-    }
-    let result = null;
-    if (run && typeof run.wait === "function") {
-      result = await run.wait();
-    }
-    if (!content && result && typeof result.result === "string") {
-      content = result.result;
-    }
-    await logSdkResult({
-      person: personFromEmail(email),
-      kind: "chat-title",
-      prompt: seed,
-      model: TITLE_MODEL,
-      result,
-    }).catch((err) => console.error("[usage] title log failed", err));
-    return titleFromAgentReply(content);
-  } finally {
-    await disposeCursorAgent(agent);
-  }
+  const res = await Promise.race([
+    chatCompletions({
+      messages: [
+        { role: "system", content: TITLE_PROMPT },
+        { role: "user", content: seed.slice(0, 800) },
+      ],
+      temperature: 0.2,
+      maxTokens: 40,
+    }),
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("title timed out")), TITLE_TIMEOUT_MS);
+    }),
+  ]);
+  return titleFromAgentReply(res.content);
 }

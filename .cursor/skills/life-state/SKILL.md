@@ -4,7 +4,7 @@ description: >-
   Guess what Yan is doing right now (showering, sleeping, in class, driving)
   from Home, GPS, schedule, Calendar, Screen Time, iMessage, and gym. Also
   read the 5-minute life-state log. Yan only. Use for "what am I doing",
-  "where am I in my day", or the scheduled Composer tick.
+  "where am I in my day", or the scheduled gpt-oss tick.
 disable-model-invocation: true
 ---
 
@@ -51,9 +51,7 @@ as a context source. Prefetch is `/tmp/yanylevin-context-life-state.json`
 kinds, do not dump JSONL into identity or places.md. Indoor activity (rooms,
 apps, class periods, gym sets, shower, sleep) lives only in this log.
 Location `places.md` is the address. Do not write samples from the 01:00 /
-02:30 / 03:00 jobs. The 5-minute Composer tick is the live writer. That tick
-starts on the clock (:00, :05, :10, …). A slow run does not slide the next
-start.
+02:30 / 03:00 jobs. The **5-minute tick** is the live writer. Node calls local gpt-oss (`openai/gpt-oss-20b` in LM Studio). That tick starts on the clock (:00, :05, :10, …). A slow run does not slide the next start. It does not use the Cursor SDK.
 
 The **01:30 life-state cleanup** job is the other writer. It rewrites
 yesterday's samples in place when Screen Time, iMessage, Teams, Calendar,
@@ -62,17 +60,7 @@ location, or neighbors prove a tick was wrong. Follow
 
 ## Scheduled tick
 
-You are a one-shot local Composer job. This tick started on a 5-minute
-clock mark. Snapshot is already on disk. Infer. Write one sample. Stop.
-
-1. Read this skill, `schema.md`, and `heuristics.md`.
-2. Read `/tmp/yanylevin-life-state-snapshot.json`. Shortcut POSTs live under `phoneSignals.recent` and the by-kind keys. They are extra. Missing them is normal (locked phone). A POST does not write a sample. This tick does.
-3. Read last samples from the snapshot `previous` array (or `node server/life-state.js recent 3`).
-4. Pick `kind`, `activity`, `place`, `placeLabel`, `confidence`, `evidence`, optional `notes`. Set `since` / `continued` from the last sample.
-5. Write `/tmp/yanylevin-life-state-guess.json` with those fields only (no `at` / `local` / `dateKey` unless you have them; the CLI fills clock fields).
-6. Run `node server/life-state.js append /tmp/yanylevin-life-state-guess.json`. If it rejects, fix once and retry. Then stop.
-
-Do not git commit. Do not edit any other file. Do not wander the repo.
+You are not this writer. The 5-minute job is local gpt-oss, started by Node. Do not start a Composer job to append a live sample.
 
 ## Evidence tokens
 

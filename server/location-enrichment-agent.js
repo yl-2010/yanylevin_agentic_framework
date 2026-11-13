@@ -1,5 +1,5 @@
 /**
- * Nightly Grok 4.7 xhigh pass: enrich places.md / trips.md with named
+ * Nightly Composer 2.5 pass: enrich places.md / trips.md with named
  * businesses/buildings and trip mode. Indoor activity stays in life-state.
  * Yan only. Chained after the 01:00 location compose. Does not git-commit
  * location files.
@@ -41,12 +41,8 @@ const COMPOSE_WAIT_MS = 15 * 60 * 1000;
 const COMPOSE_POLL_MS = 5000;
 
 export const LOCATION_ENRICHMENT_MODEL_SPEC = {
-  id: process.env.CURSOR_LOCATION_ENRICHMENT_MODEL || "grok-4.7",
-  params: [
-    { id: "context", value: "256k" },
-    { id: "reasoning_effort", value: "xhigh" },
-    { id: "fast", value: "false" },
-  ],
+  id: process.env.CURSOR_LOCATION_ENRICHMENT_MODEL || "composer-2.5",
+  params: [{ id: "fast", value: "false" }],
 };
 
 /** @type {Promise<unknown>|null} */

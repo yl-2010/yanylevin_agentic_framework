@@ -13,7 +13,7 @@ disable-model-invocation: true
 
 You run **after** the location-history compose job has written `places.md` and `trips.md`. Do not re-cluster GPS. Read those markdown files (and `state.json`, live `.location.json`, raw JSONL only if a stay is unnamed) and name the place and the trip mode. Do not write what Yan was doing inside the place.
 
-Model: **grok-4.7 xhigh** (reasoning_effort=xhigh, fast=false, context=256k).
+Model: **composer-2.5** (fast=false).
 
 Places and trips are **two equal passes**. A good `places.md` does not finish the job. If `trips.md` still says generic `car`, you are not done.
 

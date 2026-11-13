@@ -907,9 +907,11 @@ export async function evaluateGuestMention(opts) {
       handle,
       inContacts,
       audience: describeGuestAudience(platform, message),
-      model: imessageBoost
-        ? copyModelSpec(GUEST_GROK_SPEC)
-        : guestModelSpec(Boolean(slot.useGrok), slug, displayName),
+      model: platform === "teams"
+        ? copyModelSpec(GUEST_COMPOSER_SPEC)
+        : imessageBoost
+          ? copyModelSpec(GUEST_GROK_SPEC)
+          : guestModelSpec(Boolean(slot.useGrok), slug, displayName),
       ...(imessageBoost ? { forceGrok: true } : {}),
     },
   };

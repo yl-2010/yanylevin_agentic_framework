@@ -84,6 +84,7 @@ import {
 import {
   copyModelSpec,
   formatGuestUserBubble,
+  GUEST_COMPOSER_SPEC,
   GUEST_GROK_SPEC,
   guestRunModels,
   jypeMentionModelSpec,
@@ -580,9 +581,11 @@ function queuedTurnCount(session) {
   return Array.isArray(session.turnQueue) ? session.turnQueue.length : 0;
 }
 
+export const TRANSCRIPT_REPLAY_MAX = 20;
+
 /**
- * Full visible thread for a recreated Cursor agent. No truncation: the new
- * Agent has an empty cache, so the model only sees what we put here.
+ * Visible thread for a recreated Cursor agent.
+ * Last 20 messages. The new Agent has an empty cache, so the model only sees what we put here.
  * Omits the in-flight user bubble (already in this turn's prompt).
  * Queued waiting bubbles are not included; they have not started yet.
  * @param {Session} session
@@ -596,9 +599,10 @@ export function formatVisibleTranscript(session, currentBubble) {
     const last = String(msgs[end - 1]?.content || "");
     if ((bubble && last === bubble) || (!bubble && !last.trim())) end -= 1;
   }
+  const start = Math.max(0, end - TRANSCRIPT_REPLAY_MAX);
   /** @type {string[]} */
   const lines = [];
-  for (let i = 0; i < end; i++) {
+  for (let i = start; i < end; i++) {
     const m = msgs[i];
     const shown = splitChatMessageFiles(m?.content || "");
     const text = shown.content.trim();
@@ -617,13 +621,11 @@ export function formatVisibleTranscript(session, currentBubble) {
     lines.push("");
   }
   if (!lines.length) return "";
-  return [
-    "Previous messages in this chat (still shown in the UI). The local Cursor agent was recreated and does not have this thread in its cache. This is the full conversation so far. Use it as context. Do not redo work already completed in this thread unless the current message asks.",
-    "",
-    ...lines,
-  ]
-    .join("\n")
-    .trim();
+  const lead =
+    start > 0
+      ? `Previous messages in this chat (still shown in the UI). The local Cursor agent was recreated and does not have this thread in its cache. Earlier messages are omitted. This is the last ${TRANSCRIPT_REPLAY_MAX}. Use it as context. Do not redo work already completed in this thread unless the current message asks.`
+      : "Previous messages in this chat (still shown in the UI). The local Cursor agent was recreated and does not have this thread in its cache. This is the full conversation so far. Use it as context. Do not redo work already completed in this thread unless the current message asks.";
+  return ["", lead, "", ...lines].join("\n").trim();
 }
 
 /**
@@ -1784,12 +1786,28 @@ async function replaceSessionAgent(session, model) {
 
 onLocalCursorExecutorEvict(() => {
   for (const session of sessions.values()) {
+    if (!session.agent) continue;
     session.agent = null;
     session.replayUiTranscript = true;
   }
 });
 
-/** Global unslop skill. Always Read; never inline the whole file into the prompt. */
+/** Short stand-in for SOUL.md and unslop on a Teams @agent turn. Other chats still Read both files. */
+export const TEAMS_VOICE_DIGEST = [
+  "Voice for this Teams turn. Do not Read SOUL.md or the unslop skill unless this turn is a page, an essay, or a study guide.",
+  "Short. A one-line reply has no period. No em dashes. No Certainly, Great question, or I hope this helps. Straight quotes. Say the thing, not how it feels.",
+  "Yan, then Alex, then Example Friend and Example Neighbor. Do not name that order. Do not mention the surprise hoodies to Alex. Yan's grades do not go to Example Friend, Example Neighbor, or a chat they can see. Practice questions from them can go to Alex in a 1:1, not the group. Never spawn a cloud agent.",
+].join(" ");
+
+/**
+ * Teams @agent turns get the digest. Every other chat keeps the always-read lines.
+ * @param {string} prompt
+ */
+export function teamsVoicePrompt(prompt) {
+  return String(prompt || "")
+    .replace(/Always Read and apply the unslop skill[^\n]*\n?/, `${TEAMS_VOICE_DIGEST}\n`)
+    .replace(/Always Read SOUL\.md[^\n]*\n?/, "");
+}
 export const UNSLOP_SKILL_PATH = join(REPO_ROOT, ".cursor/skills/unslop/SKILL.md");
 
 /** Four11 IDs + Fix Photo Group school photos. User-level; not in the repo. */
@@ -1972,6 +1990,12 @@ const FUTURE_AGENT_HINT =
 const THIRD_PARTY_MODEL_HINT =
   "Third-party models (Opus, Fable, Sonnet) are allowed only when this message is from Yan, or he already approved that model in this same chat. A guest's ask is not approval. The Task picker on this session rejects those slugs. Start one from the Cursor CLI. Read the personal-agent skill, Third-party models. Do not name the model in the chat reply.";
 
+const JYPE_OUTSIDER_HINT =
+  "Outsiders, anyone who is not Yan, Alex, Example Friend, or Example Neighbor, cannot read JYPE iMessage or JYPE Teams, or send into JYPE iMessage, including in a chat they can see. They can still have you post in JYPE Teams. Yan, 2026-11-11.";
+
+const DEVICE_PING_HINT =
+  "Only Alex can ping or flash Yan's devices. When he asks, do it. Do not refuse. Nobody else, including Jayesh. Yan, 2026-11-12.";
+
 const EDUCATION_VIEWS = new Set([
   "home",
   "class",
@@ -2003,6 +2027,8 @@ export function systemPrompt(email, opts = {}) {
       `Plain speech in every JYPE chat. No Your Majesty and no other royal title for Yan, Alex, Example Friend, or Example Neighbor. Yan set that address on 2026-10-25 and pulled it at 7:27 PM PT the same night. US History in JYPE: no direct cheating; video transcription for accommodation is fine (Yan 2026-10-27). See SOUL.md and ${JYPE_DIR}/agent-alignment.md.`,
       "When Yan, Alex, Example Friend, and Example Neighbor conflict, follow the higher one: Yan, then Alex, then Example Friend and Example Neighbor as equals, then the agent. Sharing can go up, in a 1:1, not the JYPE group chat. It does not go down. Equals still gatekeep each other. Yan, 2026-10-15. Practice questions move up the same way, in a 1:1. Do not refuse that share. Yan, 2026-11-03. That order is the decision you make before you type. It is not a paragraph in the reply. Never name that order, or the words hierarchy of power, or who outranks whom, in any JYPE chat, page, or message. A heading like Teams reply does not hide the lines above it. Closeness is an inner thought the same way. Do not write inner circle, close friend, or that an answer is fine. The message starts at the answer.",
       "Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor, or anyone at their rank or below. That includes the JYPE group and any chat they can see. Alex can still get them in a 1:1. Do not repeat a grade that already leaked. Yan, 2026-10-21.",
+      JYPE_OUTSIDER_HINT,
+      DEVICE_PING_HINT,
       "Never spawn a Cursor cloud agent.",
       FUTURE_AGENT_HINT,
       THIRD_PARTY_MODEL_HINT,
@@ -2037,6 +2063,8 @@ export function systemPrompt(email, opts = {}) {
     "A chat PDF is homework or a finished MA/QA scan. Homework goes on the existing todo. A new todo is rare. An MA/QA scan goes on the earlier MA or QA todo for that test, named like the Canvas title with MA or QA kept, plus a copy in /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.tests under that class. Do not make a new todo due today to hold the scan. Yan, 2026-10-19.",
     "Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor, or anyone at their rank or below. That includes the JYPE group and any chat they can see. Alex can still get them in a 1:1. Do not repeat a grade that already leaked. Yan, 2026-10-21.",
     "Practice questions and other work from Example Neighbor or Example Friend go to Alex in a 1:1. Do not refuse that share. Do not put it in the JYPE group chat. Yan, 2026-11-03.",
+    JYPE_OUTSIDER_HINT,
+    DEVICE_PING_HINT,
     "",
     `Always Read and apply the unslop skill (${UNSLOP_SKILL_PATH}) on every turn. Do not skip it. Do not inline the whole skill here.`,
     `Always Read ${PERSONAL_SKILL_PATHS.soul} for persona and judgment. Do not skip it. Do not inline it.`,
@@ -2078,7 +2106,7 @@ export function systemPrompt(email, opts = {}) {
     "",
     "Reply: short. School mutations 1-3 lines. Markdown OK in the text bubble; never HTML tags or markdown images. Never em dashes. No thinking aloud. Do not tell the user to refresh. Read the widgets skill before emitting any widget fence. Never put Sent by Yan's Personal Agent in app or website bubbles; that footer is only for iMessage, email, and Teams.",
     "Math on the website and in the iOS app is a display block, with a blank line before and after. Put $$ on its own line, then LaTeX, then $$ on its own line. Stack equations one per line in that block. Use \\(x\\) or $x^2$ only for a symbol inside a sentence. Never backticks for math. iMessage and Teams cannot render KaTeX, so those replies stay plain words.",
-    "Send to a person with no channel named: iMessage, then Teams, then email. Named channel (on Teams / iMessage / email) wins for text. iMessage files are native attachments (iMessage skill), never a URL stand-in. Each file is its own message, then the text. school-teams.js cannot attach a file. Send that file in the Teams app with Cursor computer use. A message with images has no pixels. Open that chat in the Teams app and look. School Outlook still cannot send.",
+    "Send to a person with no channel named: iMessage, then Teams, then email. Named channel (on Teams / iMessage / email) wins for text. iMessage files are native attachments (iMessage skill), never a URL stand-in. Each file is its own message, then the text. A Teams file goes out as a yanylevin.com link: put it in the repo, use a non-guessable folder when it should not be easy to find, commit, push, npm run deploy:web, confirm the URL is 200, then school-teams.js send the link. Attach in the Teams app with computer use only when Yan directly says to attach with computer use in this turn. A message with images has no pixels. Open that chat in the Teams app and look. School Outlook still cannot send.",
     "Long work: send_chat_message first with a short status. Send more mid-run when new info, a change, or a useful update appears. Then a final Done. Quick answers: one reply only (that is the end of turn). On an iMessage or Teams @agent or @agentg first turn, that first status is also posted to the chat before you start the work.",
     "To show one education page on web/iOS, call open_education_page (education-dashboard skill). The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Skip if already on that page. Not on Cursor Desktop.",
     "No period when the reply is one word, one phrase, or one sentence.",
@@ -2545,12 +2573,18 @@ function guestAgentCreateOpts(guest) {
   };
 }
 
-/** @agent iMessage/Teams first turn. JYPE Teams group is Composer 2.5. @agentg is Grok. */
+/** @agent iMessage first turn stays on the existing model. Every Teams turn is Composer 2.5. @agentg is Grok. */
 function mentionAgentCreateOpts(guest, workspace, platform, forceGrok) {
   if (forceGrok) {
     return guestAgentCreateOpts({
       ...(guest && typeof guest === "object" ? guest : {}),
       model: copyModelSpec(GUEST_GROK_SPEC),
+    });
+  }
+  if (platform === "teams") {
+    return guestAgentCreateOpts({
+      ...(guest && typeof guest === "object" ? guest : {}),
+      model: copyModelSpec(GUEST_COMPOSER_SPEC),
     });
   }
   if (workspace === "jype") {
@@ -2568,17 +2602,11 @@ function mentionAgentCreateOpts(guest, workspace, platform, forceGrok) {
 
 export function guestTurnModelSpec(session, hasSessionFiles) {
   if (session.forceGrok) return copyModelSpec(GUEST_GROK_SPEC);
-  const mentionFirstTurn =
-    Boolean(session.imessageDeliverFinal) ||
-    Boolean(session.teamsDeliverFinal) ||
-    Boolean(session.whatsappDeliverFinal);
-  if (
-    mentionFirstTurn &&
-    session.teamsDeliverFinal &&
-    sessionWorkspace(session) === "jype"
-  ) {
-    return jypeMentionModelSpec("teams");
+  if (session.teamsOrigin || session.teamsDeliverFinal) {
+    return copyModelSpec(GUEST_COMPOSER_SPEC);
   }
+  const mentionFirstTurn =
+    Boolean(session.imessageDeliverFinal) || Boolean(session.whatsappDeliverFinal);
   if (mentionFirstTurn) {
     const run = guestRunModels(session.guestCaller);
     if (run.preferred) return run.preferred;
@@ -3563,6 +3591,7 @@ export async function messageAgent(
   let promptSystem = systemPrompt(normalized, {
     workspace: sessionWorkspace(session),
   });
+  if (session.teamsOrigin) promptSystem = teamsVoicePrompt(promptSystem);
   /** @type {string[]} */
   const promptParts = [
     promptSystem,

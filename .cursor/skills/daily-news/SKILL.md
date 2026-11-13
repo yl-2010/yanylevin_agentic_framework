@@ -18,7 +18,7 @@ Yan-only (`education/you@example.com/`). Local Cursor agents, never cloud.
 
 | Phase | Model | Skill | Output |
 |-------|-------|-------|--------|
-| 1 news | grok-4.7 xhigh | this file (news sections only) | `/tmp/yanylevin-daily-briefing-news-draft-<dateKey>.json` |
+| 1 news | grok-4.7 high | this file (news sections only) | `/tmp/yanylevin-daily-briefing-news-draft-<dateKey>.json` |
 | 2 agent-recap | grok-4.7 high | agent-recap | `/tmp/yanylevin-daily-briefing-agent-recap-<dateKey>.json` |
 | 3 unslop | composer-2.5 | unslop + assemble | `todo.json`, `taste.md` |
 

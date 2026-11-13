@@ -14,7 +14,7 @@ Use Cursor's built-in computer use. `server/computer-use.js` is off. Do not run 
 
 If that work runs as its own step, the model is inherit. That is the same model as this turn, Grok or Composer, whichever this chat already has. Do not pick a different one.
 
-Use the skill for that app first. Teams, iMessage, Mail, OneNote, Calendar, Home, Canvas, and the other personal skills already have a command. Computer use is for the part that command cannot do. A Teams file the CLI cannot attach, a Teams image with no pixels, an OneNote change the CLI cannot make, an existing Word, Excel, or PowerPoint file. Do the rest with the skill.
+Use the skill for that app first. Teams, iMessage, Mail, OneNote, Calendar, Home, Canvas, and the other personal skills already have a command. Computer use is for the part that command cannot do. A Teams image with no pixels, an OneNote change the CLI cannot make, an existing Word, Excel, or PowerPoint file. A Teams file goes out as a yanylevin.com link. Attach it in the Teams app only when Yan directly says to attach with computer use in this turn. Do the rest with the skill.
 
 Stay on one app in the background. The real cursor stays where it is. Read the accessibility tree, then act on the element. Set the value when the line says settable. Use screenshot pixels when the tree has no control.
 

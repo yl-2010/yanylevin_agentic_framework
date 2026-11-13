@@ -350,6 +350,7 @@ html.lg-chrome .edu-file-tile {
 
 html.lg-chrome .edu-panel.lg-static,
 html.lg-chrome .edu-file-tile.lg-static,
+html.lg-chrome .edu-case-side.lg-static,
 html.lg-chrome .yan-chat-widget.lg-static,
 html.lg-chrome .yan-chat-map-ios.lg-static,
 html.lg-chrome .yan-chat-bubble.lg-static {
@@ -358,6 +359,7 @@ html.lg-chrome .yan-chat-bubble.lg-static {
 
 html.lg-chrome .edu-panel.lg-static:hover,
 html.lg-chrome .edu-file-tile.lg-static:hover,
+html.lg-chrome .edu-case-side.lg-static:hover,
 html.lg-chrome .yan-chat-widget.lg-static:hover,
 html.lg-chrome .yan-chat-map-ios.lg-static:hover,
 html.lg-chrome .yan-chat-bubble.lg-static:hover {
@@ -366,11 +368,13 @@ html.lg-chrome .yan-chat-bubble.lg-static:hover {
 
 html.lg-chrome .edu-panel.lg-static.lg-refraction::after,
 html.lg-chrome .edu-file-tile.lg-static.lg-refraction::after,
+html.lg-chrome .edu-case-side.lg-static.lg-refraction::after,
 html.lg-chrome .yan-chat-widget.lg-static.lg-refraction::after,
 html.lg-chrome .yan-chat-map-ios.lg-static.lg-refraction::after,
 html.lg-chrome .yan-chat-bubble.lg-static.lg-refraction::after,
 html.lg-chrome[data-resolved-theme="dark"] .edu-panel.lg-static.lg-refraction::after,
 html.lg-chrome[data-resolved-theme="dark"] .edu-file-tile.lg-static.lg-refraction::after,
+html.lg-chrome[data-resolved-theme="dark"] .edu-case-side.lg-static.lg-refraction::after,
 html.lg-chrome[data-resolved-theme="dark"] .yan-chat-widget.lg-static.lg-refraction::after,
 html.lg-chrome[data-resolved-theme="dark"] .yan-chat-map-ios.lg-static.lg-refraction::after,
 html.lg-chrome[data-resolved-theme="dark"] .yan-chat-bubble.lg-static.lg-refraction::after {
@@ -385,6 +389,7 @@ html.lg-chrome[data-resolved-theme="dark"] .yan-chat-bubble.lg-static.lg-refract
 @media (prefers-color-scheme: dark) {
   html.lg-chrome:not([data-resolved-theme="light"]) .edu-panel.lg-static.lg-refraction::after,
   html.lg-chrome:not([data-resolved-theme="light"]) .edu-file-tile.lg-static.lg-refraction::after,
+  html.lg-chrome:not([data-resolved-theme="light"]) .edu-case-side.lg-static.lg-refraction::after,
   html.lg-chrome:not([data-resolved-theme="light"]) .yan-chat-widget.lg-static.lg-refraction::after,
   html.lg-chrome:not([data-resolved-theme="light"]) .yan-chat-map-ios.lg-static.lg-refraction::after,
   html.lg-chrome:not([data-resolved-theme="light"]) .yan-chat-bubble.lg-static.lg-refraction::after {
@@ -431,6 +436,7 @@ a {
 .yan-chat-send::before,
 .edu-panel::before,
 .edu-file-tile::before,
+.edu-case-side::before,
 .yan-chat-widget::before,
 .yan-chat-map-ios::before,
 .yan-chat-bubble::before,
@@ -451,6 +457,7 @@ a {
 .yan-chat-send.lg-refraction::after,
 .edu-panel.lg-refraction::after,
 .edu-file-tile.lg-refraction::after,
+.edu-case-side.lg-refraction::after,
 .yan-chat-widget.lg-refraction::after,
 .yan-chat-map-ios.lg-refraction::after,
 .yan-chat-bubble.lg-refraction::after,
@@ -472,6 +479,7 @@ a {
 .yan-chat-send.lg-fallback,
 .edu-panel.lg-fallback,
 .edu-file-tile.lg-fallback,
+.edu-case-side.lg-fallback,
 .yan-chat-widget.lg-fallback,
 .yan-chat-bubble.lg-fallback,
 .edu-filter.lg-fallback,
@@ -487,6 +495,7 @@ a {
   html:not([data-resolved-theme="light"]) .yan-chat-send.lg-refraction::after,
   html:not([data-resolved-theme="light"]) .edu-panel.lg-refraction::after,
   html:not([data-resolved-theme="light"]) .edu-file-tile.lg-refraction::after,
+  html:not([data-resolved-theme="light"]) .edu-case-side.lg-refraction::after,
   html:not([data-resolved-theme="light"]) .yan-chat-widget.lg-refraction::after,
   html:not([data-resolved-theme="light"]) .yan-chat-bubble.lg-refraction::after,
   html:not([data-resolved-theme="light"]) .edu-filter.lg-refraction::after,
@@ -501,6 +510,7 @@ html[data-resolved-theme="dark"] .yan-chat-close.lg-refraction::after,
 html[data-resolved-theme="dark"] .yan-chat-send.lg-refraction::after,
 html[data-resolved-theme="dark"] .edu-panel.lg-refraction::after,
 html[data-resolved-theme="dark"] .edu-file-tile.lg-refraction::after,
+html[data-resolved-theme="dark"] .edu-case-side.lg-refraction::after,
 html[data-resolved-theme="dark"] .yan-chat-widget.lg-refraction::after,
 html[data-resolved-theme="dark"] .yan-chat-bubble.lg-refraction::after,
 html[data-resolved-theme="dark"] .edu-filter.lg-refraction::after,
@@ -1424,30 +1434,37 @@ html[data-resolved-theme="light"] .edu-filter.is-on {
 .edu-case {
   display: flex;
   flex-direction: column;
-  border-radius: 10px;
-  overflow: hidden;
+  gap: 0.45rem;
   padding: 0;
-  gap: 0;
-  background: color-mix(in srgb, var(--fg) 5%, transparent);
 }
 
-.edu-case .edu-case-side {
-  border-radius: 0;
+.edu-case + .edu-case {
+  margin-top: 0.5rem;
+}
+
+.edu-case-side {
+  --lg-filter: none;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
   width: 100%;
+  padding: 0.7rem 0.95rem;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--fg);
+  box-shadow: 0 4px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
 }
 
-.edu-case .edu-case-side:first-child {
-  border-top-left-radius: 10px;
-  border-top-right-radius: 10px;
+.edu-case-side > span {
+  position: relative;
+  z-index: 2;
 }
 
-.edu-case .edu-case-side:last-child {
-  border-bottom-left-radius: 10px;
-  border-bottom-right-radius: 10px;
-}
-
-.edu-case .edu-case-side + .edu-case-side {
-  border-top: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
+.edu-case-side .edu-name {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .edu-name {

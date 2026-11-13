@@ -1,7 +1,7 @@
 /* Debate wash: muted gray-lavender in light, navy-gray-purple with a hint of blue in dark.
    Colors live in brand/palette.mjs (debate). The second selector gives this rule the same
    weight as the dark rules in /education/styles.css, so it wins in every theme state.
-   Debate chat always uses the agent color. Never set --chat-* here. */
+   No orange on /debate. Chat and selected chips use the debate accent (Yan, 2026-11-09). */
 :root,
 :root:not([data-resolved-theme="light"]) {
   --bg-0: var(--yl-debate-bg-0);
@@ -13,6 +13,13 @@
   --bloom-c: var(--yl-debate-bloom-c);
   --glow: var(--yl-debate-glow);
   --lg-tint-rgb: var(--yl-debate-glass-tint-rgb);
+  --chip-tint-rgb: var(--yl-debate-accent-rgb);
+  --yl-agent-accent: var(--yl-debate-accent);
+  --yl-agent-accent-rgb: var(--yl-debate-accent-rgb);
+  --yl-agent-pulse-rgb: var(--yl-debate-accent-rgb);
+  --chat-orange: var(--yl-debate-accent);
+  --chat-orange-rgb: var(--yl-debate-accent-rgb);
+  --chat-pulse-rgb: var(--yl-debate-accent-rgb);
 }
 
 /* Case speech: framework, defs, one contention, cards under the chain.
@@ -56,33 +63,34 @@
 }
 
 .debate-res {
+  min-height: 0;
+  padding: 0.85rem 1.2rem;
+}
+
+.debate-res p {
+  position: relative;
+  z-index: 2;
   margin: 0;
-  color: var(--muted);
+  color: var(--fg);
   font-size: var(--text-subhead, 1rem);
   line-height: 1.4;
 }
 
 .debate-switch {
   display: flex;
-  gap: 0.4rem;
+  gap: 0.5rem;
   margin-top: 0.75rem;
 }
 
-.debate-switch-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 2rem;
-  padding: 0.2rem 0.75rem;
-  border-radius: 999px;
+.edu-filter.debate-switch-link {
+  flex: 0 0 2.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
   font-size: var(--text-caption, 0.85rem);
-  font-weight: 700;
-  color: var(--muted);
-  background: color-mix(in srgb, var(--fg) 6%, transparent);
 }
 
-.debate-switch-link.is-current {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
+.debate-col-label {
+  padding-left: 0.25rem;
 }
 
 .debate-k {

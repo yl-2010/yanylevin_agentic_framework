@@ -14,13 +14,9 @@ const META = {
 };
 
 describe("location enrichment model", () => {
-  it("uses grok-4.7 xhigh with Fast off", () => {
-    assert.equal(LOCATION_ENRICHMENT_MODEL_SPEC.id, "grok-4.7");
-    assert.deepEqual(locationEnrichmentModelSpec().params, [
-      { id: "context", value: "256k" },
-      { id: "reasoning_effort", value: "xhigh" },
-      { id: "fast", value: "false" },
-    ]);
+  it("uses composer-2.5 with Fast off", () => {
+    assert.equal(LOCATION_ENRICHMENT_MODEL_SPEC.id, "composer-2.5");
+    assert.deepEqual(locationEnrichmentModelSpec().params, [{ id: "fast", value: "false" }]);
   });
 });
 

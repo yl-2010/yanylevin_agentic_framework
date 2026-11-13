@@ -58,22 +58,18 @@ describe("isoOnDateKey", () => {
 });
 
 describe("briefing model specs", () => {
-  it("news uses grok-4.7 xhigh", () => {
+  it("news uses grok-4.7 high", () => {
     assert.equal(BRIEFING_NEWS_MODEL_SPEC.id, "grok-4.7");
     assert.deepEqual(BRIEFING_NEWS_MODEL_SPEC.params, [
-      { id: "context", value: "256k" },
-      { id: "reasoning_effort", value: "xhigh" },
-      { id: "fast", value: "false" },
-    ]);
-  });
-
-  it("agent recap uses grok-4.7 high", () => {
-    assert.equal(AGENT_RECAP_MODEL_SPEC.id, "grok-4.7");
-    assert.deepEqual(AGENT_RECAP_MODEL_SPEC.params, [
       { id: "context", value: "256k" },
       { id: "reasoning_effort", value: "high" },
       { id: "fast", value: "false" },
     ]);
+  });
+
+  it("agent recap uses composer-2.5 with Fast off", () => {
+    assert.equal(AGENT_RECAP_MODEL_SPEC.id, "composer-2.5");
+    assert.deepEqual(AGENT_RECAP_MODEL_SPEC.params, [{ id: "fast", value: "false" }]);
   });
 
   it("unslop uses composer-2.5 with Fast off", () => {

@@ -15,7 +15,7 @@ disable-model-invocation: true
 
 EPS Canvas is `https://canvas.instructure.com`. A student API token lives in `server/.env` (`CANVAS_ACCESS_TOKEN`). Never print or commit the token.
 
-This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how dashboard classes line up with Canvas courses, then write education todos/dates. Nightly model: **grok-4.7 high** (reasoning_effort=high, fast=false, context=256k). Express polls Canvas about every 30 seconds and creates a new todo in code. That poll does not start a model. A new assignment then starts **composer-2.5** (fast=false) only to attach OneNote pages and files for that assignment.
+This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how dashboard classes line up with Canvas courses, then write education todos/dates. Nightly model: **composer-2.5** (fast=false). Express polls Canvas about every 30 seconds and creates a new todo in code. That poll does not start a model. A new assignment then starts **composer-2.5** (fast=false) and reads `.cursor/skills/personal-canvas/new-assignment.md` only, to attach OneNote pages and files for that assignment.
 
 ## When to run
 
@@ -39,7 +39,7 @@ node --env-file=server/.env server/canvas-files.js store --src <path> --class ph
 node --env-file=server/.env server/canvas-files.js pull
 ```
 
-To run the background Grok job instead: `node --env-file=server/.env server/canvas-sync.js --force` from the repo root. One watch poll, which starts Composer only when an assignment id is new: `node --env-file=server/.env server/canvas-sync.js --hourly`.
+To run the background Composer job instead: `node --env-file=server/.env server/canvas-sync.js --force` from the repo root. One watch poll, which starts Composer only when an assignment id is new: `node --env-file=server/.env server/canvas-sync.js --hourly`.
 
 If `.canvas/snapshot.json` is missing and the fetch CLI fails, say Canvas is not configured (token / network). Do not invent assignments.
 
@@ -75,15 +75,7 @@ Dashboard schema: `.cursor/skills/personal-agent/education-dashboard.md`.
 
 ## New assignment pass (Composer)
 
-Express already created the todo and downloaded teacher files. Do not create a second todo. Do not change name, tag, due, done, or `canvasFiles`.
-
-When the runner says new assignment: the prompt lists the new assignments. For each one, only that assignment.
-
-- Open that class notebook. Link OneNote pages that apply to this assignment. If the Canvas description names a Content Library page, that page applies. Do not walk every page against every other todo.
-- Do not run pass 1 or pass 2. Do not rewrite `onenote-seen.json`. Those are nightly.
-- Look at sibling todos in the same class. If Yan would open one of those files or OneNote pages while doing this assignment, add `linkedFiles` on this todo only. Do not add pointers on the siblings.
-
-Do not open `snapshot.json`. Do not map new classes, do not edit `course-map.json`, do not mine syllabi, do not fold comments, pages, modules, or course files.
+The watch starts Composer on `.cursor/skills/personal-canvas/new-assignment.md` only. Do not load this file for that pass.
 
 ## Map courses first (nightly / manual only)
 

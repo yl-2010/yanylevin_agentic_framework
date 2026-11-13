@@ -1,95 +1,45 @@
 /**
- * Clock :00/:05/:10/… snapshots Yan's signals, then Composer 2.5 guesses
- * life state. Local Cursor SDK one-shot. Yan only. Does not git-commit.
+ * Clock :00/:05/:10/… snapshots Yan's signals, then local gpt-oss guesses
+ * life state. No Cursor SDK. Yan only. Does not git-commit.
  * Shortcut POSTs save to signals JSONL. They do not call this.
- * A 2-minute run still leaves the next start on the following round 5.
+ * A slow run still leaves the next start on the following round 5.
  */
 
 import { open, readFile, rm, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { briefingNow, resolveBriefingTimezone } from "./daily-briefing-agent.js";
+import { chatCompletions } from "./lmstudio.js";
 import {
-  createLaterAuthRetry,
-  promptWithAuthRetry,
-  reloadCursorApiKeyFromEnv,
-  requireCursorApiKey,
-} from "./cursor-sdk-auth.js";
-import {
-  LIFE_STATE_GUESS_PATH,
   LIFE_STATE_REL,
-  LIFE_STATE_SNAPSHOT_PATH,
+  appendLifeStateGuess,
   writeLifeStateSchedulerState,
 } from "./life-state.js";
 import { buildLifeStateSnapshot } from "./life-state-snapshot.js";
-import { YAN_EMAIL } from "./phone-location.js";
 import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = "/tmp/yanylevin-life-state.lock";
 const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
+const SKILL_PATH = join(REPO_ROOT, ".cursor/skills/life-state/SKILL.md");
 export const LIFE_STATE_INTERVAL_MS = 5 * 60 * 1000;
 const LOCK_STALE_MS = 8 * 60 * 1000;
+export const LIFE_STATE_MODEL = "openai/gpt-oss-20b";
 
-export const LIFE_STATE_MODEL_SPEC = {
-  id: process.env.CURSOR_LIFE_STATE_MODEL || "composer-2.5",
-  params: [{ id: "fast", value: "false" }],
-};
+export const LIFE_STATE_GUESS_RULES = [
+  "You are Yan's 5-minute life-state tick. Infer what Yan is doing this minute from the snapshot.",
+  "Output one JSON object only, no prose, no code fence.",
+  "Fields: kind, activity, place, placeLabel, confidence, evidence (array of short tokens), optional notes.",
+  "Do not include at, local, dateKey, since, or continued.",
+  'Set "model" to "gpt-oss-20b".',
+  "Screen sessions in this snapshot win over the previous sample's activity text. Do not copy the previous activity.",
+  "Do not pick driving while GPS is at a known place unless a driving_focus or tesla_bluetooth signal is under 10 minutes old.",
+].join("\n");
 
 /** @type {Promise<unknown>|null} */
 let inFlight = null;
 /** @type {ReturnType<typeof setTimeout>|null} */
 let timer = null;
-
-const laterAuthRetry = createLaterAuthRetry({
-  prefix: "life-state",
-  run: ({ dateKey }) => runLifeState({ dateKey, force: true }),
-});
-
-/**
- * @param {{ id: string, params?: { id: string, value: string }[] }} spec
- */
-function modelSelection(spec) {
-  return {
-    id: String(spec.id),
-    params: (spec.params || []).map((p) => ({
-      id: String(p.id),
-      value: String(p.value),
-    })),
-  };
-}
-
-/**
- * @param {string} apiKey
- * @param {{ id: string, params: { id: string, value: string }[] }} spec
- */
-async function resolveModelSelection(apiKey, spec) {
-  const fallback = modelSelection(spec);
-  try {
-    const { Cursor } = await import("@cursor/sdk");
-    const models = await Cursor.models.list({ apiKey });
-    const listed = models?.find((m) => m?.id === fallback.id);
-    if (!listed) return fallback;
-    const wanted = fallback.params;
-    const variant = (listed.variants || []).find((v) => {
-      const params = v?.params || [];
-      if (wanted.length === 0) return !params.length;
-      return wanted.every((w) =>
-        params.some((p) => p.id === w.id && p.value === w.value)
-      );
-    });
-    if (variant?.params?.length) {
-      return modelSelection({ id: listed.id, params: variant.params });
-    }
-    return fallback;
-  } catch (err) {
-    console.warn(
-      "[life-state] model catalog lookup failed; using explicit ModelSelection",
-      err instanceof Error ? err.message : err
-    );
-    return fallback;
-  }
-}
 
 async function readMeta() {
   const raw = await readFile(META_PATH, "utf8");
@@ -98,10 +48,6 @@ async function readMeta() {
     throw new Error("daily-briefing meta.json missing");
   }
   return meta;
-}
-
-export function lifeStateModelSpec() {
-  return modelSelection(LIFE_STATE_MODEL_SPEC);
 }
 
 /**
@@ -120,19 +66,80 @@ export function msUntilNextLifeStateTick(nowMs = Date.now()) {
     : LIFE_STATE_INTERVAL_MS - remainder;
 }
 
-export function buildLifeStatePrompt({ dateKey, timezone, snapshotPath }) {
+export function lifeStateModelId() {
+  return LIFE_STATE_MODEL;
+}
+
+export function buildLifeStatePrompt() {
+  return LIFE_STATE_GUESS_RULES;
+}
+
+/**
+ * First `{...}` object in a model reply. Ignores prose around it.
+ * @param {string} text
+ */
+export function parseLifeStateGuessText(text) {
+  const raw = String(text || "");
+  const start = raw.indexOf("{");
+  if (start < 0) return null;
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = start; i < raw.length; i++) {
+    const c = raw[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === "\\") esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === "{") depth += 1;
+    else if (c === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        try {
+          const parsed = JSON.parse(raw.slice(start, i + 1));
+          return parsed && typeof parsed === "object" ? parsed : null;
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+async function lifeStateSystemPrompt() {
+  const [skill, schema, heuristics] = await Promise.all([
+    readFile(SKILL_PATH, "utf8"),
+    readFile(join(LIFE_STATE_REL, "schema.md"), "utf8"),
+    readFile(join(LIFE_STATE_REL, "heuristics.md"), "utf8"),
+  ]);
   return [
-    "Follow the life-state skill (.cursor/skills/life-state/SKILL.md).",
-    "Guess what Yan is doing this minute. Yan only (you@example.com).",
-    "Local only. Never spawn a Cursor cloud agent.",
-    `Today's date key: ${dateKey} (timezone ${timezone}).`,
-    `Snapshot: ${snapshotPath || LIFE_STATE_SNAPSHOT_PATH}`,
-    "Read /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education/life-state/schema.md and heuristics.md.",
-    "Read the snapshot and its previous samples. Do not open Mail, OneNote, Teams, Canvas, journal, or Health sleep.",
-    `Write a guess JSON to ${LIFE_STATE_GUESS_PATH} (kind, activity, place, placeLabel, confidence, evidence, optional notes, model composer-2.5). CLI fills at/local/dateKey/since/continued.`,
-    `Then: node server/life-state.js append ${LIFE_STATE_GUESS_PATH}`,
-    `Output folder: ${LIFE_STATE_REL}/. Do not git commit. Do not edit any other file.`,
-  ].join("\n");
+    LIFE_STATE_GUESS_RULES,
+    "--- life-state skill ---",
+    skill,
+    "--- schema.md ---",
+    schema,
+    "--- heuristics.md ---",
+    heuristics,
+  ].join("\n\n");
+}
+
+async function askLifeState(system, snapshot) {
+  const res = await chatCompletions({
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: `Snapshot:\n${JSON.stringify(snapshot, null, 2)}` },
+    ],
+    temperature: 0.2,
+    maxTokens: 6000,
+  });
+  const guess = parseLifeStateGuessText(res.content);
+  if (!guess) return null;
+  guess.model = "gpt-oss-20b";
+  return guess;
 }
 
 export async function isLifeStateBusy() {
@@ -206,51 +213,41 @@ async function runLifeStateOnce({ force = false } = {}) {
 
   try {
     const snap = await buildLifeStateSnapshot();
-    await reloadCursorApiKeyFromEnv();
-    const apiKey = requireCursorApiKey();
-    const model = await resolveModelSelection(apiKey, LIFE_STATE_MODEL_SPEC);
     console.log(
-      `[life-state] guessing ${dateKey} tz=${timezone} model=${model.id} force=${Boolean(force)}`
+      `[life-state] guessing ${dateKey} tz=${timezone} model=${LIFE_STATE_MODEL} force=${Boolean(force)}`
     );
-
-    const prompt = buildLifeStatePrompt({
-      dateKey,
-      timezone,
-      snapshotPath: snap.path,
-    });
-    const { result, authFailed, capacityFailed, transientFailed, usedFallback } =
-      await promptWithAuthRetry({
-        prefix: "life-state",
-        prompt,
-        model,
-        cwd: REPO_ROOT,
-      });
-
-    if (usedFallback) {
-      console.warn("[life-state] used auto after preferred-model retries");
+    let guess = null;
+    let lmError = "";
+    try {
+      const system = await lifeStateSystemPrompt();
+      guess = await askLifeState(system, snap.snapshot);
+      if (!guess) guess = await askLifeState(system, snap.snapshot);
+    } catch (err) {
+      lmError = err instanceof Error ? err.message : String(err);
     }
-    if (transientFailed) {
-      laterAuthRetry.schedule(dateKey);
+    if (!guess) {
+      console.error("[life-state] gpt-oss skipped", lmError || "invalid json");
       await writeLifeStateSchedulerState({
         lastStatus: "error",
-        lastError: authFailed ? "auth" : capacityFailed ? "capacity" : "error",
+        lastError: lmError ? "lm-studio" : "invalid-json",
       });
       return {
         ok: false,
         dateKey,
-        status: result?.status || "error",
-        reason: authFailed ? "auth" : capacityFailed ? "capacity" : "error",
+        reason: lmError ? "lm-studio" : "invalid-json",
+        error: lmError || "invalid json",
       };
     }
-
-    laterAuthRetry.clear();
+    try {
+      await appendLifeStateGuess(guess, { timeZone: timezone });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[life-state] append rejected", msg);
+      await writeLifeStateSchedulerState({ lastStatus: "error", lastError: "invalid-guess" });
+      return { ok: false, dateKey, reason: "invalid-guess", error: msg };
+    }
     await writeLifeStateSchedulerState({ lastStatus: "ok", lastError: null });
-    return {
-      ok: true,
-      dateKey,
-      status: result?.status || "finished",
-      snapshotPath: snap.path,
-    };
+    return { ok: true, dateKey, snapshotPath: snap.path, kind: guess.kind };
   } finally {
     await releaseLock(handle);
   }

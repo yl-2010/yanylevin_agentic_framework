@@ -2251,12 +2251,17 @@
     const name = escapeHtml(c.name || c.id);
     const affHref = BASE === "/debate" ? spaCase(c.id, "aff") : debateCaseHref(c.id, "aff");
     const negHref = BASE === "/debate" ? spaCase(c.id, "neg") : debateCaseHref(c.id, "neg");
+    const fid = String(c.id || "").replace(/[^a-z0-9]+/gi, "-");
     return `<li class="edu-case">
-      <a class="edu-row edu-row-link edu-case-side" href="${escapeHtml(affHref)}">
+      <a class="edu-row-link edu-case-side" data-liquid-glass="rounded" data-filter-id="lg-edu-case-${escapeHtml(
+        fid
+      )}-aff" href="${escapeHtml(affHref)}">
         <span class="edu-name">${name}</span>
         <span class="edu-tag">Aff</span>
       </a>
-      <a class="edu-row edu-row-link edu-case-side" href="${escapeHtml(negHref)}">
+      <a class="edu-row-link edu-case-side" data-liquid-glass="rounded" data-filter-id="lg-edu-case-${escapeHtml(
+        fid
+      )}-neg" href="${escapeHtml(negHref)}">
         <span class="edu-name">${name}</span>
         <span class="edu-tag">Neg</span>
       </a>
@@ -3152,18 +3157,14 @@
         debateBlockfileHtml(c, "neg")
     );
     const switchHtml = hasSpeech
-      ? `<nav class="debate-switch" aria-label="Side">
-          <a class="debate-switch-link${
-            sideKey === "aff" ? " is-current" : ""
-          }" href="${escapeHtml(spaCase(c.id, "aff"))}"${
-            sideKey === "aff" ? ' aria-current="page"' : ""
-          }>Aff</a>
-          <a class="debate-switch-link${
-            sideKey === "neg" ? " is-current" : ""
-          }" href="${escapeHtml(spaCase(c.id, "neg"))}"${
-            sideKey === "neg" ? ' aria-current="page"' : ""
-          }>Neg</a>
-        </nav>`
+      ? `<nav class="debate-switch" aria-label="Side">${["aff", "neg"]
+          .map((k) => {
+            const on = sideKey === k;
+            return `<a class="edu-filter circle debate-switch-link${on ? " is-on" : ""}" data-liquid-glass="circle" data-filter-id="lg-debate-switch-${k}" href="${escapeHtml(
+              spaCase(c.id, k)
+            )}"${on ? ' aria-current="page"' : ""}><span>${k === "neg" ? "Neg" : "Aff"}</span></a>`;
+          })
+          .join("")}</nav>`
       : "";
     appEl.innerHTML = `
       <header class="edu-hero edu-hero--detail">
@@ -3176,7 +3177,13 @@
       ${
         speech || blockfile
           ? `<div class="debate-case${blockfile ? " debate-case--split" : ""}">
-              ${resolutionLine ? `<p class="debate-res">${escapeHtml(resolutionLine)}</p>` : ""}
+              ${
+                resolutionLine
+                  ? `<section class="edu-panel debate-res" data-liquid-glass="rounded" data-filter-id="lg-debate-res"><p>${escapeHtml(
+                      resolutionLine
+                    )}</p></section>`
+                  : ""
+              }
               ${
                 blockfile
                   ? `<div class="debate-col">${speech}</div>
@@ -4117,7 +4124,7 @@
         return;
       }
 
-      const dateFilterChip = t.closest?.(".edu-filter");
+      const dateFilterChip = t.closest?.(".edu-filter:not(.debate-switch-link)");
       if (dateFilterChip?.querySelector("input[data-date-filter]")) {
         event.preventDefault();
         const input = dateFilterChip.querySelector("input[data-date-filter]");
@@ -4131,7 +4138,7 @@
         return;
       }
 
-      const filterChip = t.closest?.(".edu-filter");
+      const filterChip = t.closest?.(".edu-filter:not(.debate-switch-link)");
       if (filterChip) {
         event.preventDefault();
         const input = filterChip.querySelector("input[data-filter]");

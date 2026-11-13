@@ -1,5 +1,5 @@
 /**
- * Nightly Grok 4.7 xhigh: fact-check overnight agent writes against
+ * Nightly Composer 2.5: fact-check overnight agent writes against
  * source dumps. Starts as soon as both 03:00 agents (location-brain
  * and health-brain) finish, before the 06:00 briefing. Yan only.
  */
@@ -43,12 +43,8 @@ const WAIT_MS = 90 * 60 * 1000;
 const WAIT_POLL_MS = 5000;
 
 export const FACT_CHECK_MODEL_SPEC = {
-  id: process.env.CURSOR_FACT_CHECK_MODEL || "grok-4.7",
-  params: [
-    { id: "context", value: "256k" },
-    { id: "reasoning_effort", value: "xhigh" },
-    { id: "fast", value: "false" },
-  ],
+  id: process.env.CURSOR_FACT_CHECK_MODEL || "composer-2.5",
+  params: [{ id: "fast", value: "false" }],
 };
 
 /** @type {Promise<unknown>|null} */

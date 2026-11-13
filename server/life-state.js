@@ -642,7 +642,7 @@ export async function assessLifeStateHeartbeat(opts = {}) {
   if (String(scheduler.lastStatus || "") === "error") {
     issues.push({
       code: "life-state-error",
-      detail: `Life-state Composer last failed: ${clipStr(scheduler.lastError || scheduler.lastStatus, 160)}.`,
+      detail: `Life-state guess last failed: ${clipStr(scheduler.lastError || scheduler.lastStatus, 160)}.`,
     });
   }
   if (gpsAgeMinutes == null) {

@@ -1,7 +1,7 @@
 /**
  * Morning Daily Briefing: 3-phase local Cursor SDK pipeline.
- *   1. news        Grok 4.7 xhigh  draft news capsules
- *   2. agent-recap Grok 4.7 high   overnight agent recap card
+ *   1. news        Grok 4.7 high   draft news capsules
+ *   2. agent-recap Composer 2.5    overnight agent recap card
  *   3. unslop      Composer 2.5   unslop + write todo.json + taste.md
  * Yan only.
  */
@@ -36,6 +36,7 @@ export function schedulerWait(when, now = Date.now()) {
   return { delay, fire: true };
 }
 import {
+  BRIEFING_LATER_RETRY_MS,
   createLaterAuthRetry,
   promptWithAuthRetry,
   reloadCursorApiKeyFromEnv,
@@ -91,18 +92,14 @@ export const BRIEFING_NEWS_MODEL_SPEC = {
     "grok-4.7",
   params: [
     { id: "context", value: "256k" },
-    { id: "reasoning_effort", value: "xhigh" },
+    { id: "reasoning_effort", value: "high" },
     { id: "fast", value: "false" },
   ],
 };
 
 export const AGENT_RECAP_MODEL_SPEC = {
-  id: process.env.CURSOR_AGENT_RECAP_MODEL || "grok-4.7",
-  params: [
-    { id: "context", value: "256k" },
-    { id: "reasoning_effort", value: "high" },
-    { id: "fast", value: "false" },
-  ],
+  id: process.env.CURSOR_AGENT_RECAP_MODEL || "composer-2.5",
+  params: [{ id: "fast", value: "false" }],
 };
 
 export const BRIEFING_UNSLOP_MODEL_SPEC = {
@@ -137,6 +134,7 @@ let timer = null;
 const laterAuthRetry = createLaterAuthRetry({
   prefix: "daily-briefing",
   run: ({ dateKey }) => runDailyBriefing({ dateKey }),
+  delaysMs: BRIEFING_LATER_RETRY_MS.slice(0, 2),
 });
 
 /**
@@ -606,6 +604,15 @@ async function releaseLock(handle) {
   await rm(LOCK_PATH, { force: true });
 }
 
+async function draftFileExists(path) {
+  try {
+    const st = await stat(path);
+    return st.isFile() && st.size > 0;
+  } catch {
+    return false;
+  }
+}
+
 function requireKey() {
   return requireCursorApiKey();
 }
@@ -630,8 +637,11 @@ export function buildNewsPrompt({ dateKey, timezone, force, dueTime }) {
   ].join("\n");
 }
 
-export function buildAgentRecapPrompt({ dateKey, timezone }) {
+export function buildAgentRecapPrompt({ dateKey, timezone, force }) {
   const recap = agentRecapDraftPath(dateKey);
+  const rebuild = force
+    ? `Rebuild: overwrite ${recap} even if it already exists.`
+    : `If ${recap} already exists and this is not a rebuild, stop.`;
   return [
     "Follow the agent-recap skill (.cursor/skills/agent-recap/SKILL.md).",
     "You are phase 2 (agent recap) of Yan's morning Daily Briefing pipeline. Yan only (you@example.com).",
@@ -640,13 +650,14 @@ export function buildAgentRecapPrompt({ dateKey, timezone }) {
     `Read ${NIGHTLY_STATUS_PATH} first, then dig as the skill says (brain/state.json notes, journal, git log, server log tail).`,
     "notes.calendar is written by synthesis before actions. It is not a record of calendar creates. List Apple Calendar before saying an event stayed off.",
     `pipelineFinished false or lastPipelinePhase not finished means actions/lint did not complete. Put that under URGENT.`,
-    "lifeState.issues is URGENT. Copy the detail (5-minute log fail, no GPS on disk, missing device bundle, Composer error, Home/Screen Time snapshot fail). Empty issues means omit. iPad is not the phone heartbeat. Do not invent a stale-GPS failure. An old pin while Yan stayed put is expected: iOS only wakes the iPhone app on a ~500m move, a visit, or opening the app. Location compose skip no-new-points is the same, not URGENT.",
+    "lifeState.issues is URGENT. Copy the detail (5-minute log fail, no GPS on disk, missing device bundle, guess error, Home/Screen Time snapshot fail). Empty issues means omit. iPad is not the phone heartbeat. Do not invent a stale-GPS failure. An old pin while Yan stayed put is expected: iOS only wakes the iPhone app on a ~500m move, a visit, or opening the app. Location compose skip no-new-points is the same, not URGENT.",
     "healthShortcut.issues is URGENT. Each issue is a missing or stale iPhone Health Shortcut dump (none in the last 12 hours). Copy the detail. Empty issues means omit. This is the Shortcut POST, not a health-takeaways skip.",
     `Write only ${recap} as JSON:`,
     '{ "id": "agent-recap", "title": "Agent Recap", "category": "other", "noVote": true, "vote": null, "body": "..." }',
     "An URGENT bullet from the last 7 daily briefing agent recaps stays on today's card until you check and the failure is gone. A quiet night is not a fix. One morning that forgot the bullet does not clear it. Rewrite the detail from this morning. School OneNote signed out, or the 1:00 Canvas sync leaving page links unwritten, stays URGENT until a night lists pages and writes the links.",
     "Body: URGENT section (omit if none), Actions section (omit if none), then general recap prose. No citations.",
     "Cover every scheduled overnight agent except the daily briefing itself.",
+    rebuild,
   ].join("\n");
 }
 
@@ -771,21 +782,32 @@ async function runDailyBriefingOnce({ force = false, dateKey: dateKeyOpt } = {})
 
     await prefetchNightlyStatus(dateKey, timezone);
 
-    let outcome = await runPhase(
-      "news",
-      handle,
-      buildNewsPrompt({ dateKey, timezone, force, dueTime }),
-      newsModel
-    );
-    if (outcome.transientFailed) return phaseFailed("news", outcome, dateKey);
+    const newsDraft = newsDraftPath(dateKey);
+    const recapDraft = agentRecapDraftPath(dateKey);
+    let outcome = { result: { status: "skipped" }, transientFailed: false };
+    if (force || !(await draftFileExists(newsDraft))) {
+      outcome = await runPhase(
+        "news",
+        handle,
+        buildNewsPrompt({ dateKey, timezone, force, dueTime }),
+        newsModel
+      );
+      if (outcome.transientFailed) return phaseFailed("news", outcome, dateKey);
+    } else {
+      console.log(`[daily-briefing] skip news ${dateKey}: draft exists`);
+    }
 
-    outcome = await runPhase(
-      "agent-recap",
-      handle,
-      buildAgentRecapPrompt({ dateKey, timezone }),
-      recapModel
-    );
-    if (outcome.transientFailed) return phaseFailed("agent-recap", outcome, dateKey);
+    if (force || !(await draftFileExists(recapDraft))) {
+      outcome = await runPhase(
+        "agent-recap",
+        handle,
+        buildAgentRecapPrompt({ dateKey, timezone, force }),
+        recapModel
+      );
+      if (outcome.transientFailed) return phaseFailed("agent-recap", outcome, dateKey);
+    } else {
+      console.log(`[daily-briefing] skip agent-recap ${dateKey}: draft exists`);
+    }
 
     outcome = await runPhase(
       "unslop",

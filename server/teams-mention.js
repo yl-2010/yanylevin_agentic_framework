@@ -17,6 +17,9 @@ import {
 } from "./imessage-mention.js";
 import { SCHOOL_EMAIL } from "./school-mail.js";
 
+const TEAMS_FILE_LINE =
+  "A file for this Teams chat goes out as a yanylevin.com link. Put the file in the repo, use a non-guessable folder when it should not be easy to find, commit, push, run npm run deploy:web, confirm the URL returns 200, then send that link with school-teams.js send. Do not attach it in the Teams app with computer use unless Yan directly says to attach with computer use in this turn. Anyone else still gets a link. An images field on a message has no pixels. Open that chat in the Teams app and look. School Outlook still cannot send.";
+
 const FOOTER_RE = new RegExp(
   AGENT_SENT_FOOTER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
   "i"
@@ -139,10 +142,12 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
       );
     }
     lines.push(
-      `Read the surrounding thread before answering: ${threadCmd} (school Teams skill).`,
+      preview
+        ? "The thread is already above. Do not run school-teams.js thread again unless you need messages older than that preview."
+        : `Read the surrounding thread before answering: ${threadCmd} (school Teams skill).`,
       ...previewLines,
       speakerLine,
-      "school-teams.js cannot attach a file. When the job is to get a PDF or other file into this Teams chat, open the Teams app and attach it with Cursor computer use (personal-computer skill). That step uses this turn's model. Do not run server/computer-use.js. Do not paste a file path into the chat. Do not email it instead. School Outlook still cannot send. An images field on a message has no pixels. Open that chat in the Teams app and look.",
+      TEAMS_FILE_LINE,
       "",
       "Your reply",
       replyReaderLine(opts.guestCaller, "Teams", chat),
@@ -160,10 +165,12 @@ export function formatTeamsOriginBlock(origin, opts = {}) {
     lines.push(
       "This turn is on the website or app. The reply stays in this chat. Do not post it to Teams. Do not run school-teams.js send. send_chat_message stays in the app and website only.",
       "Post to that Teams chat only when this message asks you to tell that chat, reply there, or send something those people should see. A follow-up on the same topic, typed here, stays here. The group already got the first reply.",
-      `If this message is about what was said in that Teams chat, read it first: ${threadCmd} (school Teams skill).`,
+      preview
+        ? "The thread is already above. Do not run school-teams.js thread again unless you need messages older than that preview."
+        : `If this message is about what was said in that Teams chat, read it first: ${threadCmd} (school Teams skill).`,
       ...previewLines,
       speakerLine,
-      "school-teams.js cannot attach a file. When they ask you to get a PDF or other file to someone on Teams, open the Teams app and attach it with Cursor computer use (personal-computer skill). That step uses this turn's model. Do not run server/computer-use.js. Do not paste a file path into Teams. Do not email it instead. School Outlook still cannot send. An images field on a message has no pixels. Open that chat in the Teams app and look."
+      TEAMS_FILE_LINE,
     );
   }
   return lines.join("\n");

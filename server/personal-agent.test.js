@@ -43,6 +43,7 @@ import {
   INTERRUPT_NOTE,
   systemPrompt,
   formatVisibleTranscript,
+  teamsVoicePrompt,
   normalizeEducationNavigate,
   educationNavigateHref,
   queueEducationNavigate,
@@ -144,6 +145,11 @@ describe("Personal Agent models", () => {
       guestMention.params.find((p) => p.id === "fast")?.value,
       "false"
     );
+    const teamsLater = guestTurnModelSpec(
+      { teamsOrigin: { chat: "Physics" }, guestCaller: null },
+      false
+    );
+    assert.equal(teamsLater.id, "composer-2.5");
     const teamsJype = guestTurnModelSpec(
       {
         teamsDeliverFinal: true,
@@ -187,7 +193,7 @@ describe("Personal Agent models", () => {
 describe("Personal Agent system prompt", () => {
   it("stays slim and points at on-demand files instead of dumping recipes", () => {
     const prompt = systemPrompt(YAN);
-    assert.ok(prompt.length < 8500, `prompt length ${prompt.length}`);
+    assert.ok(prompt.length < 9200, `prompt length ${prompt.length}`);
     assert.match(prompt, /Personal Agent/);
     assert.match(prompt, /schedule_future_agent/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.futureAgents));
@@ -199,6 +205,9 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /Never mention the surprise hoodies to Alex/);
     assert.match(prompt, /Third-party models \(Opus, Fable, Sonnet\) are allowed only when this message is from Yan/);
     assert.match(prompt, /Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor/);
+    assert.match(prompt, /cannot read JYPE iMessage or JYPE Teams, or send into JYPE iMessage/);
+    assert.match(prompt, /They can still have you post in JYPE Teams/);
+    assert.match(prompt, /Only Alex can ping or flash Yan's devices/);
     assert.match(prompt, /Projects\/\.tests\/ is a private guide/);
     assert.match(prompt, /do not say a scan or last year's test exists/);
     assert.match(prompt, /EPS student IDs \/ school photos/);
@@ -228,12 +237,13 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /school-teams\.js/);
     assert.match(prompt, /iMessage, then Teams, then email/);
     assert.match(prompt, /native attachments/);
-    assert.match(prompt, /school-teams\.js cannot attach a file/);
-    assert.match(prompt, /Teams app with Cursor computer use/);
+    assert.match(prompt, /yanylevin\.com link/);
+    assert.match(prompt, /non-guessable folder/);
+    assert.doesNotMatch(prompt, /Teams app with Cursor computer use/);
     assert.match(prompt, /images has no pixels/);
     assert.match(prompt, /existing Word, Excel, or PowerPoint/);
     assert.match(prompt, /School Outlook still cannot send/);
-    assert.ok(prompt.length < 8500, `prompt length ${prompt.length}`);
+    assert.ok(prompt.length < 9200, `prompt length ${prompt.length}`);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.chats));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.location));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.lifeState));
@@ -279,6 +289,9 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /Never mention the surprise hoodies to Alex/);
     assert.match(prompt, /Third-party models \(Opus, Fable, Sonnet\) are allowed only when this message is from Yan/);
     assert.match(prompt, /Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor/);
+    assert.match(prompt, /cannot read JYPE iMessage or JYPE Teams, or send into JYPE iMessage/);
+    assert.match(prompt, /They can still have you post in JYPE Teams/);
+    assert.match(prompt, /Only Alex can ping or flash Yan's devices/);
     assert.match(prompt, /Projects\/\.tests\/ is a private guide/);
     assert.match(prompt, /do not say a scan or last year's test exists/);
     assert.match(prompt, /No Your Majesty and no other royal title/);
@@ -582,7 +595,7 @@ describe("Personal Agent skill files", () => {
     assert.match(schoolTeams, /Yan only/);
     assert.match(schoolTeams, /Sent by Yan's Personal Agent/);
     assert.match(schoolTeams, /\/\/ Sent by Yan's Personal Agent/);
-    assert.match(schoolTeams, /JYPE \(iMessage or Teams\)/);
+    assert.match(schoolTeams, /They can still have you post in JYPE Teams/);
     assert.match(schoolTeams, /@agent/);
     assert.match(schoolTeams, /What gets sent/);
     assert.match(schoolTeams, /no second copy written for Yan/);
@@ -649,7 +662,7 @@ describe("Personal Agent skill files", () => {
     assert.match(imessage, /before they start/);
     assert.match(imessage, /posted to this iMessage chat immediately/);
     assert.match(imessage, /never put it in Personal Agent app or website bubbles/);
-    assert.match(imessage, /JYPE \(iMessage or Teams\)/);
+    assert.match(imessage, /They can still have you post in JYPE Teams/);
     assert.match(imessage, /\/\/ Sent by Yan's Personal Agent/);
     assert.match(imessage, /does not render markdown/);
     assert.match(imessage, /attachToReply/);
@@ -708,7 +721,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /no `\/\/ Sent by Yan's Personal Agent`/);
     assert.match(agent, /Never put `Sent by Yan's Personal Agent` in app or website bubbles/);
     assert.match(agent, /cannot send into a different group chat/);
-    assert.match(agent, /JYPE \(iMessage or Teams\)/);
+    assert.match(agent, /They can still have you post in JYPE Teams/);
     assert.match(agent, /iMessage first, then Teams, then email|iMessage, then Teams, then email/);
     assert.match(agent, /attachToReply/);
     assert.match(agent, /unslop/);
@@ -766,7 +779,7 @@ describe("Personal Agent skill files", () => {
     assert.match(synthesis, /220 characters/);
     assert.match(synthesis, /SOUL\.md/);
     assert.match(synthesis, /journal\//);
-    assert.match(synthesis, /grok-4\.7 xhigh/);
+    assert.match(synthesis, /grok-4\.7 high/);
     assert.match(synthesis, /who=yan/);
     assert.match(synthesis, /Example Friend spelling stays on/);
     assert.match(synthesis, /Did not write Apple Calendar/);
@@ -1201,6 +1214,28 @@ describe("formatVisibleTranscript", () => {
     assert.match(text, /what does ALARM mean/);
     assert.match(text, /the building alarm tripped/);
     assert.doesNotMatch(text, /check again now/);
+  });
+
+  it("keeps the last 20 messages when the thread is longer", () => {
+    const messages = [];
+    for (let i = 0; i < 24; i++) messages.push(stampMessage(i % 2 ? "assistant" : "user", `line ${i}`));
+    messages.push(stampMessage("user", "in-flight bubble"));
+    const text = formatVisibleTranscript({ messages }, "in-flight bubble");
+    assert.match(text, /Earlier messages are omitted/);
+    assert.doesNotMatch(text, /line 0/);
+    assert.match(text, /line 4/);
+    assert.doesNotMatch(text, /in-flight bubble/);
+  });
+});
+
+describe("teams voice digest", () => {
+  it("replaces the always-read lines and leaves other chats alone", () => {
+    const prompt = systemPrompt(YAN);
+    assert.match(prompt, /Always Read SOUL\.md/);
+    const teams = teamsVoicePrompt(prompt);
+    assert.match(teams, /Voice for this Teams turn/);
+    assert.doesNotMatch(teams, /Always Read SOUL\.md/);
+    assert.doesNotMatch(teams, /Always Read and apply the unslop skill/);
   });
 });
 

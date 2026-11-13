@@ -269,7 +269,7 @@ describe("imessage-mention", () => {
     assert.match(block, /treat them as not close/);
     assert.match(block, /None of it goes in the reply/);
     assert.match(block, /different group chat than the one that called you/);
-    assert.match(block, /JYPE \(iMessage or Teams\)/);
+    assert.match(block, /They can still have you post in JYPE Teams/);
     assert.doesNotMatch(block, /Called from iMessage\. This Personal Agent chat is otherwise normal/);
     assert.doesNotMatch(block, /Composer|Grok|grok-4/);
   });
@@ -301,7 +301,7 @@ describe("imessage-mention", () => {
     assert.match(block, /must not be answered here/);
     assert.match(block, /Grade-wide, class, or huge groups/);
     assert.match(block, /different group chat than the one that called you/);
-    assert.match(block, /JYPE \(iMessage or Teams\)/);
+    assert.match(block, /They can still have you post in JYPE Teams/);
     assert.match(block, /Class of 2028 and every other group/);
     assert.doesNotMatch(block, /confidential information/);
     const dm = formatIMessageOriginBlock(origin, {

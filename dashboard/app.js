@@ -75,7 +75,7 @@
         {
           id: "life-state",
           name: "Life state",
-          model: "Composer 2.5",
+          model: "gpt-oss 20b",
           kind: "clock",
         },
       ],
@@ -126,7 +126,7 @@
         {
           id: "enrichment",
           name: "Location enrichment",
-          model: "Grok 4.7 xhigh",
+          model: "Composer 2.5",
           kind: "after",
         },
         { gap: true },
@@ -139,7 +139,7 @@
         {
           id: "canvas",
           name: "Canvas LMS sync",
-          model: "Grok 4.7 high",
+          model: "Composer 2.5",
           kind: "clock",
         },
       ],
@@ -156,7 +156,7 @@
         {
           id: "life-state-cleanup",
           name: "Life-state cleanup",
-          model: "Grok 4.7 xhigh",
+          model: "Composer 2.5",
           kind: "clock",
         },
       ],
@@ -181,14 +181,14 @@
         {
           id: "synthesis",
           name: "Nightly synthesis",
-          model: "Grok 4.7 xhigh",
+          model: "Grok 4.7 high",
           kind: "after",
         },
         { edge: true },
         {
           id: "actions",
           name: "Nightly actions",
-          model: "Grok 4.7 high",
+          model: "Composer 2.5",
           kind: "after",
           optional: true,
         },
@@ -221,7 +221,7 @@
         {
           id: "fact-check",
           name: "Nightly fact-check",
-          model: "Grok 4.7 xhigh",
+          model: "Composer 2.5",
           kind: "after",
         },
       ],
@@ -232,14 +232,14 @@
         {
           id: "briefing-news",
           name: "Daily news",
-          model: "Grok 4.7 xhigh",
+          model: "Grok 4.7 high",
           kind: "clock",
         },
         { edge: true },
         {
           id: "briefing-recap",
           name: "Agent recap",
-          model: "Grok 4.7 high",
+          model: "Composer 2.5",
           kind: "after",
         },
         { edge: true },

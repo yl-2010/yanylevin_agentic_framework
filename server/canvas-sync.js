@@ -1,6 +1,6 @@
 /**
  * Canvas LMS fetch + dashboard sync agents.
- * Nightly: Grok 4.7 high, full map (new classes, syllabus, dates).
+ * Nightly: Composer 2.5, full map (new classes, syllabus, dates).
  * Hourly: Composer 2.5 (not fast), mapped classes only.
  * Live overlay: page-open GET of submissions, grades, and planner overrides.
  * Token from server/.env (never commit). Agents never write done into todo.json.
@@ -60,12 +60,8 @@ const LOCK_HEARTBEAT_MS = 10 * 60 * 1000;
 const SKILL_PATH = ".cursor/skills/personal-canvas/SKILL.md";
 
 export const CANVAS_SYNC_MODEL_SPEC = {
-  id: process.env.CURSOR_CANVAS_SYNC_MODEL || "grok-4.7",
-  params: [
-    { id: "context", value: "256k" },
-    { id: "reasoning_effort", value: "high" },
-    { id: "fast", value: "false" },
-  ],
+  id: process.env.CURSOR_CANVAS_SYNC_MODEL || "composer-2.5",
+  params: [{ id: "fast", value: "false" }],
 };
 
 export const CANVAS_HOURLY_MODEL_SPEC = {
@@ -2021,7 +2017,7 @@ export function buildCanvasNewAssignmentPrompt({
 }) {
   const briefs = (assignments || []).map(canvasAssignmentBrief);
   return [
-    `Follow ${SKILL_PATH} (new assignment pass). Express already created the todo. Do not create another one.`,
+    `Follow .cursor/skills/personal-canvas/new-assignment.md. Express already created the todo. Do not create another one.`,
     "Yan only (you@example.com). Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} hour ${hourKey} (timezone ${timezone}).`,
     `Course map: ${CANVAS_REL}/course-map.json.`,
@@ -2353,7 +2349,7 @@ function startLockHeartbeat() {
 }
 
 /**
- * Fetch snapshot then (unless fetchOnly) run the Grok 4.7 high sync agent.
+ * Fetch snapshot then (unless fetchOnly) run the Composer 2.5 sync agent.
  * @param {{ force?: boolean, fetchOnly?: boolean }} [opts]
  */
 export async function runCanvasSync(opts = {}) {

@@ -8,13 +8,9 @@ import {
 } from "./fact-check-agent.js";
 
 describe("fact-check model", () => {
-  it("uses grok-4.7 with xhigh effort and Fast off", () => {
-    assert.equal(FACT_CHECK_MODEL_SPEC.id, "grok-4.7");
-    assert.deepEqual(factCheckModelSpec().params, [
-      { id: "context", value: "256k" },
-      { id: "reasoning_effort", value: "xhigh" },
-      { id: "fast", value: "false" },
-    ]);
+  it("uses composer-2.5 with Fast off", () => {
+    assert.equal(FACT_CHECK_MODEL_SPEC.id, "composer-2.5");
+    assert.deepEqual(factCheckModelSpec().params, [{ id: "fast", value: "false" }]);
   });
 });
 

@@ -1,7 +1,7 @@
 ---
 name: life-state-cleanup
 description: >-
-  Nightly Grok 4.7 xhigh job: clean yesterday's 5-minute life-state log
+  Nightly Composer 2.5 job: clean yesterday's 5-minute life-state log
   using Screen Time, iMessage, Teams, Calendar, location, and other
   sources. Fix flicker and wrong kinds. Yan only. Not the live 5-minute tick.
 disable-model-invocation: true
@@ -13,7 +13,7 @@ disable-model-invocation: true
 
 You run at **01:30** (`lifeStateCleanupLocalTime` in `education/you@example.com/daily-briefing/meta.json`), after the 01:00 location compose. Chat title refresh is the other 01:30 job. Context synthesis is 02:30 and will read the cleaned log.
 
-Model: **grok-4.7 xhigh** (reasoning_effort=xhigh, fast=false, context=256k).
+Model: **composer-2.5** (fast=false).
 
 The 5-minute Composer tick guesses from a snapshot. It flickers. One sleeping sample between awake samples, Home while GPS was at school, shower from a leftover fan. Your job is yesterday's full day with every source, then rewrite the wrong ticks.
 

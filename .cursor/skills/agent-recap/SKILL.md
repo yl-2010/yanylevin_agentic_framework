@@ -46,7 +46,7 @@ Use this order. **Omit a section entirely** when it does not apply that day (do 
      Overnight mail is `mailSince`.
    - **Life-state / iPhone heartbeat** from prefetch `lifeState`. Copy
      `lifeState.issues[]` as URGENT (5-minute log stopped or gapped,
-     Composer error, no iPhone GPS on disk, GPS without a device
+     guess error, no iPhone GPS on disk, GPS without a device
      bundle, Home or Screen Time snapshot fail). Empty `issues` means omit
      this. iPad must not be treated as the phone heartbeat.
    - Do not invent a GPS heartbeat failure, and do not put an old pin
@@ -98,7 +98,7 @@ All scheduled jobs **except** the daily briefing itself:
 | 01:00 | Location compose, location enrichment, health takeaways, canvas sync |
 | 01:30 | Chat title refresh, life-state cleanup |
 | 02:30 | Context synthesis pipeline (triage, entities, synthesis, actions, lint) |
-| 03:00 | Location brain projection, health brain projection, then fact-check (Grok 4.7 xhigh) as soon as both finish. URGENT if fact-check did not run. Mention `notes.factCheck` corrections in the recap; do not re-verify facts. |
+| 03:00 | Location brain projection, health brain projection, then fact-check (Composer 2.5) as soon as both finish. URGENT if fact-check did not run. Mention `notes.factCheck` corrections in the recap; do not re-verify facts. |
 
 Health takeaways may skip when there are no new dumps; that is OK unless something else looks wrong.
 
