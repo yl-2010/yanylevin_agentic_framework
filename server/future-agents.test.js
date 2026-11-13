@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseChatHistoryMeta } from "./education-chat-history.js";
@@ -12,9 +12,12 @@ import {
   futureAgentWait,
   listUpcomingFutureAgents,
   parseRunAt,
+  readFutureAgent,
   scheduleFutureAgent,
+  scheduledThreadShouldInheritHide,
   selectDueFutureAgents,
 } from "./future-agents.js";
+import { listChatHistory, patchChatHistoryEphemeral } from "./education-chat-history.js";
 
 const YAN = "you@example.com";
 const JEFFERY = "friend@example.com";
@@ -100,6 +103,7 @@ describe("future agent schedule", () => {
         "utf8"
       );
       assert.match(own, /Remind me to mail the form/);
+      assert.doesNotMatch(own, /^ephemeral:/m);
       await assert.rejects(
         readFile(
           join(
@@ -142,6 +146,131 @@ describe("future agent schedule", () => {
         left.map((row) => row.sessionId),
         [personal.sessionId]
       );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("inherits the parent chat hide and keeps JYPE listed", async () => {
+    const root = await mkdtemp(join(tmpdir(), "future-agents-hide-"));
+    const finished = "2026-10-11T08:00:00.000Z";
+    try {
+      const hidden = await scheduleFutureAgent({
+        root,
+        now: NOW,
+        runAt: "2026-10-14T15:00:00-07:00",
+        prompt: "Text me when class ends.",
+        workspace: "personal",
+        email: YAN,
+        ephemeral: true,
+        origin: { kind: "imessage", to: "+15551212" },
+      });
+      const hiddenPath = join(
+        root,
+        "education",
+        YAN,
+        ".chat-history",
+        `${hidden.sessionId}.md`
+      );
+      const hiddenText = await readFile(hiddenPath, "utf8");
+      assert.match(hiddenText, /^ephemeral: true$/m);
+      const hiddenRecord = await readFutureAgent(hidden.sessionId, { root });
+      assert.equal(hiddenRecord?.ephemeral, true);
+      await writeFile(
+        hiddenPath,
+        hiddenText.replace(/^updated: .+$/m, `updated: ${finished}`),
+        "utf8"
+      );
+      const stillFresh = await listChatHistory({
+        root,
+        email: YAN,
+        now: new Date("2026-10-11T08:09:00.000Z"),
+      });
+      assert.ok(stillFresh.some((row) => row.sessionId === hidden.sessionId));
+      const expired = await listChatHistory({
+        root,
+        email: YAN,
+        now: new Date("2026-10-11T08:11:00.000Z"),
+      });
+      assert.equal(
+        expired.some((row) => row.sessionId === hidden.sessionId),
+        false
+      );
+
+      const jype = await scheduleFutureAgent({
+        root,
+        now: NOW,
+        runAt: "2026-10-14T15:00:00-07:00",
+        prompt: "Send the link in Teams.",
+        workspace: "jype",
+        email: YAN,
+        ephemeral: true,
+        origin: { kind: "teams", chatId: "19:abc@thread.v2" },
+      });
+      const jypeText = await readFile(
+        join(root, "education/projects/jype/.chat-history", `${jype.sessionId}.md`),
+        "utf8"
+      );
+      assert.doesNotMatch(jypeText, /^ephemeral:/m);
+      const jypeRecord = await readFutureAgent(jype.sessionId, { root });
+      assert.equal(jypeRecord?.ephemeral, false);
+      const jypeListed = await listChatHistory({
+        root,
+        email: YAN,
+        workspace: "jype",
+        now: new Date("2026-10-11T09:00:00.000Z"),
+      });
+      assert.ok(jypeListed.some((row) => row.sessionId === jype.sessionId));
+
+      const kept = await scheduleFutureAgent({
+        root,
+        now: NOW,
+        runAt: "2026-10-14T15:00:00-07:00",
+        prompt: "Leave this one listed.",
+        workspace: "personal",
+        email: YAN,
+      });
+      const keptPath = join(
+        root,
+        "education",
+        YAN,
+        ".chat-history",
+        `${kept.sessionId}.md`
+      );
+      const before = await readFile(keptPath, "utf8");
+      const updated = before.match(/^updated: (\S+)/m)?.[1] || "";
+      assert.equal(
+        scheduledThreadShouldInheritHide(
+          { workspace: "", origin: { kind: "teams" }, status: "done" },
+          { visibility: "showing", messages: [{ role: "user" }] }
+        ),
+        true
+      );
+      assert.equal(
+        scheduledThreadShouldInheritHide(
+          { workspace: "jype", origin: { kind: "teams" }, status: "done" },
+          { visibility: "showing", messages: [{ role: "user" }] }
+        ),
+        false
+      );
+      assert.equal(
+        scheduledThreadShouldInheritHide(
+          { workspace: "", origin: { kind: "teams" }, status: "done" },
+          {
+            visibility: "showing",
+            messages: [{ role: "user" }, { role: "user" }],
+          }
+        ),
+        false
+      );
+      assert.equal(await patchChatHistoryEphemeral({
+        root,
+        email: YAN,
+        sessionId: kept.sessionId,
+      }), true);
+      const after = await readFile(keptPath, "utf8");
+      assert.match(after, /^ephemeral: true$/m);
+      assert.match(after, new RegExp(`^updated: ${updated}$`, "m"));
     } finally {
       await rm(root, { recursive: true, force: true });
     }

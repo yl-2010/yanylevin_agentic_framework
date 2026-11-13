@@ -36,6 +36,7 @@ import {
   listChatHistory,
   loadChatHistory,
   markChatHistoryRead,
+  patchChatHistoryEphemeral,
   persistChatHistory,
   resolveChatStarter,
   sanitizeSessionId,
@@ -51,8 +52,11 @@ import {
   cancelFutureAgent,
   clearFutureAgentTimer,
   formatScheduledSystemBlock,
+  listFutureAgentRecords,
+  markFutureAgentEphemeral,
   markFutureAgentStatus,
   readFutureAgent,
+  scheduledThreadShouldInheritHide,
   scheduleFutureAgent,
 } from "./future-agents.js";
 import {
@@ -887,8 +891,33 @@ function clearEphemeralHideTimer(sid) {
 }
 
 /**
+ * Tell open history drawers to refetch. The list drops an idle ephemeral
+ * row from the file's updated time. delayMs is the time left on that timer.
+ * @param {string} email
+ * @param {string} sid
+ * @param {number} [delayMs]
+ */
+function armEphemeralListRefresh(email, sid, delayMs = EPHEMERAL_HIDE_MS) {
+  clearEphemeralHideTimer(sid);
+  const wait = Math.max(0, Math.min(Number(delayMs) || 0, EPHEMERAL_HIDE_MS));
+  const t = setTimeout(() => {
+    ephemeralHideTimers.delete(sid);
+    const live = sessions.get(sid);
+    if (live?.ephemeralPinned) return;
+    notifyEducationClients(email, "change", {
+      source: "agent",
+      sessionId: sid,
+      status: live?.status || "idle",
+      ...(sessionWorkspace(live) === "jype" ? { workspace: "jype" } : {}),
+    });
+  }, wait);
+  if (typeof t.unref === "function") t.unref();
+  ephemeralHideTimers.set(sid, t);
+}
+
+/**
  * SSE/poll so an open history drawer drops the row at 10 minutes.
- * List filtering still uses the file's `updated` time if the process restarts.
+ * List filtering still uses the file's updated time if the process restarts.
  * @param {string} sid
  * @param {Session} session
  * @param {unknown} status
@@ -897,17 +926,74 @@ function scheduleEphemeralHideNotify(sid, session, status) {
   clearEphemeralHideTimer(sid);
   if (shouldPersistChatEphemeral(session) !== true) return;
   if (String(status || "") === "running") return;
-  const t = setTimeout(() => {
-    ephemeralHideTimers.delete(sid);
-    if (session.ephemeralPinned) return;
-    notifyEducationClients(session.email, "change", {
-      source: "agent",
-      sessionId: sid,
-      status: "idle",
-    });
-  }, EPHEMERAL_HIDE_MS);
-  if (typeof t.unref === "function") t.unref();
-  ephemeralHideTimers.set(sid, t);
+  armEphemeralListRefresh(session.email, sid, EPHEMERAL_HIDE_MS);
+}
+
+/**
+ * Channel schedules written before the hide was inherited. One user
+ * message means nobody continued the thread in the app.
+ */
+async function backfillInheritedScheduledHides() {
+  const rows = await listFutureAgentRecords();
+  /** @type {Set<string>} */
+  const touched = new Set();
+  for (const record of rows) {
+    if (!record || record.ephemeral || record.workspace === "jype") continue;
+    if (record.status === "canceled") continue;
+    const kind = record.origin?.kind;
+    if (kind !== "imessage" && kind !== "teams" && kind !== "whatsapp") continue;
+    try {
+      const loaded = await loadChatHistory({
+        email: record.email,
+        sessionId: record.sessionId,
+        workspace: record.workspace,
+      });
+      if (!scheduledThreadShouldInheritHide(record, loaded)) continue;
+      const patched = await patchChatHistoryEphemeral({
+        email: record.email,
+        sessionId: record.sessionId,
+        workspace: record.workspace,
+      });
+      if (!patched) continue;
+      await markFutureAgentEphemeral(record.sessionId);
+      record.ephemeral = true;
+      touched.add(record.email);
+    } catch (err) {
+      console.error(
+        "[future-agents] inherit hide",
+        record.sessionId,
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+  for (const email of touched) {
+    notifyEducationClients(email, "change", { source: "agent", status: "idle" });
+  }
+  return rows;
+}
+
+/**
+ * Pending inherited-hide threads are not a live session yet. Refresh an
+ * open history list when their 10 minutes are up. A later reply restarts it.
+ * @param {object[]|undefined} rows
+ */
+async function rearmInheritedEphemeralHides(rows) {
+  for (const record of rows || []) {
+    if (!record?.ephemeral) continue;
+    const loaded = await loadChatHistory({
+      email: record.email,
+      sessionId: record.sessionId,
+      workspace: record.workspace,
+    }).catch(() => null);
+    if (!loaded?.ephemeral) continue;
+    const updated = Date.parse(loaded.updated || "");
+    const elapsed = Number.isFinite(updated) ? Date.now() - updated : EPHEMERAL_HIDE_MS;
+    armEphemeralListRefresh(
+      record.email,
+      record.sessionId,
+      Math.max(0, EPHEMERAL_HIDE_MS - elapsed)
+    );
+  }
 }
 
 /**
@@ -1005,6 +1091,23 @@ function canManageFutureAgent(record, session) {
 }
 
 /**
+ * A scheduled thread copies the parent's channel, and that origin would
+ * hide it. Pin the thread unless the parent chat hides and this transcript
+ * still does. A web or iOS follow-up sets ephemeralPinned first.
+ * @param {Session} session
+ * @param {object|null|undefined} record
+ */
+export function applyScheduledVisibility(session, record) {
+  if (!session) return;
+  if (sessionWorkspace(session) === "jype") {
+    session.ephemeralPinned = true;
+    return;
+  }
+  if (session.ephemeralPinned) return;
+  if (!record?.ephemeral) session.ephemeralPinned = true;
+}
+
+/**
  * @param {Session} session
  * @param {object|null|undefined} record
  */
@@ -1015,7 +1118,7 @@ function attachScheduledToSession(session, record) {
   session.scheduledStatus = record.status || "pending";
   session.futureAgentRecord = record;
   session.forceGrok = true;
-  session.ephemeralPinned = true;
+  applyScheduledVisibility(session, record);
   const origin = record.origin || {};
   if (origin.kind === "teams" && origin.chatId) {
     session.teamsOrigin = {
@@ -1096,6 +1199,7 @@ function futureAgentTools(sid, session) {
             email: session.email,
             person: usagePerson(session),
             origin: originFromSession(session),
+            ephemeral: shouldPersistChatEphemeral(session) === true,
           });
           return JSON.stringify({
             ok: true,
@@ -3208,7 +3312,6 @@ export async function resumeAgent(sessionId, email, opts = {}) {
       resumed.scheduledRunAt = loaded.scheduledRunAt || "";
       resumed.scheduledStatus = loaded.scheduledStatus || "pending";
       resumed.forceGrok = true;
-      resumed.ephemeralPinned = true;
     }
   }
   activeByEmail.set(focusKey(normalized, workspace), sid);
@@ -4039,7 +4142,6 @@ async function hydrateAgentSession(sid, email, opts = {}) {
     session.scheduledRunAt = loaded.scheduledRunAt || "";
     session.scheduledStatus = loaded.scheduledStatus || "pending";
     session.forceGrok = true;
-    session.ephemeralPinned = true;
   }
   sessions.set(sid, session);
   return session;
@@ -4252,6 +4354,9 @@ export async function scheduleFutureAgentLive(input) {
     result.sessionId,
     "idle"
   );
+  if (result.record.ephemeral) {
+    armEphemeralListRefresh(result.record.email, result.sessionId);
+  }
   return result;
 }
 
@@ -4399,7 +4504,7 @@ export async function runScheduledAgent(record) {
         whatsappDeliverFinal: false,
         guestCaller: null,
         usagePerson: fresh.person || personFromEmail(email),
-        ephemeralPinned: true,
+        ephemeralPinned: workspace === "jype" ? true : !loaded.ephemeral,
       };
       sessions.set(sid, session);
     }
@@ -4447,7 +4552,10 @@ export async function runScheduledAgent(record) {
 }
 
 export function startFutureAgentScheduler() {
-  armStoredFutureAgents((record) => runScheduledAgent(record)).catch((err) => {
-    console.error("[future-agents] scheduler", err);
-  });
+  armStoredFutureAgents((record) => runScheduledAgent(record))
+    .then(() => backfillInheritedScheduledHides())
+    .then((rows) => rearmInheritedEphemeralHides(rows))
+    .catch((err) => {
+      console.error("[future-agents] scheduler", err);
+    });
 }

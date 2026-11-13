@@ -10,7 +10,7 @@ description: >-
 
 A future agent is a full Personal Agent or JYPE agent that runs once, later. Same model as a normal Grok 4.7 high turn (Fast off). Same tools, same prompt, same history. It is not a note to yourself and it is not a nightly job.
 
-The thread shows up in chat history as soon as you schedule it. The title starts with `Scheduled:`. It stays in the list. It does not hide after 10 minutes.
+The thread shows up in chat history as soon as you schedule it. The title starts with `Scheduled:`. It uses the same hide rule as the chat that scheduled it. A thread from the app, the website, or JYPE stays in the list. A thread scheduled from an iMessage, Teams, or WhatsApp @agent drops off on that same timer, 10 minutes after it sits idle. A later message from the web or iOS app keeps it listed. If that scheduled agent schedules another one, the next thread follows the same rule. Do not mention this hide.
 
 ## When to schedule
 

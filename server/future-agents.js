@@ -318,6 +318,7 @@ export function normalizeFutureAgentRecord(raw) {
     origin: cleanOrigin(raw?.origin),
     title: String(raw?.title || "").trim(),
     createdAt: String(raw?.createdAt || "").trim(),
+    ephemeral: raw?.ephemeral === true,
   };
 }
 
@@ -325,6 +326,35 @@ async function writeRecord(record, root) {
   const dir = futureAgentsDir(root);
   await mkdir(dir, { recursive: true });
   await writeFile(recordPath(record.sessionId, root), `${JSON.stringify(record, null, 2)}\n`, "utf8");
+}
+
+/**
+ * Personal channel schedules follow the @agent hide. JYPE stays listed.
+ * A second user message means someone continued the thread in the app.
+ * @param {object|null|undefined} record
+ * @param {{ ephemeral?: boolean, visibility?: string, messages?: { role?: string }[] }|null|undefined} loaded
+ */
+export function scheduledThreadShouldInheritHide(record, loaded) {
+  if (!record || record.ephemeral === true) return false;
+  if (normalizeJypeWorkspace(record.workspace) === "jype") return false;
+  if (record.status === "canceled") return false;
+  const kind = String(record.origin?.kind || "");
+  if (kind !== "imessage" && kind !== "teams" && kind !== "whatsapp") return false;
+  if (!loaded || loaded.ephemeral || loaded.visibility === "hidden") return false;
+  const userTurns = (loaded.messages || []).filter((m) => m?.role === "user").length;
+  return userTurns <= 1;
+}
+
+/**
+ * @param {string} sessionId
+ * @param {{ root?: string }} [opts]
+ */
+export async function markFutureAgentEphemeral(sessionId, opts = {}) {
+  const record = await readFutureAgent(sessionId, opts);
+  if (!record || record.ephemeral) return record;
+  record.ephemeral = true;
+  await writeRecord(record, opts.root);
+  return record;
 }
 
 /**
@@ -413,6 +443,7 @@ export function publicFutureAgentEntry(record) {
  *   email: string,
  *   person?: string,
  *   origin?: object,
+ *   ephemeral?: boolean,
  *   root?: string,
  *   now?: number,
  *   sessionId?: string,
@@ -436,6 +467,8 @@ export async function scheduleFutureAgent(input) {
   const sessionId = String(input?.sessionId || "").trim() || randomUUID();
   const title = scheduledChatTitle(prompt);
   const createdAt = new Date().toISOString();
+  // JYPE chats stay listed. Personal chats inherit the parent's hide rule.
+  const ephemeral = input?.ephemeral === true && workspace !== "jype";
   const record = {
     sessionId,
     runAt,
@@ -448,6 +481,7 @@ export async function scheduleFutureAgent(input) {
     origin: cleanOrigin(input?.origin),
     title,
     createdAt,
+    ephemeral,
   };
   const bubble = formatScheduledUserBubble(runAt, prompt);
   await persistChatHistory({
@@ -456,7 +490,7 @@ export async function scheduleFutureAgent(input) {
     workspace,
     root: input?.root,
     title,
-    ephemeral: false,
+    ephemeral,
     visibility: "showing",
     scheduled: true,
     scheduledRunAt: runAt,

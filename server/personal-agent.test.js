@@ -30,6 +30,7 @@ import {
   shouldKeepChatHistoryRead,
   isUiChatClient,
   shouldPersistChatEphemeral,
+  applyScheduledVisibility,
   pinEphemeralChatIfUiClient,
   shouldAppendEndOfTurn,
   snapshotMessages,
@@ -978,6 +979,32 @@ describe("ephemeral @agent chats", () => {
     assert.equal(pinEphemeralChatIfUiClient(session, { client: "web" }, "sid"), true);
     assert.equal(session.ephemeralPinned, true);
     assert.equal(shouldPersistChatEphemeral(session), false);
+  });
+
+  it("lets a scheduled thread hide only when the parent chat hides", () => {
+    const inherited = { ephemeralPinned: false, imessageOrigin: { to: "x" } };
+    applyScheduledVisibility(inherited, { ephemeral: true });
+    assert.equal(inherited.ephemeralPinned, false);
+    assert.equal(shouldPersistChatEphemeral(inherited), true);
+
+    const followedUp = { ephemeralPinned: true, imessageOrigin: { to: "x" } };
+    applyScheduledVisibility(followedUp, { ephemeral: true });
+    assert.equal(followedUp.ephemeralPinned, true);
+    assert.equal(shouldPersistChatEphemeral(followedUp), false);
+
+    const staying = { ephemeralPinned: false, imessageOrigin: { to: "x" } };
+    applyScheduledVisibility(staying, {});
+    assert.equal(staying.ephemeralPinned, true);
+    assert.equal(shouldPersistChatEphemeral(staying), false);
+
+    const jype = {
+      workspace: "jype",
+      ephemeralPinned: false,
+      teamsOrigin: { chatId: "x" },
+    };
+    applyScheduledVisibility(jype, { ephemeral: true });
+    assert.equal(jype.ephemeralPinned, true);
+    assert.equal(shouldPersistChatEphemeral(jype), false);
   });
 });
 

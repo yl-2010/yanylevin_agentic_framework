@@ -1121,6 +1121,41 @@ export async function patchChatHistoryVisibility(opts) {
 }
 
 /**
+ * Mark a thread ephemeral without moving updated, so the hide clock
+ * stays on the last reply.
+ * @param {{ email: string, sessionId: string, workspace?: string, root?: string }} opts
+ * @returns {Promise<boolean>}
+ */
+export async function patchChatHistoryEphemeral(opts) {
+  const email = canonicalizeEmail(opts?.email);
+  const sessionId = sanitizeSessionId(opts?.sessionId);
+  const rel = chatHistoryFileRel(email, sessionId, opts?.workspace);
+  if (!email || !sessionId || !rel) return false;
+  const abs = absChatFile(email, rel, opts?.workspace, opts?.root);
+  let text;
+  try {
+    text = await readFile(abs, "utf8");
+  } catch (err) {
+    if (err && /** @type {{ code?: string }} */ (err).code === "ENOENT") {
+      return false;
+    }
+    throw err;
+  }
+  if (/^ephemeral:\s+true\s*$/m.test(text)) return true;
+  let next;
+  if (/^ephemeral:\s+/m.test(text)) {
+    next = text.replace(/^ephemeral:\s+.*$/m, "ephemeral: true");
+  } else if (/^visibility:\s+/m.test(text)) {
+    next = text.replace(/^(visibility:\s+\S+)\s*$/m, "$1\nephemeral: true");
+  } else {
+    return false;
+  }
+  if (next === text) return false;
+  await writeFile(abs, next, "utf8");
+  return true;
+}
+
+/**
  * Update scheduledStatus on an existing future-agent thread.
  * @param {{
  *   email: string,
