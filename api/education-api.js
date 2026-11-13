@@ -5,6 +5,7 @@
 
 const { mintHs256Jwt } = require("./_jwt");
 const { readSession, getAuthSecret } = require("./_auth");
+const { sendHistoryFinal } = require("./_us-history-final-quiz");
 
 const ISSUER = "yanylevin-next";
 const AUDIENCE = "yanylevin-mac-api";
@@ -204,6 +205,10 @@ module.exports = async function handler(req, res) {
     const route = routePath(req);
     const method = req.method || "GET";
 
+    if (route === "history-final") {
+      await sendHistoryFinal(req, res);
+      return;
+    }
     if (route === "data") {
       if (method !== "GET") {
         res.setHeader("Allow", "GET");

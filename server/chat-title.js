@@ -4,6 +4,7 @@
  */
 
 import { chatCompletions } from "./lmstudio.js";
+import { stripHarmonyTokens } from "./chat-theme.js";
 import {
   applyChatTitleStarter,
   CHAT_GUEST_WRAP_RE,
@@ -18,6 +19,15 @@ import {
 
 const TITLE_TIMEOUT_MS = 40_000;
 export const TITLE_MODEL = "openai/gpt-oss-20b";
+/**
+ * gpt-oss writes an analysis channel before the title. A 40 token cap
+ * ended on that channel, so content came back empty or as `<|channel|>final`
+ * about half the time. 256 leaves room for the reasoning and the title.
+ */
+export const TITLE_MAX_TOKENS = 256;
+
+/** Model echo of the old Name (Teams) seed. */
+const PLATFORM_ECHO_RE = /\((?:Teams|iMessage)\)\s*:/i;
 
 /** Shared with the 01:30 full-transcript refresh job. */
 export const CHAT_TITLE_STYLE = `Keyword-style chat list title, not a sentence.
@@ -49,18 +59,9 @@ export function titleSeedFromUserMessage(raw) {
   if (task) return task;
   let s = String(raw || "").trim();
   const wrap = s.match(CHAT_GUEST_WRAP_RE);
-  let who = "";
-  let platform = "";
-  if (wrap) {
-    who = String(wrap[1] || "").trim();
-    platform = String(wrap[2] || "").trim();
-    s = s.slice(wrap[0].length).trim();
-  }
+  if (wrap) s = s.slice(wrap[0].length).trim();
   s = s.replace(AGENT_MENTION_LEAD_RE, "").trim();
   if (!s && wrap) s = "@agent";
-  if (who && platform) {
-    return `${who} (${platform}): ${s}`.trim();
-  }
   return s;
 }
 
@@ -89,6 +90,11 @@ export function isStubChatTitle(title, firstUserMessage) {
   }
   if (!t) return true;
   if (CHAT_GUEST_WRAP_RE.test(t)) return true;
+  if (/<\|/.test(String(title || "")) || /<\|/.test(t)) return true;
+  if (PLATFORM_ECHO_RE.test(String(title || "")) || PLATFORM_ECHO_RE.test(t)) {
+    return true;
+  }
+  if (/^(?:final|analysis|commentary)$/i.test(t)) return true;
   const collapsed = String(firstUserMessage || "").replace(/\s+/g, " ").trim();
   if (!collapsed) return false;
   if (t === fallbackChatTitle(collapsed)) return true;
@@ -108,7 +114,10 @@ let pumping = false;
  * @returns {string}
  */
 export function titleFromAgentReply(raw) {
-  return sanitizeChatTitle(raw);
+  const stripped = stripHarmonyTokens(raw);
+  if (!stripped || PLATFORM_ECHO_RE.test(stripped)) return "";
+  if (/<\|/.test(stripped)) return "";
+  return sanitizeChatTitle(stripped);
 }
 
 /** @type {Set<string>} */
@@ -260,7 +269,7 @@ async function generateTitleWithAgent(firstPrompt) {
         { role: "user", content: seed.slice(0, 800) },
       ],
       temperature: 0.2,
-      maxTokens: 40,
+      maxTokens: TITLE_MAX_TOKENS,
     }),
     new Promise((_, reject) => {
       setTimeout(() => reject(new Error("title timed out")), TITLE_TIMEOUT_MS);

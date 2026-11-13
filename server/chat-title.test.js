@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   isStubChatTitle,
   TITLE_MODEL,
+  TITLE_MAX_TOKENS,
   titleFromAgentReply,
   titleSeedFromUserMessage,
   TITLE_PROMPT,
@@ -16,6 +17,26 @@ describe("titleFromAgentReply", () => {
 
   it("strips quotes and trailing punctuation", () => {
     assert.equal(titleFromAgentReply('"Friday calc homework."'), "Friday calc homework");
+  });
+
+  it("drops a cutoff harmony channel with no title", () => {
+    assert.equal(titleFromAgentReply("<|channel|>final"), "");
+    assert.equal(titleFromAgentReply("<|channel|>"), "");
+  });
+
+  it("keeps the final channel when the title is after the marker", () => {
+    assert.equal(
+      titleFromAgentReply("<|channel|>final<|message|>South Asian quiz"),
+      "South Asian quiz"
+    );
+  });
+
+  it("drops a Teams wrapper echo", () => {
+    assert.equal(titleFromAgentReply("(Teams): what's southasianesh"), "");
+  });
+
+  it("leaves enough tokens for the reasoning channel", () => {
+    assert.ok(TITLE_MAX_TOKENS >= 128);
   });
 
   it("uses keyword-style instructions", () => {
@@ -35,7 +56,7 @@ describe("titleSeedFromUserMessage", () => {
       titleSeedFromUserMessage(
         "From Alex on Teams:\n\n@agent can you do my history hw"
       ),
-      "Alex (Teams): can you do my history hw"
+      "can you do my history hw"
     );
   });
 
@@ -44,7 +65,7 @@ describe("titleSeedFromUserMessage", () => {
       titleSeedFromUserMessage(
         "From Example Friend on iMessage:\n\n@agent send a photo"
       ),
-      "Example Friend (iMessage): send a photo"
+      "send a photo"
     );
   });
 
@@ -88,6 +109,15 @@ describe("isStubChatTitle", () => {
   it("flags a cleaned guest fallback", () => {
     assert.equal(
       isStubChatTitle("Alex (Teams): can you do my history", teams),
+      true
+    );
+  });
+
+  it("flags harmony leftovers and platform echoes", () => {
+    assert.equal(isStubChatTitle("<|channel|>final", "hello"), true);
+    assert.equal(isStubChatTitle("Alex: <|channel|>", "hello"), true);
+    assert.equal(
+      isStubChatTitle("Batu: (Teams): what's southasianesh", teams),
       true
     );
   });

@@ -31,3 +31,47 @@ Illustrator/
 
 # South Asianesh Royale realtime server runs on the Mac (LaunchAgent com.yanylevin.sar-game), not Vercel.
 southasianeshroyale-server/
+
+# Large audio and slide files live in Vercel Blob (store yanylevin-media), not in each deploy.
+# Each deploy used to carry ~255 MB of these, so a busy day of deploys blew the 10 GB
+# Hobby Deployment Storage cap. vercel.json redirects each path to its Blob copy.
+# New big media: `vercel blob put <path> --access public --pathname <path>`, then add it here and a redirect.
+/jype/come-closer/come-closer.m4a
+/jype/still-open/still-open.m4a
+/jype/frontier-cascadia-materials/EPSynapse.pptx
+/jype/we-love-costco-voice/we-love-costco-voice.m4a
+/jype/we-love-costco/we-love-costco.m4a
+/jype/we-love-costco-male/we-love-costco-male.m4a
+/jype/we-love-costco-low/we-love-costco-low.m4a
+/jype/hell-week-song-read/hell-week-read.m4a
+/jype/hell-week-song/hell-week.m4a
+/jype/hell-week-song-week/hell-week-week.m4a
+/jype/peak-hell-day/peak-hell-day.mp3
+/happy-sample/happy-sample.mp3
+/jype/stacked-hell/stacked-hell.mp3
+/costco-eps/costco-eps.mp3
+/jype/hell-week-song-tune/hell-week-tune.m4a
+/jype/peak-hell-day-low/peak-hell-day-low.mp3
+/jype/hell-week-song/hell-week-sung.m4a
+/jype/hell-week-song-hook/hell-week-hook.m4a
+/jype/hell-week-song-1548/hell-week-1548.m4a
+/jype/hell-week-song-monday/hell-week-monday.m4a
+/one-fifty/one-fifty.mp3
+/jype/last-light/last-light.mp3
+/jype/you-looked/you-looked.m4a
+/jype/twice-up/twice-up.mp3
+/jype/hill-squared/hill-squared.mp3
+/jype/second-climb/second-climb.mp3
+/espanol-final/script.m4a
+/jype/thank-you-for-your-interest/thank-you-for-your-interest.m4a
+/jype/put-the-units/put-the-units.m4a
+/jype/peak-hell-day-scare/peak-hell-day-scare.mp3
+/jype/come-to-the-car/come-to-the-car.m4a
+/jype/run-to-the-car/run-to-the-car.m4a
+/jype/speaker-on/speaker-on.m4a
+/jype/ayo-is-not-an-answer/ayo-is-not-an-answer.m4a
+/jype/sweet-home-the-wall/sweet-home-the-wall.mp3
+/american-lit/lit-took-the-birthday/lit-took-the-birthday.m4a
+/jype/sreekar-birthday/sreekar-birthday.mp3
+/spanish-scare/open-the-book.m4a
+/abre-el-libro/abre-el-libro.m4a
