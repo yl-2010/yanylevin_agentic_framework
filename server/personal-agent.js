@@ -28,7 +28,6 @@ import { educationDataDir, JYPE_DIR } from "./onedrive-projects.js";
 import { gitAddCommitPush } from "./git-publish.js";
 import { encodeEducationRouteId } from "./education-route-id.js";
 import { enqueueBrainExtraction } from "./brain-extraction.js";
-import { sendAccountAlert } from "./apns.js";
 import { parseLocationPayload } from "./phone-location.js";
 import { formatCalendarLiveLines } from "./calendar-cli.js";
 import { formatCanvasLiveLine } from "./canvas-sync.js";
@@ -1139,62 +1138,9 @@ function futureAgentTools(sid, session) {
  * @param {string} sid
  * @param {Session} session
  */
-function sendPushTool(sid, session) {
-  return {
-    send_push: {
-      description:
-        "Send a push notification to this account's iPhone and iPad. Do not call this. The app is signed with a free Apple developer account, which cannot receive remote push, so the call fails. To reach them, use iMessage.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          title: {
-            type: "string",
-            description: "Short title, a few words.",
-          },
-          body: {
-            type: "string",
-            description: "The line they should read. One or two sentences.",
-          },
-        },
-        required: ["title", "body"],
-      },
-      async execute({ title, body }) {
-        if (!sessions.has(sid) || sessions.get(sid) !== session) {
-          return "session gone";
-        }
-        const result = await sendAccountAlert({
-          email: session.email,
-          title,
-          body,
-          sessionId: sid,
-        });
-        return JSON.stringify(result);
-      },
-    },
-  };
-}
-
-/**
- * Website, app, and scheduled chats can alert this account's phones.
- * A turn that still delivers to iMessage, Teams, or WhatsApp already notifies there.
- * @param {Session|null|undefined} session
- */
-export function sessionMaySendPush(session) {
-  if (!session) return false;
-  if (session.imessageDeliverFinal || session.teamsDeliverFinal || session.whatsappDeliverFinal) {
-    return false;
-  }
-  const owed = String(session.channelReplyOwed || "");
-  if (owed === "imessage" || owed === "teams" || owed === "whatsapp") return false;
-  const progress = String(session.channelProgress || "");
-  if (progress === "imessage" || progress === "teams" || progress === "whatsapp") return false;
-  return true;
-}
-
 function sessionCustomTools(sid, session) {
   return {
     ...sendChatMessageTool(sid, session),
-    ...(sessionMaySendPush(session) ? sendPushTool(sid, session) : {}),
     ...futureAgentTools(sid, session),
     ...openEducationPageTool(sid, session),
     ...(sessionMayUseBrowser(session) ? browserCustomTools(session) : {}),
@@ -2107,7 +2053,6 @@ export function systemPrompt(email, opts = {}) {
       `- Celebration site: ${PERSONAL_SKILL_PATHS.celebration}`,
       "File uploads can be stored in the matching JYPE class or project folder.",
       "Math on the website and in the iOS app is a display block, with a blank line before and after. Put $$ on its own line, then LaTeX, then $$ on its own line. Stack equations one per line in that block. Use \\(x\\) or $x^2$ only for a symbol inside a sentence. Never backticks for math. iMessage and Teams cannot render KaTeX, so those replies stay plain words.",
-      "send_push cannot reach the iPhone or iPad. The app is on a free Apple developer account, which cannot receive remote push. Do not say you sent a phone alert. To reach them, use iMessage.",
     ].join("\n");
   }
   return [
@@ -2169,7 +2114,6 @@ export function systemPrompt(email, opts = {}) {
     "Math on the website and in the iOS app is a display block, with a blank line before and after. Put $$ on its own line, then LaTeX, then $$ on its own line. Stack equations one per line in that block. Use \\(x\\) or $x^2$ only for a symbol inside a sentence. Never backticks for math. iMessage and Teams cannot render KaTeX, so those replies stay plain words.",
     "Send to a person with no channel named: iMessage, then Teams, then email. Named channel (on Teams / iMessage / email) wins for text. iMessage files are native attachments (iMessage skill), never a URL stand-in. Each file is its own message, then the text. A Teams file goes out as a yanylevin.com link: put it in the repo, use a non-guessable folder when it should not be easy to find, commit, push, npm run deploy:web, confirm the URL is 200, then school-teams.js send the link. Attach in the Teams app with computer use only when Yan directly says to attach with computer use in this turn. A message with images has no pixels. Open that chat in the Teams app and look. School Outlook still cannot send.",
     "Long work: send_chat_message first with a short status. Send more mid-run when new info, a change, or a useful update appears. Then a final Done. Quick answers: one reply only (that is the end of turn). On an iMessage or Teams @agent or @agentg first turn, that first status is also posted to the chat before you start the work.",
-    "send_push cannot reach the iPhone or iPad. The app is on a free Apple developer account, which cannot receive remote push. Do not say you sent a phone alert. To reach them, use iMessage.",
     "To show one education page on web/iOS, call open_education_page (education-dashboard skill). The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Skip if already on that page. Not on Cursor Desktop.",
     "No period when the reply is one word, one phrase, or one sentence.",
   ].join("\n");

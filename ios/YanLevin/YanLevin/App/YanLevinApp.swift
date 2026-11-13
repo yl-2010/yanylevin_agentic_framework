@@ -9,7 +9,6 @@ struct YanLevinApp: App {
     @StateObject private var nav = AppNavigationStore.shared
     @Environment(\.scenePhase) private var scenePhase
     @State private var showLaunchCover = true
-    @UIApplicationDelegateAdaptor(YanAppDelegate.self) private var appDelegate
 
     init() {
         // iPhone Max landscape used `.sidebarAdaptable` and wrote split

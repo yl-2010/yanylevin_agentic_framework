@@ -284,6 +284,4 @@ export async function startInProcessAgentSchedulers() {
   teams.startTeamsAgentMentionScheduler();
   wa.startWhatsAppAgentMentionScheduler();
   agent.startFutureAgentScheduler();
-  const { startClassLiveActivityScheduler } = await import("./class-live-activity-scheduler.js");
-  startClassLiveActivityScheduler();
 }

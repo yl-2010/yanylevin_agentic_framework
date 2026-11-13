@@ -74,7 +74,6 @@
 		9449091BE5AF456E7D7EAAF6 /* TodoWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56E5089678AC6FD751ABBA54 /* TodoWidget.swift */; };
 		958BCCA3A8A3810849928DDB /* AppLoadingScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F59C1B7CC61E1680271B65 /* AppLoadingScreen.swift */; };
 		9BEC1717E9F8F9A601A23781 /* ChatControlWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B019B6E0B0488314D38BD9 /* ChatControlWidget.swift */; };
-		9C2BC6FE6EED09EB2F09868F /* PushRegistration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4D7D6AD22A5FB4EA9F81DD8 /* PushRegistration.swift */; };
 		A0F684FF13DDC6E02923E9CD /* YLMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 080B5543DFC0877FE81D2D84 /* YLMark.swift */; };
 		A2139B04EF6EC6327A839060 /* AgentActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 697A904D8BE3400C45BC3787 /* AgentActivityAttributes.swift */; };
 		A3F8D551C2EE0A3BE4752D3A /* AppGroupStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E7DDEA1EF28086A8752029D /* AppGroupStore.swift */; };
@@ -210,7 +209,6 @@
 		9BBD84778BC1EBA0B291C926 /* ChatHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHistory.swift; sourceTree = "<group>"; };
 		9EC3D1C27A611BCEB5A03A7D /* KaTeX_Size3-Regular.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Size3-Regular.woff2"; sourceTree = "<group>"; };
 		A056C44E530D5338DB54978D /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
-		A4D7D6AD22A5FB4EA9F81DD8 /* PushRegistration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushRegistration.swift; sourceTree = "<group>"; };
 		A86C6C326C4186DB341D3C76 /* LiveActivityChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityChrome.swift; sourceTree = "<group>"; };
 		A94CCFD3097868B59A3491ED /* EducationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EducationStore.swift; sourceTree = "<group>"; };
 		AB6D32A34C8B1C29DF15F180 /* TabReselectObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabReselectObserver.swift; sourceTree = "<group>"; };
@@ -287,7 +285,6 @@
 				0C2AAC92030253A56EE90A26 /* OpenClassIntent.swift */,
 				499CB5F2593A83941A69B5D4 /* OpenTodoIntent.swift */,
 				79A3148F43AFD9F3B55F1A43 /* PadTabBarPin.swift */,
-				A4D7D6AD22A5FB4EA9F81DD8 /* PushRegistration.swift */,
 				B414370293577E90FDB3BC95 /* RootTabView.swift */,
 				AB6D32A34C8B1C29DF15F180 /* TabReselectObserver.swift */,
 				BD7AE7215F57F3740AB87531 /* YanLevinApp.swift */,
@@ -672,7 +669,6 @@
 				7FABD05D5D1BBC89B680FD9B /* PadTabBarPin.swift in Sources */,
 				A6296BB53F8F6B2A3F71EA80 /* PhoneLocationReporter.swift in Sources */,
 				BE062D44E3319A3659ABBE58 /* PortfolioContent.swift in Sources */,
-				9C2BC6FE6EED09EB2F09868F /* PushRegistration.swift in Sources */,
 				C52595D82A1AB8D1201B44B3 /* RootTabView.swift in Sources */,
 				E0DACB5DB2DB4BB7947801BD /* TabReselectObserver.swift in Sources */,
 				47486BD29572D791F436479F /* Theme.swift in Sources */,

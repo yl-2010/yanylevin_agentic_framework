@@ -52,7 +52,6 @@ import {
   deliverIMessageProgressReply,
   deliverTeamsFinalReply,
   channelProgressKind,
-  sessionMaySendPush,
   channelSendToolResult,
   usageKind,
   usagePerson,
@@ -1615,17 +1614,5 @@ describe("composeTurnPrompt", () => {
         "X",
       ].join("\n")
     );
-  });
-});
-
-describe("send_push gate", () => {
-  it("allows an app chat and skips a turn that still delivers to a channel", () => {
-    assert.equal(sessionMaySendPush({ email: YAN }), true);
-    assert.equal(sessionMaySendPush({ email: YAN, imessageDeliverFinal: true }), false);
-    assert.equal(sessionMaySendPush({ email: YAN, teamsDeliverFinal: true }), false);
-    assert.equal(sessionMaySendPush({ email: YAN, whatsappDeliverFinal: true }), false);
-    assert.equal(sessionMaySendPush({ email: YAN, channelReplyOwed: "imessage" }), false);
-    assert.equal(sessionMaySendPush({ email: YAN, channelProgress: "teams" }), false);
-    assert.equal(sessionMaySendPush(null), false);
   });
 });

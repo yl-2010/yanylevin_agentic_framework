@@ -44,18 +44,14 @@ Apple/iCloud emails alias onto the same Gmail-backed account folders — Google 
 
 ### Live Activities (iPhone and iPad)
 
-Lock Screen on both. Dynamic Island on iPhone. Status bar on iPad. Full-access only. Class minutes (`12 min`) are system-drawn, so they keep counting with the app asleep.
-
-The class card is one activity for the school day. It starts at the first highlight and stays up through passing, lunch, and free periods, showing the next real class until that class begins. It ends 15 minutes after the last bell. The class name changes when the app is running. After the app sleeps, the name stays on the last class until the next open. The minute text keeps moving either way. A free Apple developer account cannot receive the push that would change the name from the Mac while the app is closed. That needs the paid program and Push Notifications on the App ID.
-
-`send_push` is on website, app, and scheduled chats, and it is off for iMessage, Teams, and WhatsApp turns. It does not deliver on this account. Remote alerts need the same paid program, an APNs key on the Mac, and the push entitlement back in the app. The key is `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_KEY_PATH`, and `APNS_BUNDLE_ID` in `server/.env`. Do not add `aps-environment` on the free Personal Team. The app will not install.
+Lock Screen on both; Dynamic Island on iPhone; status bar on iPad. Full-access only. Started from the app (foreground, education SSE, or iPhone location heartbeat). Class minutes (`12 min`) are system-drawn, so they keep counting with the app asleep. No ActivityKit push yet.
 
 | Activity | When | Tap |
 |----------|------|-----|
-| **Class** | The school day, from the first highlight until 15 minutes after the last bell. Real class during its window, next real class during a gap. Open HW / CW / MA / QA for that class. | Banner → class page. A row → that assignment (`yanylevin://class?id=` / `yanylevin://todo?id=`). |
-| **Agents** | Personal Agent threads that are running or queued. Up to 3 rows; `+N more` after that. Started from the app, not by push. | Banner → Chat tab. A row → that session (`yanylevin://chat?open=1` / `yanylevin://chat?sessionId=`). |
+| **Class** | Current real class only (not free periods), including the 10-minute lead (or the whole passing period if that gap is under 10 minutes). Shows open HW / CW / MA / QA due that period. | Banner → class page. A row → that assignment (`yanylevin://class?id=` / `yanylevin://todo?id=`). |
+| **Agents** | Personal Agent threads that are running or queued. Up to 3 rows; `+N more` after that. | Banner → Chat tab. A row → that session (`yanylevin://chat?open=1` / `yanylevin://chat?sessionId=`). |
 
-Enable Live Activities for Yan Levin in Settings if they do not appear.
+Enable Live Activities for Yan Levin in iPhone Settings if they do not appear.
 
 ### Education widgets (full-access only)
 

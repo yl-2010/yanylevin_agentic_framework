@@ -73,21 +73,14 @@ enum EducationScheduleHelper {
         return nil
     }
 
-    static func minutesToDate(dateKey: String, minutes: Int, timezone: String? = nil) -> Date? {
+    static func minutesToDate(dateKey: String, minutes: Int) -> Date? {
         let parts = dateKey.split(separator: "-")
         guard parts.count == 3,
               let y = Int(parts[0]),
               let m = Int(parts[1]),
               let day = Int(parts[2])
         else { return nil }
-        var cal = Calendar(identifier: .gregorian)
-        if let timezone, let tz = TimeZone(identifier: timezone) {
-            cal.timeZone = tz
-        } else {
-            cal = .current
-        }
-        return cal.date(from: DateComponents(
-            timeZone: cal.timeZone,
+        return Calendar.current.date(from: DateComponents(
             year: y,
             month: m,
             day: day,

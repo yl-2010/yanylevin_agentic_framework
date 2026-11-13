@@ -88,8 +88,6 @@ targets:
         # Also set AccountView.signInWithAppleEnabled = true
         com.apple.security.application-groups:
           - group.com.example.personalagent
-        # aps-environment needs a paid Apple Developer Program membership.
-        # A free Personal Team cannot sign it, and the app will not install.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.personalagent

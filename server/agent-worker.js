@@ -206,8 +206,6 @@ async function main() {
     startTeamsAgentMentionScheduler();
     startWhatsAppAgentMentionScheduler();
     agent.startFutureAgentScheduler();
-    const { startClassLiveActivityScheduler } = await import("./class-live-activity-scheduler.js");
-    startClassLiveActivityScheduler();
   });
 }
 
