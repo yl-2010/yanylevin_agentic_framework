@@ -19,6 +19,9 @@ export const OUTLOOK_REST_BASE = "https://outlook.office.com/api/v2.0";
 const LOGIN_WAIT_MS = 10 * 60_000;
 const REFRESH_WAIT_MS = 45_000;
 const TOKEN_SKEW_S = 90;
+const CAPTURE_COOLDOWN_MS = 5 * 60_000;
+/** @type {number} */
+let captureFailAt = 0;
 
 export function schoolMailDir() {
   return (
@@ -363,7 +366,9 @@ async function captureToken(opts) {
     // or the timeout rejects with nobody listening and Node exits.
     pending.catch(() => {});
     const page = context.pages()[0] || (await context.newPage());
-    await page.goto(OWA_URL, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    page
+      .goto(OWA_URL, { waitUntil: "domcontentloaded", timeout: 30_000 })
+      .catch(() => {});
     const token = await pending;
     await saveSession({ token }, opts.root);
     return token;
@@ -483,13 +488,21 @@ async function resolveToken(opts) {
   if (!session) {
     throw new Error("no saved school Outlook session");
   }
+  if (!opts.force && captureFailAt && Date.now() - captureFailAt < CAPTURE_COOLDOWN_MS) {
+    if (session.token) return session.token;
+    throw new Error("timed out waiting for Outlook sign-in");
+  }
   try {
-    return await captureToken({
+    const token = await captureToken({
       headed: Boolean(opts.headed),
       root,
     });
+    captureFailAt = 0;
+    return token;
   } catch (err) {
+    captureFailAt = Date.now();
     const msg = err instanceof Error ? err.message : String(err);
+    console.error("[school-mail] token refresh failed:", msg.replace(/\s+/g, " ").slice(0, 240));
     if (session.token && !opts.force) return session.token;
     throw new Error(msg);
   }

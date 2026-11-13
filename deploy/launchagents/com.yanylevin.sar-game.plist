@@ -21,8 +21,8 @@
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>/tmp/yanylevin-sar-game.log</string>
+  <string>/Users/you/Library/Logs/personal-agent/personal-agent-sar-game.log</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/yanylevin-sar-game.log</string>
+  <string>/Users/you/Library/Logs/personal-agent/personal-agent-sar-game.log</string>
 </dict>
 </plist>

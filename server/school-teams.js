@@ -912,9 +912,9 @@ function waitForTeamsTokens(context, timeoutMs) {
   });
 }
 
-async function clickIfVisible(page, name, timeoutMs = 4000) {
+async function clickIfVisible(page, name, timeoutMs = 4000, exact = false) {
   try {
-    const btn = page.getByRole("button", { name, exact: false });
+    const btn = page.getByRole("button", { name, exact });
     await btn.first().waitFor({ state: "visible", timeout: timeoutMs });
     await btn.first().click({ timeout: 3000 });
     return true;
@@ -933,33 +933,20 @@ async function captureToken(opts) {
     // or the timeout rejects with nobody listening and Node exits.
     pending.catch(() => {});
     const page = context.pages()[0] || (await context.newPage());
-    try {
-      await page.goto(TEAMS_WEB_URL, {
-        waitUntil: "domcontentloaded",
-        timeout: 60_000,
-      });
-    } catch {
-      // token listener still runs
-    }
-    await sleep(2000);
-    await clickIfVisible(page, "Chat");
-    await clickIfVisible(page, "Chats");
-    try {
-      await page.goto("https://teams.microsoft.com/v2/#/chats", {
-        waitUntil: "domcontentloaded",
-        timeout: 30_000,
-      });
-    } catch {
-      // still listening
-    }
-    try {
-      await page.goto("https://teams.microsoft.com/v2/#/teams", {
-        waitUntil: "domcontentloaded",
-        timeout: 30_000,
-      });
-    } catch {
-      // still listening
-    }
+    const nav = (async () => {
+      try {
+        await page.goto(TEAMS_WEB_URL, {
+          waitUntil: "domcontentloaded",
+          timeout: 30_000,
+        });
+      } catch {
+        // token listener still runs
+      }
+      // Stay on Chat. Hopping to #/teams cancels the IC3 request, and the
+      // 45s timer can expire before that navigation finishes.
+      await clickIfVisible(page, "Chat", 8_000, true);
+    })();
+    nav.catch(() => {});
     const found = await pending;
     const session = {
       token: found.ic3,
@@ -1030,8 +1017,11 @@ async function apiRequest(url, session, { method = "GET", body, token, extra } =
 }
 
 export const CAPTURE_COOLDOWN_MS = 5 * 60_000;
+const PROFILE_BUSY_COOLDOWN_MS = 15_000;
 /** @type {number} */
 let captureFailAt = 0;
+/** @type {number} */
+let captureCooldownMs = CAPTURE_COOLDOWN_MS;
 
 export function isTeamsAuthError(err) {
   const status = Number(err?.status || 0);
@@ -1060,7 +1050,7 @@ async function resolveSession(opts) {
   ) {
     return { ...session, root };
   }
-  if (!opts.force && captureFailAt && Date.now() - captureFailAt < CAPTURE_COOLDOWN_MS) {
+  if (!opts.force && captureFailAt && Date.now() - captureFailAt < captureCooldownMs) {
     throw new Error("timed out waiting for Teams chat tokens");
   }
   try {
@@ -1073,6 +1063,10 @@ async function resolveSession(opts) {
   } catch (err) {
     captureFailAt = Date.now();
     const msg = err instanceof Error ? err.message : String(err);
+    captureCooldownMs = /ProcessSingleton|already in use|profile directory|SingletonLock/i.test(msg)
+      ? PROFILE_BUSY_COOLDOWN_MS
+      : CAPTURE_COOLDOWN_MS;
+    console.error("[school-teams] token refresh failed:", msg.replace(/\s+/g, " ").slice(0, 240));
     if (opts.refresh || opts.force) throw new Error(msg);
     if (session.token && session.csaToken) {
       return { ...session, root };

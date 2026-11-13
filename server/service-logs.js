@@ -17,6 +17,7 @@ export const SERVICE_LOG_FILES = {
   lmstudioGptOss: "personal-agent-lmstudio-gpt-oss.log",
   cloudflared: "cloudflared-personal-agent.log",
   computerUse: "personal-agent-computer-use.log",
+  sarGame: "personal-agent-sar-game.log",
 };
 
 /** @type {Record<keyof typeof SERVICE_LOG_FILES, string>} */
@@ -31,6 +32,7 @@ export const EDUCATION_SYNC_LOG_PATH = SERVICE_LOGS.educationSync;
 export const LMSTUDIO_GPT_OSS_LOG_PATH = SERVICE_LOGS.lmstudioGptOss;
 export const CLOUDFLARED_LOG_PATH = SERVICE_LOGS.cloudflared;
 export const COMPUTER_USE_LOG_PATH = SERVICE_LOGS.computerUse;
+export const SAR_GAME_LOG_PATH = SERVICE_LOGS.sarGame;
 
 export function ensureServiceLogDir() {
   mkdirSync(SERVICE_LOG_DIR, { recursive: true });

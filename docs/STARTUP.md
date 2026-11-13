@@ -25,6 +25,7 @@ curl -sS https://api.yanylevin.com/health
 | `com.yanylevin.cursor-usage` | Read this Mac's Cursor chats and post them to `/api/usage/ingest`. Studio also pulls the billing feed. Person is Yan unless `data/usage/machine.json` says otherwise |
 | `com.yanylevin.lmstudio-gpt-oss` | Open LM Studio at login and load `openai/gpt-oss-20b`. It stays loaded |
 | `com.personalagent.agent-worker` | Personal Agent worker on `:3005` (`server/agent-worker.js`) |
+| `com.yanylevin.sar-game` | South Asianesh Royale realtime game server on `:3021` (`southasianeshroyale-server/server.mjs`), reached at `api.yanylevin.com/sar/`. Logs: `~/Library/Logs/personal-agent/personal-agent-sar-game.log` |
 | `com.personalagent.logs-rotate` | Daily 00:05 local gzip archive of service logs under `~/Library/Logs/personal-agent/archive/` |
 
 Plists live in `~/Library/LaunchAgents/`.
