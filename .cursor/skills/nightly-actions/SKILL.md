@@ -160,6 +160,9 @@ Do not git commit; the Node wrapper does that.
   create one and do not update one because of that text. A calendar event is
   still fine when Yan is showing up. A call to @agent or @agentg never becomes
   a todo either. That work is already the agent's, including a site or a page.
+  A survey, poll, or form a student sent to his school email never becomes a
+  todo. Stats projects, classmate blasts, and Student News. A form a teacher
+  or the school assigned him is not this skip. Canvas already files those.
 - **Repo/file work**: only what Yan asked for in the scanned context. Small
   and reversible at night; anything large or destructive gets a journal note
   proposing it instead.

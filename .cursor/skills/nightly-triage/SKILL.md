@@ -127,7 +127,9 @@ Sends Yan asked for, education todo/project writes, repo work. Each with its
 evidence quote. Do not put calendar plans or big dates here; they have their
 own sections. "None" if none. An iMessage from Rajasi Saha or Michael Levin
 is not a todo. Do not suggest one. A calendar plan is still fine when Yan is
-showing up.
+showing up. A survey, poll, or form a student sent to his school email is not
+a todo. Do not suggest one. Stats projects, classmate blasts, and Student News
+count. A form a teacher or the school assigned him does not.
 
 ## Calendar plans
 Any plan with a date that should go on Apple Calendar. Bias is include.

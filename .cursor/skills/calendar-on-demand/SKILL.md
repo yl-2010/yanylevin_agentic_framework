@@ -54,7 +54,7 @@ A call to @agent or @agentg is not his task. Yan telling the agent to make a get
 
 Messages. Someone gives him the task. "Send me the photo tonight", "fill this out", "email the office the form". A chat that only mentions an idea, a maybe, or something he could do is not a task.
 
-Email. The mail gives him a direct task. Fill out a form. Reply to a direct question asked of him. Send an email about something the mail says he has to email about. Send a named file someone told him to send.
+Email. The mail gives him a direct task. Fill out a form a teacher or the school assigned him. Reply to a direct question asked of him. Send an email about something the mail says he has to email about. Send a named file someone told him to send.
 
 Skip these, even when they sound useful:
 
@@ -64,6 +64,7 @@ Skip these, even when they sound useful:
 - A task for someone else.
 - Homework, Canvas, and due dates that already live on the education dashboard. Canvas sync already makes those todos.
 - College spam, and the weekly EPS college-visit list, unless he signed up.
+- A survey, poll, or form a student sent to his school email. Stats projects, classmate blasts, and Student News. A form a teacher or the school assigned him is not this. Canvas already files those.
 
 Do not invent a follow-up. Someone writing to him is not "reply" unless they asked him a question or told him to reply. "This might matter" is not a todo.
 

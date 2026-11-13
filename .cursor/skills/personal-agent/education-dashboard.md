@@ -197,6 +197,10 @@ Nightly / Canvas / school-mail: if a proposed create looks like a row in `delete
 
 **Yan, 2026-11-08.** Telling the agent to do something does not add a todo on his education list. That includes @agent and @agentg, from Yan or from Alex. Make a get well site, make a chem site, build a page, or any other job handed to the agent. Do the work. Do not also write `todo.json` for it. Write a todo when they ask for one, or when something is actually due.
 
+### Student survey mail stays off his list
+
+**Yan, 2026-11-13.** A survey, poll, or form a student sent to `owner@school.example` is not a todo. Stats projects, classmate blasts, and Student News. Do not create one. If one is already on the list, delete the folder and add a `deleted.md` row. A form a teacher or the school assigned him stays a class todo. Canvas sync already makes those.
+
 Dates only when he says add date. That is a yanylevin Dates row. Apple Calendar only when he says add to calendar. Write both only when the same message names both. Canvas sync still defaults existing MAs into Dates. That path is not this rule.
 
 ### Time phrases

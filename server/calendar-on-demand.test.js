@@ -42,6 +42,8 @@ describe("calendar signal", () => {
     assert.match(String(CALENDAR_SIGNAL_QUESTION.criteria.false), /question not asked of him/);
     assert.match(String(CALENDAR_SIGNAL_QUESTION.criteria.false), /@agent or @agentg/);
     assert.match(String(CALENDAR_SIGNAL_QUESTION.criteria.true), /@agent or @agentg is not a task/);
+    assert.match(String(CALENDAR_SIGNAL_QUESTION.criteria.true), /student emailed to his school inbox is not a task/);
+    assert.match(String(CALENDAR_SIGNAL_QUESTION.criteria.false), /survey, poll, or form a student sent to his school email/);
     assert.equal(calendarSignalYes({ noul: 0.35 }), true);
     assert.equal(calendarSignalYes({ noul: 0.34 }), false);
     assert.equal(calendarSignalYes({ probability: 0.9 }), true);
@@ -212,6 +214,7 @@ describe("calendar on-demand prompt", () => {
     assert.match(prompt, /Open todos you may update/);
     assert.match(prompt, /Reply to the form/);
     assert.match(prompt, /college spam/i);
+    assert.match(prompt, /survey, poll, or form a student sent to his school email/);
     assert.match(prompt, /Do not move an existing event to another calendar/);
     assert.match(prompt, /signed up for that visit/);
     assert.match(prompt, /education todos/);
