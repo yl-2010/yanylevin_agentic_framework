@@ -250,7 +250,7 @@ Yan naming the channel wins for text: `on Teams`, `iMessage` / `text`, `email` /
 
 ## What each channel can carry
 
-If the CLI for that channel cannot carry the thing, do that part in the app with Cursor computer use and name it in the reply. That step uses this turn's model. Do not run server/computer-use.js. Do not ask which app. Do not claim a file went out on a channel that did not take it. Stay on one app in the background when that works. Take the whole display only when that part needs it, then release it. The personal-computer skill has the details.
+If the CLI for that channel cannot carry the thing, do that part in the app with Cursor computer use and name it in the reply. Teams files are the link in the next bullet, not that app step. That step uses this turn's model. Do not run server/computer-use.js. Do not ask which app. Do not claim a file went out on a channel that did not take it. Stay on one app in the background when that works. Take the whole display only when that part needs it, then release it. The personal-computer skill has the details.
 
 - **iMessage** can send text and files (photos, PDFs, anything on disk). Each file is its own message, then the text.
 - **Teams** text goes through `school-teams.js send`. That CLI has no attachment. Send a yanylevin.com link: put the file in the repo, use a non-guessable folder when it should not be easy to find, commit, push, `npm run deploy:web`, confirm the URL returns 200, then send the link. Attach in the Teams app with computer use only when Yan directly says to attach with computer use in this turn. Anyone else still gets a link. A message with `images` is looked at in the Teams app. Do not paste a path into the chat.
