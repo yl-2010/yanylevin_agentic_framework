@@ -98,6 +98,7 @@ import {
   WORKING_LABEL_DEFAULT,
   createLocalCursorAgent,
   disposeCursorAgent,
+  evictLocalCursorExecutor,
   recreateLocalCursorAgent,
   onLocalCursorExecutorEvict,
   reloadCursorApiKeyFromEnv,
@@ -3303,6 +3304,11 @@ async function executeAgentTurn(sid, session, opts) {
           })
         );
         if (recreate) {
+          // The SDK keeps one local executor per cwd and key. Replacing this
+          // chat's handle leaves that executor up while any other chat still
+          // holds it, so an auth failure repeats. Drop every handle first
+          // unless a scheduled job is using the executor.
+          await evictLocalCursorExecutor({ skipIfScheduledAtLeast: 1 });
           await replaceSessionAgent(session, nextModel);
         } else if (!session.agent) {
           session.agent = await createLocalCursorAgent({
@@ -3614,7 +3620,12 @@ export async function messageAgent(
     throw err;
   }
 
-  const session = sessions.get(sid);
+  let session = sessions.get(sid);
+  if (!session) {
+    session = await hydrateAgentSession(sid, normalized, {
+      workspace: normalizeJypeWorkspace(uiContext?.workspace),
+    });
+  }
   if (!session) {
     const err = new Error("session not found");
     err.status = 404;
@@ -3960,6 +3971,80 @@ export async function promoteQueuedTurn(sessionId, email, queueIdRaw) {
   };
 }
 
+/**
+ * Worker restart and the one-hour idle prune drop the in-memory session.
+ * The transcript is still on disk. A state poll that 404s makes the app
+ * wipe the open chat, so load the file instead of creating a Cursor agent.
+ * The agent is created on the next send.
+ * @param {string} sid
+ * @param {string} email
+ * @param {{ workspace?: string, root?: string }} [opts]
+ */
+async function hydrateAgentSession(sid, email, opts = {}) {
+  const normalized = canonicalizeEmail(email);
+  const live = sessions.get(sid);
+  if (live) return live;
+  const hinted = normalizeJypeWorkspace(opts.workspace);
+  /** @type {string[]} */
+  const workspaces = [];
+  if (hinted) workspaces.push(hinted);
+  if (!workspaces.includes("")) workspaces.push("");
+  if (!workspaces.includes("jype")) workspaces.push("jype");
+  let loaded = null;
+  for (const ws of workspaces) {
+    loaded = await loadChatHistory({
+      email: normalized,
+      sessionId: sid,
+      workspace: ws,
+      root: opts.root,
+    });
+    if (loaded) break;
+  }
+  if (!loaded) return null;
+  const again = sessions.get(sid);
+  if (again) return again;
+  const workspace = normalizeJypeWorkspace(loaded.workspace || hinted);
+  const messages = (loaded.messages || []).map((m) => messageFromHistory(m));
+  const session = {
+    agent: null,
+    email: normalized,
+    workspace,
+    starter: resolveChatStarter({
+      workspace,
+      email: normalized,
+      starter: loaded.starter,
+      firstUserMessage: messages.find((m) => m.role === "user")?.content,
+    }),
+    createdAt: Date.parse(loaded.started) || Date.now(),
+    lastUsedAt: Date.now(),
+    uploads: [],
+    uploadDirRel: chatUploadDir(normalized, workspace, sid),
+    messages,
+    status: "idle",
+    workingLabel: null,
+    runPromise: null,
+    turnQueue: [],
+    replayUiTranscript: true,
+    imessageOrigin: null,
+    imessageDeliverFinal: false,
+    teamsOrigin: null,
+    teamsDeliverFinal: false,
+    whatsappOrigin: null,
+    whatsappDeliverFinal: false,
+    guestCaller: null,
+    ephemeralPinned: workspace === "jype" ? true : !loaded.ephemeral,
+  };
+  if (loaded.scheduled) {
+    session.scheduled = true;
+    session.scheduledRunAt = loaded.scheduledRunAt || "";
+    session.scheduledStatus = loaded.scheduledStatus || "pending";
+    session.forceGrok = true;
+    session.ephemeralPinned = true;
+  }
+  sessions.set(sid, session);
+  return session;
+}
+
 /** Running or queued turns across every chat. Worker /health reports it. */
 export function busySessionCount() {
   let n = 0;
@@ -3973,7 +4058,7 @@ export function busySessionCount() {
  * @param {string} sessionId
  * @param {string} email
  */
-export function getAgentState(sessionId, email) {
+export async function getAgentState(sessionId, email, opts = {}) {
   const normalized = canonicalizeEmail(email);
   const sid = String(sessionId || "").trim();
   if (!sid) {
@@ -3981,7 +4066,10 @@ export function getAgentState(sessionId, email) {
     err.status = 400;
     throw err;
   }
-  const session = sessions.get(sid);
+  let session = sessions.get(sid);
+  if (!session) {
+    session = await hydrateAgentSession(sid, normalized, opts);
+  }
   if (!session) {
     const err = new Error("session not found");
     err.status = 404;

@@ -231,6 +231,47 @@ describe("pollAppleMailFile", () => {
     assert.ok(state.seenIds.includes("mid:<1@u.edu>"));
     assert.ok(state.seenIds.includes("mid:<2@x.com>"));
   });
+
+  it("still files mail that showed up late, and does not move the cursor to now", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mail-file-"));
+    const path = join(dir, "state.json");
+    await writeFile(
+      path,
+      JSON.stringify({ lastAt: "2026-11-13T16:30:00.000Z", seenIds: [] })
+    );
+    let since = "";
+    const moved = [];
+    const out = await pollAppleMailFile({
+      statePath: path,
+      now: () => new Date("2026-11-13T16:30:00.000Z"),
+      listRecentAppleMail: async (opts) => {
+        since = opts.since;
+        return [
+          {
+            id: 9,
+            account: "Exchange",
+            folder: "Inbox",
+            from: "admissions@example.edu",
+            subject: "Visit campus",
+            received: "2026-11-12T20:00:00.000Z",
+            messageId: "<late@example.edu>",
+            body: "Apply now and tour campus.",
+          },
+        ];
+      },
+      classifyMailRow: async () => ({ choice: "college", confidence: 0.9 }),
+      moveAndMarkRead: async (row, dest) => {
+        moved.push(dest);
+        return "moved";
+      },
+    });
+    const lag = Date.parse("2026-11-13T16:30:00.000Z") - Date.parse(since);
+    assert.ok(lag >= 36 * 60 * 60 * 1000);
+    assert.equal(out.filed, 1);
+    assert.deepEqual(moved, ["Colleges"]);
+    const state = await loadFileState(path);
+    assert.equal(state.lastAt, "2026-11-13T16:30:00.000Z");
+  });
 });
 
 describe("backfillAppleMailFile", () => {

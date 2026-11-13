@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { formatTeamsOriginBlock, normalizeTeamsOrigin } from "./teams-mention.js";
@@ -61,7 +62,9 @@ import {
   shouldSkipDuplicateChannelSend,
   composeTurnPrompt,
   liveContextSections,
+  getAgentState,
 } from "./personal-agent.js";
+import { persistChatHistory } from "./education-chat-history.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const YAN = "you@example.com";
@@ -1614,5 +1617,32 @@ describe("composeTurnPrompt", () => {
         "X",
       ].join("\n")
     );
+  });
+});
+
+describe("getAgentState after the in-memory session is gone", () => {
+  it("loads the transcript from disk instead of 404", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pa-state-"));
+    const sid = "edu-diskstate1";
+    try {
+      await persistChatHistory({
+        root,
+        email: YAN,
+        sessionId: sid,
+        messages: [
+          { role: "user", content: "sort the inbox", at: "2026-11-13T16:00:00.000Z" },
+          { role: "assistant", content: "Filed the college mail", at: "2026-11-13T16:01:00.000Z" },
+        ],
+      });
+      const state = await getAgentState(sid, YAN, { root });
+      assert.equal(state.sessionId, sid);
+      assert.equal(state.status, "idle");
+      assert.equal(state.messages.length, 2);
+      assert.equal(state.messages[1].content, "Filed the college mail");
+      const again = await getAgentState(sid, YAN, { root });
+      assert.equal(again.messages.length, 2);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });

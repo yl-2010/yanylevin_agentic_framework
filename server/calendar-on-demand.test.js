@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { classifyMailRow } from "./apple-mail-file.js";
@@ -616,6 +616,42 @@ describe("school mail calendar poll", () => {
       });
       assert.equal(out.skipped, "watermark");
       assert.equal(fetched, 0);
+    } finally {
+      resetCalendarOnDemandForTests();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("re-reads the last day and does not stamp wall-clock now", async () => {
+    resetCalendarOnDemandForTests();
+    const dir = await mkdtemp(join(tmpdir(), "cal-school-"));
+    const statePath = join(dir, "state.json");
+    await writeFile(statePath, JSON.stringify({ lastAt: "2026-11-13T16:00:00.000Z" }));
+    let since = "";
+    try {
+      const out = await pollSchoolMailCalendar({
+        statePath,
+        now: () => new Date("2026-11-13T16:00:00.000Z"),
+        fetchSchoolMessages: async (opts) => {
+          since = opts.since;
+          return [
+            {
+              id: "m-late",
+              subject: "club meeting",
+              body: "tomorrow at 3",
+              received: "2026-11-12T18:00:00.000Z",
+            },
+          ];
+        },
+        systemOne: async () => ({
+          answers: { calendar: { choice: "no", confidence: 0.2 } },
+        }),
+      });
+      assert.equal(out.ok, true);
+      const lag = Date.parse("2026-11-13T16:00:00.000Z") - Date.parse(since);
+      assert.ok(lag >= 20 * 60 * 60 * 1000);
+      const saved = JSON.parse(await readFile(statePath, "utf8"));
+      assert.equal(saved.lastAt, "2026-11-13T16:00:00.000Z");
     } finally {
       resetCalendarOnDemandForTests();
       await rm(dir, { recursive: true, force: true });

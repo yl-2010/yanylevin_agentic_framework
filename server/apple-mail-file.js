@@ -20,7 +20,11 @@ export const STATE_PATH = "/tmp/yanylevin-apple-mail-file.json";
 export const MOVE_SCRIPT = join(ROOT, "apple-mail-file.applescript");
 export const POLL_MS = 10_000;
 export const POLL_LIMIT = 20;
-export const OVERLAP_MS = 20_000;
+export const POLL_LIST_LIMIT = 400;
+/** Exchange can index a newer message before an older one that was stuck
+ * during an outage. Keep re-reading this far behind wall clock. Seen ids
+ * stop a second file. */
+export const LATE_SYNC_OVERLAP_MS = 48 * 60 * 60 * 1000;
 export const SEEN_MAX = 500;
 export const MIN_CONFIDENCE = 0.5;
 export const DEST_ACCOUNT = "iCloud";
@@ -344,12 +348,12 @@ export async function pollAppleMailFile(deps = {}) {
     return { ok: true, skipped: "watermark", filed: 0 };
   }
 
-  const sinceMs = Date.parse(state.lastAt) - OVERLAP_MS;
-  const since = new Date(Math.max(0, sinceMs)).toISOString();
+  const nowMs = nowFn().getTime();
+  const since = new Date(Math.max(0, nowMs - LATE_SYNC_OVERLAP_MS)).toISOString();
   const list = deps.listRecentAppleMail || listRecentAppleMail;
   let rows = [];
   try {
-    rows = await list({ since, limit: 80 });
+    rows = await list({ since, limit: POLL_LIST_LIMIT });
   } catch (err) {
     console.error("[apple-mail-file] list", err);
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
@@ -378,11 +382,10 @@ export async function pollAppleMailFile(deps = {}) {
       }),
   });
   let newest = state.lastAt;
-  for (const row of batch) {
+  for (const row of rows) {
     const at = receivedIso(row);
     if (at && at > newest) newest = at;
   }
-  if (nowIso > newest && batch.length === hits.length) newest = nowIso;
   await saveFileState(
     { lastAt: newest, seenIds: result.nextSeen.slice(-SEEN_MAX) },
     path

@@ -28,7 +28,32 @@ export const SEEN_PATH = "/tmp/yanylevin-calendar-on-demand-seen.json";
 export const SCHOOL_MAIL_STATE_PATH = "/tmp/yanylevin-school-mail-calendar.json";
 export const TEAMS_CHANNEL_STATE_PATH = "/tmp/yanylevin-teams-channel-calendar.json";
 const SEEN_MAX = 800;
-const OVERLAP_MS = 20_000;
+/** Mail and channel posts can land in the local index hours after their
+ * received time. The poll keeps re-reading this window. Seen ids skip dupes. */
+export const SCHOOL_MAIL_LOOKBACK_MS = 24 * 60 * 60 * 1000;
+export const TEAMS_CHANNEL_LOOKBACK_MS = 6 * 60 * 60 * 1000;
+export const SCHOOL_MAIL_FETCH_MAX = 100;
+
+/**
+ * Newest timestamp actually present in this page. An empty page keeps the
+ * previous stamp. Never substitute wall-clock now: that hides mail which
+ * syncs late with an older received time.
+ * @param {string} prev
+ * @param {object[]} rows
+ * @param {string} [field]
+ */
+export function nextObservedStamp(prev, rows, field = "received") {
+  let newest = Date.parse(prev);
+  let found = false;
+  for (const row of rows || []) {
+    const ms = Date.parse(String(row?.[field] || ""));
+    if (!Number.isFinite(ms)) continue;
+    found = true;
+    if (!Number.isFinite(newest) || ms > newest) newest = ms;
+  }
+  if (!found || !Number.isFinite(newest)) return prev;
+  return new Date(newest).toISOString();
+}
 
 export const CALENDAR_ON_DEMAND_MODEL_SPEC = {
   id: process.env.CURSOR_CALENDAR_ON_DEMAND_MODEL || "composer-2.5",
@@ -1045,21 +1070,22 @@ export async function pollSchoolMailCalendar(deps = {}) {
     await saveStamp(path, nowIso);
     return { ok: true, skipped: "watermark", queued: 0 };
   }
-  const sinceMs = Date.parse(state.lastAt) - OVERLAP_MS;
-  const since = new Date(Math.max(0, sinceMs)).toISOString();
+  const since = new Date(now.getTime() - SCHOOL_MAIL_LOOKBACK_MS).toISOString();
   const fetch =
     deps.fetchSchoolMessages ||
     (await import("./school-mail.js")).fetchSchoolMessages;
   let rows = [];
   try {
-    rows = await fetch({ since, max: 25, includeBody: true });
+    rows = await fetch({ since, max: SCHOOL_MAIL_FETCH_MAX, includeBody: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[calendar-on-demand] school mail", msg);
     return { ok: false, error: msg };
   }
   const result = await ingestCalendarRows("school-mail", rows, deps);
-  if (!result.errors) await saveStamp(path, nowIso);
+  if (!result.errors) {
+    await saveStamp(path, nextObservedStamp(state.lastAt, rows, "received"));
+  }
   return { ok: true, ...result };
 }
 
@@ -1078,8 +1104,7 @@ export async function pollTeamsChannelCalendar(deps = {}) {
     await saveStamp(path, nowIso);
     return { ok: true, skipped: "watermark", queued: 0 };
   }
-  const sinceMs = Date.parse(state.lastAt) - OVERLAP_MS;
-  const since = new Date(Math.max(0, sinceMs)).toISOString();
+  const since = new Date(now.getTime() - TEAMS_CHANNEL_LOOKBACK_MS).toISOString();
   const fetch =
     deps.fetchRecentChannelMessages ||
     (await import("./school-teams.js")).fetchRecentChannelMessages;
@@ -1096,7 +1121,9 @@ export async function pollTeamsChannelCalendar(deps = {}) {
     return { ok: false, error: msg };
   }
   const result = await ingestCalendarRows("teams-channel", rows, deps);
-  if (!result.errors) await saveStamp(path, nowIso);
+  if (!result.errors) {
+    await saveStamp(path, nextObservedStamp(state.lastAt, rows, "at"));
+  }
   return { ok: true, ...result };
 }
 
