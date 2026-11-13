@@ -46,16 +46,16 @@ Apple/iCloud emails alias onto the same Gmail-backed account folders — Google 
 
 Lock Screen on both. Dynamic Island on iPhone. Status bar on iPad. Full-access only. Class minutes (`12 min`) are system-drawn, so they keep counting with the app asleep.
 
-The class card is one activity for the school day. It starts at the first highlight and stays up through passing, lunch, and free periods, showing the next real class until that class begins. It ends 15 minutes after the last bell. Opening the app once on a device registers it. After that, the Mac pushes the next class at each bell, including when the app stays closed. iPhone and iPad each need their own open. Apple removes a Live Activity about 8 hours after it starts. If a day would run longer than that, the Mac ends it and starts a fresh one before the cap.
+The class card is one activity for the school day. It starts at the first highlight and stays up through passing, lunch, and free periods, showing the next real class until that class begins. It ends 15 minutes after the last bell. The class name changes when the app is running. After the app sleeps, the name stays on the last class until the next open. The minute text keeps moving either way. A free Apple developer account cannot receive the push that would change the name from the Mac while the app is closed. That needs the paid program and Push Notifications on the App ID.
 
-Push alerts are a separate tool, `send_push`, on website, app, and scheduled chats. The agent calls it when you should look. Opening the alert on one device clears it on the other. iMessage, Teams, and WhatsApp turns do not send a second push. This needs an APNs key on the Mac (`APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_KEY_PATH`, `APNS_BUNDLE_ID` in `server/.env`) and a build with Push Notifications turned on.
+`send_push` is on website, app, and scheduled chats, and it is off for iMessage, Teams, and WhatsApp turns. It does not deliver on this account. Remote alerts need the same paid program, an APNs key on the Mac, and the push entitlement back in the app. The key is `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_KEY_PATH`, and `APNS_BUNDLE_ID` in `server/.env`. Do not add `aps-environment` on the free Personal Team. The app will not install.
 
 | Activity | When | Tap |
 |----------|------|-----|
 | **Class** | The school day, from the first highlight until 15 minutes after the last bell. Real class during its window, next real class during a gap. Open HW / CW / MA / QA for that class. | Banner → class page. A row → that assignment (`yanylevin://class?id=` / `yanylevin://todo?id=`). |
 | **Agents** | Personal Agent threads that are running or queued. Up to 3 rows; `+N more` after that. Started from the app, not by push. | Banner → Chat tab. A row → that session (`yanylevin://chat?open=1` / `yanylevin://chat?sessionId=`). |
 
-Enable Live Activities for Yan Levin in Settings if they do not appear. Allow notifications when the app asks, or pushes cannot arrive.
+Enable Live Activities for Yan Levin in Settings if they do not appear.
 
 ### Education widgets (full-access only)
 

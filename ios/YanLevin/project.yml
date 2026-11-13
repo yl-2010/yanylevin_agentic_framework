@@ -72,9 +72,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         UIBackgroundModes:
           - location
-          - remote-notification
-        "UIBackgroundModes~ipad":
-          - remote-notification
+        "UIBackgroundModes~ipad": []
         NSLocationWhenInUseUsageDescription: "This app uses your location on chat maps. On iPhone it may also send location to the Personal Agent so it knows where you are, including when you chat from the website or iPad."
         "NSLocationWhenInUseUsageDescription~ipad": "Yan Levin uses your location on chat maps. The iPad app does not send location to the Personal Agent and does not run a background heartbeat."
         NSLocationAlwaysAndWhenInUseUsageDescription: "This app uses your iPhone location in the background so the Personal Agent can see where you are when you chat from the web or a computer. On iPhone it also sends a location update about every 5 minutes, plus when you move a significant distance."
@@ -90,18 +88,15 @@ targets:
         # Also set AccountView.signInWithAppleEnabled = true
         com.apple.security.application-groups:
           - group.com.example.personalagent
-        com.apple.developer.aps-environment: $(APS_ENVIRONMENT)
+        # aps-environment needs a paid Apple Developer Program membership.
+        # A free Personal Team cannot sign it, and the app will not install.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.personalagent
-        APS_ENVIRONMENT: development
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.education
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GOOGLE_IOS_CLIENT_ID: ""
         GOOGLE_URL_SCHEME: com.googleusercontent.apps.PLACEHOLDER
-      configs:
-        Release:
-          APS_ENVIRONMENT: production
     dependencies:
       - package: GoogleSignIn
         product: GoogleSignIn

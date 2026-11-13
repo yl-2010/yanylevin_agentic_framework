@@ -8,8 +8,6 @@ final class LiveActivityCoordinator {
     private var syncTask: Task<Void, Never>?
     private var classEndTask: Task<Void, Never>?
     private var agentSyncGeneration = 0
-    private var watchingClassPush = false
-    private var watchedActivityIds = Set<String>()
 
     private init() {}
 
@@ -24,7 +22,7 @@ final class LiveActivityCoordinator {
 
     func sync() async {
         guard AppGroupStore.hasFullAccess else {
-            await endClass(report: true)
+            await endClass()
             await endAgents()
             return
         }
@@ -34,10 +32,9 @@ final class LiveActivityCoordinator {
 
     private func syncClass() async {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
-            await endClass(report: true)
+            await endClass()
             return
         }
-        startPushWatching()
         guard let tree = AppGroupStore.loadCachedEducationTree() else { return }
         let sections = EducationScheduleHelper.classSections(
             schedule: tree.schedule,
@@ -45,15 +42,15 @@ final class LiveActivityCoordinator {
             activeClassIdsByDate: tree.activeClassIdsByDate
         )
         guard let section = sections.first(where: \.isToday) else {
-            await endClass(report: true)
+            await endClass()
             return
         }
         switch classDayPhase(section: section, tree: tree) {
         case .idle(let when):
-            await endClass(report: true)
+            await endClass()
             armClassEnd(when)
         case .end:
-            await endClass(report: true)
+            await endClass()
         case .show(let state, let stale):
             await upsertDay(dayId: dayId(for: section.dateKey), state: state, staleDate: stale)
             armClassEnd(stale)
@@ -159,7 +156,6 @@ final class LiveActivityCoordinator {
         let existing = Activity<ClassActivityAttributes>.activities
         if let current = existing.first(where: { $0.attributes.dayId == dayId }) {
             await current.update(content)
-            watchActivityToken(current)
             for extra in existing where extra.id != current.id {
                 await extra.end(nil, dismissalPolicy: .immediate)
             }
@@ -169,18 +165,17 @@ final class LiveActivityCoordinator {
             await extra.end(nil, dismissalPolicy: .immediate)
         }
         do {
-            let activity = try Activity.request(
+            _ = try Activity.request(
                 attributes: ClassActivityAttributes(dayId: dayId),
                 content: content,
-                pushType: .token
+                pushType: nil
             )
-            watchActivityToken(activity)
         } catch {
             NSLog("LiveActivity class start: %@", error.localizedDescription)
         }
     }
 
-    private func endClass(report: Bool) async {
+    private func endClass() async {
         classEndTask?.cancel()
         classEndTask = nil
         let running = Activity<ClassActivityAttributes>.activities
@@ -188,58 +183,6 @@ final class LiveActivityCoordinator {
         for activity in running {
             await activity.end(nil, dismissalPolicy: .immediate)
         }
-        if report {
-            await PushRegistration.shared.uploadLiveActivity(
-                pushToStartToken: nil,
-                activityPushToken: nil,
-                dayId: nil,
-                ended: true
-            )
-        }
-    }
-
-    private func startPushWatching() {
-        guard !watchingClassPush else { return }
-        watchingClassPush = true
-        Task { @MainActor in
-            for await token in Activity<ClassActivityAttributes>.pushToStartTokenUpdates {
-                let hex = Self.hex(token)
-                await PushRegistration.shared.uploadLiveActivity(
-                    pushToStartToken: hex,
-                    activityPushToken: nil,
-                    dayId: nil,
-                    ended: false
-                )
-            }
-        }
-        Task { @MainActor in
-            for await activity in Activity<ClassActivityAttributes>.activityUpdates {
-                self.watchActivityToken(activity)
-            }
-        }
-        for activity in Activity<ClassActivityAttributes>.activities {
-            watchActivityToken(activity)
-        }
-    }
-
-    private func watchActivityToken(_ activity: Activity<ClassActivityAttributes>) {
-        guard watchedActivityIds.insert(activity.id).inserted else { return }
-        let dayId = activity.attributes.dayId
-        Task { @MainActor in
-            for await token in activity.pushTokenUpdates {
-                let hex = Self.hex(token)
-                await PushRegistration.shared.uploadLiveActivity(
-                    pushToStartToken: nil,
-                    activityPushToken: hex,
-                    dayId: dayId,
-                    ended: false
-                )
-            }
-        }
-    }
-
-    private static func hex(_ data: Data) -> String {
-        data.map { String(format: "%02x", $0) }.joined()
     }
 
     /// Wake when the next class content has to change. The minute counter is system-drawn.

@@ -2,7 +2,8 @@ import Foundation
 import UIKit
 import UserNotifications
 
-/// Registers this iPhone or iPad for alerts, and clears an alert the other device already opened.
+/// Remote push registration. Unused while the app is signed with a free Personal Team.
+/// A free account cannot provision aps-environment, so nothing calls this.
 @MainActor
 final class PushRegistration {
     static let shared = PushRegistration()

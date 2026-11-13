@@ -841,7 +841,6 @@
 		B941A47F7A7CBC8CEF4078EF /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				APS_ENVIRONMENT = development;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = YanLevin/YanLevin.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -923,7 +922,6 @@
 		F8BA73F80E2B622EAB0DB2BE /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				APS_ENVIRONMENT = production;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = YanLevin/YanLevin.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";

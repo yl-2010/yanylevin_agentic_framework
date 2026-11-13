@@ -72,7 +72,6 @@ struct YanLevinApp: App {
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
                     YLHaptics.prepareSession()
-                    PushRegistration.shared.onForeground()
                     nav.consumePendingNewChatIfNeeded()
                     nav.consumePendingOpenTodoIfNeeded()
                     nav.consumePendingOpenClassIfNeeded()
