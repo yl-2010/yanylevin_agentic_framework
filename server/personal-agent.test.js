@@ -52,6 +52,7 @@ import {
   deliverIMessageProgressReply,
   deliverTeamsFinalReply,
   channelProgressKind,
+  sessionMaySendPush,
   channelSendToolResult,
   usageKind,
   usagePerson,
@@ -59,6 +60,8 @@ import {
   nextOutboundAction,
   outboundResumePrompt,
   shouldSkipDuplicateChannelSend,
+  composeTurnPrompt,
+  liveContextSections,
 } from "./personal-agent.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -1534,5 +1537,95 @@ describe("normalizeAttachments with on-disk draft files", () => {
         ),
       (err) => err.status === 400 && /total size/.test(err.message)
     );
+  });
+});
+
+describe("composeTurnPrompt", () => {
+  const now = {
+    dateKey: "2026-11-12",
+    localTime: "09:05",
+    timezone: "America/New_York",
+    isSchoolDay: true,
+    inClass: false,
+  };
+  const plan = (uiContext, localTime = "09:05", channel = "") => ({
+    system: "SYSTEM PROMPT",
+    channel,
+    live: liveContextSections({ ...now, localTime }, uiContext, "Calendar: nothing"),
+    turn: "User:\nhi",
+  });
+  const agentA = { id: "a" };
+
+  it("sends the full prompt on the first turn, stable text first", () => {
+    const p = plan({ client: "web", view: "home" });
+    const out = composeTurnPrompt(p, null, agentA);
+    assert.equal(out.full, true);
+    assert.ok(out.text.startsWith("SYSTEM PROMPT\n"));
+    assert.ok(out.text.includes(formatLiveContextBlock({ ...now }, { client: "web", view: "home" }, "Calendar: nothing")));
+    assert.ok(out.text.endsWith("User:\nhi"));
+  });
+
+  it("sends only the clock and changed sections on later turns", () => {
+    const first = composeTurnPrompt(plan({ client: "web", view: "home" }), null, agentA);
+    const same = composeTurnPrompt(plan({ client: "web", view: "home" }, "09:07"), first.sent, agentA);
+    assert.equal(same.full, false);
+    assert.ok(!same.text.includes("SYSTEM PROMPT"));
+    assert.ok(!same.text.includes("Calendar: nothing"));
+    assert.ok(same.text.includes("Schedule clock: 2026-11-12 09:07"));
+    assert.ok(same.text.includes("unchanged"));
+
+    const moved = composeTurnPrompt(
+      plan({ client: "ios", view: "class", className: "Calc", classId: "c1" }, "09:08"),
+      same.sent,
+      agentA
+    );
+    assert.equal(moved.full, false);
+    assert.ok(moved.text.includes("- client: ios"));
+    assert.ok(moved.text.includes("Viewing expanded CLASS: Calc"));
+    assert.ok(!moved.text.includes("School day today"));
+    assert.ok(!moved.text.includes("SYSTEM PROMPT"));
+  });
+
+  it("resends a changed channel block and notes a cleared page", () => {
+    const first = composeTurnPrompt(plan({ client: "web" }), null, agentA);
+    const next = composeTurnPrompt(plan(null, "09:06", "Teams origin"), first.sent, agentA);
+    assert.ok(next.text.includes("Teams origin"));
+    assert.ok(next.text.includes("Client page / screen: none this turn."));
+  });
+
+  it("sends everything again to a new agent or a changed system prompt", () => {
+    const first = composeTurnPrompt(plan({ client: "web" }), null, agentA);
+    const recreated = composeTurnPrompt(plan({ client: "web" }), first.sent, { id: "b" });
+    assert.equal(recreated.full, true);
+    const sys = composeTurnPrompt({ ...plan({ client: "web" }), system: "NEW" }, first.sent, agentA);
+    assert.equal(sys.full, true);
+  });
+
+  it("keeps formatLiveContextBlock identical to the section join", () => {
+    const ui = { client: "web", view: "home" };
+    const s = liveContextSections(now, ui, "X");
+    assert.equal(
+      formatLiveContextBlock(now, ui, "X"),
+      [
+        "Live context (authoritative for this turn — use fully):",
+        s.clock,
+        s.schedule,
+        s.client,
+        "",
+        "X",
+      ].join("\n")
+    );
+  });
+});
+
+describe("send_push gate", () => {
+  it("allows an app chat and skips a turn that still delivers to a channel", () => {
+    assert.equal(sessionMaySendPush({ email: YAN }), true);
+    assert.equal(sessionMaySendPush({ email: YAN, imessageDeliverFinal: true }), false);
+    assert.equal(sessionMaySendPush({ email: YAN, teamsDeliverFinal: true }), false);
+    assert.equal(sessionMaySendPush({ email: YAN, whatsappDeliverFinal: true }), false);
+    assert.equal(sessionMaySendPush({ email: YAN, channelReplyOwed: "imessage" }), false);
+    assert.equal(sessionMaySendPush({ email: YAN, channelProgress: "teams" }), false);
+    assert.equal(sessionMaySendPush(null), false);
   });
 });

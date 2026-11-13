@@ -495,6 +495,27 @@
     </article>`;
   }
 
+  /** DAILY_BRIEFING_RUNNER=grokbot on the Mac: the 06:00 phases run on Grok Bot. */
+  function applyBriefingRunner(runner) {
+    const grokbot = runner === "grokbot";
+    let changed = false;
+    for (const band of AGENT_BANDS) {
+      for (const item of band.items) {
+        if (!item.id || !item.id.startsWith("briefing-")) continue;
+        if (!item.cursorModel) item.cursorModel = item.model;
+        const next = grokbot ? "Grok Bot" : item.cursorModel;
+        if (item.model !== next) {
+          item.model = next;
+          changed = true;
+        }
+      }
+    }
+    if (changed && agentsEl) {
+      agentsEl.dataset.ready = "";
+      renderAgents();
+    }
+  }
+
   function renderAgents() {
     if (!agentsEl || agentsEl.dataset.ready === "1") return;
     agentsEl.innerHTML = AGENT_BANDS.map((band) => {
@@ -686,6 +707,7 @@
       renderChats(Array.isArray(chat.entries) ? chat.entries : []);
       renderLogins(Array.isArray(logins.entries) ? logins.entries : []);
       renderActions(Array.isArray(actions.entries) ? actions.entries : []);
+      applyBriefingRunner(actions.briefingRunner);
       renderFutureAgents(Array.isArray(future.entries) ? future.entries : [], true);
     } catch (err) {
       console.error("[dashboard]", err);

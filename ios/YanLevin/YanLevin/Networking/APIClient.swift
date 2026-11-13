@@ -27,6 +27,7 @@ enum APIConfig {
     static func usesMacAPI(_ path: String) -> Bool {
         let p = path.hasPrefix("/") ? String(path.dropFirst()) : path
         return p.hasPrefix("api/education/") || p.hasPrefix("api/fitness/") || p.hasPrefix("api/jype/")
+            || p.hasPrefix("api/push/") || p.hasPrefix("api/live-activity/")
     }
 }
 

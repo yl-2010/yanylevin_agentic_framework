@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { agentTypeLabel, billingSnapshotsToSend, buildClumps, filterClumps, hideWhatsAppAgentPrompt, kindFromPrefix, packUsageEvents, personFromEmail, scrubWhatsAppAgentTitles, summarizeClumps, threadLabelFromRows, tokensFromUsage, unpackUsageEvents, visibleKind } from "./usage-log.js";
+import { agentTypeLabel, billingSnapshotsToSend, buildClumps, filterClumps, hideWhatsAppAgentPrompt, isGrokBotCloudAgent, kindFromPrefix, packUsageEvents, personFromEmail, scrubWhatsAppAgentTitles, summarizeClumps, threadLabelFromRows, tokensFromUsage, unpackUsageEvents, visibleKind } from "./usage-log.js";
 import { classifyLocalPrompt, projectRepo } from "./usage-local.js";
 
 describe("usage clumps", () => {
@@ -100,6 +100,67 @@ describe("usage clumps", () => {
     const nobody = clumps.find((row) => row.threadId === "unknown-conv");
     assert.equal(nobody.person, "Alex");
     assert.equal(nobody.kind, "cursor-desktop");
+  });
+
+  it("gives Grok Bot cloud agents to Yan and leaves hand-started cloud agents alone", () => {
+    const grokBotRun = "bc-df5b1fe4-6d79-5f3d-b589-520b4f60283c";
+    const taggedRun = "bc-11111111-2222-4333-8444-555555555555";
+    const handRun = "bc-abce2d6d-0f22-41a1-8198-572762cf7aae";
+    assert.equal(isGrokBotCloudAgent(grokBotRun), true);
+    assert.equal(isGrokBotCloudAgent(handRun), false);
+    assert.equal(isGrokBotCloudAgent("df5b1fe4-6d79-5f3d-b589-520b4f60283c"), false);
+    const cloudBill = (id, conv, at, cents) => ({
+      id: `bill:${id}`,
+      source: "billing",
+      at,
+      usageEventId: id,
+      conversationId: conv,
+      model: "claude-opus-5-5-low",
+      tokens: tokensFromUsage({ inputTokens: 100, outputTokens: 20 }),
+      chargedCents: cents,
+    });
+    const clumps = buildClumps([
+      {
+        id: "sdk:req-9",
+        source: "sdk",
+        at: "2026-11-13T01:45:30.000Z",
+        startedAt: "2026-11-13T01:44:00.000Z",
+        endedAt: "2026-11-13T01:45:30.000Z",
+        person: "Yan",
+        repo: "yanylevin-agents",
+        kind: "future-agent",
+        model: "claude-opus-5-5-low",
+        prompt: "nightly",
+        threadId: "chat-9",
+        requestId: "req-9",
+        tokens: tokensFromUsage({}),
+      },
+      cloudBill("g1", grokBotRun, "2026-11-13T01:45:13.000Z", 300),
+      cloudBill("g2", grokBotRun, "2026-11-13T01:50:00.000Z", 20),
+      {
+        id: `tx:grokbot:${taggedRun}`,
+        source: "transcript",
+        at: "2026-11-13T01:00:00.000Z",
+        conversationId: taggedRun,
+        machine: "grokbot",
+        person: "Alex",
+        repo: "yanylevin",
+        kind: "grok-bot-cloud-agent",
+        prompt: "fix the harness",
+      },
+      cloudBill("t1", taggedRun, "2026-11-13T01:01:00.000Z", 5),
+      cloudBill("h1", handRun, "2026-10-25T02:09:17.000Z", 7),
+    ]);
+    const grokBot = clumps.find((row) => row.threadId === grokBotRun);
+    assert.equal(grokBot.person, "Yan");
+    assert.equal(grokBot.kind, "cloud-agent");
+    assert.equal(grokBot.repo, "Grok Bot");
+    assert.equal(grokBot.chargedCents, 320);
+    assert.equal(clumps.find((row) => row.kind === "future-agent").chargedCents, 0);
+    const tagged = clumps.find((row) => row.threadId === taggedRun);
+    assert.equal(tagged.person, "Yan");
+    assert.equal(tagged.repo, "yanylevin");
+    assert.equal(clumps.find((row) => row.threadId === handRun).person, "Alex");
   });
 
   it("splits one desktop thread across prompts and can filter", () => {

@@ -13,6 +13,20 @@ import { gradeDirFromMeta } from "./education-onedrive.js";
 /** @type {Map<string, Set<(event: string, data: object) => void>>} */
 const listenersByEmail = new Map();
 
+/** @type {Set<(email: string, event: string, data: object) => void>} */
+const notifyTaps = new Set();
+
+/**
+ * Observe every notifyEducationClients call. The agent worker forwards
+ * these to the API process, which owns the browser/iOS SSE streams.
+ * @param {(email: string, event: string, data: object) => void} fn
+ * @returns {() => void} unsubscribe
+ */
+export function onEducationNotify(fn) {
+  notifyTaps.add(fn);
+  return () => notifyTaps.delete(fn);
+}
+
 /**
  * Push an SSE event to all live education event subscribers for this user.
  * Used for filesystem changes and agent status (same "change" path clients already handle).
@@ -21,6 +35,13 @@ const listenersByEmail = new Map();
  * @param {object} [data]
  */
 export function notifyEducationClients(email, event = "change", data = {}) {
+  for (const tap of notifyTaps) {
+    try {
+      tap(email, event, data);
+    } catch {
+      /* ignore broken tap */
+    }
+  }
   const workspace = String(data?.workspace || "").trim().toLowerCase();
   const key = workspace === "jype" ? "jype" : canonicalizeEmail(email);
   const set = listenersByEmail.get(key);

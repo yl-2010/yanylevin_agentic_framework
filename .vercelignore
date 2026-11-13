@@ -28,3 +28,6 @@ data/usage/
 **/__pycache__/
 prasham-schedule-options/build/
 Illustrator/
+
+# South Asianesh Royale realtime server runs on the Mac (LaunchAgent com.yanylevin.sar-game), not Vercel.
+southasianeshroyale-server/

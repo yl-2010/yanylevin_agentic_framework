@@ -18,6 +18,9 @@ if [[ ! -x "$HOME/.lmstudio/bin/lms" ]]; then
   exit 1
 fi
 
+# shellcheck source=service-log-dir.sh
+source "$REPO/deploy/launchagents/service-log-dir.sh"
+
 mkdir -p "$HOME/Library/LaunchAgents"
 cp "$SRC" "$DEST"
 
@@ -34,9 +37,9 @@ SERVICE="${DOMAIN}/${LABEL}"
 if launchctl print "$SERVICE" >/dev/null 2>&1; then
   launchctl bootout "$DOMAIN" "$DEST" 2>/dev/null || launchctl bootout "$SERVICE" 2>/dev/null || true
 fi
-launchctl bootstrap "$DOMAIN" "$DEST"
+yl_bootstrap_agent "$DOMAIN" "$DEST"
 launchctl enable "$SERVICE" 2>/dev/null || true
 launchctl kickstart -k "$SERVICE"
 
 echo "installed ${LABEL}"
-echo "logs: /tmp/yanylevin-lmstudio-gpt-oss.log"
+echo "logs: $SERVICE_LOG_DIR/personal-agent-lmstudio-gpt-oss.log"

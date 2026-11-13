@@ -86,7 +86,7 @@ Use this order. **Omit a section entirely** when it does not apply that day (do 
 2. `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/state.json` (especially `notes`, `notes.factCheck`, and `lastSynthesisDateKey`).
 3. Yesterday's journal: `brain/journal/<dateKey minus 1>.md` when it exists.
 4. `location/state.json`, `health/state.json`, `daily-briefing/chat-title-refresh-state.json` if prefetch is thin. `lifeState` on the prefetch is the 5-minute log + iPhone heartbeat health; do not re-scan JSONL unless an issue is unclear. `healthShortcut` on the prefetch is Shortcut `lastIngestAt` vs 12 hours; do not re-read raw dumps unless the issue is unclear.
-5. `/tmp/personal-agent-server.log` tail (prefetch includes filtered lines; read more if needed).
+5. `~/Library/Logs/personal-agent/personal-agent-server.log` tail (prefetch includes filtered lines; read more if needed).
 6. `git log` for today's `education:` commits (nightly pipeline, canvas, health, location).
 
 ## Overnight agents to cover

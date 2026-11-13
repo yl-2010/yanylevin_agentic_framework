@@ -27,7 +27,9 @@ education/**/.chat-drafts/
 data/usage/
 data/future-agents/
 data/study/
+data/agent-mentions/
 data/agent-actions.jsonl
+data/push-devices.json
 **/.venv/
 **/venv/
 **/__pycache__/

@@ -316,13 +316,13 @@ export function createLocalIpcHandler(deps = {}) {
       }
       if (method === "POST" && path === "/future-agents/schedule") {
         const payload = await readJsonBody(req);
-        const { scheduleFutureAgentLive } = await import("./personal-agent.js");
+        const { scheduleFutureAgentLive } = await import("./agent-worker-client.js");
         const result = await scheduleFutureAgentLive(payload);
         return sendJson(res, 200, result);
       }
       if (method === "POST" && path === "/future-agents/cancel") {
         const payload = await readJsonBody(req);
-        const { cancelFutureAgentLive } = await import("./personal-agent.js");
+        const { cancelFutureAgentLive } = await import("./agent-worker-client.js");
         const result = await cancelFutureAgentLive(payload?.sessionId);
         return sendJson(res, 200, result);
       }

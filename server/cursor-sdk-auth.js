@@ -936,23 +936,22 @@ export async function createLocalCursorAgent({ model, cwd }) {
 }
 
 /**
- * Evict the shared executor, then create a fresh Agent.
+ * Dispose only the caller's failing Agent, then create a fresh one.
+ * Other chats keep their agents; owner evict listeners do not fire.
  * `attach` runs in the same lock as create so the owner pointer is never a
- * handle that another evict already disposed.
+ * handle that a full evict already disposed.
  * @param {{
  *   model: { id: string, params?: { id: string, value: string }[] },
  *   cwd: string,
  *   attach?: (agent: any) => void,
+ *   previous?: unknown,
  * }} opts
  */
-export async function recreateLocalCursorAgent({ model, cwd, attach }) {
+export async function recreateLocalCursorAgent({ model, cwd, attach, previous }) {
   const run = evictChain.then(async () => {
-    if (scheduledCursorWork >= 1) {
-      console.warn(
-        "[cursor-sdk] recreate without full evict; scheduled job in flight"
-      );
-    } else {
-      await evictLocalCursorExecutorUnlocked();
+    if (previous) {
+      liveLocalAgents.delete(previous);
+      await disposeAgentHandle(previous);
     }
     const agent = await createLocalCursorAgent({ model, cwd });
     if (typeof attach === "function") attach(agent);

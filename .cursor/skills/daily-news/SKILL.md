@@ -26,6 +26,16 @@ Phase 1 stops after the news draft. Phase 3 reads unslop, merges agent recap (fi
 
 Cursor Desktop on this repo: follow the same phase order when compiling manually.
 
+### Grok Bot runner (`DAILY_BRIEFING_RUNNER=grokbot`)
+
+With `DAILY_BRIEFING_RUNNER=grokbot` in `server/.env`, Express does not start Cursor SDK runs for the briefing (it logs `skip <date>: DAILY_BRIEFING_RUNNER=grokbot`). A Grok Bot routine does the model work on the Mac instead, through `server/daily-briefing-grokbot.js`:
+
+1. `node server/daily-briefing-grokbot.js prepare` takes the same lock, runs the same nightly prefetch, and writes one bundle per phase to `/tmp/yanylevin-daily-briefing-grokbot/<dateKey>/<phase>.json`: the exact prompt this file's phases get, the skill paths, inputs, the output path, and how it is validated.
+2. Grok Bot does `news`, then `agent-recap`, each followed by `phase-done --phase <name>` (validates the draft; prepares `unslop.json` once both pass).
+3. Grok Bot does `unslop` (writes `todo.json` and `taste.md`), then `finalize` (validates both, same git step, releases the lock).
+
+Output files, schema, and timing are the same as the Cursor run. Exit 2 means a file failed validation: fix it and rerun the same command. `node server/daily-briefing-agent.js --cursor` still runs the Cursor phases by hand.
+
 ## Files
 
 ```

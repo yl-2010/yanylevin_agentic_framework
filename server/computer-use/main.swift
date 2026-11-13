@@ -26,9 +26,17 @@ var lastWindowSize = CGSize.zero
 var lastWindowID: CGWindowID = 0
 var lastImageSize = CGSize.zero
 
+func serviceLogURL() -> URL {
+    let fm = FileManager.default
+    let dir = fm.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Logs/yanylevin", isDirectory: true)
+    try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+    return dir.appendingPathComponent("personal-agent-computer-use.log")
+}
+
 func log(_ message: String) {
     let line = "\(ISO8601DateFormatter().string(from: Date())) \(message)\n"
-    let url = URL(fileURLWithPath: "/tmp/yanylevin-computer-use.log")
+    let url = serviceLogURL()
     if let data = line.data(using: .utf8) {
         if FileManager.default.fileExists(atPath: url.path),
            let handle = try? FileHandle(forWritingTo: url) {

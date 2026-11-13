@@ -4,6 +4,11 @@
  *   2. agent-recap Composer 2.5    overnight agent recap card
  *   3. unslop      Composer 2.5   unslop + write todo.json + taste.md
  * Yan only.
+ *
+ * DAILY_BRIEFING_RUNNER=grokbot moves the model work to a Grok Bot routine.
+ * Express then never starts a Cursor SDK run for the briefing. The routine
+ * drives `daily-briefing-grokbot.js` (prepare, phase-done, finalize), which
+ * reuses the prompts, prefetch, lock, and paths in this file.
  */
 
 import { execFile } from "node:child_process";
@@ -51,13 +56,29 @@ import {
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const BRIEFING_EMAIL = "you@example.com";
-const LOCK_PATH = "/tmp/yanylevin-daily-briefing.lock";
-const SERVER_LOG_PATH = "/tmp/personal-agent-server.log";
+export const LOCK_PATH = "/tmp/yanylevin-daily-briefing.lock";
+import { SERVER_LOG_PATH } from "./service-logs.js";
+export { SERVER_LOG_PATH };
 /** Global unslop skill. Phase 3 reads it; never inline into prompts. */
-const UNSLOP_SKILL_PATH = join(homedir(), ".cursor/skills/unslop/SKILL.md");
+export const UNSLOP_SKILL_PATH = join(homedir(), ".cursor/skills/unslop/SKILL.md");
 import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 
-const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
+export const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
+export const BRIEFING_REPO_ROOT = REPO_ROOT;
+
+/**
+ * Who does the briefing's model work. `cursor` (default) runs the Cursor SDK
+ * phases inside Express. `grokbot` leaves them to the Grok Bot routine.
+ * @param {Record<string, string|undefined>} [env]
+ * @returns {"cursor"|"grokbot"}
+ */
+export function briefingRunner(env = process.env) {
+  const raw = String(env?.DAILY_BRIEFING_RUNNER || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
+  return raw === "grokbot" || raw === "grok" ? "grokbot" : "cursor";
+}
 
 /** Undated leftover from before date-keyed drafts. Ignore it. */
 export const NEWS_DRAFT_PATH = "/tmp/yanylevin-daily-briefing-news-draft.json";
@@ -180,6 +201,10 @@ async function resolveModelSelection(apiKey, spec) {
     );
     return fallback;
   }
+}
+
+export async function readBriefingMeta() {
+  return readMeta();
 }
 
 async function readMeta() {
@@ -405,7 +430,7 @@ async function recentEducationCommits(dateKey) {
  * @param {string} dateKey
  * @param {string} timezone
  */
-export async function prefetchNightlyStatus(dateKey, timezone) {
+export async function prefetchNightlyStatus(dateKey, timezone, outPath = NIGHTLY_STATUS_PATH) {
   const { pipelineFinishedOn, synthesisRanOn } = await import(
     "./context-synthesis-agent.js"
   );
@@ -567,13 +592,13 @@ export async function prefetchNightlyStatus(dateKey, timezone) {
     healthShortcut: await assessHealthShortcutHeartbeat(),
   };
 
-  await writeFile(NIGHTLY_STATUS_PATH, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  await writeFile(outPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
   return payload;
 }
 
-const LOCK_STALE_MS = 45 * 60 * 1000;
+export const LOCK_STALE_MS = 45 * 60 * 1000;
 
-async function acquireLock() {
+export async function acquireLock() {
   try {
     const handle = await open(LOCK_PATH, "wx");
     await handle.writeFile(String(process.pid));
@@ -595,7 +620,7 @@ async function acquireLock() {
   }
 }
 
-async function releaseLock(handle) {
+export async function releaseLock(handle) {
   try {
     await handle.close();
   } catch {
@@ -604,7 +629,7 @@ async function releaseLock(handle) {
   await rm(LOCK_PATH, { force: true });
 }
 
-async function draftFileExists(path) {
+export async function draftFileExists(path) {
   try {
     const st = await stat(path);
     return st.isFile() && st.size > 0;
@@ -684,7 +709,24 @@ export function buildUnslopPrompt({ dateKey, timezone, force, dueTime }) {
 }
 
 /**
- * @param {{ force?: boolean, dateKey?: string }} [opts]
+ * Date, zone, and due time for one briefing run. Cursor and Grok Bot runs
+ * resolve them the same way.
+ * @param {{ dateKey?: string, meta?: object, now?: Date }} [opts]
+ */
+export async function briefingContext({ dateKey: dateKeyOpt, meta: metaOpt, now: nowOpt } = {}) {
+  const meta = metaOpt || (await readMeta());
+  const now = briefingNow(meta, nowOpt || new Date());
+  const dateKey = dateKeyOpt || now.dateKey;
+  return {
+    meta,
+    dateKey,
+    timezone: resolveBriefingTimezone(meta, dateKey),
+    dueTime: dueHm(meta),
+  };
+}
+
+/**
+ * @param {{ force?: boolean, dateKey?: string, runner?: "cursor"|"grokbot" }} [opts]
  */
 export async function runDailyBriefing(opts = {}) {
   if (inFlight) return inFlight;
@@ -745,19 +787,23 @@ function phaseFailed(phase, outcome, dateKey) {
 }
 
 /**
- * @param {{ force?: boolean, dateKey?: string }} [opts]
+ * @param {{ force?: boolean, dateKey?: string, runner?: "cursor"|"grokbot" }} [opts]
  */
-async function runDailyBriefingOnce({ force = false, dateKey: dateKeyOpt } = {}) {
-  const meta = await readMeta();
-  const now = briefingNow(meta);
-  const dateKey = dateKeyOpt || now.dateKey;
-  const timezone = resolveBriefingTimezone(meta, dateKey);
-  const dueTime = dueHm(meta);
+async function runDailyBriefingOnce({ force = false, dateKey: dateKeyOpt, runner } = {}) {
+  const { dateKey, timezone, dueTime } = await briefingContext({ dateKey: dateKeyOpt });
 
   if (!force && (await briefingExists(dateKey))) {
     console.log(`[daily-briefing] skip ${dateKey}: already exists`);
     laterAuthRetry.clear();
     return { ok: true, skipped: true, reason: "exists", dateKey };
+  }
+
+  if ((runner || briefingRunner()) === "grokbot") {
+    console.log(
+      `[daily-briefing] skip ${dateKey}: DAILY_BRIEFING_RUNNER=grokbot, the Grok Bot routine compiles it (no Cursor SDK run)`
+    );
+    laterAuthRetry.clear();
+    return { ok: true, skipped: true, reason: "runner-grokbot", dateKey };
   }
 
   const handle = await acquireLock();
@@ -860,7 +906,7 @@ function armTimer(meta) {
   const when = nextCompileAt(meta);
   const wait = schedulerWait(when);
   console.log(
-    `[daily-briefing] next compile ${when.toISOString()} (in ${Math.round(wait.delay / 60000)} min)${wait.fire ? "" : " recheck"}`
+    `[daily-briefing] next compile ${when.toISOString()} (in ${Math.round(wait.delay / 60000)} min)${wait.fire ? "" : " recheck"} runner=${briefingRunner()}`
   );
   timer = setTimeout(() => {
     const job = wait.fire
@@ -906,7 +952,9 @@ const isMain = (() => {
 
 if (isMain) {
   const force = process.argv.includes("--force");
-  runDailyBriefing({ force })
+  // --cursor runs the Cursor SDK phases by hand even in grokbot mode.
+  const runner = process.argv.includes("--cursor") ? "cursor" : undefined;
+  runDailyBriefing({ force, runner })
     .then((result) => {
       console.log("[daily-briefing]", result);
       if (!result?.ok && !result?.skipped) process.exitCode = 1;

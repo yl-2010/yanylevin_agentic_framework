@@ -24,14 +24,24 @@ curl -sS https://api.yanylevin.com/health
 | `com.personalagent.education-sync` | Auto push/pull education + fitness folders, JYPE workspace, `tmp/`; optional OneDrive relaunch |
 | `com.yanylevin.cursor-usage` | Read this Mac's Cursor chats and post them to `/api/usage/ingest`. Studio also pulls the billing feed. Person is Yan unless `data/usage/machine.json` says otherwise |
 | `com.yanylevin.lmstudio-gpt-oss` | Open LM Studio at login and load `openai/gpt-oss-20b`. It stays loaded |
+| `com.personalagent.agent-worker` | Personal Agent worker on `:3005` (`server/agent-worker.js`) |
+| `com.personalagent.logs-rotate` | Daily 00:05 local gzip archive of service logs under `~/Library/Logs/personal-agent/archive/` |
 
 Plists live in `~/Library/LaunchAgents/`.
+
+### Service logs
+
+LaunchAgent stdout/stderr and the computer-use helper log live in `~/Library/Logs/personal-agent/`, which survives reboots. `com.personalagent.logs-rotate` runs at 00:05 local time, copy-truncates each non-empty live log, and gzip-compresses it into `~/Library/Logs/personal-agent/archive/<name>-YYYY-MM-DD.log.gz`. Archives are never deleted. Install or reload with:
+
+```bash
+bash $HOME/yanylevin_agentic_framework/deploy/launchagents/install-logs-rotate.sh
+```
 
 ```bash
 bash $HOME/yanylevin_agentic_framework/deploy/launchagents/install-lmstudio-gpt-oss.sh
 ```
 
-Logs: `/tmp/yanylevin-lmstudio-gpt-oss.log`. This agent only loads gpt-oss. Orpheus stays unloaded until another local API voice asks for it.
+Logs: `~/Library/Logs/personal-agent/personal-agent-lmstudio-gpt-oss.log`. This agent only loads gpt-oss. Orpheus stays unloaded until another local API voice asks for it.
 
 ### Education / data folder sync (Mac Studio + MacBook)
 
@@ -49,7 +59,7 @@ Install / reload on each Mac (repo path `$HOME/yanylevin_agentic_framework`, Hom
 bash $HOME/yanylevin_agentic_framework/deploy/launchagents/install-education-sync.sh
 ```
 
-Logs: `/tmp/yanylevin-education-sync.log`. Those user-data commits never deploy the site. Git auto-deploy is off. Agents run `npm run deploy:web` for homepage, `/education` `/fitness` `/dashboard` UI, and `api/`, not for `education/<email>/` or `education/projects/jype/` sync.
+Logs: `~/Library/Logs/personal-agent/personal-agent-education-sync.log`. Those user-data commits never deploy the site. Git auto-deploy is off. Agents run `npm run deploy:web` for homepage, `/education` `/fitness` `/dashboard` UI, and `api/`, not for `education/<email>/` or `education/projects/jype/` sync.
 
 ### Cursor usage collector (Mac Studio + MacBook)
 
@@ -59,7 +69,7 @@ Reads Cursor's local chat database and posts prompts to the Studio API. The Stud
 bash $HOME/yanylevin_agentic_framework/deploy/launchagents/install-cursor-usage.sh
 ```
 
-`USAGE_INGEST_TOKEN` lives in `server/.env` on both Macs (same value). The MacBook posts to `https://api.yanylevin.com`. Person is Yan. A one-line `data/usage/machine.json` (`{"person":"Yan"}`) overrides that. Logs: `/tmp/yanylevin-cursor-usage.log`.
+`USAGE_INGEST_TOKEN` lives in `server/.env` on both Macs (same value). The MacBook posts to `https://api.yanylevin.com`. Person is Yan. A one-line `data/usage/machine.json` (`{"person":"Yan"}`) overrides that. Logs: `~/Library/Logs/personal-agent/personal-agent-cursor-usage.log`.
 
 ---
 

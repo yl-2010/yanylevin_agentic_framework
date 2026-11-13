@@ -23,6 +23,9 @@ if [[ ! -f "$REPO/scripts/education-folder-sync.mjs" ]]; then
   exit 1
 fi
 
+# shellcheck source=service-log-dir.sh
+source "$REPO/deploy/launchagents/service-log-dir.sh"
+
 mkdir -p "$HOME/Library/LaunchAgents"
 cp "$SRC" "$DEST"
 
@@ -38,16 +41,15 @@ uid="$(id -u)"
 DOMAIN="gui/${uid}"
 SERVICE="${DOMAIN}/${LABEL}"
 
-# Copy first. If the job is already loaded, restart it (bootout+bootstrap
-# on a live job often returns I/O error 5 and leaves sync dead).
+# bootout+bootstrap so StandardOutPath and other plist edits take effect.
 if launchctl print "$SERVICE" >/dev/null 2>&1; then
-  launchctl kickstart -k "$SERVICE"
-else
-  launchctl bootstrap "$DOMAIN" "$DEST"
-  launchctl enable "$SERVICE" 2>/dev/null || true
-  launchctl kickstart -k "$SERVICE"
+  launchctl bootout "$SERVICE" 2>/dev/null || launchctl bootout "$DOMAIN" "$DEST" 2>/dev/null || true
+  sleep 1
 fi
+yl_bootstrap_agent "$DOMAIN" "$DEST"
+launchctl enable "$SERVICE" 2>/dev/null || true
+launchctl kickstart -k "$SERVICE"
 
 echo "installed ${LABEL}"
-echo "logs: /tmp/yanylevin-education-sync.log"
+echo "logs: $SERVICE_LOG_DIR/personal-agent-education-sync.log"
 echo "check: launchctl print gui/${uid}/${LABEL} | head"

@@ -28,6 +28,7 @@ import { educationDataDir, JYPE_DIR } from "./onedrive-projects.js";
 import { gitAddCommitPush } from "./git-publish.js";
 import { encodeEducationRouteId } from "./education-route-id.js";
 import { enqueueBrainExtraction } from "./brain-extraction.js";
+import { sendAccountAlert } from "./apns.js";
 import { parseLocationPayload } from "./phone-location.js";
 import { formatCalendarLiveLines } from "./calendar-cli.js";
 import { formatCanvasLiveLine } from "./canvas-sync.js";
@@ -114,8 +115,11 @@ const PA_ERROR_REPLY =
 
 /**
  * Prepared agent turn (active or waiting in turnQueue).
+ * prompt is the full text; promptPlan (app/channel turns) lets the send pick
+ * full vs delta against session.lastSentContext at send time.
  * @typedef {{
  *   prompt: string,
+ *   promptPlan?: { system: string, channel: string, live: { clock: string, schedule: string, client: string, appendix: string }, turn: string },
  *   images: { data: string, mimeType: string }[],
  *   model: ModelSelection,
  *   normalized: string,
@@ -1135,9 +1139,62 @@ function futureAgentTools(sid, session) {
  * @param {string} sid
  * @param {Session} session
  */
+function sendPushTool(sid, session) {
+  return {
+    send_push: {
+      description:
+        "Send a push notification to this account's iPhone and iPad. Use it when they should look at this chat and are not already here. Opening it on one device clears it on the other. Do not call this for a normal reply. Not available on iMessage, Teams, or WhatsApp turns.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          title: {
+            type: "string",
+            description: "Short title, a few words.",
+          },
+          body: {
+            type: "string",
+            description: "The line they should read. One or two sentences.",
+          },
+        },
+        required: ["title", "body"],
+      },
+      async execute({ title, body }) {
+        if (!sessions.has(sid) || sessions.get(sid) !== session) {
+          return "session gone";
+        }
+        const result = await sendAccountAlert({
+          email: session.email,
+          title,
+          body,
+          sessionId: sid,
+        });
+        return JSON.stringify(result);
+      },
+    },
+  };
+}
+
+/**
+ * Website, app, and scheduled chats can alert this account's phones.
+ * A turn that still delivers to iMessage, Teams, or WhatsApp already notifies there.
+ * @param {Session|null|undefined} session
+ */
+export function sessionMaySendPush(session) {
+  if (!session) return false;
+  if (session.imessageDeliverFinal || session.teamsDeliverFinal || session.whatsappDeliverFinal) {
+    return false;
+  }
+  const owed = String(session.channelReplyOwed || "");
+  if (owed === "imessage" || owed === "teams" || owed === "whatsapp") return false;
+  const progress = String(session.channelProgress || "");
+  if (progress === "imessage" || progress === "teams" || progress === "whatsapp") return false;
+  return true;
+}
+
 function sessionCustomTools(sid, session) {
   return {
     ...sendChatMessageTool(sid, session),
+    ...(sessionMaySendPush(session) ? sendPushTool(sid, session) : {}),
     ...futureAgentTools(sid, session),
     ...openEducationPageTool(sid, session),
     ...(sessionMayUseBrowser(session) ? browserCustomTools(session) : {}),
@@ -1771,24 +1828,27 @@ function requireKey() {
  * @param {ModelSelection} model
  */
 async function replaceSessionAgent(session, model) {
-  const prev = session.agent;
+  const previous = session.agent;
   session.agent = null;
-  if (prev) await disposeCursorAgent(prev);
   await recreateLocalCursorAgent({
     model,
     cwd: REPO_ROOT,
+    previous,
     attach: (agent) => {
       session.agent = agent;
       session.replayUiTranscript = true;
+      session.lastSentContext = null;
     },
   });
 }
 
+/** Only a full executor evict (scheduled-job retry in this process) lands here. */
 onLocalCursorExecutorEvict(() => {
   for (const session of sessions.values()) {
     if (!session.agent) continue;
     session.agent = null;
     session.replayUiTranscript = true;
+    session.lastSentContext = null;
   }
 });
 
@@ -2047,6 +2107,7 @@ export function systemPrompt(email, opts = {}) {
       `- Celebration site: ${PERSONAL_SKILL_PATHS.celebration}`,
       "File uploads can be stored in the matching JYPE class or project folder.",
       "Math on the website and in the iOS app is a display block, with a blank line before and after. Put $$ on its own line, then LaTeX, then $$ on its own line. Stack equations one per line in that block. Use \\(x\\) or $x^2$ only for a symbol inside a sentence. Never backticks for math. iMessage and Teams cannot render KaTeX, so those replies stay plain words.",
+      "send_push alerts this account's iPhone and iPad when they should look at this chat and are not already here. A normal reply does not need it. The tool is not on iMessage, Teams, or WhatsApp turns.",
     ].join("\n");
   }
   return [
@@ -2108,6 +2169,7 @@ export function systemPrompt(email, opts = {}) {
     "Math on the website and in the iOS app is a display block, with a blank line before and after. Put $$ on its own line, then LaTeX, then $$ on its own line. Stack equations one per line in that block. Use \\(x\\) or $x^2$ only for a symbol inside a sentence. Never backticks for math. iMessage and Teams cannot render KaTeX, so those replies stay plain words.",
     "Send to a person with no channel named: iMessage, then Teams, then email. Named channel (on Teams / iMessage / email) wins for text. iMessage files are native attachments (iMessage skill), never a URL stand-in. Each file is its own message, then the text. A Teams file goes out as a yanylevin.com link: put it in the repo, use a non-guessable folder when it should not be easy to find, commit, push, npm run deploy:web, confirm the URL is 200, then school-teams.js send the link. Attach in the Teams app with computer use only when Yan directly says to attach with computer use in this turn. A message with images has no pixels. Open that chat in the Teams app and look. School Outlook still cannot send.",
     "Long work: send_chat_message first with a short status. Send more mid-run when new info, a change, or a useful update appears. Then a final Done. Quick answers: one reply only (that is the end of turn). On an iMessage or Teams @agent or @agentg first turn, that first status is also posted to the chat before you start the work.",
+    "send_push alerts this account's iPhone and iPad when they should look at this chat and are not already here. A normal reply does not need it. The tool is not on iMessage, Teams, or WhatsApp turns.",
     "To show one education page on web/iOS, call open_education_page (education-dashboard skill). The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Skip if already on that page. Not on Cursor Desktop.",
     "No period when the reply is one word, one phrase, or one sentence.",
   ].join("\n");
@@ -2163,12 +2225,34 @@ export function normalizeUiContext(raw) {
  * @param {string} [appendix]
  */
 export function formatLiveContextBlock(nowContext, uiContext, appendix = "") {
+  const s = liveContextSections(nowContext, uiContext, appendix);
+  const lines = [LIVE_CONTEXT_HEADER];
+  for (const part of [s.clock, s.schedule, s.client]) {
+    if (part) lines.push(part);
+  }
+  if (s.appendix) lines.push("", s.appendix);
+  return lines.join("\n");
+}
+
+const LIVE_CONTEXT_HEADER = "Live context (authoritative for this turn — use fully):";
+
+/**
+ * Live context split so later turns in a thread can send only what changed.
+ * clock is tiny and always sent; the rest are compared with the last turn.
+ * @param {object|null} nowContext
+ * @param {Record<string, unknown>|null} uiContext
+ * @param {string} [appendix]
+ * @returns {{ clock: string, schedule: string, client: string, appendix: string }}
+ */
+export function liveContextSections(nowContext, uiContext, appendix = "") {
   /** @type {string[]} */
-  const lines = ["Live context (authoritative for this turn — use fully):"];
+  let lines = [];
+  let clock = "";
+  let schedule = "";
 
   if (nowContext) {
+    clock = `Schedule clock: ${nowContext.dateKey} ${nowContext.localTime} (${nowContext.timezone}).`;
     lines.push(
-      `Schedule clock: ${nowContext.dateKey} ${nowContext.localTime} (${nowContext.timezone}).`,
       `School day today: ${nowContext.isSchoolDay ? "yes" : "no"}.`,
       "Classes are in person. Say in a class, never class meeting."
     );
@@ -2210,6 +2294,8 @@ export function formatLiveContextBlock(nowContext, uiContext, appendix = "") {
       `Schedule clock unavailable — Read ${PERSONAL_SKILL_PATHS.schedule} if you need bells or today's classes.`
     );
   }
+  schedule = lines.join("\n");
+  lines = [];
 
   if (uiContext) {
     lines.push("Client page / screen:");
@@ -2328,12 +2414,70 @@ export function formatLiveContextBlock(nowContext, uiContext, appendix = "") {
     }
   }
 
-  const extra = String(appendix || "").trim();
-  if (extra) {
-    lines.push("", extra);
+  return {
+    clock,
+    schedule,
+    client: lines.join("\n"),
+    appendix: String(appendix || "").trim(),
+  };
+}
+
+/**
+ * Full prompt on the first send to an Agent; later sends to that same Agent
+ * carry only the clock, live sections that changed, and the turn itself.
+ * Stable text comes first so the provider prompt cache keeps hitting.
+ * @param {{
+ *   system: string,
+ *   channel: string,
+ *   live: { clock: string, schedule: string, client: string, appendix: string },
+ *   turn: string,
+ * }} plan
+ * @param {{ agent: unknown, system: string, channel: string, live: Record<string, string> }|null} last
+ * @param {unknown} agent
+ * @returns {{ text: string, full: boolean, sent: { agent: unknown, system: string, channel: string, live: Record<string, string> } }}
+ */
+export function composeTurnPrompt(plan, last, agent) {
+  const sent = {
+    agent,
+    system: plan.system,
+    channel: plan.channel,
+    live: { ...plan.live },
+  };
+  const full =
+    !last || !agent || last.agent !== agent || last.system !== plan.system;
+  if (full) {
+    const parts = [plan.system, ""];
+    if (plan.channel) parts.push(plan.channel, "");
+    const s = plan.live;
+    const block = [LIVE_CONTEXT_HEADER];
+    for (const part of [s.clock, s.schedule, s.client]) {
+      if (part) block.push(part);
+    }
+    if (s.appendix) block.push("", s.appendix);
+    parts.push(block.join("\n"), "", plan.turn);
+    return { text: parts.join("\n"), full: true, sent };
   }
 
-  return lines.join("\n");
+  /** @type {string[]} */
+  const changed = [];
+  if (plan.channel !== last.channel && plan.channel) changed.push(plan.channel);
+  const prev = last.live || {};
+  for (const key of ["schedule", "client", "appendix"]) {
+    const now = String(plan.live[key] || "");
+    if (now === String(prev[key] || "")) continue;
+    if (now) {
+      changed.push(now);
+    } else if (key === "client") {
+      changed.push("Client page / screen: none this turn.");
+    }
+  }
+  const head = changed.length
+    ? "Live context update (only what changed since your last turn; everything else from earlier still holds):"
+    : "Live context unchanged since your last turn except the clock.";
+  const block = [head];
+  if (plan.live.clock) block.push(plan.live.clock);
+  for (const part of changed) block.push(part);
+  return { text: `${block.join("\n")}\n\n${plan.turn}`, full: false, sent };
 }
 
 /**
@@ -3188,6 +3332,8 @@ async function executeAgentTurn(sid, session, opts) {
   session.channelProgress = channelProgressKind(opts);
   session.lastChannelProgressText = "";
 
+  /** @type {ReturnType<typeof composeTurnPrompt>["sent"]|null} */
+  let pendingSent = null;
   try {
     /** @type {string[]} */
     const chunks = [];
@@ -3237,7 +3383,20 @@ async function executeAgentTurn(sid, session, opts) {
         const history = session.replayUiTranscript
           ? formatVisibleTranscript(session, opts.bubble)
           : "";
-        const text = history ? `${history}\n\n${prompt}` : prompt;
+        let turnPrompt = prompt;
+        pendingSent = null;
+        if (opts.promptPlan) {
+          const composed = composeTurnPrompt(
+            opts.promptPlan,
+            session.lastSentContext || null,
+            session.agent
+          );
+          turnPrompt = composed.text;
+          pendingSent = composed.sent;
+        } else {
+          session.lastSentContext = null;
+        }
+        const text = history ? `${history}\n\n${turnPrompt}` : turnPrompt;
         const sendPayload = images.length > 0 ? { text, images } : text;
         chunks.length = 0;
         const run = await session.agent.send(sendPayload, sendOpts);
@@ -3346,6 +3505,11 @@ async function executeAgentTurn(sid, session, opts) {
     session.lastUsedAt = Date.now();
     if (String(result?.status || "").toLowerCase() !== "error") {
       session.replayUiTranscript = false;
+      if (pendingSent && pendingSent.agent === session.agent) {
+        session.lastSentContext = pendingSent;
+      }
+    } else {
+      session.lastSentContext = null;
     }
     const finishedStatus = result?.status === "error" ? "error" : "idle";
     if (finishedStatus === "idle" && !session.interrupting) {
@@ -3417,6 +3581,7 @@ async function executeAgentTurn(sid, session, opts) {
     }
     console.error("[personal-agent] run", err);
     if (!sessions.has(sid) || sessions.get(sid) !== session) return;
+    session.lastSentContext = null;
     if (opts.scheduledKickoff) {
       session.scheduledStatus = "failed";
       session.scheduledKickoff = false;
@@ -3592,51 +3757,49 @@ export async function messageAgent(
     workspace: sessionWorkspace(session),
   });
   if (session.teamsOrigin) promptSystem = teamsVoicePrompt(promptSystem);
+  const live = liveContextSections(
+    nowContext,
+    uiContext,
+    await buildYanLiveAppendix(normalized, nowContext?.timezone)
+  );
   /** @type {string[]} */
-  const promptParts = [
-    promptSystem,
-    "",
-    formatLiveContextBlock(
-      nowContext,
-      uiContext,
-      await buildYanLiveAppendix(normalized, nowContext?.timezone)
-    ),
-  ];
+  const channelParts = [];
+  /** @type {string[]} */
+  const promptParts = [];
   const imessageBlock = formatIMessageOriginBlock(session.imessageOrigin, {
     deliverFinal: Boolean(session.imessageDeliverFinal),
     guestCaller: session.guestCaller,
   });
   if (imessageBlock) {
-    promptParts.push("", imessageBlock);
+    channelParts.push(imessageBlock);
   }
   const teamsBlock = formatTeamsOriginBlock(session.teamsOrigin, {
     deliverFinal: Boolean(session.teamsDeliverFinal),
     guestCaller: session.guestCaller,
   });
   if (teamsBlock) {
-    promptParts.push("", teamsBlock);
+    channelParts.push(teamsBlock);
   }
   const whatsappBlock = formatWhatsAppOriginBlock(session.whatsappOrigin, {
     deliverFinal: Boolean(session.whatsappDeliverFinal),
     guestCaller: session.guestCaller,
   });
   if (whatsappBlock) {
-    promptParts.push("", whatsappBlock);
+    channelParts.push(whatsappBlock);
   }
   const composerSchedule = jypeComposerScheduleLine(model, session.teamsOrigin);
   if (composerSchedule) {
-    promptParts.push("", composerSchedule);
+    channelParts.push(composerSchedule);
   }
   if (session.futureAgentRecord) {
-    promptParts.push(
-      "",
+    channelParts.push(
       formatScheduledSystemBlock(session.futureAgentRecord, { kickoff: false })
     );
   }
   if (interrupting) {
-    promptParts.push("", interruptClarificationNote(session.channelReplyOwed));
+    promptParts.push(interruptClarificationNote(session.channelReplyOwed), "");
   }
-  promptParts.push("", "User:", text || "(no text — see attachments)");
+  promptParts.push("User:", text || "(no text — see attachments)");
 
   if (hasSessionFiles) {
     promptParts.push(
@@ -3659,7 +3822,13 @@ export async function messageAgent(
     );
   }
 
-  const prompt = promptParts.join("\n");
+  const promptPlan = {
+    system: promptSystem,
+    channel: channelParts.join("\n\n"),
+    live,
+    turn: promptParts.join("\n"),
+  };
+  const prompt = composeTurnPrompt(promptPlan, null, null).text;
 
   /** @type {{ data: string, mimeType: string }[]} */
   const images = [];
@@ -3687,6 +3856,7 @@ export async function messageAgent(
   /** @type {TurnOpts} */
   const turnOpts = {
     prompt,
+    promptPlan,
     images,
     model,
     normalized,
@@ -3813,6 +3983,11 @@ export async function promoteQueuedTurn(sessionId, email, queueIdRaw) {
     const owed = session.channelReplyOwed || "";
     turn.prompt = rewritePromptForOwedChannel(turn.prompt, owed);
     turn.prompt = withInterruptNote(turn.prompt, owed);
+    if (turn.promptPlan) {
+      const plan = turn.promptPlan;
+      plan.channel = rewritePromptForOwedChannel(plan.channel, owed);
+      plan.turn = withInterruptNote(`\n\n${plan.turn}`, owed).replace(/^\n\n/, "");
+    }
     if (owed) handOffOwedChannel(session, turn);
     turn.interrupted = true;
   }
@@ -3839,6 +4014,15 @@ export async function promoteQueuedTurn(sessionId, email, queueIdRaw) {
     workingLabel: session.workingLabel || null,
     content: null,
   };
+}
+
+/** Running or queued turns across every chat. Worker /health reports it. */
+export function busySessionCount() {
+  let n = 0;
+  for (const s of sessions.values()) {
+    if (s.status === "running" || (s.turnQueue || []).length > 0) n += 1;
+  }
+  return n;
 }
 
 /**

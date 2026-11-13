@@ -27,6 +27,9 @@ if [[ ! -f "$REPO/server/.env" ]] || ! grep -q '^USAGE_INGEST_TOKEN=.\+' "$REPO/
   exit 1
 fi
 
+# shellcheck source=service-log-dir.sh
+source "$REPO/deploy/launchagents/service-log-dir.sh"
+
 mkdir -p "$HOME/Library/LaunchAgents"
 cp "$SRC" "$DEST"
 
@@ -41,13 +44,14 @@ uid="$(id -u)"
 DOMAIN="gui/${uid}"
 SERVICE="${DOMAIN}/${LABEL}"
 
+# bootout+bootstrap so StandardOutPath and other plist edits take effect.
 if launchctl print "$SERVICE" >/dev/null 2>&1; then
-  launchctl kickstart -k "$SERVICE"
-else
-  launchctl bootstrap "$DOMAIN" "$DEST"
-  launchctl enable "$SERVICE" 2>/dev/null || true
-  launchctl kickstart -k "$SERVICE"
+  launchctl bootout "$SERVICE" 2>/dev/null || launchctl bootout "$DOMAIN" "$DEST" 2>/dev/null || true
+  sleep 1
 fi
+yl_bootstrap_agent "$DOMAIN" "$DEST"
+launchctl enable "$SERVICE" 2>/dev/null || true
+launchctl kickstart -k "$SERVICE"
 
 echo "installed ${LABEL}"
-echo "logs: /tmp/yanylevin-cursor-usage.log"
+echo "logs: $SERVICE_LOG_DIR/personal-agent-cursor-usage.log"

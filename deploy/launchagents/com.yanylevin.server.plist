@@ -22,8 +22,8 @@
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>/tmp/personal-agent-server.log</string>
+  <string>/Users/you/Library/Logs/personal-agent/personal-agent-server.log</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/personal-agent-server.log</string>
+  <string>/Users/you/Library/Logs/personal-agent/personal-agent-server.log</string>
 </dict>
 </plist>

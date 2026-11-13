@@ -307,9 +307,12 @@ export async function messageFitnessAgent(sessionId, email, message, ctx = {}) {
     laterDelaysMs: [],
     onBeforeAttempt: async ({ model: nextModel, recreate }) => {
       if (recreate) {
+        const previous = session.agent;
+        session.agent = null;
         await recreateLocalCursorAgent({
           model: nextModel,
           cwd: REPO_ROOT,
+          previous,
           attach: (agent) => {
             session.agent = agent;
           },

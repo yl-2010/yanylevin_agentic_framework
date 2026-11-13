@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.personalagent.agent-worker</string>
+  <key>WorkingDirectory</key>
+  <string>$HOME/yanylevin_agentic_framework/server</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/node</string>
+    <string>--env-file=.env</string>
+    <string>$HOME/yanylevin_agentic_framework/server/agent-worker.js</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/you/Library/Logs/personal-agent/personal-agent-worker.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/you/Library/Logs/personal-agent/personal-agent-worker.log</string>
+</dict>
+</plist>

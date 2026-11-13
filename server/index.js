@@ -40,7 +40,7 @@ import {
 } from "./phone-location.js";
 import { healthTokenMatches, writeHealthDump } from "./phone-health.js";
 import { writeLifeStateIntent } from "./life-state-intent.js";
-import { startDailyBriefingScheduler } from "./daily-briefing-agent.js";
+import { briefingRunner, startDailyBriefingScheduler } from "./daily-briefing-agent.js";
 import { startLocationHistoryScheduler } from "./location-history-agent.js";
 import { startLocationEnrichmentScheduler } from "./location-enrichment-agent.js";
 import { startContextSynthesisScheduler } from "./context-synthesis-agent.js";
@@ -77,8 +77,12 @@ import {
   resumeAgent,
   markAgentChatRead,
   resolveChatUploadFile,
-  startFutureAgentScheduler,
-} from "./personal-agent.js";
+  ensureAgentWorker,
+  startAgentWorkerBridge,
+  startAgentWorkerWatchdog,
+  startInProcessAgentSchedulers,
+} from "./agent-worker-client.js";
+import { agentWorkerInProcess } from "./agent-worker-protocol.js";
 import {
   listUpcomingFutureAgents,
   publicFutureAgentEntry,
@@ -91,9 +95,7 @@ import {
 } from "./fitness-data.js";
 import { attachFitnessEvents } from "./fitness-events.js";
 import { startLocalIpc } from "./local-ipc.js";
-import { startIMessageAgentMentionScheduler } from "./imessage-agent-mentions.js";
-import { startTeamsAgentMentionScheduler } from "./teams-agent-mentions.js";
-import { startWhatsAppAgentMentionScheduler } from "./whatsapp-agent-mentions.js";
+import { mountPushRoutes } from "./push-routes.js";
 import { startAppleMailFileScheduler } from "./apple-mail-file.js";
 import { startCalendarReconcileScheduler } from "./calendar-memory.js";
 import {
@@ -482,6 +484,7 @@ app.get("/api/agent-actions", requireAuth, async (req, res) => {
       mtimeMs,
       size,
       entries,
+      briefingRunner: briefingRunner(),
     });
   } catch (err) {
     console.error("[/api/agent-actions]", err);
@@ -524,9 +527,31 @@ app.post("/api/usage/ingest", async (req, res) => {
   }
 });
 
+app.post("/api/usage/grokbot", async (req, res) => {
+  const run = async () => {
+    try {
+      const { ingestGrokBotSnapshot } = await import("./grokbot-usage.js");
+      res.json(await ingestGrokBotSnapshot(req.body || {}));
+    } catch (err) {
+      const { isSnapshotError } = await import("./grokbot-usage.js");
+      if (isSnapshotError(err)) {
+        res.status(400).json({ ok: false, error: err.message });
+        return;
+      }
+      console.error("[/api/usage/grokbot]", err);
+      res.status(500).json({ ok: false, error: "grokbot usage ingest failed" });
+    }
+  };
+  if (ingestTokenOk(req.get("authorization") || "")) {
+    await run();
+    return;
+  }
+  requireUsageReader(req, res, run);
+});
+
 app.get("/api/usage/index", requireUsageReader, async (req, res) => {
   try {
-    const index = await usageIndex();
+    const index = await usageIndex(Date.now(), { from: req.query?.from });
     res.setHeader("Cache-Control", "no-store");
     res.json(index);
   } catch (err) {
@@ -1036,9 +1061,9 @@ app.post(
   }
 );
 
-app.get("/api/education/agent/state", requireEducationUser, (req, res) => {
+app.get("/api/education/agent/state", requireEducationUser, async (req, res) => {
   try {
-    const result = getAgentState(req.query?.sessionId, req.user.email);
+    const result = await getAgentState(req.query?.sessionId, req.user.email);
     res.setHeader("Cache-Control", "no-store");
     res.json(result);
   } catch (err) {
@@ -1050,9 +1075,9 @@ app.get("/api/education/agent/state", requireEducationUser, (req, res) => {
   }
 });
 
-app.get("/api/education/agent/active", requireEducationUser, (req, res) => {
+app.get("/api/education/agent/active", requireEducationUser, async (req, res) => {
   try {
-    const result = getActiveAgent(req.user.email);
+    const result = await getActiveAgent(req.user.email);
     res.setHeader("Cache-Control", "no-store");
     res.json(result);
   } catch (err) {
@@ -1384,9 +1409,9 @@ app.post("/api/jype/agent/interrupt-queued", requireJypeUser, async (req, res) =
   }
 });
 
-app.get("/api/jype/agent/state", requireJypeUser, (req, res) => {
+app.get("/api/jype/agent/state", requireJypeUser, async (req, res) => {
   try {
-    const result = getAgentState(req.query?.sessionId, req.user.email);
+    const result = await getAgentState(req.query?.sessionId, req.user.email);
     res.setHeader("Cache-Control", "no-store");
     res.json(result);
   } catch (err) {
@@ -1398,9 +1423,9 @@ app.get("/api/jype/agent/state", requireJypeUser, (req, res) => {
   }
 });
 
-app.get("/api/jype/agent/active", requireJypeUser, (req, res) => {
+app.get("/api/jype/agent/active", requireJypeUser, async (req, res) => {
   try {
-    const result = getActiveAgent(req.user.email, JYPE_WS);
+    const result = await getActiveAgent(req.user.email, JYPE_WS);
     res.setHeader("Cache-Control", "no-store");
     res.json(result);
   } catch (err) {
@@ -1634,31 +1659,28 @@ app.use((_req, res) => {
   res.status(404).json({ ok: false, error: "not found" });
 });
 
-  startDailyBriefingScheduler();
-  startLocationHistoryScheduler();
-  startLocationEnrichmentScheduler();
-  startHealthTakeawaysScheduler();
-  startCanvasSyncScheduler();
-  startChatTitleRefreshScheduler();
-  startLifeStateCleanupScheduler();
-  startContextSynthesisScheduler();
-  startLocationBrainScheduler();
-  startHealthBrainScheduler();
-  startFactCheckScheduler();
-  startLifeStateScheduler();
-  startHomeAgentScheduler();
-  startLocalIpc();
-  startIMessageAgentMentionScheduler();
-  startTeamsAgentMentionScheduler();
-  startWhatsAppAgentMentionScheduler();
-  startFutureAgentScheduler();
-  startAppleMailFileScheduler();
-  startCalendarReconcileScheduler();
-  startSchoolMailCalendarScheduler();
-  startTeamsChannelCalendarScheduler();
-  onOnedriveSnapshotWrote((email) => {
-    educationTreeCache.delete(canonicalizeEmail(email));
-  });
-  startOnedriveSnapshotLoop(YAN_EMAIL);
+    startDailyBriefingScheduler();
+    startLocationHistoryScheduler();
+    startLocationEnrichmentScheduler();
+    startHealthTakeawaysScheduler();
+    startCanvasSyncScheduler();
+    startChatTitleRefreshScheduler();
+    startLifeStateCleanupScheduler();
+    startContextSynthesisScheduler();
+    startLocationBrainScheduler();
+    startHealthBrainScheduler();
+    startFactCheckScheduler();
+    startLifeStateScheduler();
+    startHomeAgentScheduler();
+    startLocalIpc();
+    startAppleMailFileScheduler();
+    startCalendarReconcileScheduler();
+    startSchoolMailCalendarScheduler();
+    startTeamsChannelCalendarScheduler();
+    onOnedriveSnapshotWrote((email) => {
+      educationTreeCache.delete(canonicalizeEmail(email));
+    });
+    startOnedriveSnapshotLoop(YAN_EMAIL);
+  }
 });
 

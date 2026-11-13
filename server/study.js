@@ -658,12 +658,12 @@ async function writeExamWithModel(dir, material, email) {
       laterDelaysMs: [],
       onBeforeAttempt: async ({ model: nextModel, recreate }) => {
         if (recreate) {
-          const prev = holder.agent;
+          const previous = holder.agent;
           holder.agent = null;
-          if (prev) await disposeCursorAgent(prev);
           await recreateLocalCursorAgent({
             model: nextModel,
             cwd: dir,
+            previous,
             attach: (agent) => {
               holder.agent = agent;
             },

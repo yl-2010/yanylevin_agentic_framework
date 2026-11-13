@@ -11,7 +11,8 @@ struct ClassActivityAssignment: Codable, Hashable {
 }
 
 struct ClassActivityAttributes: ActivityAttributes {
-    var classId: String
+    /// One activity for the school day. The visible class lives on the content state.
+    var dayId: String
 
     struct ContentState: Codable, Hashable {
         var classId: String

@@ -7,6 +7,8 @@ alwaysApply: true
 
 Restarting the live Express API is **the agent’s job** when this Cursor instance is on **Yan’s Mac Studio** and the change set affects that process. Do not skip it or leave it for the user. Follow [`AGENTS.md`](../../AGENTS.md).
 
+Restarting the API is safe for running agents. Personal Agent turns live in a separate process, the agent worker (`com.personalagent.agent-worker`, `server/agent-worker.js`, 127.0.0.1:3005). The API proxies `/api/education/agent/*` and `/api/jype/agent/*` to it and re-attaches to the worker's status stream when it comes back, so loading dots and `/agent/running` pick up where they left off.
+
 ## Gate (must pass)
 
 Confirm Mac Studio before any restart:
@@ -19,7 +21,7 @@ Skip restart on MacBook, Cursor Cloud, or any other host.
 
 ## Applicable changes
 
-Restart when edits affect the running Node process, e.g. `server/**`, `server/package.json`, or `deploy/launchagents/com.personalagent.server.plist` / root `npm run server` plumbing.
+Restart the API when edits affect the running Node process, e.g. `server/**`, `server/package.json`, or `deploy/launchagents/com.personalagent.server.plist` / root `npm run server` plumbing. Do not wait for agents to go idle first.
 
 Skip for static HTML/CSS/JS, iOS, Vercel-only, docs-only, or education/fitness data-folder sync.
 
@@ -31,3 +33,17 @@ curl -sS -f http://127.0.0.1:3004/health
 ```
 
 That LaunchAgent is the production equivalent of `npm run server`. If it is not loaded and a manual `npm run server` is running, stop it and start `npm run server` from the repo root instead, then verify `/health`.
+
+## Agent worker restart (kills running turns)
+
+Restart the worker only when the change touches code it runs: `server/personal-agent.js`, `server/agent-worker*.js`, `server/cursor-sdk-auth.js`, `server/future-agents.js`, the `*-agent-mentions.js` pollers, `*-mention.js`, `imessage-send.js` / `whatsapp-send.js` / `school-teams.js`, or another module `personal-agent.js` imports. Restarting it drops every in-flight Personal Agent turn and its queue, the same as an API restart did before.
+
+Default to the idle restart. It waits until no chat is running or queued, then the worker exits and launchd starts the new code. Your own turn finishes first, so a Personal Agent turn can ask for it safely:
+
+```bash
+npm run agent-worker:restart-when-idle   # then: curl -sS http://127.0.0.1:3005/health
+```
+
+`launchctl kickstart -k "gui/$(id -u)/com.personalagent.agent-worker"` restarts at once and kills every running turn, yours included. Use it only from a plain terminal when `busySessions` is 0 or the fix is urgent.
+
+If the worker LaunchAgent is not installed yet, run `deploy/launchagents/install-agent-worker.sh` once.

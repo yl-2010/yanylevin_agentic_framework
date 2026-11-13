@@ -7,7 +7,11 @@
   "scripts": {
     "start": "node --env-file=.env index.js",
     "dev": "node --env-file=.env --watch index.js",
+    "agent-worker": "node --env-file=.env agent-worker.js",
+    "agent-worker:restart-when-idle": "curl -sS -f -X POST http://127.0.0.1:3005/restart-when-idle",
     "daily-briefing": "node --env-file=.env daily-briefing-agent.js",
+    "daily-briefing-grokbot": "node --env-file=.env daily-briefing-grokbot.js",
+    "grokbot-usage": "node grokbot-usage.js",
     "location-history": "node --env-file=.env location-history-agent.js",
     "life-state": "node --env-file=.env life-state-agent.js",
     "life-state-cleanup": "node --env-file=.env life-state-cleanup-agent.js",

@@ -25,8 +25,8 @@
   <key>ThrottleInterval</key>
   <integer>10</integer>
   <key>StandardOutPath</key>
-  <string>/tmp/yanylevin-cursor-usage.log</string>
+  <string>/Users/you/Library/Logs/personal-agent/personal-agent-cursor-usage.log</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/yanylevin-cursor-usage.log</string>
+  <string>/Users/you/Library/Logs/personal-agent/personal-agent-cursor-usage.log</string>
 </dict>
 </plist>

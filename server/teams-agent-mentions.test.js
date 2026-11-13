@@ -8,6 +8,7 @@ import {
   parseMentionState,
   pollTeamsAgentMentions,
   saveMentionState,
+  teamsMessageCreatedMs,
 } from "./teams-agent-mentions.js";
 
 describe("teams-agent-mentions poller", () => {
@@ -298,5 +299,199 @@ describe("teams-agent-mentions poller", () => {
     assert.equal(result.started, 0);
     assert.equal(started.length, 0);
     assert.equal(limited.length, 0);
+  });
+
+  // Alex Xu, 2026-11-12: one new @agent in a 1:1 that was quiet since
+  // Nov 3 started seven sessions, one per @agent in the last 15 messages.
+  // Teams returns the chat's recent messages, and the /tmp seen list had
+  // been wiped by a reboot, so every old mention looked new.
+  const alexChat = "19:alex_yan@unq.gbl.spaces";
+  const alexOld = [
+    ["1793732847329", "2026-11-03T19:07:27.329Z", "@agent tae park weber"],
+    ["1793732904866", "2026-11-03T19:08:24.866Z", "@agent ayo song"],
+    ["1793733019050", "2026-11-03T19:10:19.050Z", "@agent stone fridge car"],
+    ["1793741079228", "2026-11-03T21:24:39.228Z", "@agent what is the sibling question?"],
+    ["1793741194167", "2026-11-03T21:26:34.167Z", "@agent, slime"],
+    ["1793742361873", "2026-11-03T21:46:01.873Z", "@agent other songs"],
+  ].map(([id, at, text]) => ({
+    id,
+    at,
+    text,
+    fromMe: false,
+    chat: "Alex Xu",
+    chatId: alexChat,
+    chatType: "oneOnOne",
+    messageType: "message",
+    from: "Alex Xu",
+  }));
+  const alexNew = {
+    ...alexOld[0],
+    id: "1794507411835",
+    at: "2026-11-12T18:16:51.835Z",
+    text: "@agent does Samarth Patankar have a sister?",
+  };
+  const guestStart = async () => ({
+    action: "start",
+    caller: { displayName: "Alex", slug: "", platform: "teams" },
+  });
+
+  it("old backlog in a quiet chat plus one new mention starts exactly one session", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "teams-agent-"));
+    const statePath = join(dir, "state.json");
+    // Fresh state after a reboot: watermark only, no seen keys.
+    await saveMentionState(
+      { lastAt: "2026-11-12T18:16:45.000Z", seenIds: [] },
+      statePath
+    );
+    /** @type {object[]} */
+    const started = [];
+    const result = await pollTeamsAgentMentions({
+      statePath,
+      now: () => new Date("2026-11-12T18:16:53.000Z"),
+      fetchRecent: async () => [alexNew, ...alexOld].reverse(),
+      evaluateGuestMention: guestStart,
+      startFromMessage: async (message) => {
+        started.push(message);
+      },
+      log: () => {},
+    });
+    assert.equal(result.started, 1);
+    assert.deepEqual(started.map((m) => m.id), [alexNew.id]);
+    assert.equal(result.skippedOld["before-watermark"], 6);
+
+    // Next poll, same rows: nothing new.
+    const again = await pollTeamsAgentMentions({
+      statePath,
+      now: () => new Date("2026-11-12T18:17:01.000Z"),
+      fetchRecent: async () => [alexNew, ...alexOld],
+      evaluateGuestMention: guestStart,
+      startFromMessage: async (message) => {
+        started.push(message);
+      },
+      log: () => {},
+    });
+    assert.equal(again.started, 0);
+    assert.equal(started.length, 1);
+  });
+
+  it("does not replay after long downtime (stale watermark)", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "teams-agent-"));
+    const statePath = join(dir, "state.json");
+    // Worker was down since Nov 1; old mentions are past the max age.
+    await saveMentionState(
+      { lastAt: "2026-11-01T00:00:00.000Z", seenIds: [] },
+      statePath
+    );
+    const started = [];
+    const result = await pollTeamsAgentMentions({
+      statePath,
+      now: () => new Date("2026-11-12T18:16:53.000Z"),
+      fetchRecent: async () => [...alexOld, alexNew],
+      evaluateGuestMention: guestStart,
+      startFromMessage: async (message) => {
+        started.push(message);
+      },
+      log: () => {},
+    });
+    assert.equal(result.started, 1);
+    assert.equal(started[0].id, alexNew.id);
+  });
+
+  it("ignores an edited old mention whose row time moved forward", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "teams-agent-"));
+    const statePath = join(dir, "state.json");
+    await saveMentionState(
+      { lastAt: "2026-11-12T18:16:45.000Z", seenIds: [] },
+      statePath
+    );
+    const edited = { ...alexOld[3], at: "2026-11-12T18:16:50.000Z" };
+    assert.equal(
+      teamsMessageCreatedMs(edited),
+      Date.parse("2026-11-03T21:24:39.228Z")
+    );
+    const started = [];
+    const result = await pollTeamsAgentMentions({
+      statePath,
+      now: () => new Date("2026-11-12T18:16:53.000Z"),
+      fetchRecent: async () => [edited],
+      evaluateGuestMention: guestStart,
+      startFromMessage: async (message) => {
+        started.push(message);
+      },
+      log: () => {},
+    });
+    assert.equal(result.started, 0);
+    assert.equal(started.length, 0);
+  });
+
+  it("never starts a mention older than the last handled one in that chat", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "teams-agent-"));
+    const statePath = join(dir, "state.json");
+    await saveMentionState(
+      {
+        lastAt: "2026-11-12T18:16:45.000Z",
+        seenIds: [],
+        chats: { [alexChat]: "2026-11-12T18:16:44.000Z" },
+      },
+      statePath
+    );
+    const late = { ...alexNew, id: "x-late", at: "2026-11-12T18:16:40.000Z" };
+    const started = [];
+    const result = await pollTeamsAgentMentions({
+      statePath,
+      now: () => new Date("2026-11-12T18:16:53.000Z"),
+      fetchRecent: async () => [late, alexNew],
+      evaluateGuestMention: guestStart,
+      startFromMessage: async (message) => {
+        started.push(message);
+      },
+      log: () => {},
+    });
+    assert.deepEqual(started.map((m) => m.id), [alexNew.id]);
+    assert.equal(result.started, 1);
+    const saved = await loadMentionState(statePath);
+    assert.equal(saved.chats[alexChat], alexNew.at);
+    assert.ok(saved.seenIds.includes(`teams:${alexChat}:${alexNew.id}`));
+  });
+
+  it("keeps handled state across a restart (new process, same file)", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "teams-agent-"));
+    const statePath = join(dir, "nested", "state.json");
+    await saveMentionState(
+      { lastAt: "2026-11-12T18:16:45.000Z", seenIds: [] },
+      statePath
+    );
+    const started = [];
+    const poll = (now) =>
+      pollTeamsAgentMentions({
+        statePath,
+        now: () => new Date(now),
+        fetchRecent: async () => [alexNew],
+        evaluateGuestMention: guestStart,
+        startFromMessage: async (message) => {
+          started.push(message);
+        },
+        log: () => {},
+      });
+    await poll("2026-11-12T18:16:53.000Z");
+    // Restart: worker is down ~30 s, comes back with the same file.
+    await poll("2026-11-12T18:17:30.000Z");
+    assert.equal(started.length, 1);
+  });
+
+  it("parses a corrupt state file as empty and re-watermarks", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "teams-agent-"));
+    const statePath = join(dir, "state.json");
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(statePath, "{not json", "utf8");
+    const result = await pollTeamsAgentMentions({
+      statePath,
+      now: () => new Date("2026-11-12T18:16:53.000Z"),
+      fetchRecent: async () => [alexNew, ...alexOld],
+      startFromMessage: async () => {
+        throw new Error("should not start");
+      },
+    });
+    assert.equal(result.skipped, "watermark");
   });
 });

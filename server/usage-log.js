@@ -2,11 +2,13 @@
  * Cursor usage clumps. One user prompt is one row.
  * Billing that neither the Studio nor the MacBook can trace (no prompt, no
  * transcript on either machine) is Alex. He no longer runs a collector,
- * so kind is cursor-desktop and repo is Other. Files stay on the Mac under
+ * so kind is cursor-desktop and repo is Other. Cloud agents Grok Bot started
+ * are always Yan (isGrokBotCloudAgent). Files stay on the Mac under
  * data/usage/. Gitignored.
  */
 
 import { createHash, timingSafeEqual, randomUUID } from "node:crypto";
+import { createRequire } from "node:module";
 import { appendFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { chatTitlesForSessions } from "./education-chat-history.js";
@@ -14,6 +16,9 @@ import { canonicalizeEmail } from "./identity.js";
 
 import { zonedLocalToUtc } from "./local-clock.js";
 import { USAGE_DIR as ONEDRIVE_USAGE_DIR } from "./onedrive-projects.js";
+
+/** Same 1st party / 3rd party / Grok Bot split the /usage page uses. */
+const { sourceOf, lastPeriodBounds } = createRequire(import.meta.url)("../usage/sources.js");
 
 export const USAGE_DIR = ONEDRIVE_USAGE_DIR;
 export const USAGE_ROWS_PATH = join(USAGE_DIR, "rows.jsonl");
@@ -36,6 +41,41 @@ let builtFlight = null;
 /** Dedupe signatures by row id, valid while the jsonl stamp matches. */
 /** @type {{ stamp: string, sigs: Map<string, string> } | null} */
 let knownRows = null;
+
+/**
+ * Grok Bot usage rides the same Cursor billing feed (model grok-bot-*), but
+ * it is its own pool. It is never a Cursor prompt and never Alex.
+ * @param {unknown} model
+ */
+export function isGrokBotModel(model) {
+  return /^grok-bot(?:-|$)/i.test(String(model || "").trim());
+}
+
+const CLOUD_AGENT_ID = /^bc-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Cursor cloud agent runs bill under conversationId bc-<uuid>.
+ * @param {unknown} id
+ */
+export function isCloudAgentId(id) {
+  return CLOUD_AGENT_ID.test(String(id || "").trim());
+}
+
+/**
+ * A cloud agent Grok Bot started. Those are always Yan's, never Alex's.
+ * Runs started through the Cursor API or SDK (Grok Bot's cloud agents) get a
+ * name-based v5 uuid. Runs started by hand on cursor.com or in the desktop app
+ * get a random v4 uuid and keep the old rules. This server never starts cloud
+ * agents. A transcript row with kind grok-bot-cloud-agent marks any other run.
+ * @param {unknown} id
+ * @param {{ kind?: string }|null|undefined} [tag] transcript index entry for the run
+ */
+export function isGrokBotCloudAgent(id, tag) {
+  const value = String(id || "").trim();
+  if (!isCloudAgentId(value)) return false;
+  if (value[17] === "5") return true;
+  return canonicalKind(tag?.kind || "") === "grok-bot-cloud-agent";
+}
 
 /**
  * @param {string|null|undefined} email
@@ -623,14 +663,17 @@ function stringList(value) {
  */
 export function buildClumps(rows, local = null) {
   const all = latestById(rows);
-  const billing = all.filter((r) => r.source === "billing");
+  const index = transcriptIndex(all, local);
+  const grokBotCloud = (r) => isGrokBotCloudAgent(r.conversationId, index.get(String(r.conversationId || "")));
+  const billing = all.filter((r) => r.source === "billing" && !isGrokBotModel(r.model) && !grokBotCloud(r));
+  const grokBotBills = all.filter((r) => r.source === "billing" && isGrokBotModel(r.model));
+  const grokBotCloudBills = all.filter((r) => r.source === "billing" && !isGrokBotModel(r.model) && grokBotCloud(r));
   const prompts = all.filter((r) => r.source === "sdk" || r.source === "desktop");
   /** @type {Set<string>} */
   const explained = new Set();
 
   /** @type {object[]} */
   const clumps = [];
-  const index = transcriptIndex(all, local);
   const bills = indexBilling(billing, index);
   const sdk = prompts
     .filter((p) => p.source === "sdk")
@@ -651,6 +694,28 @@ export function buildClumps(rows, local = null) {
   const folded = foldSubagents(clumps);
   clumps.length = 0;
   clumps.push(...folded);
+  for (const bill of grokBotBills) clumps.push(billingOnlyClump(bill));
+  for (const [conv, list] of groupByConversation(grokBotCloudBills)) {
+    const hit = index.get(conv) || {};
+    clumps.push(
+      toClump(
+        {
+          id: `cloud:${conv}`,
+          source: "cloud-agent",
+          at: list.map((bill) => bill.at).sort().at(-1) || "",
+          person: "Yan",
+          repo: hit.repo || "Grok Bot",
+          kind: "cloud-agent",
+          model: dominantModel(list),
+          prompt: hit.prompt || "",
+          threadId: conv,
+          machine: "",
+          tokens: emptyTokens(),
+        },
+        list
+      )
+    );
+  }
   /** @type {Map<string, object[]>} */
   const localGroups = new Map();
   for (const bill of billing) {
@@ -687,6 +752,22 @@ export function buildClumps(rows, local = null) {
   }
   clumps.sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0));
   return clumps;
+}
+
+/**
+ * @param {object[]} bills
+ * @returns {Map<string, object[]>}
+ */
+function groupByConversation(bills) {
+  /** @type {Map<string, object[]>} */
+  const groups = new Map();
+  for (const bill of bills) {
+    const conv = String(bill.conversationId || "");
+    const list = groups.get(conv) || [];
+    list.push(bill);
+    groups.set(conv, list);
+  }
+  return groups;
 }
 
 /**
@@ -936,6 +1017,7 @@ function toClump(prompt, matched) {
         model: bill.model || prompt.model || "",
         usageEventId: bill.usageEventId || "",
         tokens: part,
+        chargedCents: num(bill.chargedCents),
       });
     }
     const own = tokensFromUsage(prompt.tokens);
@@ -1017,13 +1099,14 @@ function pickParentPrompt(parents, child) {
 
 function billingOnlyClump(bill) {
   const tokens = tokensFromUsage(bill.tokens);
+  const grokBot = isGrokBotModel(bill.model);
   return {
     id: bill.id,
     source: "billing",
     at: bill.at || "",
-    person: "Alex",
-    repo: "Other",
-    kind: "cursor-desktop",
+    person: grokBot ? "Yan" : "Alex",
+    repo: grokBot ? "Grok Bot" : "Other",
+    kind: grokBot ? "grok-bot" : "cursor-desktop",
     model: bill.model || "",
     modelConfig: null,
     prompt: "",
@@ -1037,9 +1120,44 @@ function billingOnlyClump(bill) {
         model: bill.model || "",
         usageEventId: bill.usageEventId || "",
         tokens,
+        chargedCents: num(bill.chargedCents),
       },
     ],
   };
+}
+
+/**
+ * One prompt can bill more than one pool: a subagent on Claude under a
+ * Composer chat, or Auto that picked a third-party model. Split it so each
+ * source gets its own tokens and cents. Same-source prompts stay one part.
+ * @param {object} row clump
+ * @returns {{ model: string, tokens: ReturnType<typeof emptyTokens>, chargedCents: number }[]}
+ */
+export function sourceParts(row) {
+  const whole = [{ model: row.model || "unknown", tokens: tokensFromUsage(row.tokens), chargedCents: num(row.chargedCents) }];
+  const calls = Array.isArray(row.calls) ? row.calls.filter((c) => c && c.model) : [];
+  if (!calls.length) return whole;
+  const own = sourceOf(row.model);
+  if (calls.every((c) => sourceOf(c.model) === own)) return whole;
+  /** @type {Map<string, { tokens: ReturnType<typeof emptyTokens>, cents: number, models: Map<string, number> }>} */
+  const groups = new Map();
+  for (const call of calls) {
+    const source = sourceOf(call.model);
+    const group = groups.get(source) || { tokens: emptyTokens(), cents: 0, models: new Map() };
+    const cents = num(call.chargedCents);
+    group.tokens = addTokens(group.tokens, tokensFromUsage(call.tokens));
+    group.cents += cents;
+    group.models.set(call.model, (group.models.get(call.model) || 0) + cents + 0.0001);
+    groups.set(source, group);
+  }
+  return [...groups.entries()].map(([source, group]) => ({
+    model:
+      source === own && row.model
+        ? row.model
+        : [...group.models.entries()].sort((a, b) => b[1] - a[1])[0][0],
+    tokens: group.tokens,
+    chargedCents: group.cents,
+  }));
 }
 
 /**
@@ -1203,6 +1321,13 @@ async function readPlan() {
 export async function resolveRange(query, now = Date.now()) {
   const range = String(query.range || "30d");
   const to = now;
+  if (range === "custom") {
+    const from = Date.parse(String(query.from || ""));
+    const until = Date.parse(String(query.to || ""));
+    if (Number.isFinite(from) && Number.isFinite(until) && from <= until) {
+      return { from: new Date(from).toISOString(), to: new Date(Math.min(until, to)).toISOString(), range };
+    }
+  }
   if (range === "7d") return { from: new Date(to - 7 * DAY_MS).toISOString(), to: new Date(to).toISOString(), range };
   if (range === "period") {
     let start = "";
@@ -1290,24 +1415,26 @@ export function packUsageEvents(clumps) {
     }
     return id;
   };
-  const events = clumps.map((row) => {
-    const tokens = tokensFromUsage(row.tokens);
-    return [
-      Date.parse(row.at || "") || 0,
-      idOf("person", row.person || "Other"),
-      idOf("repo", row.repo || "Other"),
-      idOf("kind", visibleKind(row.kind) || "other"),
-      idOf("model", row.model || "unknown"),
-      idOf("thread", row.threadId || row.id || ""),
-      idOf("label", agentTypeLabel(row)),
-      tokens.input || 0,
-      tokens.output || 0,
-      tokens.cacheRead || 0,
-      tokens.cacheWrite || 0,
-      num(row.chargedCents),
-      tokens.reasoning || 0,
-    ];
-  });
+  const events = clumps.flatMap((row) =>
+    sourceParts(row).map((part) => {
+      const tokens = part.tokens;
+      return [
+        Date.parse(row.at || "") || 0,
+        idOf("person", row.person || "Other"),
+        idOf("repo", row.repo || "Other"),
+        idOf("kind", visibleKind(row.kind) || "other"),
+        idOf("model", part.model || "unknown"),
+        idOf("thread", row.threadId || row.id || ""),
+        idOf("label", agentTypeLabel(row)),
+        tokens.input || 0,
+        tokens.output || 0,
+        tokens.cacheRead || 0,
+        tokens.cacheWrite || 0,
+        num(part.chargedCents),
+        tokens.reasoning || 0,
+      ];
+    })
+  );
   return { dict, events };
 }
 
@@ -1335,17 +1462,38 @@ export function unpackUsageEvents(packed) {
   }));
 }
 
+/** Oldest day a typed range can reach back to. */
+export const USAGE_INDEX_MAX_DAYS = 400;
+
+/**
+ * Lower bound for the index. A typed range (`?from=`) can reach further back
+ * than the billing period and 30 days, up to USAGE_INDEX_MAX_DAYS.
+ * @param {number} defaultFrom
+ * @param {unknown} requested
+ * @param {number} now
+ */
+export function indexFromBound(defaultFrom, requested, now) {
+  const asked = Date.parse(String(requested || ""));
+  if (!Number.isFinite(asked)) return defaultFrom;
+  const floor = now - USAGE_INDEX_MAX_DAYS * DAY_MS;
+  return Math.min(defaultFrom, Math.max(asked, floor));
+}
+
 /**
  * One payload covers billing period, 7 days, and 30 days.
- * The page filters it locally.
+ * The page filters it locally. `query.from` widens it for a typed range.
  * @param {number} [now]
+ * @param {{ from?: string }} [query]
  */
-export async function usageIndex(now = Date.now()) {
+export async function usageIndex(now = Date.now(), query = {}) {
   const { clumps, billedAt } = await loadBuiltClumps();
   const period = await resolveRange({ range: "period" }, now);
   const week = await resolveRange({ range: "7d" }, now);
   const month = await resolveRange({ range: "30d" }, now);
-  const from = Math.min(Date.parse(period.from), Date.parse(month.from));
+  const last = lastPeriodBounds(period.from);
+  // Always carry the last full billing period so that window needs no second load.
+  const defaultFrom = Math.min(Date.parse(period.from), Date.parse(month.from), last ? last.from : Infinity);
+  const from = indexFromBound(defaultFrom, query?.from, now);
   /** @type {object[]} */
   const ranged = [];
   for (const row of clumps) {
@@ -1369,15 +1517,30 @@ export async function usageIndex(now = Date.now()) {
     ok: true,
     bounds: {
       period: { from: period.from, to: period.to },
+      ...(last ? { lastPeriod: { from: new Date(last.from).toISOString(), to: new Date(last.to).toISOString() } } : {}),
       "7d": { from: week.from, to: week.to },
       "30d": { from: month.from, to: month.to },
     },
+    loadedFrom: new Date(from).toISOString(),
     plan: await readPlan(),
+    grokbot: await grokBotIndex(from),
     sync: await readSync(billedAt),
     dict: packed.dict,
     events: packed.events,
     titles,
   };
+}
+
+/** @param {number} fromMs */
+async function grokBotIndex(fromMs) {
+  try {
+    const { grokBotUsageForIndex } = await import("./grokbot-usage.js");
+    // One extra week so the first day of a range still has the snapshot that covered it.
+    return await grokBotUsageForIndex({ fromMs: fromMs - 7 * DAY_MS });
+  } catch (err) {
+    console.error("[usage] grokbot snapshots", err);
+    return { snapshots: [], latest: null };
+  }
 }
 
 /**

@@ -8,6 +8,8 @@ final class LiveActivityCoordinator {
     private var syncTask: Task<Void, Never>?
     private var classEndTask: Task<Void, Never>?
     private var agentSyncGeneration = 0
+    private var watchingClassPush = false
+    private var watchedActivityIds = Set<String>()
 
     private init() {}
 
@@ -22,7 +24,7 @@ final class LiveActivityCoordinator {
 
     func sync() async {
         guard AppGroupStore.hasFullAccess else {
-            await endClass()
+            await endClass(report: true)
             await endAgents()
             return
         }
@@ -32,42 +34,103 @@ final class LiveActivityCoordinator {
 
     private func syncClass() async {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
-            await endClass()
+            await endClass(report: true)
             return
         }
-        let tree = AppGroupStore.loadCachedEducationTree()
+        startPushWatching()
+        guard let tree = AppGroupStore.loadCachedEducationTree() else { return }
         let sections = EducationScheduleHelper.classSections(
-            schedule: tree?.schedule,
-            classes: tree?.classes ?? [],
-            activeClassIdsByDate: tree?.activeClassIdsByDate
+            schedule: tree.schedule,
+            classes: tree.classes ?? [],
+            activeClassIdsByDate: tree.activeClassIdsByDate
         )
-        guard let active = EducationScheduleHelper.activeDayClass(in: sections),
-              !active.dayClass.cls.isFreePeriod
-        else {
-            await endClass()
-            armNextHighlight(in: sections)
+        guard let section = sections.first(where: \.isToday) else {
+            await endClass(report: true)
             return
         }
-        let dayClass = active.dayClass
+        switch classDayPhase(section: section, tree: tree) {
+        case .idle(let when):
+            await endClass(report: true)
+            armClassEnd(when)
+        case .end:
+            await endClass(report: true)
+        case .show(let state, let stale):
+            await upsertDay(dayId: dayId(for: section.dateKey), state: state, staleDate: stale)
+            armClassEnd(stale)
+        }
+    }
+
+    private enum ClassDayPhase {
+        case idle(Date?)
+        case show(ClassActivityAttributes.ContentState, Date?)
+        case end
+    }
+
+    /// One card from the first highlight until 15 minutes after the last bell.
+    /// Gaps show the next real class instead of ending the activity.
+    private func classDayPhase(section: DaySection, tree: EducationTreeResponse) -> ClassDayPhase {
+        let classes = section.classes
+        let real = classes.filter { !$0.cls.isFreePeriod && $0.endMin != nil }
+        guard !real.isEmpty else { return .end }
+        let lastBell = classes.compactMap(\.endMin).max() ?? 0
+        let dayEnd = lastBell + EducationScheduleHelper.schoolDayEndBufferMinutes
+        let firstReal = classes.firstIndex(where: { !$0.cls.isFreePeriod }) ?? 0
+        var dayStart = EducationScheduleHelper.highlightStartMin(for: real[0], in: classes)
+        for dayClass in classes.prefix(firstReal) {
+            guard let highlight = EducationScheduleHelper.highlightStartMin(for: dayClass, in: classes) else { continue }
+            if dayStart == nil || highlight < dayStart! { dayStart = highlight }
+        }
+        let zone = tree.schedule?.timezone
+        func at(_ minutes: Int) -> Date? {
+            EducationScheduleHelper.minutesToDate(dateKey: section.dateKey, minutes: minutes, timezone: zone)
+        }
+        guard let dayStart else { return .end }
+        if section.nowMinutes < dayStart {
+            return .idle(at(dayStart))
+        }
+        if section.nowMinutes >= dayEnd {
+            return .end
+        }
+        let shown: DayClass
+        let staleMin: Int
+        if let active = classes.first(where: { section.isCurrent($0) && !$0.cls.isFreePeriod }) {
+            shown = active
+            staleMin = active.endMin ?? dayEnd
+        } else if let upcoming = real.first(where: { ($0.endMin ?? 0) > section.nowMinutes }) {
+            shown = upcoming
+            staleMin = upcoming.endMin ?? dayEnd
+        } else if let last = real.last {
+            shown = last
+            staleMin = dayEnd
+        } else {
+            return .end
+        }
+        return .show(contentState(for: shown, section: section, tree: tree), at(staleMin))
+    }
+
+    private func contentState(
+        for dayClass: DayClass,
+        section: DaySection,
+        tree: EducationTreeResponse
+    ) -> ClassActivityAttributes.ContentState {
+        let zone = tree.schedule?.timezone
         let (items, overflow) = EducationScheduleHelper.periodAssignments(
             for: dayClass,
-            dateKey: active.section.dateKey,
+            dateKey: section.dateKey,
             from: tree
         )
-        let startDate = dayClass.startMin.flatMap {
-            EducationScheduleHelper.minutesToDate(dateKey: active.section.dateKey, minutes: $0)
-        }
-        let endDate = dayClass.endMin.flatMap {
-            EducationScheduleHelper.minutesToDate(dateKey: active.section.dateKey, minutes: $0)
-        }
-        let state = ClassActivityAttributes.ContentState(
+        return ClassActivityAttributes.ContentState(
             classId: dayClass.cls.id,
             className: dayClass.cls.displayName,
             period: dayClass.period,
             start: dayClass.start ?? "",
             end: dayClass.end ?? "",
-            startDate: startDate,
-            endDate: endDate,
+            startDate: dayClass.startMin.flatMap {
+                EducationScheduleHelper.minutesToDate(dateKey: section.dateKey, minutes: $0, timezone: zone)
+            },
+            endDate: dayClass.endMin.flatMap {
+                EducationScheduleHelper.minutesToDate(dateKey: section.dateKey, minutes: $0, timezone: zone)
+            },
             scoreLabel: dayClass.cls.scoreLabel,
             assignments: items.map {
                 ClassActivityAssignment(
@@ -81,15 +144,22 @@ final class LiveActivityCoordinator {
             },
             overflowCount: overflow
         )
-        await upsertClass(state: state, staleDate: endDate)
-        armClassRefresh(startDate: startDate, endDate: endDate)
     }
 
-    private func upsertClass(state: ClassActivityAttributes.ContentState, staleDate: Date?) async {
+    private func dayId(for dateKey: String) -> String {
+        "school-day-\(dateKey)"
+    }
+
+    private func upsertDay(
+        dayId: String,
+        state: ClassActivityAttributes.ContentState,
+        staleDate: Date?
+    ) async {
         let content = ActivityContent(state: state, staleDate: staleDate)
         let existing = Activity<ClassActivityAttributes>.activities
-        if let current = existing.first(where: { $0.attributes.classId == state.classId }) {
+        if let current = existing.first(where: { $0.attributes.dayId == dayId }) {
             await current.update(content)
+            watchActivityToken(current)
             for extra in existing where extra.id != current.id {
                 await extra.end(nil, dismissalPolicy: .immediate)
             }
@@ -98,58 +168,81 @@ final class LiveActivityCoordinator {
         for extra in existing {
             await extra.end(nil, dismissalPolicy: .immediate)
         }
-        let attrs = ClassActivityAttributes(classId: state.classId)
         do {
-            _ = try Activity.request(attributes: attrs, content: content, pushType: nil)
+            let activity = try Activity.request(
+                attributes: ClassActivityAttributes(dayId: dayId),
+                content: content,
+                pushType: .token
+            )
+            watchActivityToken(activity)
         } catch {
             NSLog("LiveActivity class start: %@", error.localizedDescription)
         }
     }
 
-    private func endClass() async {
+    private func endClass(report: Bool) async {
         classEndTask?.cancel()
         classEndTask = nil
-        for activity in Activity<ClassActivityAttributes>.activities {
+        let running = Activity<ClassActivityAttributes>.activities
+        guard !running.isEmpty else { return }
+        for activity in running {
             await activity.end(nil, dismissalPolicy: .immediate)
         }
+        if report {
+            await PushRegistration.shared.uploadLiveActivity(
+                pushToStartToken: nil,
+                activityPushToken: nil,
+                dayId: nil,
+                ended: true
+            )
+        }
     }
 
-    private func armNextHighlight(in sections: [DaySection]) {
-        guard let section = sections.first(where: { $0.isToday }) else { return }
-        var soonest: Date?
-        for dayClass in section.classes {
-            guard !dayClass.cls.isFreePeriod,
-                  let startMin = EducationScheduleHelper.highlightStartMin(
-                for: dayClass,
-                in: section.classes
-            ), startMin > section.nowMinutes,
-               let date = EducationScheduleHelper.minutesToDate(
-                dateKey: section.dateKey,
-                minutes: startMin
-               )
-            else { continue }
-            if soonest == nil || date < soonest! {
-                soonest = date
+    private func startPushWatching() {
+        guard !watchingClassPush else { return }
+        watchingClassPush = true
+        Task { @MainActor in
+            for await token in Activity<ClassActivityAttributes>.pushToStartTokenUpdates {
+                let hex = Self.hex(token)
+                await PushRegistration.shared.uploadLiveActivity(
+                    pushToStartToken: hex,
+                    activityPushToken: nil,
+                    dayId: nil,
+                    ended: false
+                )
             }
         }
-        armClassRefresh(startDate: soonest, endDate: nil)
+        Task { @MainActor in
+            for await activity in Activity<ClassActivityAttributes>.activityUpdates {
+                self.watchActivityToken(activity)
+            }
+        }
+        for activity in Activity<ClassActivityAttributes>.activities {
+            watchActivityToken(activity)
+        }
     }
 
-    /// Wake at class start (lead countdown → elapsed) and at class end (dismiss).
-    /// Elapsed time is `Text(timerInterval:)`, so the app does not need a per-minute poke.
-    private func armClassRefresh(startDate: Date?, endDate: Date?) {
-        let now = Date()
-        if let startDate, startDate > now {
-            armClassEnd(startDate)
-            return
+    private func watchActivityToken(_ activity: Activity<ClassActivityAttributes>) {
+        guard watchedActivityIds.insert(activity.id).inserted else { return }
+        let dayId = activity.attributes.dayId
+        Task { @MainActor in
+            for await token in activity.pushTokenUpdates {
+                let hex = Self.hex(token)
+                await PushRegistration.shared.uploadLiveActivity(
+                    pushToStartToken: nil,
+                    activityPushToken: hex,
+                    dayId: dayId,
+                    ended: false
+                )
+            }
         }
-        if let endDate, endDate > now {
-            armClassEnd(endDate)
-            return
-        }
-        armClassEnd(nil)
     }
 
+    private static func hex(_ data: Data) -> String {
+        data.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Wake when the next class content has to change. The minute counter is system-drawn.
     private func armClassEnd(_ date: Date?) {
         classEndTask?.cancel()
         guard let date else {
