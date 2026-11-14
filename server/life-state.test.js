@@ -10,6 +10,7 @@ import {
   completeLifeStateRecord,
   formatLifeStateLocal,
   lifeStateLogMonthKey,
+  lifeStateMonthShrinkError,
   isCurrentLifeStateFresh,
   parseLifeStateRecord,
   readCurrentLifeState,
@@ -24,6 +25,20 @@ import {
 describe("lifeStateLogMonthKey", () => {
   it("keeps a late Pacific evening in that month", () => {
     assert.equal(lifeStateLogMonthKey("2026-11-01T06:30:00.000Z"), "2026-10");
+  });
+});
+
+describe("lifeStateMonthShrinkError", () => {
+  it("blocks a rewrite that drops rows and ignores a partial last line", () => {
+    const full = '{"at":"a"}\n{"at":"b"}\n{"at":"c"}\n';
+    const short = '{"at":"a"}\n';
+    const cut = `${full}{"at":"partial`;
+    assert.equal(
+      lifeStateMonthShrinkError(full, short, "2026-09"),
+      "refusing to shrink log-2026-09.jsonl from 3 rows to 1"
+    );
+    assert.equal(lifeStateMonthShrinkError(cut, full, "2026-09"), null);
+    assert.equal(lifeStateMonthShrinkError(null, short, "2026-09"), null);
   });
 });
 

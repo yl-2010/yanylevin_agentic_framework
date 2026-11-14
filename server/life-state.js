@@ -3,9 +3,10 @@
  * Yan only. Does not git-commit.
  */
 
-import { appendFile, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { withCloudRetry } from "./cloud-storage-io.js";
 import { YAN_EMAIL, readPhoneLocation } from "./phone-location.js";
 import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 
@@ -714,13 +715,49 @@ export async function listLifeStateLogFiles(dir) {
   return names.filter((n) => /^log-\d{4}-\d{2}\.jsonl$/.test(n)).sort();
 }
 
+/**
+ * Valid JSONL rows. A trailing partial line does not count.
+ * @param {string} text
+ */
+export function countLifeStateLogRows(text) {
+  let n = 0;
+  for (const line of String(text || "").split("\n")) {
+    const s = line.trim();
+    if (!s) continue;
+    try {
+      JSON.parse(s);
+      n += 1;
+    } catch {
+      /* partial line */
+    }
+  }
+  return n;
+}
+
+/**
+ * @param {string|null} current
+ * @param {string} next
+ * @param {string} month
+ * @returns {string|null}
+ */
+export function lifeStateMonthShrinkError(current, next, month) {
+  if (current == null) return null;
+  const before = countLifeStateLogRows(current);
+  const after = countLifeStateLogRows(next);
+  if (after < before) {
+    return `refusing to shrink log-${month}.jsonl from ${before} rows to ${after}`;
+  }
+  return null;
+}
+
 /** @param {string} file */
 async function readJsonlObjects(file) {
   let raw = "";
   try {
-    raw = await readFile(file, "utf8");
-  } catch {
-    return [];
+    raw = await withCloudRetry(file, () => readFile(file, "utf8"));
+  } catch (err) {
+    if (err && err.code === "ENOENT") return [];
+    throw err;
   }
   /** @type {Record<string, unknown>[]} */
   const out = [];
@@ -766,8 +803,29 @@ async function writeLifeStateMonthLogs(dir, records) {
   const keep = new Set();
   for (const [month, rows] of byMonth) {
     const body = `${rows.map((r) => JSON.stringify(r)).join("\n")}\n`;
-    await writeFile(lifeStateLogPath(dir, month), body, "utf8");
+    const path = lifeStateLogPath(dir, month);
     keep.add(`log-${month}.jsonl`);
+    let current = null;
+    try {
+      current = await withCloudRetry(path, () => readFile(path, "utf8"));
+    } catch (err) {
+      if (!err || err.code !== "ENOENT") throw err;
+    }
+    if (current === body) continue;
+    const shrink = lifeStateMonthShrinkError(current, body, month);
+    if (shrink) {
+      const err = new Error(shrink);
+      err.status = 409;
+      throw err;
+    }
+    const tmp = `${path}.${process.pid}.tmp`;
+    await withCloudRetry(tmp, () => writeFile(tmp, body, "utf8"));
+    try {
+      await withCloudRetry(path, () => rename(tmp, path));
+    } catch (err) {
+      await rm(tmp, { force: true }).catch(() => {});
+      throw err;
+    }
   }
   for (const name of await listLifeStateLogFiles(dir)) {
     if (!keep.has(name)) await rm(join(dir, name), { force: true });
