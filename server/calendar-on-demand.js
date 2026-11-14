@@ -261,6 +261,52 @@ export function isAgentInstruction(text) {
   return /(^|\s)@agentg?\b/i.test(String(text || ""));
 }
 
+/** @param {object|null|undefined} message */
+export function schoolMailFromAddress(message) {
+  const direct = String(message?.fromAddress || "").trim();
+  if (direct.includes("@")) return direct.toLowerCase();
+  const from = String(message?.from || "").trim();
+  const angled = from.match(/<([^>]+@[^>]+)>/);
+  if (angled) return angled[1].trim().toLowerCase();
+  if (from.includes("@")) return from.toLowerCase();
+  return "";
+}
+
+function schoolMailText(message) {
+  const subject = String(message?.subject || "");
+  const body = String(message?.body || message?.preview || "");
+  return `${subject}\n${body}`.trim();
+}
+
+const SCHOOL_MAIL_SYSTEM_FROM =
+  /@(?:notifications\.|noreply\.|no-reply\.|canvas\.instructure|instructure\.com|pathivy\.|scoir\.com)/i;
+const SCHOOL_MAIL_STAFF_FROM =
+  /(?:^|[\s<(])(?:dr|mr|ms|mrs)\.?\s|\b(?:admissions|registrar|counseling|college office|dean|principal|head of school)\b|(?:lorne|seeley|gummere|bodin|harris|richardson|michelle|bart)\b/i;
+const STUDENT_SURVEY_STRONG =
+  /(?:forms\.gle\/|docs\.google\.com\/forms|typeform\.com|forms\.office\.com)|\bgoogle form\b|\bstats (?:class|project|data|hw|homework|assignment)\b|\bstudent news\b.*\b(?:survey|poll|form)\b|\b(?:survey|poll|form)\b.*\bstudent news\b|\bclass(?:mate)? blast\b|\bfor my stats\b/i;
+const STUDENT_SURVEY_WEAK =
+  /\b(?:survey|poll|questionnaire)\b|(?:please |can you )?(?:fill out|complete|take).{0,48}?(?:survey|poll|questionnaire|google form)/i;
+
+/**
+ * Classmate stats forms and Student News polls emailed to owner@school.example.
+ * Teacher- or school-assigned forms still pass through.
+ * @param {object|null|undefined} message
+ */
+export function isStudentSurveySchoolMail(message) {
+  if (!message || typeof message !== "object") return false;
+  const text = schoolMailText(message);
+  if (!text) return false;
+  const fromDisplay = String(message.from || "");
+  const fromAddress = schoolMailFromAddress(message);
+  const envelope = `${fromDisplay} ${fromAddress} ${String(message.subject || "")}`;
+  if (SCHOOL_MAIL_SYSTEM_FROM.test(fromAddress)) return false;
+  if (/\bcanvas\b/i.test(envelope) || /\binstructure\b/i.test(text)) return false;
+  if (SCHOOL_MAIL_STAFF_FROM.test(envelope)) return false;
+  if (STUDENT_SURVEY_STRONG.test(text)) return true;
+  if (STUDENT_SURVEY_WEAK.test(text)) return true;
+  return false;
+}
+
 /**
  * @param {string} source
  * @param {object|null|undefined} message
@@ -286,6 +332,7 @@ export function rowEligible(source, message) {
     if (isAgentInstruction(text)) return false;
     return true;
   }
+  if (source === "school-mail" && isStudentSurveySchoolMail(message)) return false;
   const subject = String(message.subject || "").trim();
   const body = String(message.body || message.preview || "").trim();
   return Boolean(subject || body);
@@ -926,6 +973,9 @@ export function enqueueCalendarThread(item, deps = {}) {
  * @param {object} [deps]
  */
 export async function considerCalendarMessage(source, message, deps = {}) {
+  if (source === "school-mail" && isStudentSurveySchoolMail(message)) {
+    return { ok: true, skipped: "student-survey" };
+  }
   if (!rowEligible(source, message)) return { ok: true, skipped: "noise" };
   const parent = source === "imessage" && (await messageIsParentText(message, deps));
   let answer = deps.calendarAnswer;

@@ -21,6 +21,8 @@ import {
   resetCalendarOnDemandForTests,
   rowEligible,
   isAgentInstruction,
+  isStudentSurveySchoolMail,
+  schoolMailFromAddress,
   CALENDAR_ON_DEMAND_MODEL_SPEC,
   CALENDAR_SIGNAL_QUESTION,
   CALENDAR_SIGNAL_THRESHOLD,
@@ -77,6 +79,62 @@ describe("calendar signal", () => {
       false
     );
     assert.equal(rowEligible("teams", { text: "send the form tonight" }), true);
+  });
+
+  it("skips classmate survey spam on school Outlook", () => {
+    const spam = {
+      from: "Kaylin Moon <kmoon28@school.example>",
+      fromAddress: "kmoon28@school.example",
+      subject: "Stats survey",
+      body: "Hi Yan, for my stats project please fill out this Google Form: https://forms.gle/abc123",
+    };
+    assert.equal(isStudentSurveySchoolMail(spam), true);
+    assert.equal(rowEligible("school-mail", spam), false);
+    const studentNews = {
+      from: "Student News <news@school.example>",
+      fromAddress: "news@school.example",
+      subject: "Student News poll: LPC snacks",
+      body: "Fill out the poll by Friday.",
+    };
+    assert.equal(isStudentSurveySchoolMail(studentNews), true);
+    const debate = {
+      from: "Coach <coach@school.example>",
+      subject: "Practice This Week",
+      body: "Record a speech and share it with the captains",
+    };
+    assert.equal(isStudentSurveySchoolMail(debate), false);
+    assert.equal(rowEligible("school-mail", debate), true);
+    const teacher = {
+      from: "Michelle Lorne <mlorne@school.example>",
+      fromAddress: "mlorne@school.example",
+      subject: "Advisory form",
+      body: "Please fill out the school-assigned permission form by Friday.",
+    };
+    assert.equal(isStudentSurveySchoolMail(teacher), false);
+    assert.equal(schoolMailFromAddress({ from: "A <a@b.com>" }), "a@b.com");
+  });
+
+  it("does not call Jev for student survey school mail", async () => {
+    resetCalendarOnDemandForTests();
+    let calls = 0;
+    const deps = {
+      systemOne: async () => {
+        calls += 1;
+        return { answers: { calendar: { noul: 0.99 } } };
+      },
+    };
+    const out = await considerCalendarMessage(
+      "school-mail",
+      {
+        fromAddress: "lcheng@school.example",
+        subject: "sleep hours survey",
+        body: "Can you take my stats survey?",
+      },
+      deps
+    );
+    assert.equal(out.skipped, "student-survey");
+    assert.equal(calls, 0);
+    resetCalendarOnDemandForTests();
   });
 });
 
