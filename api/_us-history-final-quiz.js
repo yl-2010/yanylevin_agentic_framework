@@ -7,8 +7,69 @@ const { readSession } = require("./_auth");
 
 const ALLOWED = new Set(["you@example.com", "you@example.com"]);
 
+// Choice order from one Fisher-Yates pass with crypto.randomInt on 2026-11-13.
+// Reloading uses this same order. Saves match the choice text.
+const ORDER = {
+  c01: [3, 1, 0, 2],
+  c02: [3, 1, 0, 2],
+  c04: [3, 2, 1, 0],
+  c05: [0, 1, 2, 3],
+  c06: [2, 0, 3, 1],
+  c07: [1, 2, 3, 0],
+  c08: [3, 2, 1, 0],
+  c10: [0, 2, 3, 1],
+  c11: [2, 0, 1, 3],
+  c12: [1, 0, 2, 3],
+  c13: [1, 0, 2, 3],
+  c14: [0, 2, 3, 1],
+  c16: [3, 0, 2, 1],
+  c17: [1, 2, 3, 0],
+  c18: [3, 1, 0, 2],
+  c19: [1, 3, 2, 0],
+  c20: [2, 0, 1, 3],
+  c21: [2, 0, 1, 3],
+  c22: [2, 3, 1, 0],
+  c23: [3, 0, 2, 1],
+  c24: [1, 0, 2, 3],
+  c25: [0, 2, 1, 3],
+  c26: [1, 3, 2, 0],
+  c27: [1, 3, 0, 2],
+  c30: [0, 3, 1, 2],
+  m01: [1, 2, 3, 0],
+  m02: [0, 3, 1, 2],
+  m03: [2, 1, 0, 3],
+  m04: [0, 3, 1, 2],
+  m05: [0, 1, 3, 2],
+  m06: [3, 0, 1, 2],
+  m07: [0, 3, 1, 2],
+  m08: [0, 1, 2, 3],
+  m09: [2, 1, 0, 3],
+  m10: [0, 3, 2, 1],
+  p01: [2, 0, 1, 3],
+  p02: [2, 3, 0, 1],
+  p03: [2, 1, 0, 3],
+  p05: [0, 1, 2, 3],
+  p06: [0, 3, 1, 2],
+  p08: [2, 1, 0, 3],
+  p09: [3, 1, 2, 0],
+  p10: [3, 2, 0, 1],
+  b01: [3, 0, 2, 1],
+};
+
 function mc(id, stem, choices, answer, why) {
-  return { id, kind: "mc", stem, choices, answer, why };
+  const perm = ORDER[id];
+  if (!perm || perm.length !== choices.length) {
+    throw new Error("bad choice order for " + id);
+  }
+  const next = perm.map((i) => choices[i]);
+  return {
+    id,
+    kind: "mc",
+    stem,
+    choices: next,
+    answer: perm.indexOf(answer),
+    why,
+  };
 }
 
 function tf(id, stem, isTrue, why) {
