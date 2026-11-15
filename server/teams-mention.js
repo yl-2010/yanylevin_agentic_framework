@@ -18,7 +18,7 @@ import {
 import { SCHOOL_EMAIL } from "./school-mail.js";
 
 const TEAMS_FILE_LINE =
-  "A file for this Teams chat goes out as a yanylevin.com link. Put the file in the repo, use a non-guessable folder when it should not be easy to find, commit, push, run npm run deploy:web, confirm the URL returns 200, then send that link with school-teams.js send. Do not attach it in the Teams app with computer use unless Yan directly says to attach with computer use in this turn. Anyone else still gets a link. An images field on a message has no pixels. Open that chat in the Teams app and look. School Outlook still cannot send.";
+  "A file for this Teams chat goes out as a yanylevin.com link. Put the file in the repo, use a non-guessable folder when it should not be easy to find, commit, push, run npm run deploy:web, confirm the URL returns 200, then send that link with school-teams.js send. A request to send the file is the link. Attach it in Teams with computer use only when they specifically ask for the file to go through Teams. An images field on a message has no pixels. Open that chat in the Teams app and look. School Outlook still cannot send.";
 
 const FOOTER_RE = new RegExp(
   AGENT_SENT_FOOTER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),

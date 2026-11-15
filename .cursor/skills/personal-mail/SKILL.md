@@ -111,7 +111,7 @@ Look up an address in Contacts (`.cursor/skills/personal-contacts/SKILL.md`) whe
 
 ## Attachments
 
-Mail.app can attach files. iMessage cannot, Teams cannot, and school Outlook cannot. Email the file when they asked for email. Otherwise put it on yanylevin.com and send the link.
+Mail.app can attach files. The iMessage and Teams send commands cannot, and school Outlook cannot. Email the file when they asked for email. Otherwise put it on yanylevin.com and send the link. Attach it in Messages or Teams with computer use only when they specifically ask for the file to go through that app.
 
 Do not re-read a sent message through Mail's scripting interface to decide whether the attachments were wrong. That read can report duplicate names and drop files that the sent message actually has. If Yan says the original mail was fine, send nothing else. One send, then stop.
 

@@ -97,7 +97,7 @@ Reply `Sent to … (Teams)`.  Never from location-history or
 daily-briefing. Context-synthesis may send only when Yan's own message in that
 run directed it.
 
-`school-teams.js send` is text. iMessage is text too. A file for either chat goes out as a yanylevin.com link. Put the file in the repo, use a non-guessable folder when it should not be easy to find, commit, push, run `npm run deploy:web`, confirm the URL returns 200, then send the link. Do not attach it in Messages. Do not attach it in the Teams app with computer use unless Yan directly says to attach with computer use in this turn. Anyone else still gets a link. Email the file with Mail.app only when they asked for email. A class channel or a big group is not a place for a private file. An `images` field has no pixels. Open that chat in the Teams app and look. School Outlook still cannot send.
+`school-teams.js send` is text. iMessage send is text too. A file for either chat goes out as a yanylevin.com link. Put the file in the repo, use a non-guessable folder when it should not be easy to find, commit, push, run `npm run deploy:web`, confirm the URL returns 200, then send the link. Attach it in Messages or Teams with computer use only when they specifically ask for the file to go through that app. Email the file with Mail.app only when they asked for email. A class channel or a big group is not a place for a private file. An `images` field has no pixels. Open that chat in the Teams app and look. School Outlook still cannot send.
 
 `--text` is markdown (or plain text). The CLI converts it to Teams HTML
 (`RichText/Html`) so desktop keeps newlines and bold/lists/links. Do not

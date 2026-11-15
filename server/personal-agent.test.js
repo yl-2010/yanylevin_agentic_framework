@@ -243,6 +243,7 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /school-teams\.js/);
     assert.match(prompt, /iMessage, then Teams, then email/);
     assert.match(prompt, /cannot attach a file/);
+    assert.match(prompt, /specifically ask for the file to go through that app/);
     assert.doesNotMatch(prompt, /native attachments/);
     assert.match(prompt, /yanylevin\.com link/);
     assert.match(prompt, /non-guessable folder/);

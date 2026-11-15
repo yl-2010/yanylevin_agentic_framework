@@ -74,7 +74,7 @@ curl -sS --unix-socket /tmp/personal-agent-local.sock \
   http://localhost/imessage/send
 ```
 
-iMessage cannot attach a file. Messages accepts `send POSIX file` and returns success, then the photo or PDF never arrives. Do not POST `files` or `attachments`, and do not pass `--attach`. Do not attach in the Messages app, including with computer use.
+iMessage cannot attach a file through the send command. Messages accepts `send POSIX file` and returns success, then the photo or PDF never arrives. Do not POST `files` or `attachments`, and do not pass `--attach`. A request to send the file is a yanylevin.com link. Attach it in Messages with computer use only when they specifically ask for the file to go through Messages.
 
 A file for this chat goes on yanylevin.com. Put it in the repo, use a non-guessable folder when it should not be easy to find, commit, push, run `npm run deploy:web`, confirm the URL returns 200, then send that link in the text. Email the file with Mail.app only when they asked for email.
 
@@ -101,7 +101,7 @@ Relay 1:1 messages between Alex and his friends who do not go to Example School,
 
 **What gets sent.** Your final text is the iMessage. The server posts it, word for word, to the chat that called you. Every `send_chat_message` line on that turn is posted there too. Nothing is cut, and there is no second copy written for Yan. Write to the person who called you, or to the group, not to Yan about them. Do not open with who they are to Yan, how close they are, what you decided to share, or who else reads the chat. Decide that, then start with the answer. Yan, 2026-10-31.
 
-On a long job, `@agent` and `@agentg` call `send_chat_message` with one short plain line of what they are about to do before they start. That line is posted to this iMessage chat immediately. Send another only when the chat should hear something new. Do not send still working with no news. Quick answers stay one message. Do not put the final text in `send_chat_message`. The server still sends that final bubble when the work is done. Do not write Sent on iMessage in the app. A message that is only `@agent` means read the surrounding thread and infer the job from it. Same tools as a typed Personal Agent chat. iMessage cannot attach a file. Put it on yanylevin.com and send the link in the text. Email the file only when they asked for email.
+On a long job, `@agent` and `@agentg` call `send_chat_message` with one short plain line of what they are about to do before they start. That line is posted to this iMessage chat immediately. Send another only when the chat should hear something new. Do not send still working with no news. Quick answers stay one message. Do not put the final text in `send_chat_message`. The server still sends that final bubble when the work is done. Do not write Sent on iMessage in the app. A message that is only `@agent` means read the surrounding thread and infer the job from it. Same tools as a typed Personal Agent chat. iMessage cannot attach a file through the send command. Put it on yanylevin.com and send the link in the text. Email the file only when they asked for email. Attach it in Messages with computer use only when they specifically ask for the file to go through Messages.
 
 Do not put `@agent` in outgoing texts. That would start another session. Extra sends during the turn are only for texts that are not that final bubble. A file goes out as a yanylevin.com link in the text.
 

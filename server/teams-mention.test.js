@@ -83,6 +83,8 @@ describe("teams-mention trigger", () => {
     assert.match(block, /Do not add \/\/ Sent by Yan's Personal Agent/);
     assert.match(block, /Do not also school-teams send/);
     assert.match(block, /yanylevin\.com link/);
+    assert.match(block, /specifically ask for the file to go through Teams/);
+    assert.doesNotMatch(block, /Yan directly says/);
     assert.match(block, /npm run deploy:web/);
     assert.doesNotMatch(block, /attach it with Cursor computer use/);
     assert.match(block, /images field on a message has no pixels/);

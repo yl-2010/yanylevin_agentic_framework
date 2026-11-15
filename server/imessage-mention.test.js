@@ -221,6 +221,7 @@ describe("imessage-mention", () => {
     assert.match(block, /Start with the answer/);
     assert.match(block, /full Personal Agent turn/);
     assert.match(block, /cannot attach files/);
+    assert.match(block, /specifically ask for the file to go through Messages/);
     assert.match(block, /yanylevin\.com/);
     assert.doesNotMatch(block, /attachToReply/);
     assert.doesNotMatch(block, /native iMessage files/);

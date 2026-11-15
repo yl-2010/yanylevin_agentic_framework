@@ -346,7 +346,7 @@ export function formatIMessageOriginBlock(origin, opts = {}) {
     lines.push(
       `Read the surrounding thread before answering: ${threadCmd} (iMessage skill).`,
       AGENT_VS_YAN_LINE,
-      "This is a full Personal Agent turn. iMessage cannot attach files. Do not POST files or attachments. Messages accepts that send and the file never arrives. Put the file on yanylevin.com (non-guessable folder when it should not be easy to find, commit, push, npm run deploy:web, confirm 200) and send the link in the text. Email the file with Mail.app only when they asked for email.",
+      "This is a full Personal Agent turn. iMessage cannot attach files. Do not POST files or attachments. Messages accepts that send and the file never arrives. Put the file on yanylevin.com (non-guessable folder when it should not be easy to find, commit, push, npm run deploy:web, confirm 200) and send the link in the text. Email the file with Mail.app only when they asked for email. Attach it in Messages with computer use only when they specifically ask for the file to go through Messages.",
       "",
       "Your reply",
       replyReaderLine(opts.guestCaller, "iMessage", chat),
