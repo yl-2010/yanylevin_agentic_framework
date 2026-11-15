@@ -23,7 +23,6 @@ import {
   isIc3Token,
   isTeamsAuthError,
   isTeamsToken,
-  messageFromCsaLast,
   normalizeChat,
   messageText,
   normalizeMessage,
@@ -32,7 +31,6 @@ import {
   pickByName,
   pickChat,
   runSchoolTeams,
-  teamsRequestOpensChat,
   teamsScopes,
 } from "./school-teams.js";
 import { applyAgentSentFooter } from "./imessage-mention.js";
@@ -161,7 +159,6 @@ describe("school-teams tokens", () => {
 describe("school-teams urls and shapes", () => {
   it("builds CSA/IC3 chat URLs", () => {
     assert.match(buildChatsUrl(), /\/api\/csa\/amer\/api\/v3\/teams\/users\/me\/updates/);
-    assert.match(buildChatsUrl(), /isPrefetch=true/);
     assert.match(
       buildChatMessagesUrl("19:abc@thread.v2"),
       /\/api\/chatsvc\/amer\/v1\/users\/ME\/conversations\/19%3Aabc/
@@ -170,65 +167,6 @@ describe("school-teams urls and shapes", () => {
       buildSendChatUrl("19:x"),
       `${TEAMS_CLOUD}/api/chatsvc/amer/v1/users/ME/conversations/19%3Ax/messages`
     );
-  });
-
-  it("treats opening a chat or moving the read marker as a read", () => {
-    assert.equal(
-      teamsRequestOpensChat(
-        "GET",
-        "https://teams.cloud.microsoft/api/chatsvc/amer/v1/users/ME/conversations/19%3Aabc/messages?pageSize=20"
-      ),
-      true
-    );
-    assert.equal(
-      teamsRequestOpensChat(
-        "GET",
-        "https://teams.cloud.microsoft/api/chatsvc/amer/v1/users/ME/conversations/19%3Aabc"
-      ),
-      true
-    );
-    assert.equal(
-      teamsRequestOpensChat(
-        "PUT",
-        "https://teams.cloud.microsoft/api/chatsvc/amer/v1/users/ME/conversations/19%3Aabc/properties?name=consumptionhorizon"
-      ),
-      true
-    );
-    assert.equal(
-      teamsRequestOpensChat(
-        "GET",
-        "https://teams.cloud.microsoft/api/csa/amer/api/v3/teams/users/me/updates?isPrefetch=true"
-      ),
-      false
-    );
-  });
-
-  it("reads the newest chat message off the chat list", () => {
-    const row = normalizeChat(
-      {
-        id: "19:abc",
-        isOneOnOne: true,
-        isLastMessageFromMe: false,
-        selfObjectId: "yan",
-        members: [
-          { displayName: "Yan Levin", email: "owner@school.example", objectId: "yan" },
-          { displayName: "Alex Rivera", email: "friend@school.example", objectId: "p" },
-        ],
-        lastMessage: {
-          id: "1700000000000",
-          content: "<p>@agent hi</p>",
-          messagetype: "RichText/Html",
-          originalArrivalTime: "2026-09-09T12:00:00Z",
-          imDisplayName: "Alex Rivera",
-          from: "https://teams.cloud.microsoft/api/chatsvc/amer/v1/users/ME/contacts/8:orgid:p",
-        },
-      },
-      "owner@school.example"
-    );
-    assert.equal(row.latest.fromMe, false);
-    assert.equal(row.latest.id, "1700000000000");
-    assert.equal(row.latest.text, "@agent hi");
-    assert.equal(messageFromCsaLast({ lastMessage: { content: "no id" } }), null);
   });
 
   it("names a 1:1 from the other member when topic is empty", () => {

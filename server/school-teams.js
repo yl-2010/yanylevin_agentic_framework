@@ -452,28 +452,6 @@ function chatTypeOf(raw) {
   return "group";
 }
 
-/**
- * The newest message already attached to a CSA chat row.
- * Reading it does not call /messages, which marks the chat read.
- * @param {object|null|undefined} raw
- * @param {{ objectId?: string, email?: string }} [self]
- */
-export function messageFromCsaLast(raw, self = {}) {
-  const last = raw?.lastMessage || raw?.lastMessagePreview;
-  if (!last || typeof last !== "object") return null;
-  const id = String(last.id || "").trim();
-  if (!id) return null;
-  const row = normalizeMessage(last, {
-    chatId: String(raw?.id || "").trim(),
-    kind: "chat",
-    textMax: MESSAGE_TEXT_MAX,
-    self,
-  });
-  if (raw?.isLastMessageFromMe === true) row.fromMe = true;
-  else if (raw?.isLastMessageFromMe === false) row.fromMe = false;
-  return row;
-}
-
 export function normalizeChat(raw, selfEmail = SCHOOL_EMAIL) {
   const preview = raw?.lastMessagePreview || raw?.lastMessage || {};
   const updated = String(
@@ -486,17 +464,12 @@ export function normalizeChat(raw, selfEmail = SCHOOL_EMAIL) {
       raw?.createdAt ||
       ""
   ).trim();
-  const latest = messageFromCsaLast(raw, {
-    objectId: raw?.selfObjectId,
-    email: selfEmail,
-  });
   return {
     id: String(raw?.id || "").trim(),
     name: chatDisplayName(raw, selfEmail),
     chatType: chatTypeOf(raw),
     updated: isoOrEmpty(updated) || updated,
     preview: messageText(preview, 200),
-    ...(latest ? { latest } : {}),
     members: (Array.isArray(raw?.members) ? raw.members : [])
       .map((m) => ({
         name: memberName(m),
@@ -694,32 +667,7 @@ export function groupMessagesByMonth(messages) {
 
 export function buildCsaUpdatesUrl(region = "amer") {
   const r = encodeURIComponent(String(region || "amer").trim() || "amer");
-  // Background sync. The open Teams app asks with isPrefetch=false.
-  return `${TEAMS_CLOUD}/api/csa/${r}/api/v3/teams/users/me/updates?isPrefetch=true&enableMembershipSummary=true`;
-}
-
-/**
- * True when this chatsvc call is the one Teams uses to open a chat or
- * move the read marker. Token refresh aborts these so the login page
- * cannot mark chats read.
- * @param {string} method
- * @param {string} url
- */
-export function teamsRequestOpensChat(method, url) {
-  const m = String(method || "").toUpperCase();
-  let path = "";
-  try {
-    path = new URL(String(url || "")).pathname;
-  } catch {
-    return false;
-  }
-  if (!/\/api\/chatsvc\//i.test(path)) return false;
-  if ((m === "PUT" || m === "POST" || m === "PATCH") && /consumptionhorizon/i.test(String(url))) {
-    return true;
-  }
-  if (m !== "GET") return false;
-  if (/\/messages$/i.test(path)) return true;
-  return /\/conversations\/[^/]+$/i.test(path);
+  return `${TEAMS_CLOUD}/api/csa/${r}/api/v3/teams/users/me/updates?isPrefetch=false&enableMembershipSummary=true`;
 }
 
 export function buildChatsUrl({ region = "amer" } = {}) {
@@ -884,11 +832,7 @@ async function launchChrome(opts) {
 }
 
 function waitForTeamsTokens(context, timeoutMs) {
-  /** @type {{ consider: (token: string, headers: object, url: string) => void }} */
-  const bridge = {
-    consider() {},
-  };
-  const pending = new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     let done = false;
     let grace = null;
     const found = {
@@ -964,10 +908,8 @@ function waitForTeamsTokens(context, timeoutMs) {
       context.off("request", onReq);
     }
 
-    bridge.consider = consider;
     context.on("request", onReq);
   });
-  return { pending, bridge };
 }
 
 async function clickIfVisible(page, name, timeoutMs = 4000, exact = false) {
@@ -986,23 +928,10 @@ async function captureToken(opts) {
   const waitMs = headed ? LOGIN_WAIT_MS : REFRESH_WAIT_MS;
   const context = await launchChrome(opts);
   try {
-    const { pending, bridge } = waitForTeamsTokens(context, waitMs);
+    const pending = waitForTeamsTokens(context, waitMs);
     // Navigation can outlast this timer. A handler has to be attached now,
     // or the timeout rejects with nobody listening and Node exits.
     pending.catch(() => {});
-    await context.route("**/*", async (route) => {
-      const req = route.request();
-      if (!teamsRequestOpensChat(req.method(), req.url())) {
-        await route.continue();
-        return;
-      }
-      const headers = req.headers();
-      const auth = headers.authorization || headers.Authorization || "";
-      if (/^Bearer\s+/i.test(auth)) {
-        bridge.consider(auth.replace(/^Bearer\s+/i, "").trim(), headers, req.url());
-      }
-      await route.abort();
-    });
     const page = context.pages()[0] || (await context.newPage());
     const nav = (async () => {
       try {
@@ -1380,9 +1309,6 @@ function isoOrEmpty(raw) {
 
 /**
  * Recent chat messages for the @agent poller. Only chats updated since `since`.
- * The chat list already carries the newest message. Fetching /messages marks
- * the chat read, so the poller does not. Chat with yourself is missing from
- * that list, so that one thread is still fetched.
  * @param {{
  *   since?: string,
  *   chatLimit?: number,
@@ -1424,18 +1350,14 @@ async function listRecentChatMessages(session, opts = {}) {
   const out = [];
   for (const chat of chats) {
     if (since && chat.updated && chat.updated < since && !isTeamsSelfChat(chat)) continue;
-    /** @type {object[]} */
     let rows = [];
-    if (isTeamsSelfChat(chat)) {
-      try {
-        rows = await listChatMessages(session, chat.id, {
-          limit: opts.messageLimit || 20,
-        });
-      } catch {
-        continue;
-      }
-    } else if (chat.latest) {
-      rows = [chat.latest];
+    try {
+      rows = await listChatMessages(session, chat.id, {
+        limit: opts.messageLimit || 20,
+      });
+    } catch (err) {
+      if (isTeamsSelfChat(chat)) continue;
+      throw err;
     }
     const selfChat = isTeamsSelfChat(chat);
     for (const row of rows) {
@@ -1455,6 +1377,7 @@ async function listRecentChatMessages(session, opts = {}) {
         kind: "chat",
       });
     }
+    await sleep(40);
   }
   return out;
 }
@@ -1475,16 +1398,19 @@ export async function fetchSchoolTeams(opts = {}) {
   for (const chat of chats) {
     if (messages.length >= max) break;
     if (since && chat.updated && chat.updated < since) continue;
-    const row = chat.latest;
-    if (!row) continue;
-    if (since && row.at && row.at < since) continue;
-    messages.push({
-      ...row,
-      text: String(row.text || "").slice(0, DUMP_BODY_MAX),
-      chatId: chat.id,
-      chat: chat.name,
-      kind: "chat",
-    });
+    const rows = await listChatMessages(session, chat.id, { limit: 15 });
+    for (const row of rows) {
+      if (since && row.at && row.at < since) continue;
+      messages.push({
+        ...row,
+        text: String(row.text || "").slice(0, DUMP_BODY_MAX),
+        chatId: chat.id,
+        chat: chat.name,
+        kind: "chat",
+      });
+      if (messages.length >= max) break;
+    }
+    await sleep(40);
   }
 
   let teams = [];
@@ -1505,20 +1431,35 @@ export async function fetchSchoolTeams(opts = {}) {
     for (const channel of channels.slice(0, 4)) {
       if (messages.length >= max) break;
       const last = channel.lastMessage || {};
-      if (!last.id && !last.content) continue;
-      const row = normalizeMessage(last, {
-        kind: "channel",
-        chatId: channel.id,
-        textMax: DUMP_BODY_MAX,
-        self,
-      });
-      if (since && row.at && row.at < since) continue;
-      messages.push({
-        ...row,
-        team: teamName,
-        channel: channel.displayName || channel.name,
-        kind: "channel",
-      });
+      const lastAt = isoOrEmpty(
+        last.originalArrivalTime || last.originalarrivaltime || last.composeTime || last.composetime
+      );
+      if (since && lastAt && lastAt < since) continue;
+      let rows = [];
+      try {
+        rows = await listChatMessages(session, channel.id, { limit: 12 });
+      } catch {
+        if (last && (last.content || last.id)) {
+          rows = [
+            normalizeMessage(last, {
+              kind: "channel",
+              textMax: DUMP_BODY_MAX,
+              self,
+            }),
+          ];
+        }
+      }
+      for (const row of rows) {
+        if (since && row.at && row.at < since) continue;
+        messages.push({
+          ...row,
+          team: teamName,
+          channel: channel.displayName || channel.name,
+          kind: "channel",
+        });
+        if (messages.length >= max) break;
+      }
+      await sleep(40);
     }
   }
 
@@ -1580,6 +1521,7 @@ export async function fetchRecentChannelMessages(opts = {}) {
   const snapTeams = (session._csa && session._csa.teams) || teams;
   /** @type {object[]} */
   const messages = [];
+  const listMessages = opts.listChatMessages || listChatMessages;
   const self = { objectId: session.objectId, email: session.email || SCHOOL_EMAIL };
   for (const team of snapTeams.slice(0, 8)) {
     if (messages.length >= max) break;
@@ -1590,21 +1532,39 @@ export async function fetchRecentChannelMessages(opts = {}) {
     for (const channel of channels.slice(0, 4)) {
       if (messages.length >= max) break;
       const last = channel.lastMessage || {};
-      if (!last.id && !last.content) continue;
-      const row = normalizeMessage(last, {
-        kind: "channel",
-        chatId: channel.id,
-        textMax: DUMP_BODY_MAX,
-        self,
-      });
-      if (since && row.at && row.at < since) continue;
-      messages.push({
-        ...row,
-        team: teamName,
-        channel: channel.displayName || channel.name,
-        chatId: row.chatId || channel.id,
-        kind: "channel",
-      });
+      const lastAt = isoOrEmpty(
+        last.originalArrivalTime ||
+          last.originalarrivaltime ||
+          last.composeTime ||
+          last.composetime
+      );
+      if (since && lastAt && lastAt < since) continue;
+      let rows = [];
+      try {
+        rows = await listMessages(session, channel.id, { limit: 12 });
+      } catch {
+        if (last && (last.content || last.id)) {
+          rows = [
+            normalizeMessage(last, {
+              kind: "channel",
+              textMax: DUMP_BODY_MAX,
+              self,
+            }),
+          ];
+        }
+      }
+      for (const row of rows) {
+        if (since && row.at && row.at < since) continue;
+        messages.push({
+          ...row,
+          team: teamName,
+          channel: channel.displayName || channel.name,
+          chatId: row.chatId || channel.id,
+          kind: "channel",
+        });
+        if (messages.length >= max) break;
+      }
+      await sleep(40);
     }
   }
   messages.sort((a, b) => String(a.at).localeCompare(String(b.at)));
@@ -1962,13 +1922,10 @@ export async function runSchoolTeams(argv, opts = {}) {
     return withSession(parsed, root, async (session) => ({
       ok: true,
       account: SCHOOL_EMAIL,
-      chats: (await listChats(session, { limit: parsed.limit })).slice(0, parsed.limit).map((c) => {
-        const { latest: _latest, ...rest } = c;
-        return {
-          ...rest,
-          members: clipMembers(c.members),
-        };
-      }),
+      chats: (await listChats(session, { limit: parsed.limit })).slice(0, parsed.limit).map((c) => ({
+        ...c,
+        members: clipMembers(c.members),
+      })),
     }));
   }
 
