@@ -109,9 +109,9 @@
     const start = () => {
       if (cancelled) return;
       // Layout size, not the painted box: the panel may still be scaling in.
-      const w = destEl.offsetWidth;
-      const h = destEl.offsetHeight;
-      if (!destEl.isConnected || w < 2 || h < 2) {
+      // Fractional, not offsetWidth: rounding "hi" down by half a pixel wraps it.
+      const layoutW = destEl.isConnected ? getComputedStyle(destEl).width : "";
+      if (!destEl.isConnected || destEl.offsetWidth < 2 || destEl.offsetHeight < 2) {
         cancel();
         return;
       }
@@ -135,13 +135,16 @@
       clone.style.position = "fixed";
       clone.style.left = "0px";
       clone.style.top = "0px";
-      clone.style.width = `${w}px`;
+      clone.style.width = layoutW;
       clone.style.margin = "0";
       clone.style.transformOrigin = "0 0";
       clone.style.pointerEvents = "none";
       clone.style.zIndex = "96";
       clone.style.alignSelf = "auto";
       clone.style.willChange = "transform, opacity";
+      const box = clone.getBoundingClientRect();
+      const w = box.width;
+      const h = box.height;
 
       const startScale = Math.min(0.92, originRect.height / Math.max(h, 1));
       // The panel can spring in (or the list scroll) under the bubble. Aim at

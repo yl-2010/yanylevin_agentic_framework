@@ -2093,7 +2093,7 @@ a.edu-score {
   --chat-pulse-opacity: var(--yl-agent-pulse-opacity);
   --pill-w: var(--chat-circle);
   --pill-left: calc(100vw - var(--chat-pad) - var(--chat-circle));
-  /* Clears the pill's corner curve (radius is half the short pill) with a little air. */
+  /* Clears the pill's corner curve (the panel radius) with a little air. */
   --composer-pad-y: 1.25rem;
   position: fixed; inset: 0; z-index: 90; pointer-events: none;
 }
@@ -2136,11 +2136,13 @@ a.edu-score {
   pointer-events: auto; cursor: pointer; overflow: visible;
   transition:
     left 0.7s var(--chat-spring), width 0.7s var(--chat-spring),
-    height 0.22s var(--ease), box-shadow 0.35s var(--ease),
-    transform 0.3s var(--ease);
+    height 0.22s var(--ease), border-radius 0.45s var(--ease),
+    box-shadow 0.35s var(--ease), transform 0.3s var(--ease);
 }
+/* Open composer corners match the panel above it. Closed it stays the launcher circle. */
 .yan-chat.is-open .yan-chat-pill.corner {
   cursor: text;
+  border-radius: var(--chat-panel-radius);
 }
 .yan-chat-pill.corner.lg-refraction::after {
   backdrop-filter: blur(var(--lg-read-blur)) var(--lg-filter);

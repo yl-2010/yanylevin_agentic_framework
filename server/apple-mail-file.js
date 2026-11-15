@@ -2,6 +2,8 @@
  * File college-spam, routine security alerts, Sign in with Google
  * data notices, and verification codes out of Mail.app inbox/junk.
  * Jev only. Destinations are iCloud mailboxes Colleges and Security.
+ * Gmail move copies and leaves the Inbox label. The script copies into
+ * iCloud, then deletes the Gmail message so it leaves the inbox.
  */
 
 import { execFile } from "node:child_process";

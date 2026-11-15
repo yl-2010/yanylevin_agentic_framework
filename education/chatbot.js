@@ -2053,10 +2053,13 @@
       state() !== "closed" && !column.hidden && Boolean(String(input.value || "").length);
     column.classList.toggle("has-input-text", filled);
     const circle = circlePx();
-    const radius = Math.round(circle / 2);
+    const closed = state() === "closed" || column.hidden;
+    const radius = closed
+      ? Math.round(circle / 2)
+      : Math.round(cssPx(root, "--chat-panel-radius") || circle / 2);
     if (composer.pill) composer.pill.setAttribute("data-lg-radius", String(radius));
 
-    if (state() === "closed" || column.hidden) {
+    if (closed) {
       input.style.height = "";
       input.style.overflowY = "hidden";
       column.classList.remove("is-composer-tall");
@@ -3166,8 +3169,28 @@
       sendMessage(input?.value, { composer });
     });
 
-    form?.addEventListener("pointerdown", (event) => {
-      if (event.target === form) input?.focus({ preventScroll: true });
+    // The textarea is one line tall in a much taller pill. A press anywhere
+    // on the open pill that isn't a control puts the caret in the field.
+    const pillTapTarget = (event) =>
+      root.classList.contains("is-open") &&
+      input &&
+      !event.target?.closest?.(
+        "button, a, textarea, input, select, [role='button'], .yan-chat-attach-chips",
+      );
+    const focusFromPill = () => {
+      if (document.activeElement === input) return;
+      input.focus({ preventScroll: true });
+      const end = input.value.length;
+      input.setSelectionRange?.(end, end);
+    };
+    composer.pill?.addEventListener("mousedown", (event) => {
+      if (event.button !== 0 || !pillTapTarget(event)) return;
+      // Default mousedown on a non-focusable box would blur the field again.
+      event.preventDefault();
+      focusFromPill();
+    });
+    composer.pill?.addEventListener("click", (event) => {
+      if (pillTapTarget(event)) focusFromPill();
     });
 
     input?.addEventListener("input", () => {
