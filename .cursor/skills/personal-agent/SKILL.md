@@ -81,6 +81,12 @@ When Yan states a fact or correction about a person/group/org/place, write it th
 
 Unknown shorthand: `node server/brain-glossary.js "<term>"`. A slang or abbreviation learned this turn is `node server/brain-glossary.js add --term "..." --gloss "..."`. Person nicknames stay on the person card. Do not read the whole glossary index.
 
+## Always: browsers
+
+Yan's own turns use Ardia. Read `.cursor/skills/personal-browser/SKILL.md` before opening a site that curl cannot do. A password Ardia already autofills, or one it has saved, is fine to use for that login. Do not print it.
+
+Dedicated Chrome, headless Chrome, and Arc stay available when that skill gives a reason. JYPE and other guests do not get Ardia. Yan, 2026-11-15.
+
 ## Read on demand (do not preload)
 
 Do **not** dump these into context unless the turn needs them. Read the matching file, then act.
@@ -101,8 +107,8 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Yan iPhone location (live + stays/trips) | `.cursor/skills/phone-location/SKILL.md` |
 | What Yan is doing now / was doing at a time (5-minute log) | `.cursor/skills/life-state/SKILL.md` |
 | Map / image / HTML widgets, location cards, place hours | `.cursor/skills/chat-widgets/SKILL.md` |
-| Click-through / login pages (not static fetch) | `.cursor/skills/personal-browser/SKILL.md` |
-| Mac apps, or Arc if Chrome fails | `.cursor/skills/personal-computer/SKILL.md` |
+| Click-through / login pages (not static fetch). Yan's default is Ardia, including a saved or autofilled password | `.cursor/skills/personal-browser/SKILL.md` |
+| Mac apps. Websites start in Ardia | `.cursor/skills/personal-computer/SKILL.md` |
 | Yan inbox / Mail.app (search and send) | `.cursor/skills/personal-mail/SKILL.md` |
 | School Outlook `owner@school.example` | `.cursor/skills/personal-school-mail/SKILL.md` |
 | School OneNote / Class Notebooks (on demand; school questions about agendas, HW instructions, maps, day packets) | `.cursor/skills/personal-onenote/SKILL.md` |

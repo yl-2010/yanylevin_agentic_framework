@@ -23,6 +23,6 @@ Check the page with headless Chrome. Set the shell `block_until_ms` so the comma
 
 Run `curl -m 3 -o /dev/null -w '%{http_code}\n' URL` first. A `python3 -m http.server` started in the background dies when that shell step ends. Start it again in the same command as the screenshot, or confirm the port is open.
 
-Logged-in pages use `node server/agent-browser.js goto "URL"`. Read `.cursor/skills/personal-browser/SKILL.md`. Those Express `browser_*` tools are a different Chrome. They are not `cursor-ide-browser`.
+Logged-in pages start in Ardia. Read `.cursor/skills/personal-browser/SKILL.md`. Dedicated Chrome is `node server/agent-browser.js goto "URL"`, and only when that skill gives a reason. Those Express `browser_*` tools are that dedicated Chrome. They are not `cursor-ide-browser`.
 
 If headless Chrome fails, report that. Do not open the IDE browser as a fallback.

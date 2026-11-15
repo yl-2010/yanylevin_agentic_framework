@@ -1,10 +1,10 @@
 ---
 name: personal-computer
 description: >-
-  Drive Mac apps with Cursor's built-in computer use. Websites still
-  start in the dedicated Chrome. Use Arc only when that Chrome cannot
-  render the page or is not signed in. Other skills come first. Computer
-  use is for the part those skills cannot do.
+  Drive Mac apps with Cursor's built-in computer use. Websites start in
+  Ardia. Other browsers only with a reason from the personal-browser
+  skill. Other skills come first. Computer use is for the part those
+  skills cannot do.
 disable-model-invocation: true
 ---
 
@@ -30,7 +30,7 @@ Do not wipe macOS system files (`/System` and other OS-owned paths). Do not down
 
 ## Websites
 
-Start in the dedicated Chrome from the personal-browser skill. If that page will not render, or the site is not signed in there, open Arc and finish the same site with Cursor computer use. Do not open Arc first. Do not quit Arc, and do not `killall` any browser.
+Yan's own turns start in Ardia. Read `.cursor/skills/personal-browser/SKILL.md`. A password Ardia already autofills, or one it has saved, is fine to use for that login. Dedicated Chrome, headless Chrome, and Arc stay available when that skill names a reason. Do not quit Arc, and do not `killall` any browser.
 
 ## Reply
 
