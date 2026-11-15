@@ -2555,6 +2555,7 @@ private enum EducationCommentWhen {
         return parse(trimmed)
     }
 
+    /// Canvas comment stamp. Same phrasing as a todo row.
     static func format(_ iso: String, use24Hour: Bool) -> String {
         let trimmed = iso.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let date = parse(trimmed) else { return "" }
@@ -2570,7 +2571,7 @@ private enum EducationCommentWhen {
             calendar.component(.hour, from: date),
             calendar.component(.minute, from: date)
         )
-        return NaturalWhen.formatDetail(date: dateStr, time: timeStr, use24Hour: use24Hour)
+        return NaturalWhen.format(date: dateStr, time: timeStr, use24Hour: use24Hour)
     }
 
     private static func parse(_ iso: String) -> Date? {

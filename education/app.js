@@ -1002,13 +1002,14 @@
     return dated;
   }
 
+  /** Canvas comment stamp. Same phrasing as a todo row. */
   function formatCommentWhen(iso) {
     const ms = Date.parse(String(iso || ""));
     if (!Number.isFinite(ms)) return "";
     const d = new Date(ms);
     const dateStr = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
     const timeStr = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-    return formatDetailWhen(dateStr, timeStr);
+    return formatNaturalWhen(dateStr, timeStr);
   }
 
   function commentStamp(row, key = "createdAt") {
