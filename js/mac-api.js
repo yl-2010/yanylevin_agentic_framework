@@ -163,10 +163,18 @@
     return res;
   }
 
+  /** Server pings every 25s. Longer silence means a half-open stream (sleep, Wi-Fi swap). */
+  const SSE_SILENT_MS = 60_000;
+  /** Back in view after this much silence: reconnect now instead of waiting for the watchdog. */
+  const SSE_VISIBLE_STALE_MS = 35_000;
+
   /**
    * Fetch-based SSE (EventSource cannot set Authorization).
+   * onChange gets the parsed `change` payload ({} if it was not JSON). After a
+   * reconnect it also fires once with { source: "reconnect" }, since events
+   * sent while the stream was down are gone.
    * @param {string} path e.g. "/api/education/events"
-   * @param {{ onEvent?: (name: string, data: string) => void, onChange?: () => void, onError?: (err: unknown) => void }} handlers
+   * @param {{ onEvent?: (name: string, data: string) => void, onChange?: (data: Record<string, unknown>) => void, onError?: (err: unknown) => void }} handlers
    * @returns {{ close: () => void }}
    */
   function subscribeEvents(path, handlers = {}) {
@@ -174,9 +182,48 @@
     let retry = 0;
     /** @type {AbortController|null} */
     let ac = null;
+    let streaming = false;
+    let everConnected = false;
+    let lastByteAt = 0;
+    /** Set when this side aborted on purpose to reconnect. */
+    let kicked = false;
+    let retryTimer = 0;
+
+    const reconnectNow = () => {
+      if (closed) return;
+      if (streaming) {
+        kicked = true;
+        try {
+          ac?.abort();
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+      if (retryTimer) {
+        window.clearTimeout(retryTimer);
+        retryTimer = 0;
+        connect();
+      }
+    };
+
+    const watchdog = window.setInterval(() => {
+      if (streaming && Date.now() - lastByteAt > SSE_SILENT_MS) reconnectNow();
+    }, 10_000);
+
+    const onVisible = () => {
+      if (document.visibilityState === "hidden") return;
+      if (!streaming || Date.now() - lastByteAt > SSE_VISIBLE_STALE_MS) reconnectNow();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", reconnectNow);
 
     const close = () => {
       closed = true;
+      window.clearInterval(watchdog);
+      window.clearTimeout(retryTimer);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", reconnectNow);
       try {
         ac?.abort();
       } catch {
@@ -186,6 +233,8 @@
 
     const connect = async () => {
       if (closed) return;
+      retryTimer = 0;
+      kicked = false;
       ac = new AbortController();
       try {
         const { apiBase } = await loadConfig();
@@ -200,15 +249,27 @@
           signal: ac.signal,
         });
         if (!res.ok || !res.body) {
+          if (res.status === 401) clearMacToken();
           throw new Error(`SSE ${res.status}`);
         }
         retry = 0;
+        streaming = true;
+        lastByteAt = Date.now();
+        if (everConnected) {
+          try {
+            handlers.onChange?.({ source: "reconnect" });
+          } catch (err) {
+            handlers.onError?.(err);
+          }
+        }
+        everConnected = true;
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
         while (!closed) {
           const { done, value } = await reader.read();
           if (done) break;
+          lastByteAt = Date.now();
           buffer += decoder.decode(value, { stream: true });
           const parts = buffer.split("\n\n");
           buffer = parts.pop() || "";
@@ -225,18 +286,32 @@
             const data = dataLines.join("\n");
             handlers.onEvent?.(eventName, data);
             if (eventName === "change") {
-              handlers.onChange?.();
+              let payload = {};
+              try {
+                const parsed = JSON.parse(data || "{}");
+                if (parsed && typeof parsed === "object") payload = parsed;
+              } catch {
+                /* not JSON */
+              }
+              handlers.onChange?.(payload);
             }
           }
         }
       } catch (err) {
+        streaming = false;
         if (closed) return;
-        if (/** @type {any} */ (err)?.name === "AbortError") return;
-        handlers.onError?.(err);
+        if (/** @type {any} */ (err)?.name === "AbortError" && !kicked) return;
+        if (!kicked) handlers.onError?.(err);
       }
+      streaming = false;
       if (closed) return;
+      if (kicked) {
+        kicked = false;
+        connect();
+        return;
+      }
       retry = Math.min(retry + 1, 6);
-      window.setTimeout(connect, 1500 * retry);
+      retryTimer = window.setTimeout(connect, 1500 * retry);
     };
 
     connect();

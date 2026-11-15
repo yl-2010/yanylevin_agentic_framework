@@ -22,7 +22,7 @@
       last = now;
       v += (stiffness * (1 - x) - damp * v) * dt;
       x += v * dt;
-      onUpdate(x);
+      if (onUpdate(x) === false) return;
       if (Math.abs(1 - x) < 0.001 && Math.abs(v) < 0.01) {
         onUpdate(1);
         onDone();
@@ -40,28 +40,51 @@
     root?.classList.remove("is-send-flight");
   }
 
+  /** Opacity the bubble really paints at: its own ancestors up to the chat root. */
+  function paintedOpacity(el, root) {
+    let o = 1;
+    for (let n = el?.parentElement; n && n !== root; n = n.parentElement) {
+      const v = parseFloat(getComputedStyle(n).opacity);
+      if (Number.isFinite(v)) o *= v;
+    }
+    return o;
+  }
+
   /**
    * @param {{
    *   destEl: HTMLElement,
    *   originRect: DOMRect,
    *   root: HTMLElement,
    *   reduceMotion?: boolean,
+   *   onDone?: () => void,
    * }} opts
    */
   window.yanChatSendFlight = function yanChatSendFlight(opts) {
     const destEl = opts.destEl;
     const originRect = opts.originRect;
     const root = opts.root;
+    let doneCalled = false;
+    const done = () => {
+      if (doneCalled) return;
+      doneCalled = true;
+      try {
+        opts.onDone?.();
+      } catch {
+        /* ignore */
+      }
+    };
     if (active) {
       active.cancel();
       active = null;
     }
     if (!destEl || !originRect || !root) {
       root?.classList.remove("is-send-flight");
+      done();
       return;
     }
     if (opts.reduceMotion || originRect.width < 2 || originRect.height < 2) {
       root.classList.remove("is-send-flight");
+      done();
       return;
     }
 
@@ -79,13 +102,16 @@
       window.clearTimeout(timeout);
       finish(destEl, overlay, root);
       if (active && active.cancel === cancel) active = null;
+      done();
     };
     active = { cancel };
 
     const start = () => {
       if (cancelled) return;
-      const dest = destEl.getBoundingClientRect();
-      if (dest.width < 2 || dest.height < 2) {
+      // Layout size, not the painted box: the panel may still be scaling in.
+      const w = destEl.offsetWidth;
+      const h = destEl.offsetHeight;
+      if (!destEl.isConnected || w < 2 || h < 2) {
         cancel();
         return;
       }
@@ -107,25 +133,37 @@
       root.appendChild(overlay);
 
       clone.style.position = "fixed";
-      clone.style.left = `${dest.left}px`;
-      clone.style.top = `${dest.top}px`;
-      clone.style.width = `${dest.width}px`;
+      clone.style.left = "0px";
+      clone.style.top = "0px";
+      clone.style.width = `${w}px`;
       clone.style.margin = "0";
-      clone.style.transformOrigin = "bottom right";
+      clone.style.transformOrigin = "0 0";
       clone.style.pointerEvents = "none";
       clone.style.zIndex = "96";
       clone.style.alignSelf = "auto";
+      clone.style.willChange = "transform, opacity";
 
-      const startScale = Math.min(0.92, originRect.height / Math.max(dest.height, 1));
-      const tx = originRect.right - dest.right;
-      const ty = originRect.bottom - dest.bottom;
+      const startScale = Math.min(0.92, originRect.height / Math.max(h, 1));
+      // The panel can spring in (or the list scroll) under the bubble. Aim at
+      // where it is this frame, not where it was when the flight started.
       const apply = (t) => {
-        const x = tx * (1 - t);
-        const y = ty * (1 - t);
-        const s = startScale + (1 - startScale) * t;
-        clone.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+        if (!destEl.isConnected) {
+          cancel();
+          return false;
+        }
+        const dest = destEl.getBoundingClientRect();
+        const destScale = dest.width / Math.max(w, 1);
+        const s = startScale + (destScale - startScale) * t;
+        const right = originRect.right + (dest.right - originRect.right) * t;
+        const bottom = originRect.bottom + (dest.bottom - originRect.bottom) * t;
+        clone.style.transform = `translate(${right - w * s}px, ${bottom - h * s}px) scale(${s})`;
+        // Leave the composer opaque, land at whatever the turn paints (pending fade, panel fade-in).
+        const landing = Math.min(1, Math.max(0, t));
+        const target = paintedOpacity(destEl, root);
+        clone.style.opacity = String(1 + (target - 1) * landing);
+        return true;
       };
-      apply(0);
+      if (apply(0) === false) return;
 
       timeout = window.setTimeout(cancel, TIMEOUT_MS);
       stopSpring = springFrame(apply, () => {
@@ -134,6 +172,7 @@
         finish(destEl, overlay, root);
         overlay = null;
         if (active && active.cancel === cancel) active = null;
+        done();
       });
     };
 

@@ -97,6 +97,29 @@
   /** Row under pointerdown, kept in case the list rebuilds before click. */
   /** @type {{ sid: string, draftId: string, pending: boolean }|null} */
   let historyPointerRow = null;
+  /**
+   * Boot may adopt the server's active chat. After the first send or row pick
+   * it may not: GET /agent/active still names the previous chat while a new
+   * one is starting, and adopting it painted the old thread under the send.
+   */
+  let bootResumeDone = false;
+  /** Sends with no session yet that are waiting on POST /agent/start. */
+  let freshSendsInFlight = 0;
+  /** Bumped when a POST/resume applies server state, so an older poll cannot paint over it. */
+  let stateEpoch = 0;
+  /** @type {Promise<void>|null} */
+  let pollInflight = null;
+  let pollAgain = false;
+  /** @type {Promise<void>|null} */
+  let chatsInflight = null;
+  let chatsAgain = false;
+  /** Last transcript seen per session, so switching rows paints at once. */
+  /** @type {Map<string, object[]>} */
+  const transcriptCache = new Map();
+  const TRANSCRIPT_CACHE_MAX = 24;
+  let flightToken = 0;
+  let flightBusy = false;
+  let glassPending = false;
 
   const MAX_FILES = 16;
   /** Match server MAX_ATTACHMENT_BYTES / MAX_TOTAL_ATTACHMENT_BYTES. */
@@ -933,7 +956,12 @@
     });
   }
 
+  /** Glass re-init touches every glass box on the page. Mid-flight it drops frames, so it waits for the landing. */
   function refreshGlass() {
+    if (flightBusy) {
+      glassPending = true;
+      return;
+    }
     if (typeof window.reinitLiquidGlass === "function") {
       window.reinitLiquidGlass();
     }
@@ -1533,7 +1561,38 @@
     }
   }
 
-  /** Paint the sidebar from the cached lists. Cheap; patches when ids/titles match. */
+  /** A pending send's row changes key once accepted. Keep the same button so it does not flash. */
+  function renameHistoryRow(fromKey, toKey) {
+    if (!historyEl || !fromKey || !toKey || fromKey === toKey) return;
+    const sel = (k) => `.yan-chat-history-row[data-row-key="${CSS.escape(k)}"]`;
+    if (historyEl.querySelector(sel(toKey))) return;
+    const row = historyEl.querySelector(sel(fromKey));
+    if (row) row.dataset.rowKey = toKey;
+  }
+
+  /** Reuse a row button for a new section or title. */
+  function updateHistoryRow(row, entry, showAge) {
+    const title = row.querySelector(".yan-chat-history-title");
+    const text = entry.title || "Chat";
+    if (title && title.textContent !== text) title.textContent = text;
+    let age = row.querySelector(".yan-chat-history-age");
+    if (showAge && !age) {
+      age = document.createElement("span");
+      age.className = "yan-chat-history-age";
+      row.appendChild(age);
+    } else if (!showAge && age) {
+      age.remove();
+      age = null;
+    }
+    if (age) age.textContent = relativeChatAge(entry.updated);
+    applyRowState(row, entry);
+  }
+
+  /**
+   * Paint the sidebar from the cached lists. Rows and sections are reused by
+   * key and only moved when their order changes, so beams keep spinning and
+   * nothing flashes when a title lands or a pending row is accepted.
+   */
   function renderHistoryList() {
     if (!historyEl) return;
     const entries = historyEntries();
@@ -1545,26 +1604,69 @@
       return;
     }
     historyStructureKey = nextKey;
-    historyEl.innerHTML = "";
     if (!entries.length) {
+      historyEl.innerHTML = "";
       const empty = document.createElement("p");
       empty.className = "yan-chat-history-empty";
       empty.textContent = "No past chats yet.";
       historyEl.appendChild(empty);
       return;
     }
+    historyEl.querySelectorAll(":scope > .yan-chat-history-empty").forEach((el) => el.remove());
+
+    /** @type {Map<string, HTMLElement>} */
+    const rowPool = new Map();
+    historyEl.querySelectorAll(".yan-chat-history-row").forEach((row) => {
+      const key = row.dataset.rowKey || "";
+      if (key && !rowPool.has(key)) rowPool.set(key, /** @type {HTMLElement} */ (row));
+      else row.remove();
+    });
+    /** @type {Map<string, HTMLElement>} */
+    const sectionPool = new Map();
+    historyEl.querySelectorAll(":scope > .yan-chat-history-section").forEach((sec) => {
+      const key = sec.dataset.sectionKey || "";
+      if (key && !sectionPool.has(key)) sectionPool.set(key, /** @type {HTMLElement} */ (sec));
+      else sec.remove();
+    });
+
+    let prevSection = null;
     for (const section of groupChatHistory(entries)) {
-      const wrap = document.createElement("section");
-      wrap.className = "yan-chat-history-section";
-      const label = document.createElement("h2");
-      label.className = "yan-chat-history-label";
-      label.textContent = section.label;
-      wrap.appendChild(label);
-      for (const entry of section.chats) {
-        wrap.appendChild(buildHistoryRow(entry, section.showAge));
+      let wrap = sectionPool.get(section.key);
+      let label;
+      if (wrap) {
+        sectionPool.delete(section.key);
+        label = wrap.querySelector(":scope > .yan-chat-history-label");
+      } else {
+        wrap = document.createElement("section");
+        wrap.className = "yan-chat-history-section";
+        wrap.dataset.sectionKey = section.key;
+        label = document.createElement("h2");
+        label.className = "yan-chat-history-label";
+        wrap.appendChild(label);
       }
-      historyEl.appendChild(wrap);
+      if (label && label.textContent !== section.label) label.textContent = section.label;
+      const wantAfter = prevSection ? prevSection.nextSibling : historyEl.firstChild;
+      if (wantAfter !== wrap) historyEl.insertBefore(wrap, wantAfter);
+      prevSection = wrap;
+
+      let anchor = label;
+      for (const entry of section.chats) {
+        let row = rowPool.get(entry.key);
+        if (row) {
+          rowPool.delete(entry.key);
+          updateHistoryRow(row, entry, section.showAge);
+        } else {
+          row = buildHistoryRow(entry, section.showAge);
+        }
+        const want = anchor ? anchor.nextSibling : wrap.firstChild;
+        if (want !== row) wrap.insertBefore(row, want);
+        anchor = row;
+      }
+      while (anchor && anchor.nextSibling) anchor.nextSibling.remove();
     }
+    for (const row of rowPool.values()) row.remove();
+    for (const sec of sectionPool.values()) sec.remove();
+    while (prevSection && prevSection.nextSibling) prevSection.nextSibling.remove();
     markCurrentHistoryRow();
   }
 
@@ -1577,13 +1679,16 @@
     const closed = state() === "closed";
     setBeam(threadComposer.panel, sending && !closed);
     setBeam(historyComposer.pill, closed && anyChatWorking());
-    const poll = closed && lastChats.some((c) => c && c.working);
+    // Open or closed: a row that stops working must stop beaming without an SSE event.
+    const poll = lastChats.some((c) => c && c.working);
     if (!poll) {
       window.clearTimeout(launcherTimer);
       launcherTimer = 0;
     } else if (!launcherTimer) {
       launcherTimer = window.setTimeout(() => {
         launcherTimer = 0;
+        // Hidden tabs skip it; resyncChat runs when the tab comes back.
+        if (document.visibilityState === "hidden") return;
         refreshChats().catch(() => {});
       }, LAUNCHER_POLL_MS);
     }
@@ -1630,7 +1735,23 @@
     }
   }
 
-  async function refreshChats() {
+  /** One GET /agent/chats at a time. Calls during it share it and ask for one more after. */
+  function refreshChats() {
+    if (chatsInflight) {
+      chatsAgain = true;
+      return chatsInflight;
+    }
+    chatsInflight = refreshChatsOnce().finally(() => {
+      chatsInflight = null;
+      if (chatsAgain) {
+        chatsAgain = false;
+        refreshChats().catch(() => {});
+      }
+    });
+    return chatsInflight;
+  }
+
+  async function refreshChatsOnce() {
     if (!window.YanMacApi) return;
     const fetchGen = ++historyFetchGen;
     const startedAt = Date.now();
@@ -1690,12 +1811,26 @@
     if (wideEnough()) showingHistory = true;
     else hideHistory();
     markChatRead(id);
-    if (id !== sessionId) resetComposer(threadComposer);
+    bootResumeDone = true;
+    const alreadyOpen = id === sessionId;
+    if (!alreadyOpen) {
+      resetComposer(threadComposer);
+      // Switch the view now. The old thread and its orb must not linger while
+      // resume runs, and a stopped poll must not leave the orb spinning.
+      viewGen += 1;
+      stopPolling();
+      cacheTranscript();
+      sessionId = id;
+      sending = false;
+      root.classList.remove("is-busy");
+      messages = (transcriptCache.get(id) || []).map((m) => ({ ...m }));
+      clearMessagesDom();
+      renderMessagesDom({ forceScroll: true });
+      renderHistoryList();
+    }
     setState("panel", { focusComposer: threadComposer });
-    if (id === sessionId) return;
-    if (!window.YanMacApi) return;
-    const gen = ++viewGen;
-    stopPolling();
+    if (alreadyOpen || !window.YanMacApi) return;
+    const gen = viewGen;
     try {
       const res = await window.YanMacApi.macFetch(`${API}/agent/resume`, {
         method: "POST",
@@ -1708,11 +1843,12 @@
         throw new Error(data.error || `resume failed (${res.status})`);
       }
       sessionId = data.sessionId;
+      stateEpoch += 1;
       if (Array.isArray(data.messages)) applyServerMessages(data.messages);
       preferPanel = true;
       persistLocal();
       restoreSessionDraft();
-      setState("panel", { focusComposer: threadComposer });
+      if (state() !== "panel") setState("panel", { focusComposer: threadComposer });
       if (data.status === "running") {
         setBusy(true);
         setBusyLabel(data.workingLabel || "Working…");
@@ -1724,7 +1860,11 @@
     } catch (err) {
       if (gen !== viewGen) return;
       console.error("[edu-chat] resume", err);
-      if (opts?.quiet) throw err;
+      if (opts?.quiet) {
+        // Boot deep link retries; it must not look already open.
+        if (sessionId === id && !messages.length) sessionId = null;
+        throw err;
+      }
       appendBubble(
         "assistant",
         "Could not open that chat. Is the Mac API running?"
@@ -1744,8 +1884,10 @@
 
   /** Leave the current thread view without stopping its run. */
   function detachThreadView() {
+    bootResumeDone = true;
     viewGen += 1;
     stopPolling();
+    cacheTranscript();
     sessionId = null;
     messages = [];
     sending = false;
@@ -2080,10 +2222,34 @@
     }
   }
 
+  /** Follows the bottom while the reader is there; scrolling up turns it off. */
+  let stickToBottom = true;
+  /** Widgets resize by postMessage and pictures load late, after the render scrolled. */
+  const pinObserver =
+    typeof ResizeObserver === "function"
+      ? new ResizeObserver(() => {
+          if (stickToBottom && messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+        })
+      : null;
+  if (messagesEl) {
+    pinObserver?.observe(messagesEl);
+    messagesEl.addEventListener(
+      "scroll",
+      () => {
+        stickToBottom =
+          messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80;
+      },
+      { passive: true }
+    );
+  }
+
   function clearMessagesDom() {
     if (!messagesEl) return;
     removeWorkingEl();
+    pinObserver?.disconnect();
+    pinObserver?.observe(messagesEl);
     messagesEl.innerHTML = "";
+    stickToBottom = true;
   }
 
   function messageReuseKey(msg) {
@@ -2260,6 +2426,7 @@
       const key = el.dataset.reuseKey || "";
       if (key && !pool.has(key)) pool.set(key, el);
       else {
+        pinObserver?.unobserve(el);
         el.remove();
       }
     }
@@ -2276,11 +2443,13 @@
         syncQueuedTurn(turn, msg);
       } else {
         turn = buildTurn(msg, i);
+        pinObserver?.observe(turn);
         if (turn.querySelector("[data-liquid-glass]")) addedGlass = true;
       }
       nextTurns.push(turn);
     }
     for (const leftover of pool.values()) {
+      pinObserver?.unobserve(leftover);
       leftover.remove();
     }
 
@@ -2306,6 +2475,7 @@
 
     if (forceScroll || nearBottom) {
       messagesEl.scrollTop = messagesEl.scrollHeight;
+      stickToBottom = true;
     } else {
       messagesEl.scrollTop = prevScroll;
     }
@@ -2325,7 +2495,10 @@
     const files = normalizeMessageFiles(opts.files);
     if (files.length) msg.files = files;
     if (opts.queued) msg.queued = true;
-    else if (opts.pending) msg.pending = true;
+    else if (opts.pending) {
+      msg.pending = true;
+      msg.serverBase = Number(opts.serverBase) || 0;
+    }
     const locals = (opts.localFiles || []).filter((f) => f instanceof File);
     if (locals.length) pendingLocalFiles.set(msg, locals);
     messages.push(msg);
@@ -2345,11 +2518,21 @@
 
   function flyUserBubble(originRect) {
     if (typeof window.yanChatSendFlight !== "function") return;
+    const token = ++flightToken;
+    flightBusy = true;
     window.yanChatSendFlight({
       destEl: lastUserBubble(),
       originRect,
       root,
       reduceMotion,
+      onDone: () => {
+        if (token !== flightToken) return;
+        flightBusy = false;
+        if (glassPending) {
+          glassPending = false;
+          refreshGlass();
+        }
+      },
     });
   }
 
@@ -2418,8 +2601,24 @@
         if (files.length) out.files = files;
         return out;
       });
-    // Sends the server has not accepted yet stay at the end.
-    next.push(...messages.filter((m) => m && m.pending));
+    // Sends the server has not accepted yet stay at the end. The SSE "running"
+    // event can beat the POST's 202, so the server list may already hold one:
+    // drop the local copy then, or the bubble shows twice.
+    const claimed = new Set();
+    for (const p of messages) {
+      if (!p || !p.pending) continue;
+      const base = Number(p.serverBase) || 0;
+      const text = String(p.content || "").trim();
+      const at = next.findIndex(
+        (m, i) =>
+          i >= base &&
+          !claimed.has(i) &&
+          m.role === "user" &&
+          String(m.content || "").trim() === text
+      );
+      if (at >= 0) claimed.add(at);
+      else next.push(p);
+    }
     if (messagesFingerprint(next) === messagesFingerprint(messages)) {
       maybeFlushPendingQueueInterrupt();
       return;
@@ -2427,13 +2626,46 @@
     messages = next;
     renderMessagesDom();
     persistLocal();
+    cacheTranscript();
     maybeFlushPendingQueueInterrupt();
   }
 
-  async function pollState() {
+  /** Remember the visible transcript for this session. Pending sends are not kept. */
+  function cacheTranscript() {
+    if (!sessionId) return;
+    const list = messages.filter((m) => m && !m.pending);
+    transcriptCache.delete(sessionId);
+    if (!list.length) return;
+    transcriptCache.set(
+      sessionId,
+      list.map((m) => ({ ...m }))
+    );
+    while (transcriptCache.size > TRANSCRIPT_CACHE_MAX) {
+      transcriptCache.delete(transcriptCache.keys().next().value);
+    }
+  }
+
+  /** One GET /agent/state at a time. Calls during it share it and ask for one more after. */
+  function pollState() {
+    if (pollInflight) {
+      pollAgain = true;
+      return pollInflight;
+    }
+    pollInflight = pollStateOnce().finally(() => {
+      pollInflight = null;
+      if (pollAgain) {
+        pollAgain = false;
+        pollState().catch(() => {});
+      }
+    });
+    return pollInflight;
+  }
+
+  async function pollStateOnce() {
     if (!sessionId || !window.YanMacApi) return;
     const requested = sessionId;
     const gen = viewGen;
+    const epoch = stateEpoch;
     const res = await window.YanMacApi.macFetch(
       `${API}/agent/state?sessionId=${encodeURIComponent(requested)}`,
       { method: "GET", timeoutMs: 15_000 }
@@ -2442,6 +2674,11 @@
     const data = await res.json().catch(() => ({}));
     if (sessionId !== requested || gen !== viewGen) return;
     if (data.sessionId && data.sessionId !== sessionId) return;
+    if (epoch !== stateEpoch) {
+      // A send or resume applied newer state while this was in flight.
+      pollAgain = true;
+      return;
+    }
     if (res.status === 404) {
       // Cleared on another device (or TTL) — wipe local transcript too.
       sessionId = null;
@@ -2474,18 +2711,25 @@
       setBusy(true);
       setBusyLabel(data.workingLabel || "Working…");
     } else {
+      const wasSending = sending;
       setBusy(false);
       setBusyLabel("Working…");
       if (messages.length) preferPanel = true;
-      window.__eduRefresh?.();
+      // The run may have edited todos. An idle poll on its own changed nothing.
+      if (wasSending) window.__eduRefresh?.();
     }
   }
 
-  async function ensureSession() {
-    if (sessionId) return sessionId;
+  /**
+   * @param {{ fresh?: boolean, gen?: number }} [opts]
+   * fresh: always start a new session. A sessionId set by anything else since
+   * the send began belongs to another chat.
+   */
+  async function ensureSession(opts = {}) {
+    if (!opts.fresh && sessionId) return sessionId;
     if (starting) {
       while (starting) await new Promise((r) => setTimeout(r, 80));
-      return sessionId;
+      if (!opts.fresh) return sessionId;
     }
     starting = true;
     try {
@@ -2498,9 +2742,12 @@
       if (!res.ok || !data.sessionId) {
         throw new Error(data.error || `start failed (${res.status})`);
       }
-      sessionId = data.sessionId;
-      persistLocal();
-      return sessionId;
+      // The user may have opened another chat while this one started.
+      if (opts.gen == null || opts.gen === viewGen) {
+        sessionId = data.sessionId;
+        persistLocal();
+      }
+      return String(data.sessionId);
     } finally {
       starting = false;
     }
@@ -2522,17 +2769,27 @@
     const draftId = composer.draftId;
     const draftSessionId = composer.draftSessionId;
     const saveInFlight = draftId ? draftSaves.get(draftId) : null;
+    bootResumeDone = true;
     // Clear the local copy now. The server copy lives until this POST is
     // accepted, and list refreshes in between must not refill the box.
-    if (fresh && (messages.length || sending)) {
+    if (fresh) {
       viewGen += 1;
       stopPolling();
+      cacheTranscript();
       sessionId = null;
       messages = [];
       sending = false;
       root.classList.remove("is-busy");
       clearMessagesDom();
     }
+    const newChat = !sessionId;
+    let freshHeld = newChat;
+    if (freshHeld) freshSendsInFlight += 1;
+    const releaseFresh = () => {
+      if (!freshHeld) return;
+      freshHeld = false;
+      freshSendsInFlight = Math.max(0, freshSendsInFlight - 1);
+    };
     showThread = true;
     if (fresh) {
       resetComposer(threadComposer);
@@ -2546,9 +2803,11 @@
     // Idle chat: show the turn faded until the server accepts it. No orb or
     // beam yet. A busy chat keeps the queued / interrupt path.
     const usePending = !sending;
+    const serverBase = messages.filter((m) => m && !m.pending && !m.queued).length;
     const localMsg = appendBubble("user", text, {
       queued: willQueue,
       pending: usePending,
+      serverBase,
       files: items.map((f) => ({ name: f.name, mimeType: f.mimeType || "" })),
       localFiles: items.map((f) => f.file).filter((f) => f instanceof File),
     });
@@ -2625,7 +2884,22 @@
         saveInFlight ? saveInFlight.catch(() => {}) : null,
         ...items.map((f) => (f.upload ? f.upload.catch(() => {}) : null)),
       ]);
-      const [sid] = await Promise.all([ensureSession(), waitUploads]);
+      const [sid] = await Promise.all([
+        ensureSession({ fresh: newChat, gen: sendGen }),
+        waitUploads,
+      ]);
+      releaseFresh();
+      // GET /agent/chats can list the new chat before the 202. Key the pending
+      // row by session now so the list never shows it twice.
+      const startedRow = rowId ? pendingRows.get(rowId) : null;
+      if (startedRow && sid && !startedRow.sessionId) {
+        const fromKey = startedRow.key;
+        startedRow.sessionId = sid;
+        startedRow.key = `s:${sid}`;
+        startedRow.draftId = "";
+        renameHistoryRow(fromKey, startedRow.key);
+        renderHistoryList();
+      }
       const fallback = items.filter((f) => !f.removed && !f.serverId && f.file);
       /** @type {{ name: string, mimeType: string, data: string }[]} */
       const attachments = await Promise.all(fallback.map((f) => fileToAttachment(f.file)));
@@ -2692,10 +2966,12 @@
       reclaimSentComposer();
       const row = rowId ? pendingRows.get(rowId) : null;
       if (row) {
+        const fromKey = row.key;
         row.pending = false;
         row.sessionId = sid;
         row.key = `s:${sid}`;
         row.draftId = "";
+        renameHistoryRow(fromKey, row.key);
       }
       if (stale) {
         renderHistoryList();
@@ -2705,11 +2981,12 @@
       // The 202 means the prompt reached the model. Clearing the flag can leave
       // the fingerprint unchanged, so always re-render to drop the fade.
       delete localMsg.pending;
+      stateEpoch += 1;
       if (Array.isArray(data.messages)) applyServerMessages(data.messages);
       renderMessagesDom();
       persistLocal();
       setBusy(true);
-      setState("panel", { skipFocus: true });
+      if (state() !== "panel") setState("panel", { skipFocus: true });
       refreshChats().catch(() => {});
       // Keep busy + poll until assistant reply lands (and queue drains).
       startPolling();
@@ -2735,6 +3012,7 @@
       );
       setState("panel", { skipFocus: true });
     } finally {
+      releaseFresh();
       if (draftId && !accepted) releaseDraftBlock(draftId);
       else if (accepted) reclaimSentComposer();
       const focus = !threadCol.hidden ? threadComposer : historyComposer;
@@ -3051,6 +3329,7 @@
         appendBubble("assistant", data.error || "Could not interrupt with that message.");
         return;
       }
+      stateEpoch += 1;
       if (Array.isArray(data.messages)) applyServerMessages(data.messages);
       setBusy(true);
       startPolling();
@@ -3282,10 +3561,31 @@
   window.addEventListener("drop", () => setDropTarget(null), true);
   window.addEventListener("dragend", () => setDropTarget(null));
 
+  /**
+   * Background tabs throttle timers and can lose SSE events, so a finished run
+   * kept its orb and beam until reload. Ask the server again on return.
+   */
+  let lastResyncAt = 0;
+  function resyncChat() {
+    if (document.visibilityState === "hidden") return;
+    const now = Date.now();
+    if (now - lastResyncAt < 1000) return;
+    lastResyncAt = now;
+    if (sessionId) pollState().catch(() => {});
+    if (sending) startPolling();
+    refreshChats().catch(() => {});
+  }
+
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") flushAllDraftsKeepalive();
+    else resyncChat();
   });
   window.addEventListener("pagehide", flushAllDraftsKeepalive);
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) resyncChat();
+  });
+  window.addEventListener("focus", resyncChat);
+  window.addEventListener("online", resyncChat);
 
   window.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || state() === "closed") return;
@@ -3306,18 +3606,26 @@
     })()
   );
 
+  /**
+   * Boot only. Adopts the server's active chat (or the local copy).
+   * @returns {Promise<boolean>} true once the server answered, even with no chat
+   */
   async function resumeFromServer() {
-    if (!window.YanMacApi) return;
+    if (!window.YanMacApi || bootResumeDone) return false;
     const gen = viewGen;
+    const blocked = () =>
+      gen !== viewGen || bootResumeDone || freshSendsInFlight > 0 || Boolean(sessionId);
+    if (blocked()) return false;
     try {
       const res = await window.YanMacApi.macFetch(
         `${API}/agent/active`,
         { method: "GET", timeoutMs: 15_000 }
       );
       const data = await res.json().catch(() => ({}));
-      if (gen !== viewGen) return;
+      if (blocked()) return false;
       if (res.ok && data.sessionId) {
         sessionId = data.sessionId;
+        stateEpoch += 1;
         if (Array.isArray(data.messages)) applyServerMessages(data.messages);
         preferPanel = messages.length > 0;
         persistLocal();
@@ -3328,15 +3636,16 @@
         } else {
           setBusy(false);
         }
-        return;
+        return true;
       }
+      if (res.ok) return true;
     } catch {
       /* fall through to local */
     }
 
-    if (gen !== viewGen) return;
+    if (blocked()) return false;
     const local = loadLocal();
-    if (!local) return;
+    if (!local) return false;
     if (typeof local.sessionId === "string" && local.sessionId) {
       sessionId = local.sessionId;
     }
@@ -3365,6 +3674,7 @@
         /* ignore */
       }
     }
+    return Boolean(sessionId || messages.length);
   }
 
   window.__eduChatAttachFiles = (files) => {
@@ -3377,10 +3687,23 @@
   setState("closed");
 
   // Instant updates via the same education SSE / 45s poll path as the dashboard.
-  window.__eduChatRefresh = () => {
-    if (sessionId) pollState().catch(() => {});
-    else resumeFromServer().catch(() => {});
-    refreshChats().catch(() => {});
+  // One draft save fires two events (route + file watch), so collapse bursts.
+  let chatRefreshTimer = 0;
+  let chatRefreshNeedsPoll = false;
+  window.__eduChatRefresh = (payload) => {
+    // A draft save changes the list (draft rows), never the open transcript.
+    const p = payload && typeof payload === "object" ? payload : {};
+    const path = String(p.path || "").replace(/^\.?\//, "");
+    if (p.source !== "drafts" && !path.startsWith(".chat-drafts")) chatRefreshNeedsPoll = true;
+    window.clearTimeout(chatRefreshTimer);
+    chatRefreshTimer = window.setTimeout(() => {
+      chatRefreshTimer = 0;
+      const poll = chatRefreshNeedsPoll;
+      chatRefreshNeedsPoll = false;
+      if (poll && sessionId) pollState().catch(() => {});
+      else if (poll && !bootResumeDone) resumeFromServer().catch(() => {});
+      refreshChats().catch(() => {});
+    }, 250);
   };
 
   function chatDeepLinkId() {
@@ -3410,10 +3733,17 @@
       });
       return;
     }
-    resumeFromServer().catch(() => {});
-    if (resumeAttempts < 8 && !sessionId && !messages.length) {
-      window.setTimeout(resumeKick, 400);
-    }
+    if (bootResumeDone) return;
+    resumeFromServer()
+      .catch(() => false)
+      .then((answered) => {
+        if (bootResumeDone) return;
+        if (answered || resumeAttempts >= 8) {
+          bootResumeDone = true;
+          return;
+        }
+        window.setTimeout(resumeKick, 400);
+      });
   };
   if (document.readyState === "complete") {
     window.setTimeout(resumeKick, 200);

@@ -4247,6 +4247,46 @@
     });
   }
 
+  /**
+   * Chat transcripts and drafts live under the watched user folder, but /data
+   * never reads them. Typing saved a draft, and every save refetched the
+   * whole tree twice. Agent status events skip it too: files the agent edits
+   * fire their own watch event, and a finished run calls __eduRefresh.
+   */
+  function chatOnlyChange(payload) {
+    const p = payload && typeof payload === "object" ? payload : {};
+    const source = String(p.source || "");
+    if (source === "drafts") return true;
+    if (source === "agent" && p.status !== "idle") return true;
+    const path = String(p.path || "").replace(/^\.?\//, "");
+    return path.startsWith(".chat-history") || path.startsWith(".chat-drafts");
+  }
+
+  let fetchTimer = 0;
+  /** @type {Promise<void>|null} */
+  let fetchInflight = null;
+  let fetchAgain = false;
+  /** Collapse event bursts into one /data request, never two at once. */
+  function scheduleFetchData() {
+    window.clearTimeout(fetchTimer);
+    fetchTimer = window.setTimeout(() => {
+      fetchTimer = 0;
+      if (fetchInflight) {
+        fetchAgain = true;
+        return;
+      }
+      fetchInflight = fetchData()
+        .catch((err) => console.error("[edu refresh]", err))
+        .finally(() => {
+          fetchInflight = null;
+          if (fetchAgain) {
+            fetchAgain = false;
+            scheduleFetchData();
+          }
+        });
+    }, 250);
+  }
+
   function subscribeEvents() {
     const mac = window.YanMacApi;
     if (!mac) return;
@@ -4260,11 +4300,11 @@
           /* ignore bad SSE JSON */
         }
       },
-      onChange: () => {
-        fetchData().catch((err) => console.error("[edu refresh]", err));
+      onChange: (payload) => {
+        if (!chatOnlyChange(payload)) scheduleFetchData();
         // Same SSE path refreshes the floating education chat (agent reply / status).
         try {
-          window.__eduChatRefresh?.();
+          window.__eduChatRefresh?.(payload);
         } catch (err) {
           console.warn("[edu chat refresh]", err);
         }
@@ -4274,7 +4314,7 @@
     // Polling fallback while page is open (hits Mac, not Vercel)
     window.setInterval(() => {
       if (document.visibilityState === "hidden") return;
-      fetchData().catch(() => {});
+      scheduleFetchData();
       try {
         window.__eduChatRefresh?.();
       } catch {
@@ -4347,7 +4387,7 @@
   }
 
   // Expose refresh for chatbot after agent turns
-  window.__eduRefresh = () => fetchData().catch(() => {});
+  window.__eduRefresh = () => scheduleFetchData();
   window.__eduNavigate = (target) => applyEducationNavigate(target);
   window.__eduNavigatePath = (href) => applyEducationNavigatePath(href);
   window.__eduUserEmail = () =>
