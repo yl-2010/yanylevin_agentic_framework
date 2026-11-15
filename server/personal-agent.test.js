@@ -242,7 +242,8 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.schoolTeams));
     assert.match(prompt, /school-teams\.js/);
     assert.match(prompt, /iMessage, then Teams, then email/);
-    assert.match(prompt, /native attachments/);
+    assert.match(prompt, /cannot attach a file/);
+    assert.doesNotMatch(prompt, /native attachments/);
     assert.match(prompt, /yanylevin\.com link/);
     assert.match(prompt, /non-guessable folder/);
     assert.doesNotMatch(prompt, /Teams app with Cursor computer use/);
@@ -671,8 +672,9 @@ describe("Personal Agent skill files", () => {
     assert.match(imessage, /They can still have you post in JYPE Teams/);
     assert.match(imessage, /\/\/ Sent by Yan's Personal Agent/);
     assert.match(imessage, /does not render markdown/);
-    assert.match(imessage, /attachToReply/);
-    assert.match(imessage, /--attach /);
+    assert.match(imessage, /cannot attach a file/);
+    assert.doesNotMatch(imessage, /attachToReply/);
+    assert.doesNotMatch(imessage, /--attach /);
 
     const screentime = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.screentime), "utf8");
     assert.match(screentime, /screentime-read\.js/);
@@ -729,7 +731,8 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /cannot send into a different group chat/);
     assert.match(agent, /They can still have you post in JYPE Teams/);
     assert.match(agent, /iMessage first, then Teams, then email|iMessage, then Teams, then email/);
-    assert.match(agent, /attachToReply/);
+    assert.match(agent, /cannot attach a file/);
+    assert.doesNotMatch(agent, /attachToReply/);
     assert.match(agent, /unslop/);
     assert.match(agent, /SOUL\.md/);
     assert.match(agent, /identity-school\.md/);

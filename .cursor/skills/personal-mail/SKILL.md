@@ -59,7 +59,7 @@ Tesla Robotaxi and Uber Family receipts live on **Exchange**, not Gmail. Subject
 
 If to, subject, and body are clear, send. If any of those is missing, ask. Unnamed send-to-a-person uses iMessage first, then Teams, then email (personal-agent skill). Reply `Sent to … (email)`.  Never from the location-history or daily-briefing jobs.
 
-Alex calculus practice stays off his school inbox. Do not send the PDF, the key, a link, or any note about those tests to `friend@school.example`. iMessage carries that. His people card lists the school address first. Skip it for this.
+Alex calculus practice stays off his school inbox. Do not send the PDF, the key, a link, or any note about those tests to `friend@school.example`. iMessage carries a yanylevin.com link to that, not the file. His people card lists the school address first. Skip it for this.
 
 End the email body with `Sent by Yan's Personal Agent` unless Yan says not to. Same parent-thread skip as iMessage. Never put that line in the Personal Agent app or website reply. iMessage and Teams use `// Sent by Yan's Personal Agent`.
 
@@ -111,7 +111,7 @@ Look up an address in Contacts (`.cursor/skills/personal-contacts/SKILL.md`) whe
 
 ## Attachments
 
-Mail.app can attach files. School Outlook cannot, and Teams cannot. This is the path when Yan asked Teams or school mail to carry a PDF, photo, or other file.
+Mail.app can attach files. iMessage cannot, Teams cannot, and school Outlook cannot. Email the file when they asked for email. Otherwise put it on yanylevin.com and send the link.
 
 Do not re-read a sent message through Mail's scripting interface to decide whether the attachments were wrong. That read can report duplicate names and drop files that the sent message actually has. If Yan says the original mail was fine, send nothing else. One send, then stop.
 

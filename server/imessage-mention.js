@@ -346,7 +346,7 @@ export function formatIMessageOriginBlock(origin, opts = {}) {
     lines.push(
       `Read the surrounding thread before answering: ${threadCmd} (iMessage skill).`,
       AGENT_VS_YAN_LINE,
-      "This is a full Personal Agent turn. You can send native iMessage files (photos, PDFs, anything on disk). Never a yanylevin.com stand-in. Files are never in the same message as text. If this reply includes files, decide the text first, then POST /imessage/send with files and attachToReply true (no text) to this same chat as the last action, then write that text as the final bubble. The server sends each file as its own message, then the text, immediately. Extra sends to someone else still use files + text in one /imessage/send (files first, then text).",
+      "This is a full Personal Agent turn. iMessage cannot attach files. Do not POST files or attachments. Messages accepts that send and the file never arrives. Put the file on yanylevin.com (non-guessable folder when it should not be easy to find, commit, push, npm run deploy:web, confirm 200) and send the link in the text. Email the file with Mail.app only when they asked for email.",
       "",
       "Your reply",
       replyReaderLine(opts.guestCaller, "iMessage", chat),

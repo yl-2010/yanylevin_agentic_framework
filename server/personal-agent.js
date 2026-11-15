@@ -1396,7 +1396,7 @@ export function shouldSkipDuplicateChannelSend(last, finalText) {
 }
 
 /**
- * Early @agent / @agentg line. Text only, so a later final reply can still attach files.
+ * Early @agent / @agentg line. Text only. iMessage cannot attach files.
  * @param {object|null|undefined} origin
  * @param {string} content
  */
@@ -1463,11 +1463,17 @@ export async function deliverIMessageFinalReply(origin, content) {
     takeIMessageReplyFiles(origin);
     return { ok: false, skipped: "no-target" };
   }
+  const dropped = takeIMessageReplyFiles(origin);
+  if (dropped.length) {
+    console.warn(
+      "[personal-agent] dropped iMessage attachments. Send a yanylevin.com link instead.",
+      dropped.length
+    );
+  }
   return sendIMessage({
     to: to || chatGuid,
     text: body,
     chatGuid: chatGuid || undefined,
-    files: takeIMessageReplyFiles(origin),
   });
 }
 
@@ -2217,7 +2223,7 @@ export function systemPrompt(email, opts = {}) {
     "",
     "Reply: short. School mutations 1-3 lines. Markdown OK in the text bubble; never HTML tags or markdown images. Never em dashes. No thinking aloud. Do not tell the user to refresh. Read the widgets skill before emitting any widget fence. Never put Sent by Yan's Personal Agent in app or website bubbles; that footer is only for iMessage, email, and Teams.",
     "Math on the website and in the iOS app is a display block, with a blank line before and after. Put $$ on its own line, then LaTeX, then $$ on its own line. Stack equations one per line in that block. Use \\(x\\) or $x^2$ only for a symbol inside a sentence. Never backticks for math. iMessage and Teams cannot render KaTeX, so those replies stay plain words.",
-    "Send to a person with no channel named: iMessage, then Teams, then email. Named channel (on Teams / iMessage / email) wins for text. iMessage files are native attachments (iMessage skill), never a URL stand-in. Each file is its own message, then the text. A Teams file goes out as a yanylevin.com link: put it in the repo, use a non-guessable folder when it should not be easy to find, commit, push, npm run deploy:web, confirm the URL is 200, then school-teams.js send the link. Attach in the Teams app with computer use only when Yan directly says to attach with computer use in this turn. A message with images has no pixels. Open that chat in the Teams app and look. School Outlook still cannot send.",
+    "Send to a person with no channel named: iMessage, then Teams, then email. Named channel (on Teams / iMessage / email) wins for text. iMessage cannot attach a file. Messages accepts the send and the file never arrives. A file for iMessage or Teams goes out as a yanylevin.com link. Put it in the repo, use a non-guessable folder when it should not be easy to find, commit, push, npm run deploy:web, confirm the URL is 200, then send the link. Email the file with Mail.app only when they asked for email. Attach in the Teams app with computer use only when Yan directly says to attach with computer use in this turn. Do not attach in Messages. A message with images has no pixels. Open that chat in the Teams app and look. School Outlook still cannot send.",
     "Long work: send_chat_message first with a short status. Send more mid-run when new info, a change, or a useful update appears. Then a final Done. Quick answers: one reply only (that is the end of turn). On an iMessage or Teams @agent or @agentg first turn, that first status is also posted to the chat before you start the work.",
     "To show one education page on web/iOS, call open_education_page (education-dashboard skill). The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Skip if already on that page. Not on Cursor Desktop.",
     "No period when the reply is one word, one phrase, or one sentence.",

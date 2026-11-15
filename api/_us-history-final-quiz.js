@@ -1,11 +1,15 @@
 /**
  * Fall US History final practice. Questions stay off the public page.
- * Only Yan and Alex's Google sessions get the payload.
+ * Only the Google accounts in ALLOWED get the payload.
  */
 
 const { readSession } = require("./_auth");
 
-const ALLOWED = new Set(["you@example.com", "you@example.com"]);
+const ALLOWED = new Set([
+  "you@example.com",
+  "you@example.com",
+  "friend@example.com",
+]);
 
 // Choice order from one Fisher-Yates pass with crypto.randomInt on 2026-11-13.
 // Reloading uses this same order. Saves match the choice text.

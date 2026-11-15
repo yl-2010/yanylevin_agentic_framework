@@ -15,6 +15,9 @@ const execFileAsync = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)));
 export const IMESSAGE_SEND_SCRIPT = join(ROOT, "imessage-send.applescript");
 const MAX_TEXT_CHARS = 24_000;
+/** Messages.app `send POSIX file` returns success and the file never arrives. */
+export const IMESSAGE_NO_FILES =
+  "iMessage cannot attach files. Messages accepts the send and the file never arrives. Put the file on yanylevin.com and send the link. Email the file only when they asked for email.";
 export const MAX_SEND_FILES = 16;
 export const MAX_SEND_FILE_BYTES = 100 * 1024 * 1024;
 export const MAX_SEND_FILES_TOTAL = 200 * 1024 * 1024;
@@ -352,17 +355,14 @@ export async function findNamedChat(name, deps = {}) {
  *   findNamedChat?: typeof findNamedChat,
  *   listContacts?: () => Promise<unknown>,
  *   queryMessages?: (sql: string) => Promise<object[]>,
- *   resolveSendFiles?: typeof resolveSendFiles,
  * }} [deps]
  */
 export async function sendIMessage(opts = {}, deps = {}) {
   const text = String(opts.text || "");
   if (!String(opts.to || "").trim()) throw statusError("to is required", 400);
-  const resolveFiles = deps.resolveSendFiles || resolveSendFiles;
-  const files = await resolveFiles(opts.files ?? opts.attachments);
-  if (!text.trim() && !files.length) {
-    throw statusError("text or files required", 400);
-  }
+  const requestedFiles = normalizeSendFiles(opts.files ?? opts.attachments);
+  if (requestedFiles.length) throw statusError(IMESSAGE_NO_FILES, 400);
+  if (!text.trim()) throw statusError("text is required", 400);
   if (text.length > MAX_TEXT_CHARS) {
     throw statusError(`text exceeds ${MAX_TEXT_CHARS} characters`, 400);
   }
@@ -431,10 +431,10 @@ export async function sendIMessage(opts = {}, deps = {}) {
   const bodyPath = join(dir, "body.txt");
   await writeFile(bodyPath, text.trim() ? text : "", "utf8");
   const exec = deps.execFile || execFileAsync;
-  const args = [IMESSAGE_SEND_SCRIPT, handle, bodyPath, chatGuid || "", ...files];
+  const args = [IMESSAGE_SEND_SCRIPT, handle, bodyPath, chatGuid || ""];
   try {
     const { stdout, stderr } = await exec("osascript", args, {
-      timeout: files.length ? 120_000 : 45_000,
+      timeout: 45_000,
       maxBuffer: 1024 * 1024,
     });
     const how = String(stdout || "")
@@ -445,7 +445,7 @@ export async function sendIMessage(opts = {}, deps = {}) {
       to: handle,
       via: how || "osascript",
       chatGuid: chatGuid || undefined,
-      files,
+      files: [],
       warning: String(stderr || "").trim() || undefined,
     };
   } catch (err) {

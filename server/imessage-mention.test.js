@@ -220,8 +220,10 @@ describe("imessage-mention", () => {
     assert.match(block, /not a note to Yan/);
     assert.match(block, /Start with the answer/);
     assert.match(block, /full Personal Agent turn/);
-    assert.match(block, /attachToReply/);
-    assert.match(block, /native iMessage files/);
+    assert.match(block, /cannot attach files/);
+    assert.match(block, /yanylevin\.com/);
+    assert.doesNotMatch(block, /attachToReply/);
+    assert.doesNotMatch(block, /native iMessage files/);
     assert.match(block, /before you start the work/);
     assert.match(block, /posted to this iMessage chat immediately/);
     assert.match(block, /@agent and @agentg both do this/);
