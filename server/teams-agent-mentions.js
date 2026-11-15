@@ -2,7 +2,7 @@
  * Poll school Teams chats for Yan fromMe texts that mention @agent.
  * Each hit starts a normal Personal Agent session (app + website).
  *
- * Teams listing returns the last N messages of every chat that changed,
+ * The chat list carries the newest message of every chat that changed,
  * not only messages since the watermark. So the poller itself must drop
  * old rows. A mention starts a session only when it is new on every axis:
  * - created after the watermark (minus a short overlap),
