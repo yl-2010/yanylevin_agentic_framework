@@ -458,7 +458,7 @@
       ["https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js", ""],
       ["/education/markdown.js?v=katex-2", ""],
       ["/js/chat-orb.js?v=2", "module"],
-      ["/education/chatbot.js?v=chat-file-open", ""],
+      ["/education/chatbot.js?v=orb-after-send", ""],
     ];
     if (!document.querySelector("link[href*='katex.min.css']")) {
       const link = document.createElement("link");

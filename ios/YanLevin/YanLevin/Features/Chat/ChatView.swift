@@ -239,7 +239,8 @@ struct ChatView: View {
         return !busyBlocks && pendingAttachments.count < 16
     }
 
-    /// Message list rows with Working inserted before queued bubbles.
+    /// Message list rows. Working stays hidden while a send is still faded,
+    /// then sits under that message. Queued bubbles keep it above them.
     private var chatRows: [ChatRow] {
         chatRowsMemo.rows(
             messages: messages,
@@ -1875,14 +1876,17 @@ private final class ChatRowsMemo {
         self.workingLabel = workingLabel
         var rows: [ChatRow] = []
         var insertedWorking = false
+        // Pending means the POST has not landed. The bubble is still faded.
+        // The orb waits until that send finishes, then goes under the message.
+        let hideWorking = messages.contains { $0.pending }
         for msg in messages {
-            if usesEducation, isBusy, !insertedWorking, msg.queued {
+            if usesEducation, isBusy, !hideWorking, !insertedWorking, msg.queued {
                 rows.append(.working(workingLabel))
                 insertedWorking = true
             }
             rows.append(.message(msg))
         }
-        if isBusy, !insertedWorking {
+        if isBusy, !hideWorking, !insertedWorking {
             rows.append(.working(workingLabel))
         }
         cached = rows
@@ -2297,8 +2301,8 @@ private struct ChatBubbleView: View, Equatable {
     }
 }
 
-/// Rows for education chat: messages plus an optional Working indicator
-/// inserted before faded queued bubbles.
+/// Rows for education chat: messages plus an optional Working indicator.
+/// Hidden while a send is still faded. Otherwise it sits before queued bubbles.
 private enum ChatRow: Identifiable, Equatable {
     case message(ChatMessage)
     case working(String)

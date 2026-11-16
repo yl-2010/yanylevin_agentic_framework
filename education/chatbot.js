@@ -2319,7 +2319,10 @@
 
   function syncWorkingEl() {
     if (!messagesEl) return;
-    if (!sending) {
+    // A follow-up still waiting on its POST stays faded. Leave the orb off
+    // until that send lands, then put it under the message. Queued turns are
+    // already on the server, so the orb can sit above those.
+    if (!sending || messages.some((m) => m && m.pending)) {
       removeWorkingEl();
       return;
     }
@@ -2341,9 +2344,7 @@
       created = true;
     }
     const firstQueued = [...messagesEl.querySelectorAll(":scope > .yan-chat-turn")].find(
-      (el) =>
-        el.classList.contains("yan-chat-turn--queued") ||
-        el.classList.contains("yan-chat-turn--pending")
+      (el) => el.classList.contains("yan-chat-turn--queued")
     );
     if (firstQueued) {
       if (workingEl.nextSibling !== firstQueued) {
