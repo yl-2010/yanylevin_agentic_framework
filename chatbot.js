@@ -104,9 +104,22 @@
   function cssPx(el, name) {
     const raw = String(getComputedStyle(el).getPropertyValue(name) || "").trim();
     const n = parseFloat(raw);
-    if (Number.isFinite(n)) return n;
+    if (Number.isFinite(n) && /^-?[\d.]+px$/.test(raw)) return n;
+    if (raw && !raw.startsWith("var(")) return lengthPx(raw);
     const nested = raw.match(/^var\(\s*(--[\w-]+)/);
     return nested ? cssPx(el, nested[1]) : 0;
+  }
+
+  function lengthPx(value) {
+    const raw = String(value || "").trim();
+    const n = parseFloat(raw);
+    if (raw.endsWith("px") && Number.isFinite(n)) return n;
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:absolute;visibility:hidden;height:0;width:" + (raw || "0px");
+    root.appendChild(probe);
+    const w = probe.getBoundingClientRect().width;
+    probe.remove();
+    return w;
   }
 
   function circlePx() {
@@ -159,7 +172,10 @@
     if (!input || !root) return;
     syncComposerFrost();
     const circle = circlePx();
-    const radius = Math.round(circle / 2);
+    const closed = state() === "closed";
+    const radius = closed
+      ? Math.round(circle / 2)
+      : Math.round(cssPx(root, "--chat-panel-radius") || circle / 2);
     if (pill) pill.setAttribute("data-lg-radius", String(radius));
 
     if (state() === "closed") {
@@ -197,10 +213,8 @@
     input.style.height = `${nextH}px`;
     input.style.overflowY = lines > COMPOSER_MAX_LINES ? "auto" : "hidden";
 
-    const formCs = form ? getComputedStyle(form) : null;
-    const formPad = formCs
-      ? (parseFloat(formCs.paddingTop) || 0) + (parseFloat(formCs.paddingBottom) || 0)
-      : 0;
+    const padY = cssPx(root, "--composer-pad-y") || lengthPx("1.25rem");
+    const formPad = padY * 2;
     const pillH = Math.max(circle, Math.ceil(nextH + formPad));
     root.classList.toggle("is-composer-tall", pillH > circle + 4);
     if (Math.abs(pillH - lastPillH) > 0.5) {
@@ -255,6 +269,7 @@
     }
     syncComposerSize();
     scheduleGlassRefresh();
+    syncBeams();
   }
 
   // Pill left/width spring is 0.7s with overshoot. Rebuilding glass mid-tween
@@ -366,6 +381,96 @@
   }
 
   let bubbleSeq = 0;
+  let workingEl = null;
+  let workingOrb = null;
+  let orbWaiting = false;
+
+  function setBeam(el, on) {
+    if (!el) return;
+    let ring = el.querySelector(":scope > .yl-beam-ring");
+    if (on) {
+      window.clearTimeout(el._ylBeamFade);
+      el.classList.remove("is-beam-fading");
+      if (el.classList.contains("is-beaming")) return;
+      if (!ring) {
+        ring = document.createElement("span");
+        ring.className = "yl-beam-ring";
+        ring.setAttribute("aria-hidden", "true");
+        const bloom = document.createElement("span");
+        bloom.className = "yl-beam-bloom";
+        ring.appendChild(bloom);
+        el.appendChild(ring);
+        void ring.offsetWidth;
+      }
+      el.classList.add("is-beaming");
+      return;
+    }
+    if (!el.classList.contains("is-beaming")) return;
+    el.classList.remove("is-beaming");
+    el.classList.add("is-beam-fading");
+    el._ylBeamFade = window.setTimeout(() => el.classList.remove("is-beam-fading"), 650);
+  }
+
+  function syncBeams() {
+    const closed = state() === "closed";
+    setBeam(panel, sending && !closed);
+    setBeam(pill, sending && closed);
+  }
+
+  function removeWorkingEl() {
+    workingOrb?.destroy();
+    workingOrb = null;
+    workingEl?.remove();
+    workingEl = null;
+  }
+
+  function mountWorkingOrb() {
+    if (!workingEl || workingOrb || !workingEl.isConnected) return;
+    const canvas = workingEl.querySelector(".yan-chat-working-orb");
+    if (!canvas) return;
+    if (window.YLOrb && typeof window.YLOrb.mount === "function") {
+      workingOrb = window.YLOrb.mount(canvas, { size: 48 });
+      return;
+    }
+    if (orbWaiting) return;
+    orbWaiting = true;
+    window.addEventListener(
+      "ylorb-ready",
+      () => {
+        orbWaiting = false;
+        mountWorkingOrb();
+      },
+      { once: true }
+    );
+  }
+
+  function syncWorkingEl() {
+    if (!messagesEl) return;
+    if (!sending) {
+      removeWorkingEl();
+      return;
+    }
+    let created = false;
+    if (!workingEl) {
+      workingEl = document.createElement("div");
+      workingEl.className = "yan-chat-bubble yan-chat-bubble--assistant yan-chat-working";
+      workingEl.dataset.liquidGlass = "rounded";
+      workingEl.dataset.filterId = "lg-chat-working";
+      workingEl.setAttribute("role", "status");
+      workingEl.setAttribute("aria-label", "Working");
+      const canvas = document.createElement("canvas");
+      canvas.className = "yan-chat-working-orb";
+      canvas.width = 80;
+      canvas.height = 80;
+      canvas.setAttribute("aria-hidden", "true");
+      workingEl.appendChild(canvas);
+      created = true;
+    }
+    if (messagesEl.lastElementChild !== workingEl) messagesEl.appendChild(workingEl);
+    mountWorkingOrb();
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    if (created) refreshGlass();
+  }
 
   function appendBubble(role, text) {
     if (!messagesEl) return null;
@@ -377,7 +482,11 @@
     inner.className = "yan-chat-bubble-in";
     inner.textContent = text;
     el.appendChild(inner);
-    messagesEl.appendChild(el);
+    if (workingEl && workingEl.parentNode === messagesEl) {
+      messagesEl.insertBefore(el, workingEl);
+    } else {
+      messagesEl.appendChild(el);
+    }
     messagesEl.scrollTop = messagesEl.scrollHeight;
     refreshGlass();
     return el;
@@ -396,6 +505,8 @@
   function setBusy(busy) {
     sending = busy;
     root.classList.toggle("is-busy", busy);
+    syncWorkingEl();
+    syncBeams();
     if (input) input.disabled = busy;
     const submit = form?.querySelector('button[type="submit"]');
     if (submit) submit.disabled = busy;
