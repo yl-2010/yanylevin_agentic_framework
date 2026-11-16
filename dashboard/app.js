@@ -571,17 +571,50 @@
     </li>`;
   }
 
-  function renderFutureAgents(entries, resetScroll) {
-    shown.future = Array.isArray(entries) ? entries : [];
+  function renderGradeWatch(entry) {
+    const id = `lg-grade-${entry.id || "x"}`;
+    const href = String(entry.href || "");
+    const title = entry.title || "Grade watch";
+    return `<li
+      class="dash-entry dash-action"
+      data-liquid-glass="rounded"
+      data-lg-radius="18"
+      data-filter-id="${escapeHtml(id)}"
+      data-key="${escapeHtml(entry.id || "")}"
+    >
+      <a class="dash-future-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">
+        <div class="dash-entry-in">
+          <p class="dash-when">Watching</p>
+          <p class="dash-action-agent">Grade watch</p>
+          <p class="dash-action-line">${escapeHtml(title)}</p>
+        </div>
+      </a>
+    </li>`;
+  }
+
+  function renderFutureAgents(entries, resetScroll, gradeWatches) {
+    const agents = Array.isArray(entries) ? entries : [];
+    const watches = (Array.isArray(gradeWatches) ? gradeWatches : [])
+      .slice()
+      .sort((a, b) => {
+        const dt = Date.parse(b?.createdAt) - Date.parse(a?.createdAt);
+        if (dt) return dt;
+        return String(b?.id || "").localeCompare(String(a?.id || ""));
+      });
+    shown.future = agents;
     if (!futureEl) return;
-    const key = entries
-      .map((entry) => `${entry.sessionId || ""}:${entry.status || ""}:${entry.runAt || ""}`)
-      .join("|");
+    const key = [
+      watches.map((entry) => `${entry.id || ""}:${entry.createdAt || ""}`).join("|"),
+      agents
+        .map((entry) => `${entry.sessionId || ""}:${entry.status || ""}:${entry.runAt || ""}`)
+        .join("|"),
+    ].join("||");
     if (key === futureKey && futureEl.childElementCount) return;
     futureKey = key;
-    const rows = entries.length
-      ? entries.map(renderFutureAgent)
-      : [renderEmptyFuture()];
+    const rows = [];
+    rows.push(...watches.map(renderGradeWatch));
+    rows.push(...agents.map(renderFutureAgent));
+    if (!rows.length) rows.push(renderEmptyFuture());
     const scroll = futureEl.scrollLeft;
     futureEl.innerHTML = rows.join("");
     if (resetScroll) futureEl.scrollLeft = 0;
@@ -708,7 +741,11 @@
       renderLogins(Array.isArray(logins.entries) ? logins.entries : []);
       renderActions(Array.isArray(actions.entries) ? actions.entries : []);
       applyBriefingRunner(actions.briefingRunner);
-      renderFutureAgents(Array.isArray(future.entries) ? future.entries : [], true);
+      renderFutureAgents(
+        Array.isArray(future.entries) ? future.entries : [],
+        true,
+        Array.isArray(future.gradeWatches) ? future.gradeWatches : []
+      );
     } catch (err) {
       console.error("[dashboard]", err);
     }
@@ -742,7 +779,8 @@
               if (!data) return;
               renderFutureAgents(
                 Array.isArray(data.entries) ? data.entries : [],
-                false
+                false,
+                Array.isArray(data.gradeWatches) ? data.gradeWatches : []
               );
             })
             .catch((err) => console.error("[dashboard] future agents", err));

@@ -30,6 +30,8 @@ Do the part you can do now (make the page, look up the time, write the draft). S
 
 Do not say you will remember. If you did not call `schedule_future_agent` or the CLI, nothing will run later.
 
+A Canvas grade watch is `.cursor/skills/grade-watch/SKILL.md`. Call `start_grade_watch` for that. Write the texts in that call.
+
 ## How to call it
 
 Inside a Personal Agent or JYPE chat, call `schedule_future_agent`.

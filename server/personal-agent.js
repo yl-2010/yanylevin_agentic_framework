@@ -1243,10 +1243,99 @@ function futureAgentTools(sid, session) {
  * @param {string} sid
  * @param {Session} session
  */
+/**
+ * @param {string} sid
+ * @param {Session} session
+ */
+function gradeWatchTools(sid, session) {
+  return {
+    start_grade_watch: {
+      description:
+        "Start a grade watch on one Canvas assignment in a class Yan is taking. Read the grade-watch skill first and follow it, including who may start one. Pass the assignment name, Canvas URL, or id, an optional course name, and the messages to send the moment the grade is posted. Write those messages in this call. Tokens {grade}, {score}, {points}, {percent}, {assignment}, and {course} are filled in at send time. Do not schedule a future agent for this.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          assignment: {
+            type: "string",
+            description: "Assignment name, Canvas URL, or numeric id.",
+          },
+          course: {
+            type: "string",
+            description: "Class name when the assignment name matches more than one course.",
+          },
+          messages: {
+            type: "array",
+            description:
+              "Texts to send when the grade posts. channel is imessage or teams. imessage uses to (name, phone, email, or chat). teams uses chat (name or id).",
+            items: {
+              type: "object",
+              properties: {
+                channel: { type: "string" },
+                to: { type: "string" },
+                chat: { type: "string" },
+                chatGuid: { type: "string" },
+                text: { type: "string" },
+              },
+              required: ["channel", "text"],
+            },
+          },
+        },
+        required: ["assignment", "messages"],
+      },
+      async execute({ assignment, course, messages }) {
+        if (!sessions.has(sid) || sessions.get(sid) !== session) {
+          return "session gone";
+        }
+        try {
+          const { createGradeWatch } = await import("./grade-watch.js");
+          const result = await createGradeWatch({
+            assignment,
+            course,
+            messages,
+            requestedBy: session.email || "",
+          });
+          return JSON.stringify(result);
+        } catch (err) {
+          return err instanceof Error ? err.message : String(err);
+        }
+      },
+    },
+    cancel_grade_watch: {
+      description:
+        "Cancel a grade watch that is still waiting. Pass the id from start_grade_watch, or the assignment name. Read the grade-watch skill first. Does nothing once the messages have been sent.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          assignment: { type: "string" },
+          course: { type: "string" },
+        },
+      },
+      async execute({ id, assignment, course }) {
+        if (!sessions.has(sid) || sessions.get(sid) !== session) {
+          return "session gone";
+        }
+        try {
+          const { cancelGradeWatch } = await import("./grade-watch.js");
+          const result = await cancelGradeWatch({ id, assignment, course });
+          return JSON.stringify(result);
+        } catch (err) {
+          return err instanceof Error ? err.message : String(err);
+        }
+      },
+    },
+  };
+}
+
+/**
+ * @param {string} sid
+ * @param {Session} session
+ */
 function sessionCustomTools(sid, session) {
   return {
     ...sendChatMessageTool(sid, session),
     ...futureAgentTools(sid, session),
+    ...gradeWatchTools(sid, session),
     ...openEducationPageTool(sid, session),
     ...(sessionMayUseBrowser(session) ? browserCustomTools(session) : {}),
   };
@@ -1968,6 +2057,7 @@ export const PERSONAL_SKILL_PATHS = {
   factCheck: ".cursor/skills/nightly-fact-check/SKILL.md",
   jypeAgent: ".cursor/skills/jype-agent/SKILL.md",
   futureAgents: ".cursor/skills/future-agents/SKILL.md",
+  gradeWatch: ".cursor/skills/grade-watch/SKILL.md",
   celebration: ".cursor/skills/create-celebration-website/SKILL.md",
 };
 
@@ -2102,7 +2192,7 @@ export async function resolveChatUploadFile(email, workspace, sessionId, nameRaw
 }
 
 const FUTURE_AGENT_HINT =
-  "If the reply has to wait (remind me, once we're done, end of the period, send it later), call schedule_future_agent this turn. Read the future-agents skill. Do what you can now. Do not say you will remember.";
+  "If the reply has to wait (remind me, once we're done, end of the period, send it later), call schedule_future_agent this turn. Read the future-agents skill. A Canvas assignment grade is a grade watch. Read the grade-watch skill and call start_grade_watch. Do not schedule a future agent for a grade. Do what you can now. Do not say you will remember.";
 
 const THIRD_PARTY_MODEL_HINT =
   "Third-party models (Opus, Fable, Sonnet) are allowed only when this message is from Yan, or he already approved that model in this same chat. A guest's ask is not approval. The Task picker on this session rejects those slugs. Start one from the Cursor CLI. Read the personal-agent skill, Third-party models. Do not name the model in the chat reply.";
@@ -2161,6 +2251,7 @@ export function systemPrompt(email, opts = {}) {
       `- Mac apps, Arc if Chrome fails. Cursor computer use, same model as this turn: ${PERSONAL_SKILL_PATHS.computer}`,
       `- School OneNote class notebooks, when the question names a page or section: ${PERSONAL_SKILL_PATHS.schoolOnenote}`,
       `- Future agents (schedule a later run): ${PERSONAL_SKILL_PATHS.futureAgents}`,
+      `- Grade watch (poll a Canvas assignment until the grade posts): ${PERSONAL_SKILL_PATHS.gradeWatch}`,
       `- Celebration site: ${PERSONAL_SKILL_PATHS.celebration}`,
       "File uploads can be stored in the matching JYPE class or project folder.",
       "Math on the website and in the iOS app is a display block, with a blank line before and after. Put $$ on its own line, then LaTeX, then $$ on its own line. Stack equations one per line in that block. Use \\(x\\) or $x^2$ only for a symbol inside a sentence. Never backticks for math. iMessage and Teams cannot render KaTeX, so those replies stay plain words.",
@@ -2216,6 +2307,7 @@ export function systemPrompt(email, opts = {}) {
     `- Daily Briefing compile / news sources / thumbs: ${PERSONAL_SKILL_PATHS.news}`,
     `- Fitness / gym: ${PERSONAL_SKILL_PATHS.fitness}`,
     `- Future agents (schedule a later run): ${PERSONAL_SKILL_PATHS.futureAgents}`,
+    `- Grade watch (poll a Canvas assignment until the grade posts): ${PERSONAL_SKILL_PATHS.gradeWatch}`,
     `- Celebration site: ${PERSONAL_SKILL_PATHS.celebration}`,
     `- Memories / brain: ${PERSONAL_SKILL_PATHS.brain}`,
     "",

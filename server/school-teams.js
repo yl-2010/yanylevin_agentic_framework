@@ -1782,6 +1782,29 @@ export async function reactTeamsMessage(opts = {}) {
   };
 }
 
+export async function resolveTeamsChat(opts = {}) {
+  const session = opts.session || (await resolveSession(opts));
+  const chatNeedle = String(opts.chat || "").trim();
+  if (!chatNeedle) return { ok: false, error: "chat required" };
+  const resolved = await resolveChat(session, chatNeedle);
+  if (!resolved.match) {
+    const names = (resolved.ambiguous.length ? resolved.ambiguous : [])
+      .slice(0, 12)
+      .map((c) => c.name)
+      .filter(Boolean);
+    return {
+      ok: false,
+      error: resolved.ambiguous.length ? "ambiguous chat name" : "chat not found",
+      chats: names,
+    };
+  }
+  return {
+    ok: true,
+    chatId: resolved.match.id,
+    chatName: resolved.match.name || chatNeedle,
+  };
+}
+
 export async function sendTeamsMessage(opts = {}) {
   const session = opts.session || (await resolveSession(opts));
   const text = String(opts.text || "").trim();

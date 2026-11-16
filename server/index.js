@@ -87,6 +87,7 @@ import {
   listUpcomingFutureAgents,
   publicFutureAgentEntry,
 } from "./future-agents.js";
+import { listPublicGradeWatches, startGradeWatchScheduler } from "./grade-watch.js";
 import {
   isFitnessUser,
   readFitnessTree,
@@ -453,8 +454,9 @@ app.get("/api/future-agents", requireAuth, async (req, res) => {
       return;
     }
     const entries = (await listUpcomingFutureAgents()).map(publicFutureAgentEntry);
+    const gradeWatches = await listPublicGradeWatches();
     res.setHeader("Cache-Control", "no-store");
-    res.json({ ok: true, count: entries.length, entries });
+    res.json({ ok: true, count: entries.length, entries, gradeWatches });
   } catch (err) {
     console.error("[/api/future-agents]", err);
     res.status(500).json({
@@ -1671,6 +1673,7 @@ app.use((_req, res) => {
     startFactCheckScheduler();
     startLifeStateScheduler();
     startHomeAgentScheduler();
+    startGradeWatchScheduler();
     startLocalIpc();
     startAppleMailFileScheduler();
     startCalendarReconcileScheduler();

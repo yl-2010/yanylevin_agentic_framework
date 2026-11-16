@@ -61,6 +61,8 @@ If someone wants a reminder, a message after something finishes, or anything tha
 
 Read `.cursor/skills/future-agents/SKILL.md` and call `schedule_future_agent`. On Cursor Desktop, run `node server/future-agents.js schedule` from that skill.
 
+A Canvas grade is a grade watch. Read `.cursor/skills/grade-watch/SKILL.md` and call `start_grade_watch`. Leave `schedule_future_agent` for reminders and later sends.
+
 ## Always: named people (Yan only)
 
 Skip this section if the user is Alex.
@@ -102,6 +104,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Celebration site for finishing a book, MA, test, or project | `.cursor/skills/create-celebration-website/SKILL.md` |
 | Weekly PDF, `schedule.json`, bells, another class, the week | `.cursor/skills/class-schedule/SKILL.md` |
 | Reminder, "later", end of a period, send something after an event | `.cursor/skills/future-agents/SKILL.md` |
+| Watch one Canvas assignment until the grade posts, then send the texts written up front | `.cursor/skills/grade-watch/SKILL.md` |
 | EPS student IDs, four11 course lists, school / yearbook photos | `~/.cursor/skills/eps-four11/SKILL.md` |
 | Past Personal Agent transcripts | `.cursor/skills/past-chats/SKILL.md` |
 | Yan iPhone location (live + stays/trips) | `.cursor/skills/phone-location/SKILL.md` |

@@ -341,15 +341,12 @@ export async function findNamedChat(name, deps = {}) {
 }
 
 /**
+ * Resolve a Messages chat without sending. `to` is still required.
+ * A chat_identifier (the hex in live context) is not a Messages guid.
+ * Passing it through made AppleScript miss the group and text a person
+ * with the group name. Levin-Saha Family, 2026-09-30.
+ * @param {{ to?: string, chatGuid?: string }} opts
  * @param {{
- *   to?: string,
- *   text?: string,
- *   chatGuid?: string,
- *   files?: unknown,
- *   attachments?: unknown,
- * }} opts
- * @param {{
- *   execFile?: typeof execFileAsync,
  *   resolveHandle?: typeof resolveHandle,
  *   findChatGuid?: typeof findChatGuid,
  *   findNamedChat?: typeof findNamedChat,
@@ -357,32 +354,21 @@ export async function findNamedChat(name, deps = {}) {
  *   queryMessages?: (sql: string) => Promise<object[]>,
  * }} [deps]
  */
-export async function sendIMessage(opts = {}, deps = {}) {
-  const text = String(opts.text || "");
-  if (!String(opts.to || "").trim()) throw statusError("to is required", 400);
-  const requestedFiles = normalizeSendFiles(opts.files ?? opts.attachments);
-  if (requestedFiles.length) throw statusError(IMESSAGE_NO_FILES, 400);
-  if (!text.trim()) throw statusError("text is required", 400);
-  if (text.length > MAX_TEXT_CHARS) {
-    throw statusError(`text exceeds ${MAX_TEXT_CHARS} characters`, 400);
-  }
-
+export async function resolveIMessageTarget(opts = {}, deps = {}) {
   const resolve = deps.resolveHandle || resolveHandle;
   const findNamed = deps.findNamedChat || findNamedChat;
   const findGuid = deps.findChatGuid || findChatGuid;
-  let handle = "";
   const requestedChat = String(opts.chatGuid || "").trim();
   let chatGuid = requestedChat;
   const to = String(opts.to || "").trim();
-  // A chat_identifier (the hex in live context) is not a Messages guid.
-  // Passing it through made AppleScript miss the group and text a person
-  // with the group name. Levin-Saha Family, 2026-09-30.
+  if (!to) throw statusError("to is required", 400);
   if (requestedChat && !isMessagesChatGuid(requestedChat)) {
     const resolved = await findGuid(requestedChat, {
       queryMessages: deps.queryMessages,
     });
     chatGuid = isMessagesChatGuid(resolved) ? resolved : "";
   }
+  let handle = "";
   if (isMessagesChatGuid(chatGuid) && to) {
     handle = to;
   } else {
@@ -426,6 +412,39 @@ export async function sendIMessage(opts = {}, deps = {}) {
       400
     );
   }
+  return { to: handle, chatGuid: chatGuid || "" };
+}
+
+/**
+ * @param {{
+ *   to?: string,
+ *   text?: string,
+ *   chatGuid?: string,
+ *   files?: unknown,
+ *   attachments?: unknown,
+ * }} opts
+ * @param {{
+ *   execFile?: typeof execFileAsync,
+ *   resolveHandle?: typeof resolveHandle,
+ *   findChatGuid?: typeof findChatGuid,
+ *   findNamedChat?: typeof findNamedChat,
+ *   listContacts?: () => Promise<unknown>,
+ *   queryMessages?: (sql: string) => Promise<object[]>,
+ * }} [deps]
+ */
+export async function sendIMessage(opts = {}, deps = {}) {
+  const text = String(opts.text || "");
+  if (!String(opts.to || "").trim()) throw statusError("to is required", 400);
+  const requestedFiles = normalizeSendFiles(opts.files ?? opts.attachments);
+  if (requestedFiles.length) throw statusError(IMESSAGE_NO_FILES, 400);
+  if (!text.trim()) throw statusError("text is required", 400);
+  if (text.length > MAX_TEXT_CHARS) {
+    throw statusError(`text exceeds ${MAX_TEXT_CHARS} characters`, 400);
+  }
+
+  const target = await resolveIMessageTarget(opts, deps);
+  const handle = target.to;
+  const chatGuid = target.chatGuid;
 
   const dir = await mkdtemp(join(tmpdir(), "yanylevin-imessage-send-"));
   const bodyPath = join(dir, "body.txt");
