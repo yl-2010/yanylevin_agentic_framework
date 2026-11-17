@@ -6,6 +6,8 @@
 const { mintHs256Jwt } = require("./_jwt");
 const { readSession, getAuthSecret } = require("./_auth");
 const { sendHistoryFinal } = require("./_us-history-final-quiz");
+const { sendHistoryFinal2 } = require("./_us-history-final-quiz-2");
+const { sendHistoryFinal3 } = require("./_us-history-final-quiz-3");
 
 const ISSUER = "yanylevin-next";
 const AUDIENCE = "yanylevin-mac-api";
@@ -207,6 +209,14 @@ module.exports = async function handler(req, res) {
 
     if (route === "history-final") {
       await sendHistoryFinal(req, res);
+      return;
+    }
+    if (route === "history-final-2") {
+      await sendHistoryFinal2(req, res);
+      return;
+    }
+    if (route === "history-final-3") {
+      await sendHistoryFinal3(req, res);
       return;
     }
     if (route === "data") {

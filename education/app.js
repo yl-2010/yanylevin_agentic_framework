@@ -2276,9 +2276,12 @@
 
   function classRowHtml(m, highlight) {
     const href = spaClass(m.class.id);
-    const score = CFG.showGrades
-      ? scoreHtml(classScoreLabel(m.class), classCanvasLink(m.class))
-      : "";
+    // "free" matches the grade caption. It is not a link.
+    const score = !CFG.showGrades
+      ? ""
+      : isFreePeriodClass(m.class)
+        ? `<span class="edu-score">free</span>`
+        : scoreHtml(classScoreLabel(m.class), classCanvasLink(m.class));
     return `<li class="edu-row edu-class-row${highlight ? " is-current" : ""}">
       <a class="edu-row-link" href="${escapeHtml(href)}">
         <span class="edu-tag edu-period">${escapeHtml(m.period)}</span>

@@ -118,12 +118,7 @@ struct ScheduleWidgetView: View {
                             .foregroundStyle(WidgetTheme.fg)
                             .lineLimit(1)
                         Spacer(minLength: 0)
-                        if !item.dayClass.cls.scoreLabel.isEmpty {
-                            Text(item.dayClass.cls.scoreLabel)
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(WidgetTheme.accent)
-                                .monospacedDigit()
-                        }
+                        classScore(item.dayClass.cls)
                         if showTime, let start = item.dayClass.start {
                             Text(formatTime(start))
                                 .font(.caption2)
@@ -179,12 +174,7 @@ struct ScheduleWidgetView: View {
                                     .foregroundStyle(WidgetTheme.fg)
                                     .lineLimit(1)
                                 Spacer(minLength: 0)
-                                if !dayClass.cls.scoreLabel.isEmpty {
-                                    Text(dayClass.cls.scoreLabel)
-                                        .font(.caption2.weight(.bold))
-                                        .foregroundStyle(WidgetTheme.accent)
-                                        .monospacedDigit()
-                                }
+                                classScore(dayClass.cls)
                                 if let start = dayClass.start {
                                     Text(formatTime(start))
                                         .font(.caption2)
@@ -229,6 +219,18 @@ struct ScheduleWidgetView: View {
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
+    }
+
+    /// Same caption as a course grade. "free" is text only.
+    @ViewBuilder
+    private func classScore(_ cls: EducationClass) -> some View {
+        let label = cls.isFreePeriod ? "free" : cls.scoreLabel
+        if !label.isEmpty {
+            Text(label)
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(WidgetTheme.accent)
+                .monospacedDigit()
+        }
     }
 
     private func formatTime(_ t: String) -> String {

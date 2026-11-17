@@ -632,10 +632,17 @@ struct EducationView: View {
             .ylHapticNavigation()
 
             if !educationFocus.isJype && !educationFocus.isDebate {
-                EducationCanvasScoreButton(
-                    label: dayClass.cls.scoreLabel,
-                    url: dayClass.cls.canvasURL
-                )
+                if dayClass.cls.isFreePeriod {
+                    Text("free")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(YLTheme.accent(colorScheme, palette: palette))
+                        .monospacedDigit()
+                } else {
+                    EducationCanvasScoreButton(
+                        label: dayClass.cls.scoreLabel,
+                        url: dayClass.cls.canvasURL
+                    )
+                }
             }
         }
         .padding(.vertical, 8)
