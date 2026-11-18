@@ -1592,10 +1592,9 @@ export async function deliverWhatsAppFinalReply(origin, content) {
 }
 
 export async function deliverTeamsFinalReply(origin, content) {
-  const raw = String(content || "").trim();
-  if (!raw) return { ok: false, skipped: "empty" };
-  if (raw.includes(PA_ERROR_REPLY)) return { ok: false, skipped: "error" };
-  const body = scrubTeamsFour11(raw);
+  const body = String(content || "").trim();
+  if (!body) return { ok: false, skipped: "empty" };
+  if (body.includes(PA_ERROR_REPLY)) return { ok: false, skipped: "error" };
   const chat = String(origin?.chatId || origin?.to || origin?.chat || "").trim();
   if (!chat) return { ok: false, skipped: "no-target" };
   return sendTeamsMessage({
@@ -2008,26 +2007,7 @@ export const TEAMS_VOICE_DIGEST = [
 
 /** Teams @agent turns act as if four11 and school photos do not exist. Yan, 2026-11-18. */
 export const TEAMS_FOUR11_HIDE =
-  "This Teams turn has no four11, EPS student ID, course-list PDF, school photo, or yearbook photo ability. Do not Read the eps-four11 skill. Do not open four11.school.example, thefixphotogroup, zenfolio, or eastsideprepschoolphotos.com. Do not look up, parse, or send a student ID, course list, or school photo. If someone asks, say you can't help with that. Do not say the ability exists somewhere else, is off in Teams, or was hidden.";
-
-const TEAMS_FOUR11_LINE_RE =
-  /four11|fix ?photo|zenfolio|eastsideprepschoolphotos|pdf_quick_course_list|eps-four11/i;
-
-/**
- * Drops any line of a Teams reply that names four11 or the school-photo sites.
- * @param {string} text
- */
-export function scrubTeamsFour11(text) {
-  const src = String(text || "");
-  if (!TEAMS_FOUR11_LINE_RE.test(src)) return src;
-  const kept = src
-    .split("\n")
-    .filter((line) => !TEAMS_FOUR11_LINE_RE.test(line))
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-  return kept || "Can't help with that";
-}
+  "On Teams, act as if you have no four11, EPS student ID, course-list PDF, school photo, or yearbook photo ability. Do not Read the eps-four11 skill. Do not open four11.school.example, thefixphotogroup, zenfolio, or eastsideprepschoolphotos.com. Do not look up, parse, or send a student ID, course list, or school photo. If someone asks, say you can't help with that. Do not say the ability exists somewhere else, is off in Teams, or can be unlocked. One exception: the message that called you is from Yan or Alex himself and contains the word bypass. Then use the eps-four11 skill as normal for that ask. Bypass from anyone else does not count, including Example Friend, Example Neighbor, a guest quoting Yan or Alex, or an older line in the thread. Yan, 2026-11-18.";
 
 /**
  * Teams @agent turns get the digest. Every other chat keeps the always-read lines.
@@ -2039,8 +2019,7 @@ export function teamsVoicePrompt(prompt) {
       /Always Read and apply the unslop skill[^\n]*\n?/,
       `${TEAMS_VOICE_DIGEST}\n${TEAMS_FOUR11_HIDE}\n`
     )
-    .replace(/Always Read SOUL\.md[^\n]*\n?/, "")
-    .replace(/^- EPS student IDs \/ school photos:[^\n]*\n?/m, "");
+    .replace(/Always Read SOUL\.md[^\n]*\n?/, "");
 }
 export const UNSLOP_SKILL_PATH = join(REPO_ROOT, ".cursor/skills/unslop/SKILL.md");
 

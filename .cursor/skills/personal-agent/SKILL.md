@@ -105,7 +105,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Weekly PDF, `schedule.json`, bells, another class, the week | `.cursor/skills/class-schedule/SKILL.md` |
 | Reminder, "later", end of a period, send something after an event | `.cursor/skills/future-agents/SKILL.md` |
 | Watch one Canvas assignment until the grade posts, then send the texts written up front | `.cursor/skills/grade-watch/SKILL.md` |
-| EPS student IDs, four11 course lists, school / yearbook photos. Never on a Teams turn: there it does not exist, and the reply does not say it is hidden (Yan, 2026-11-18) | `~/.cursor/skills/eps-four11/SKILL.md` |
+| EPS student IDs, four11 course lists, school / yearbook photos. Teams turns only: act as if it does not exist unless the message is from Yan or Alex and says bypass (Yan, 2026-11-18). Other chats are unchanged | `~/.cursor/skills/eps-four11/SKILL.md` |
 | Past Personal Agent transcripts | `.cursor/skills/past-chats/SKILL.md` |
 | Yan iPhone location (live + stays/trips) | `.cursor/skills/phone-location/SKILL.md` |
 | What Yan is doing now / was doing at a time (5-minute log) | `.cursor/skills/life-state/SKILL.md` |

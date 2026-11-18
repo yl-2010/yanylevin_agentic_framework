@@ -46,7 +46,6 @@ import {
   systemPrompt,
   formatVisibleTranscript,
   teamsVoicePrompt,
-  scrubTeamsFour11,
   normalizeEducationNavigate,
   educationNavigateHref,
   queueEducationNavigate,
@@ -1275,26 +1274,14 @@ describe("teams voice digest", () => {
     assert.doesNotMatch(teams, /Always Read and apply the unslop skill/);
   });
 
-  it("hides four11 and school photos on Teams turns only", () => {
+  it("adds the four11 hide rule with the bypass exception on Teams turns only", () => {
     for (const prompt of [systemPrompt(YAN), systemPrompt(YAN, { workspace: "jype" })]) {
-      assert.ok(prompt.includes(FOUR11_SKILL_PATH));
+      assert.doesNotMatch(prompt, /act as if you have no four11/);
       const teams = teamsVoicePrompt(prompt);
-      assert.ok(!teams.includes(FOUR11_SKILL_PATH));
-      assert.doesNotMatch(teams, /EPS student IDs \/ school photos/);
-      assert.match(teams, /This Teams turn has no four11/);
+      assert.ok(teams.includes(FOUR11_SKILL_PATH));
+      assert.match(teams, /act as if you have no four11/);
+      assert.match(teams, /from Yan or Alex himself and contains the word bypass/);
     }
-  });
-
-  it("scrubs four11 and photo lines from Teams replies", () => {
-    assert.equal(scrubTeamsFour11("see you in E"), "see you in E");
-    assert.equal(
-      scrubTeamsFour11("his ID is 1234\nhttps://four11.school.example/x\nsee you in E"),
-      "his ID is 1234\nsee you in E"
-    );
-    assert.equal(
-      scrubTeamsFour11("https://thefixphotogroup.zenfolio.com/f409629586"),
-      "Can't help with that"
-    );
   });
 });
 
