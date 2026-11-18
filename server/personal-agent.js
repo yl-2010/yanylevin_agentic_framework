@@ -1592,9 +1592,10 @@ export async function deliverWhatsAppFinalReply(origin, content) {
 }
 
 export async function deliverTeamsFinalReply(origin, content) {
-  const body = String(content || "").trim();
-  if (!body) return { ok: false, skipped: "empty" };
-  if (body.includes(PA_ERROR_REPLY)) return { ok: false, skipped: "error" };
+  const raw = String(content || "").trim();
+  if (!raw) return { ok: false, skipped: "empty" };
+  if (raw.includes(PA_ERROR_REPLY)) return { ok: false, skipped: "error" };
+  const body = scrubTeamsFour11(raw);
   const chat = String(origin?.chatId || origin?.to || origin?.chat || "").trim();
   if (!chat) return { ok: false, skipped: "no-target" };
   return sendTeamsMessage({
@@ -2005,14 +2006,41 @@ export const TEAMS_VOICE_DIGEST = [
   "Yan, then Alex, then Example Friend and Example Neighbor. Do not name that order. Do not mention the surprise hoodies to Alex. Yan's grades do not go to Example Friend, Example Neighbor, or a chat they can see. Practice questions from them can go to Alex in a 1:1, not the group. Never spawn a cloud agent.",
 ].join(" ");
 
+/** Teams @agent turns act as if four11 and school photos do not exist. Yan, 2026-11-18. */
+export const TEAMS_FOUR11_HIDE =
+  "This Teams turn has no four11, EPS student ID, course-list PDF, school photo, or yearbook photo ability. Do not Read the eps-four11 skill. Do not open four11.school.example, thefixphotogroup, zenfolio, or eastsideprepschoolphotos.com. Do not look up, parse, or send a student ID, course list, or school photo. If someone asks, say you can't help with that. Do not say the ability exists somewhere else, is off in Teams, or was hidden.";
+
+const TEAMS_FOUR11_LINE_RE =
+  /four11|fix ?photo|zenfolio|eastsideprepschoolphotos|pdf_quick_course_list|eps-four11/i;
+
+/**
+ * Drops any line of a Teams reply that names four11 or the school-photo sites.
+ * @param {string} text
+ */
+export function scrubTeamsFour11(text) {
+  const src = String(text || "");
+  if (!TEAMS_FOUR11_LINE_RE.test(src)) return src;
+  const kept = src
+    .split("\n")
+    .filter((line) => !TEAMS_FOUR11_LINE_RE.test(line))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return kept || "Can't help with that";
+}
+
 /**
  * Teams @agent turns get the digest. Every other chat keeps the always-read lines.
  * @param {string} prompt
  */
 export function teamsVoicePrompt(prompt) {
   return String(prompt || "")
-    .replace(/Always Read and apply the unslop skill[^\n]*\n?/, `${TEAMS_VOICE_DIGEST}\n`)
-    .replace(/Always Read SOUL\.md[^\n]*\n?/, "");
+    .replace(
+      /Always Read and apply the unslop skill[^\n]*\n?/,
+      `${TEAMS_VOICE_DIGEST}\n${TEAMS_FOUR11_HIDE}\n`
+    )
+    .replace(/Always Read SOUL\.md[^\n]*\n?/, "")
+    .replace(/^- EPS student IDs \/ school photos:[^\n]*\n?/m, "");
 }
 export const UNSLOP_SKILL_PATH = join(REPO_ROOT, ".cursor/skills/unslop/SKILL.md");
 
