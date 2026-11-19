@@ -12,6 +12,7 @@ import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { classifyLocalPrompt, projectRepo, PROJECTS, readHead, refreshLocalIndex } from "./usage-local.js";
 import { billingSnapshotsToSend, desktopKind } from "./usage-log.js";
+import { grokWeeklyFromBreakdown } from "./grokbot-usage.js";
 
 const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const STATE_PATH = join(ROOT, "data", "usage", "collector-state.json");
@@ -27,6 +28,7 @@ const WORKSPACE_ROOT = join(
 const BILLING_URL = "https://api2.cursor.sh/aiserver.v1.DashboardService/GetFilteredUsageEvents";
 const USAGE_URL = "https://api2.cursor.sh/auth/usage";
 const PLAN_URL = "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage";
+const GROK_BREAKDOWN_URL = "https://api2.cursor.sh/aiserver.v1.DashboardService/GetGrokBotUsageBreakdown";
 const EXCHANGE_URL = "https://api2.cursor.sh/auth/exchange_user_api_key";
 const BACKFILL_MS = 45 * 24 * 60 * 60 * 1000;
 /** A run's usage event keeps its start timestamp while the totals fill in. */
@@ -398,6 +400,8 @@ async function pullBilling(state, person, db) {
     console.error("[usage-collect] period", err instanceof Error ? err.message : err);
   }
   const plan = await pullPlan(headers);
+  const grokWeekly = await pullGrokWeekly(headers);
+  if (plan && grokWeekly) Object.assign(plan, grokWeekly);
 
   if (!state.billingBackfillDone) {
     const page = Number(state.billingPage) || 1;
@@ -461,6 +465,17 @@ async function pullBilling(state, person, db) {
   state.billingSeen = seen;
   await writeState(state);
   console.log(`[usage-collect] billing refresh=${changed.length}`);
+}
+
+async function pullGrokWeekly(headers) {
+  try {
+    const res = await fetchSoon(GROK_BREAKDOWN_URL, { method: "POST", headers, body: "{}" });
+    if (!res.ok) return null;
+    return grokWeeklyFromBreakdown(await res.json());
+  } catch (err) {
+    console.error("[usage-collect] grok weekly", err instanceof Error ? err.message : err);
+    return null;
+  }
 }
 
 async function pullPlan(headers) {

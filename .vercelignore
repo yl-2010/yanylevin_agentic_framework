@@ -75,3 +75,15 @@ southasianeshroyale-server/
 /jype/sreekar-birthday/sreekar-birthday.mp3
 /spanish-scare/open-the-book.m4a
 /abre-el-libro/abre-el-libro.m4a
+
+# /brain/ data is Yan-only and served by /api/dashboard/brain -> Mac /api/brain (rewrite of /brain/data/brain.json).
+# It must never ship as a static file. Build tooling and test screenshots stay out too.
+brain/data/
+brain/scripts/
+brain/briefs/
+brain/**/_shots/
+brain/check-report.json
+brain/concepts/000/
+
+# Raw .wav renders are source files, never served (no page references one). An untracked 28 MB oliver.wav would ride along in every CLI deploy.
+**/*.wav

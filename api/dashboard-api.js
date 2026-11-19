@@ -10,7 +10,16 @@ const ISSUER = "yanylevin-next";
 const AUDIENCE = "yanylevin-mac-api";
 const DEFAULT_MAC_API = "https://api.yanylevin.com";
 
-const ALLOWED = new Set(["chat-log", "login-log", "agent-actions", "future-agents"]);
+const ALLOWED = new Set([
+  "chat-log",
+  "login-log",
+  "agent-actions",
+  "future-agents",
+  "brain",
+]);
+
+/** /brain/ data is Yan-only (the brain tree is never shown to Alex). */
+const BRAIN_EMAIL = "you@example.com";
 
 function macApiBase() {
   const raw =
@@ -67,7 +76,12 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    if (path === "chat-log" || path === "agent-actions" || path === "future-agents") {
+    if (
+      path === "chat-log" ||
+      path === "agent-actions" ||
+      path === "future-agents" ||
+      path === "brain"
+    ) {
       if (req.method !== "GET") {
         res.setHeader("Allow", "GET");
         res.status(405).json({ ok: false, error: "method not allowed" });
@@ -100,6 +114,11 @@ module.exports = async function handler(req, res) {
       (path === "chat-log" || req.method === "GET") &&
       session.access !== "full"
     ) {
+      res.status(403).json({ ok: false, error: "forbidden" });
+      return;
+    }
+
+    if (path === "brain" && String(session.email || "").toLowerCase() !== BRAIN_EMAIL) {
       res.status(403).json({ ok: false, error: "forbidden" });
       return;
     }

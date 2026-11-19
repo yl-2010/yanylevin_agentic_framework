@@ -613,7 +613,16 @@ export async function ingestUsageBatch(body) {
     if (!machine && !periodStart && !plan) return;
     const meta = await readMeta();
     if (periodStart) meta.periodStart = periodStart;
-    if (plan) meta.plan = plan;
+    if (plan) {
+      const prev = meta.plan && typeof meta.plan === "object" ? meta.plan : {};
+      // A tick that misses the Grok breakdown should not wipe the last good reading.
+      if (plan.grokWeeklyPercentUsed == null && Number.isFinite(Number(prev.grokWeeklyPercentUsed))) {
+        plan.grokWeeklyPercentUsed = prev.grokWeeklyPercentUsed;
+        plan.grokWeeklyStart = prev.grokWeeklyStart || "";
+        plan.grokWeeklyEnd = prev.grokWeeklyEnd || "";
+      }
+      meta.plan = plan;
+    }
     if (machine) {
       const collectors = meta.collectors && typeof meta.collectors === "object" ? meta.collectors : {};
       const seen = { ...(collectors[machine] || {}), at: now };
@@ -1302,6 +1311,18 @@ function planFromBody(raw) {
     limit: num(plan.limit),
     cycleStart: isoOrEmpty(plan.cycleStart),
     cycleEnd: isoOrEmpty(plan.cycleEnd),
+    ...grokWeeklyOnPlan(plan),
+  };
+}
+
+/** @param {Record<string, unknown>} plan */
+function grokWeeklyOnPlan(plan) {
+  const pct = Number(plan.grokWeeklyPercentUsed);
+  if (!Number.isFinite(pct)) return {};
+  return {
+    grokWeeklyPercentUsed: pct,
+    grokWeeklyStart: isoOrEmpty(plan.grokWeeklyStart),
+    grokWeeklyEnd: isoOrEmpty(plan.grokWeeklyEnd),
   };
 }
 

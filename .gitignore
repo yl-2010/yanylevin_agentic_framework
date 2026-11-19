@@ -34,6 +34,11 @@ data/agent-actions.jsonl
 **/venv/
 **/__pycache__/
 
+# Brain concepts: real private data never goes in git (served via /api/brain).
+brain/data/
+brain/**/_shots/
+brain/check-report.json
+
 # Operator data that must never be committed from a fork
 education/*/health/
 education/*/.chat-history/

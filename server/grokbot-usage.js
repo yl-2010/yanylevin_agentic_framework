@@ -165,6 +165,29 @@ export function dailyGrokBotSnapshots(snapshots, { fromMs = 0 } = {}) {
   return [...byDay.values()];
 }
 
+/**
+ * Cursor's GetGrokBotUsageBreakdown. `ppm` is parts per million of the weekly
+ * limit, so 1,000,000 ppm is 100% and the percent is the source rows added up
+ * divided by 10,000. Bot rows repeat the same spend, so they are not added.
+ * @param {any} body
+ * @returns {{ grokWeeklyPercentUsed: number, grokWeeklyStart: string, grokWeeklyEnd: string } | null}
+ */
+export function grokWeeklyFromBreakdown(body) {
+  const week = body?.weeklyLimitPpm;
+  if (!week || typeof week !== "object") return null;
+  const rows = Array.isArray(week.bySource) ? week.bySource : [];
+  let ppm = 0;
+  for (const row of rows) ppm += Number(row?.ppm) || 0;
+  if (!ppm) return null;
+  const start = Number(week.periodStartMs);
+  const end = Number(week.periodEndMs);
+  return {
+    grokWeeklyPercentUsed: ppm / 10000,
+    grokWeeklyStart: Number.isFinite(start) && start > 0 ? new Date(start).toISOString() : "",
+    grokWeeklyEnd: Number.isFinite(end) && end > 0 ? new Date(end).toISOString() : "",
+  };
+}
+
 /** Payload for /api/usage/index. */
 export async function grokBotUsageForIndex({ fromMs = 0, path } = {}) {
   const all = await readGrokBotSnapshots(path ? { path } : {});

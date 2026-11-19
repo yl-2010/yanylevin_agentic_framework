@@ -8,6 +8,7 @@
 import express from "express";
 import cors from "cors";
 import { authConfigured, requireAuth, getAuthConfig } from "./auth.js";
+import { createBrainSnapshotHandler } from "./brain-site.js";
 import { probeLmStudio, chatCompletions, getLmStudioConfig } from "./lmstudio.js";
 import {
   buildYanSystemPrompt,
@@ -443,6 +444,12 @@ app.post("/api/account-delete", requireAuth, async (req, res) => {
     });
   }
 });
+
+/**
+ * Full brain snapshot for the gated /brain/ concepts (Yan only, never Alex).
+ * Built on the box, stored at .backend/brain-site/brain.json. Never a static file on Vercel.
+ */
+app.get("/api/brain", requireAuth, createBrainSnapshotHandler());
 
 /**
  * Login audit log for the gated /dashboard (operator only).

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import {
   dailyGrokBotSnapshots,
   grokBotUsageForIndex,
+  grokWeeklyFromBreakdown,
   ingestGrokBotSnapshot,
   normalizeGrokBotSnapshot,
 } from "./grokbot-usage.js";
@@ -18,6 +19,24 @@ const SEED = {
   onDemand: { usedDollars: 0, limitDollars: 200, resetsAt: "2026-12-12T21:16:00.000Z", sharedWithCursor: true },
   shares: [{ window: "last_7_days", by: "day", dayTimezone: "UTC", rows: [{ name: "2026-11-13", percent: 100 }] }],
 };
+
+describe("grok weekly breakdown", () => {
+  it("adds source ppm into a percent and ignores bot rows", () => {
+    const week = grokWeeklyFromBreakdown({
+      weeklyLimitPpm: {
+        periodStartMs: "1794531955124",
+        periodEndMs: "1795136755124",
+        bySource: [{ ppm: 600000 }, { ppm: 107875 }],
+        byBot: [{ ppm: 999999 }],
+      },
+    });
+    assert.equal(week.grokWeeklyPercentUsed, 70.7875);
+    assert.equal(week.grokWeeklyStart, new Date(1794531955124).toISOString());
+    assert.equal(week.grokWeeklyEnd, new Date(1795136755124).toISOString());
+    assert.equal(grokWeeklyFromBreakdown({}), null);
+    assert.equal(grokWeeklyFromBreakdown({ weeklyLimitPpm: { bySource: [] } }), null);
+  });
+});
 
 describe("grokbot usage snapshots", () => {
   it("normalizes the seed snapshot", () => {
