@@ -227,6 +227,17 @@
       ],
     },
     {
+      time: "04:00",
+      items: [
+        {
+          id: "ap-study",
+          name: "AP study",
+          model: "Grok 4.7 high",
+          kind: "clock",
+        },
+      ],
+    },
+    {
       time: "06:00",
       items: [
         {
