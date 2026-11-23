@@ -498,6 +498,22 @@
       .yan-chat.has-input-text {
         --lg-read-blur: 20px;
       }
+      /* blur() next to the SVG refraction filter does not frost body text.
+         The tint layer is a real backdrop blur plus a milky fill, only while
+         the composer has text. The open panel stays clear. */
+      .yan-chat.has-input-text .yan-chat-pill.corner::before {
+        background-color: rgba(255, 255, 255, 0.62);
+        backdrop-filter: blur(20px) saturate(1.5);
+        -webkit-backdrop-filter: blur(20px) saturate(1.5);
+      }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-resolved-theme="light"]) .yan-chat.has-input-text .yan-chat-pill.corner::before {
+          background-color: rgba(18, 24, 22, 0.62);
+        }
+      }
+      html[data-resolved-theme="dark"] .yan-chat.has-input-text .yan-chat-pill.corner::before {
+        background-color: rgba(18, 24, 22, 0.62);
+      }
       @media (prefers-reduced-motion: no-preference) {
         .yan-chat {
           transition: --lg-read-blur 0.4s var(--ease), --lg-panel-blur 0.4s var(--ease);
@@ -750,14 +766,28 @@
         white-space: pre-wrap;
         word-break: break-word;
         overflow: hidden;
-        background: transparent;
+        /* Center frost. The chrome specular mask only paints the rim, and the
+           bubble's own blur cannot see the page through the panel filter. */
+        background-color: rgba(255, 255, 255, 0.72);
         box-shadow: 0 4px var(--lg-outer-shadow-blur) var(--lg-outer-shadow);
         backdrop-filter: blur(22px) saturate(1.4);
         -webkit-backdrop-filter: blur(22px) saturate(1.4);
       }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-resolved-theme="light"]) .yan-chat-bubble {
+          background-color: rgba(22, 28, 26, 0.78);
+        }
+      }
+      html[data-resolved-theme="dark"] .yan-chat-bubble {
+        background-color: rgba(22, 28, 26, 0.78);
+      }
       .yan-chat-bubble.lg-fallback {
+        background-color: rgba(255, 255, 255, 0.72);
         backdrop-filter: blur(22px) saturate(1.5);
         -webkit-backdrop-filter: blur(22px) saturate(1.5);
+      }
+      html[data-resolved-theme="dark"] .yan-chat-bubble.lg-fallback {
+        background-color: rgba(22, 28, 26, 0.78);
       }
       html[data-resolved-theme="dark"] .yan-chat-bubble {
         --lg-tint-opacity: 0.5;
