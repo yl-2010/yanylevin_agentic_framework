@@ -24,7 +24,7 @@ import {
 import { decodeTrace, parseInkml, strokesInBox, strokesOnImage, HIMETRIC_TO_PX, splitInkMultipart } from "./onenote-ink.js";
 import { normalizePacket, sanitizeSvg, richText } from "./ap-study-render.js";
 import { checkPacketAgainstPlan, normalizeAlign, normalizeGrade, parseJsonLoose } from "./ap-study-agents.js";
-import { fallbackAlign, insertApStudyCapsule, looksLikeTest, shortDate } from "./ap-study.js";
+import { buildStudyTodo, fallbackAlign, insertApStudyCapsule, looksLikeTest, mergeStudyTodo, shortDate } from "./ap-study.js";
 
 const curricula = loadCurricula();
 const spec = loadCalendarSpec();
@@ -330,6 +330,30 @@ describe("overrides", () => {
       prefs: { boost: { exam: "lit", until: "2026-12-31" } },
     });
     assert.equal(boosted.focusExam, "lit");
+  });
+
+  it("builds a College Prep todo only after the OneNote page exists", () => {
+    assert.equal(buildStudyTodo({ date: "2026-11-24", plan: { summary: "AP: Physics 2 diagnostic, 30 min" }, page: {} }), null);
+    const todo = buildStudyTodo({
+      date: "2026-11-24",
+      plan: { summary: "AP: Physics 2 diagnostic, 30 min" },
+      page: {
+        id: "page-1",
+        webUrl: "https://eastsidepreparatory-my.sharepoint.com/notebook",
+        clientUrl: "onenote:https://eastsidepreparatory-my.sharepoint.com/notebook",
+      },
+      createdAt: "2026-11-24T12:00:00.000Z",
+    });
+    assert.equal(todo.name, "Tue Nov 24 AP study");
+    assert.equal(todo.dueDate, "2026-11-24");
+    assert.equal(todo.description, "Physics 2 diagnostic. 30 minutes.");
+    assert.equal(todo.sites[0].oneNote, "personal");
+    assert.equal(todo.sites[0].main, true);
+    assert.equal(todo.sites[0].pageId, "page-1");
+    assert.match(todo.sites[0].clientUrl, /^onenote:/);
+    const kept = mergeStudyTodo({ ...todo, done: true, completedAt: "2026-11-24T20:00:00.000Z" }, { ...todo, name: "Tue Nov 24 AP study" });
+    assert.equal(kept.done, true);
+    assert.equal(kept.completedAt, "2026-11-24T20:00:00.000Z");
   });
 
   it("inserts the briefing card after the recap", () => {

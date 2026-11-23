@@ -13,6 +13,8 @@ Yan only. One 30-minute PDF a day, written on with a stylus in the school OneNot
 
 Do not generate a week of packets ahead. Tomorrow's packet is supposed to see today's ink.
 
+Once the page is in OneNote, the job writes a College Prep todo for that day (`College Prep/todos/ap-study-<date>/todo.json`). The file tile is the OneNote page. No todo before the page exists. Do not create that todo by hand.
+
 ## Where things live
 
 Data, not in git:

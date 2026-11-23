@@ -14,7 +14,7 @@ import { mkdir, readdir, readFile, rename, rm, stat, writeFile, copyFile, open }
 import { existsSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { AP_STUDY_DIR, SCHOOL_PROJECTS } from "./onedrive-projects.js";
+import { AP_STUDY_DIR, PERSONAL_PROJECTS, SCHOOL_PROJECTS } from "./onedrive-projects.js";
 import {
   EXAM_IDS,
   DIAGNOSTIC_DAYS,
@@ -502,6 +502,72 @@ export async function renderDay(date) {
   return { ok: true, pages: out.work.pageCount, keyPages: out.key.pageCount };
 }
 
+// ---------------------------------------------------------------- college prep todo
+
+export const COLLEGE_PREP_TODOS = join(PERSONAL_PROJECTS, "College Prep", "todos");
+
+/** @param {string} date */
+export function studyTodoPath(date) {
+  return join(COLLEGE_PREP_TODOS, `ap-study-${date}`, "todo.json");
+}
+
+/**
+ * Todo written only after the OneNote page exists. The site tile is the
+ * same OneNote file link class todos use.
+ * @param {{ date: string, plan?: any, page?: any, createdAt?: string }} opts
+ */
+export function buildStudyTodo(opts) {
+  const page = opts.page || {};
+  const url = String(page.webUrl || "").trim();
+  const pageId = String(page.id || "").trim();
+  if (!pageId || !/^https:\/\//i.test(url)) return null;
+  const name = `${shortDate(opts.date)} AP study`;
+  const detail = String(opts.plan?.summary || "")
+    .replace(/^AP:\s*/, "")
+    .replace(/,\s*\d+\s*min\s*$/, "")
+    .trim();
+  /** @type {{ name: string, url: string, oneNote: string, pageId: string, main: boolean, clientUrl?: string }} */
+  const site = { name, url, oneNote: "personal", pageId, main: true };
+  const clientUrl = String(page.clientUrl || "").trim();
+  if (/^onenote:/i.test(clientUrl)) site.clientUrl = clientUrl;
+  return {
+    name,
+    dueDate: opts.date,
+    dueTime: "23:59",
+    done: false,
+    showInDates: false,
+    createdAt: opts.createdAt || new Date().toISOString(),
+    description: detail ? `${detail}. 30 minutes.` : "30 minutes.",
+    sites: [site],
+  };
+}
+
+/**
+ * Keep done, createdAt, and any extra keys. Refresh the name and the link.
+ * @param {any} prev
+ * @param {any} next
+ */
+export function mergeStudyTodo(prev, next) {
+  if (!prev) return next;
+  return { ...prev, name: next.name, description: next.description, dueDate: next.dueDate, sites: next.sites };
+}
+
+/**
+ * @param {string} date
+ * @param {any} page
+ * @param {any} plan
+ */
+export async function ensureStudyTodo(date, page, plan) {
+  const next = buildStudyTodo({ date, plan, page });
+  if (!next) return { ok: false, reason: "no page" };
+  const path = studyTodoPath(date);
+  const prev = await readJson(path);
+  const todo = mergeStudyTodo(prev, next);
+  if (prev && JSON.stringify(prev) === JSON.stringify(todo)) return { ok: true, skipped: true, path };
+  await writeJson(path, todo);
+  return { ok: true, created: !prev, path };
+}
+
 // ---------------------------------------------------------------- publish
 
 /** @param {Awaited<ReturnType<typeof loadState>>} S @param {any} plan @param {string} date */
@@ -526,8 +592,14 @@ export async function publishDay(date, opts = {}) {
   const S = await loadState();
   const dayDir = join(S.P.days, date);
   const existing = await readJson(join(dayDir, "publish.json"));
-  if (existing?.id && !opts.force) return { ok: true, skipped: true, reason: "published", page: existing };
   const plan = await readJson(join(dayDir, "plan.json"));
+  if (existing?.id && !opts.force) {
+    const todo = await ensureStudyTodo(date, existing, plan).catch((err) => {
+      console.error(`[ap-study] todo failed for ${date}`, err);
+      return null;
+    });
+    return { ok: true, skipped: true, reason: "published", page: existing, todo: todo?.path || "" };
+  }
   const packet = normalizePacket(await readJson(join(dayDir, "packet.json")));
   const boxes = await readJson(join(dayDir, "boxes.json"));
   const pngs = Array.from({ length: boxes.pages }, (_, i) => join(dayDir, "pages", `page-${i + 1}.png`));
@@ -540,7 +612,11 @@ export async function publishDay(date, opts = {}) {
   });
   const row = { ...page, publishedAt: new Date().toISOString(), pages: pngs.length };
   await writeJson(join(dayDir, "publish.json"), row);
-  return { ok: true, page: row };
+  const todo = await ensureStudyTodo(date, row, plan).catch((err) => {
+    console.error(`[ap-study] todo failed for ${date}`, err);
+    return null;
+  });
+  return { ok: true, page: row, todo: todo?.path || "" };
 }
 
 // ---------------------------------------------------------------- grade
@@ -674,6 +750,7 @@ ${april.length ? `<p><b>April priorities</b></p><ol>${april.map((k) => `<li>${es
 export async function runDay(opts = {}) {
   const P = apPaths();
   const date = opts.date || todayKey();
+  if (date < DIAGNOSTIC_DAYS[0].date) return { ok: true, skipped: true, reason: "before start", date };
   const handle = await acquireLock(P);
   if (!handle) return { ok: true, skipped: true, reason: "in-flight", date };
   const log = { date, steps: [] };
@@ -717,6 +794,8 @@ export async function runDay(opts = {}) {
     const published = await readJson(join(dayDir, "publish.json"));
     if (published?.id && !opts.force) {
       step("already published", { url: published.webUrl });
+      const plan = await readJson(join(dayDir, "plan.json"));
+      step("todo", await ensureStudyTodo(date, published, plan).catch((err) => ({ error: String(err?.message || err) })));
       await writeStatus(P, date);
       return { ok: true, skipped: true, reason: "published", date, url: published.webUrl };
     }
@@ -905,6 +984,7 @@ async function maybeRunMissed() {
   const meta = await schedulerMeta();
   const now = briefingNow(meta);
   if (now.minutes < hmToMinutes(apStudyHm(meta))) return;
+  if (now.dateKey < DIAGNOSTIC_DAYS[0].date) return;
   const P = apPaths();
   if (existsSync(join(P.days, now.dateKey, "publish.json"))) return;
   const s = await readJson(P.status);
