@@ -7,7 +7,7 @@
  * until they are at least PENDING_SOLIDIFY_MS old, then they solidify into history.
  */
 
-import { readdir, readFile, writeFile, mkdir } from "node:fs/promises";
+import { readdir, readFile, writeFile, mkdir, stat, rename, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import {
@@ -135,6 +135,98 @@ function normalizeEntries(raw) {
   }
   out.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
   return out;
+}
+
+/** One writer at a time per entries file, inside this process. */
+const entryWriteChain = new Map();
+
+/**
+ * @param {string} entriesPath
+ * @param {() => Promise<T>} fn
+ * @template T
+ */
+function queueEntryWrite(entriesPath, fn) {
+  const prev = entryWriteChain.get(entriesPath) || Promise.resolve();
+  const run = prev.catch(() => {}).then(fn);
+  const tracked = run.finally(() => {
+    if (entryWriteChain.get(entriesPath) === tracked) {
+      entryWriteChain.delete(entriesPath);
+    }
+  });
+  entryWriteChain.set(entriesPath, tracked);
+  return run;
+}
+
+/**
+ * Read a log before appending. A missing file is a new machine.
+ * A file that exists but cannot be parsed is left alone.
+ * @param {string} entriesPath
+ * @returns {Promise<{ id: string, weight: number, at: string }[]>}
+ */
+export async function readEntriesForAppend(entriesPath) {
+  /** @type {import("node:fs").Stats} */
+  let info;
+  try {
+    info = await stat(entriesPath);
+  } catch (err) {
+    if (err && err.code === "ENOENT") return [];
+    throw err;
+  }
+
+  let raw;
+  try {
+    raw = await readFile(entriesPath, "utf8");
+  } catch (err) {
+    const e = new Error("entries.json could not be read");
+    e.status = 409;
+    e.cause = err;
+    throw e;
+  }
+
+  const text = String(raw);
+  if (info.size > 0 && !text.trim()) {
+    const e = new Error("entries.json was empty");
+    e.status = 409;
+    throw e;
+  }
+
+  /** @type {unknown} */
+  let parsed = { entries: [] };
+  if (text.trim()) {
+    try {
+      parsed = JSON.parse(text);
+    } catch (err) {
+      const e = new Error("entries.json was not valid JSON");
+      e.status = 409;
+      e.cause = err;
+      throw e;
+    }
+  }
+
+  const entries = normalizeEntries(parsed);
+  // A real log is larger than an empty `{ "entries": [] }`. Do not replace it
+  // with a brand-new set when nothing in it parsed.
+  if (info.size > 80 && entries.length === 0) {
+    const e = new Error("entries.json had no sets");
+    e.status = 409;
+    throw e;
+  }
+  return entries;
+}
+
+/**
+ * @param {string} entriesPath
+ * @param {{ id: string, weight: number, at: string }[]} entries
+ */
+async function writeEntriesFile(entriesPath, entries) {
+  const tmp = `${entriesPath}.${process.pid}.${randomUUID()}.tmp`;
+  await writeFile(tmp, JSON.stringify({ entries }, null, 2) + "\n", "utf8");
+  try {
+    await rename(tmp, entriesPath);
+  } catch (err) {
+    await unlink(tmp).catch(() => {});
+    throw err;
+  }
 }
 
 /**
@@ -314,7 +406,6 @@ export async function appendFitnessEntries(email, machineId, weights, opts = {})
     throw err;
   }
 
-  const existing = normalizeEntries(await readJsonFile(entriesPath));
   const baseAt = opts.at ? new Date(opts.at) : new Date();
   if (Number.isNaN(baseAt.getTime())) {
     const err = new Error("invalid at");
@@ -322,25 +413,23 @@ export async function appendFitnessEntries(email, machineId, weights, opts = {})
     throw err;
   }
 
-  /** @type {{ id: string, weight: number, at: string }[]} */
-  const created = [];
-  for (let i = 0; i < nums.length; i++) {
-    // Space multi-entry batches by 1ms so sort order is stable.
-    const at = new Date(baseAt.getTime() + i).toISOString();
-    const entry = { id: randomUUID(), weight: nums[i], at };
-    existing.push(entry);
-    created.push(entry);
-  }
-  existing.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
-
   await mkdir(machineDir, { recursive: true });
-  await writeFile(
-    entriesPath,
-    JSON.stringify({ entries: existing }, null, 2) + "\n",
-    "utf8"
-  );
 
-  return { machineId: mid, created, tree: await readFitnessTree(normalized) };
+  return queueEntryWrite(entriesPath, async () => {
+    const existing = await readEntriesForAppend(entriesPath);
+    /** @type {{ id: string, weight: number, at: string }[]} */
+    const created = [];
+    for (let i = 0; i < nums.length; i++) {
+      // Space multi-entry batches by 1ms so sort order is stable.
+      const at = new Date(baseAt.getTime() + i).toISOString();
+      const entry = { id: randomUUID(), weight: nums[i], at };
+      existing.push(entry);
+      created.push(entry);
+    }
+    existing.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+    await writeEntriesFile(entriesPath, existing);
+    return { machineId: mid, created, tree: await readFitnessTree(normalized) };
+  });
 }
 
 /**

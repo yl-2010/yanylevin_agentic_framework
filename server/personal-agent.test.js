@@ -199,7 +199,7 @@ describe("Personal Agent models", () => {
 describe("Personal Agent system prompt", () => {
   it("stays slim and points at on-demand files instead of dumping recipes", () => {
     const prompt = systemPrompt(YAN);
-    assert.ok(prompt.length < 9200, `prompt length ${prompt.length}`);
+    assert.ok(prompt.length < 9600, `prompt length ${prompt.length}`);
     assert.match(prompt, /Personal Agent/);
     assert.match(prompt, /schedule_future_agent/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.futureAgents));
@@ -242,6 +242,7 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.schoolTeams));
     assert.match(prompt, /school-teams\.js/);
     assert.match(prompt, /iMessage, then Teams, then email/);
+    assert.match(prompt, /tell Name stays in that chat unless they say iMessage/);
     assert.match(prompt, /cannot attach a file/);
     assert.match(prompt, /specifically ask for the file to go through that app/);
     assert.doesNotMatch(prompt, /native attachments/);
@@ -251,7 +252,7 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /images has no pixels/);
     assert.match(prompt, /existing Word, Excel, or PowerPoint/);
     assert.match(prompt, /School Outlook still cannot send/);
-    assert.ok(prompt.length < 9200, `prompt length ${prompt.length}`);
+    assert.ok(prompt.length < 9600, `prompt length ${prompt.length}`);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.chats));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.location));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.lifeState));
@@ -732,6 +733,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /cannot send into a different group chat/);
     assert.match(agent, /They can still have you post in JYPE Teams/);
     assert.match(agent, /iMessage first, then Teams, then email|iMessage, then Teams, then email/);
+    assert.match(agent, /tell Name means post in that same chat/);
     assert.match(agent, /cannot attach a file/);
     assert.doesNotMatch(agent, /attachToReply/);
     assert.match(agent, /unslop/);
@@ -1270,6 +1272,7 @@ describe("teams voice digest", () => {
     assert.match(prompt, /Always Read SOUL\.md/);
     const teams = teamsVoicePrompt(prompt);
     assert.match(teams, /Voice for this Teams turn/);
+    assert.match(teams, /tell Name stays in that chat unless they say iMessage/);
     assert.doesNotMatch(teams, /Always Read SOUL\.md/);
     assert.doesNotMatch(teams, /Always Read and apply the unslop skill/);
   });

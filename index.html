@@ -476,6 +476,7 @@
         --chat-top-orb: var(--corner-orb);
         --chat-clear-rgb: var(--lg-tint-rgb);
         --chat-clear-opacity: var(--lg-tint-opacity);
+        --chat-panel-fill-opacity: 0.58;
         --chat-pulse-rgb: var(--chat-orange-rgb);
         --chat-pulse-opacity: 0.32;
         --chat-top-gap: 0.75rem;
@@ -499,6 +500,23 @@
       }
       html[data-resolved-theme="light"] .yan-chat {
         --chat-orange: #fd5802; --chat-orange-rgb: 253, 88, 2;
+      }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-resolved-theme="light"]) .yan-chat.is-open,
+        html:not([data-resolved-theme="light"]) .yan-chat.has-panel {
+          --chat-panel-fill-opacity: 0.46;
+        }
+      }
+      html[data-resolved-theme="dark"] .yan-chat.is-open,
+      html[data-resolved-theme="dark"] .yan-chat.has-panel {
+        --chat-panel-fill-opacity: 0.46;
+      }
+      .yan-chat.is-open,
+      .yan-chat.has-panel {
+        --chat-clear-opacity: var(--chat-panel-fill-opacity);
+      }
+      html.lg-cheap .yan-chat.has-panel .yan-chat-panel {
+        background-color: color-mix(in srgb, var(--panel-bg) 92%, var(--fg) 4%);
       }
       .yan-chat.is-open {
         --pill-w: min(calc(var(--chat-circle) * 6), calc(100vw - (var(--chat-pad) * 2)));
@@ -804,6 +822,7 @@
       }
       .yan-chat-bubble--assistant {
         align-self: flex-start;
+        background-color: color-mix(in srgb, var(--panel-bg) 92%, var(--fg) 4%);
       }
       .yan-chat-working {
         align-self: flex-start;

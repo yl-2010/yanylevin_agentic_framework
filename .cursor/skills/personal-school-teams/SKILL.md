@@ -22,6 +22,7 @@ on `.cursor/skills/personal-imessage/SKILL.md`.
 
 Unnamed **send to a person** uses the waterfall in
 `.cursor/skills/personal-agent/SKILL.md` (iMessage, then Teams, then email).
+Already in a Teams chat, tell Name stays in that chat unless they say iMessage.
 This skill is the Teams step, and for `on Teams` / a named team+channel.
 
 The school can read these chats, including 1:1s. `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.tests/` is a
