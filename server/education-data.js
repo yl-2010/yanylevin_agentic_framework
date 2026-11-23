@@ -1090,6 +1090,18 @@ async function readJsonFile(path) {
   }
 }
 
+/** Object JSON, or {} when OneDrive deadlocks the read. A missing file is {}. */
+async function readJsonObject(path) {
+  try {
+    const value = await readJsonFile(path);
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  } catch (err) {
+    if (!isTransientCloudError(err)) throw err;
+    console.error("[education-data] skip json", path, err?.code || err?.message || err);
+    return {};
+  }
+}
+
 async function readClassProps(objectDir) {
   try {
     return await readJsonFile(join(objectDir, "class.json"));
@@ -2830,20 +2842,34 @@ export async function readEducationTree(email, opts = {}) {
   const workspace = normalizeJypeWorkspace(opts.workspace);
   if (!opts.includeFixtures && !workspace) {
     const root = userEducationRoot(email, opts);
-    const meta = (await readJsonFile(join(root, "meta.json"))) || {};
-    if (gradeDirFromMeta(meta)) {
+    let metaFailed = false;
+    let meta = {};
+    try {
+      meta = (await readJsonFile(join(root, "meta.json"))) || {};
+    } catch (err) {
+      if (!isTransientCloudError(err)) throw err;
+      metaFailed = true;
+      console.error("[education-data] meta.json", err?.code || err?.message || err);
+    }
+    if (gradeDirFromMeta(meta) || metaFailed) {
       const snap = await readOnedriveSnapshot(email);
       if (snap?.rows?.length) {
-        if (snapshotIsStale(snap)) scheduleOnedriveSnapshotRefresh(email);
-        return loadEducationTree(email, {
+        const tree = await loadEducationTree(email, {
           ...opts,
           classRows: snap.rows,
           sourceClasses: snap.sourceClasses,
         });
+        // Refresh after the page read. The walk uses the same CloudStorage
+        // queue, so starting it first makes the class list wait on OneDrive.
+        if (!metaFailed && snapshotIsStale(snap)) scheduleOnedriveSnapshotRefresh(email);
+        return tree;
       }
-      // No local copy yet. Do not block the page on OneDrive.
-      scheduleOnedriveSnapshotRefresh(email);
-      return loadEducationTree(email, { ...opts, skipOnedriveClasses: true });
+      if (!metaFailed) {
+        // No local copy yet. Do not block the page on OneDrive.
+        const tree = await loadEducationTree(email, { ...opts, skipOnedriveClasses: true });
+        scheduleOnedriveSnapshotRefresh(email);
+        return tree;
+      }
     }
   }
   // One walk holds the CloudStorage queue so Finder hide/show cannot
@@ -2863,8 +2889,8 @@ async function loadEducationTree(
   } = {}
 ) {
   const root = userEducationRoot(email, { workspace });
-  const meta = (await readJsonFile(join(root, "meta.json"))) || {};
-  const schedule = (await readJsonFile(join(root, "schedule.json"))) || {};
+  const meta = await readJsonObject(join(root, "meta.json"));
+  const schedule = await readJsonObject(join(root, "schedule.json"));
   const todayKey = scheduleTodayKey(schedule);
   const panelKeys = includeFixtures ? [] : uiPanelDateKeys(schedule, todayKey);
   const officeOpen = officeOpenOptsFromMeta(meta);

@@ -48,4 +48,22 @@ describe("cloud storage io", () => {
     assert.equal(value, "ok");
     assert.equal(tries, 3);
   });
+
+  it("retries a file provider deadlock for several seconds", async () => {
+    const path = join("/Users/yan/Library/CloudStorage/OneDrive", "class.json");
+    let tries = 0;
+    const value = await withCloudRetry(
+      path,
+      async () => {
+        tries += 1;
+        if (tries < 6) {
+          throw Object.assign(new Error("busy"), { errno: -11, code: "EDEADLK" });
+        }
+        return "ok";
+      },
+      { attempts: 8 }
+    );
+    assert.equal(value, "ok");
+    assert.equal(tries, 6);
+  });
 });

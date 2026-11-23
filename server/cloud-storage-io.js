@@ -68,8 +68,10 @@ export async function withCloudRetry(path, fn, { attempts = 4 } = {}) {
         return await fn();
       } catch (err) {
         last = err;
+        if (err && typeof err === "object" && !err.path) err.path = path;
         if (!isTransientCloudError(err) || i === n - 1) throw err;
-        await delay(40 * (i + 1));
+        // OneDrive often stays deadlocked past one immediate retry.
+        await delay(Math.min(2000, 50 * 2 ** i));
       }
     }
     throw last;

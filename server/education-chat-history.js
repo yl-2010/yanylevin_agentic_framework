@@ -4,9 +4,12 @@
  * expire with the in-memory session; these markdown files do not.
  */
 
-import { mkdir, open, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, open, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isCloudStoragePath, isTransientCloudError } from "./cloud-storage-io.js";
 import { canonicalizeEmail } from "./identity.js";
 import { formatWidgetsAsFences, parseAgentReply } from "./chat-widgets.js";
 import { stripAgentSentFooter } from "./imessage-mention.js";
@@ -731,11 +734,12 @@ export async function loadChatLastReadMap(opts) {
   const abs = absChatFile(email, chatHistoryReadFileRel(email, opts?.workspace), opts?.workspace, opts?.root);
   let text;
   try {
-    text = await readFile(abs, "utf8");
+    text = await retryCloudRead(() => readFile(abs, "utf8"));
   } catch (err) {
     if (err && /** @type {{ code?: string }} */ (err).code === "ENOENT") {
       return {};
     }
+    if (isTransientCloudError(err)) return {};
     throw err;
   }
   let raw;
@@ -1249,13 +1253,124 @@ export async function loadChatHistory(opts) {
  *   root?: string,
  * }} opts
  */
+const CHAT_LIST_HEAD_BYTES = 20 * 1024;
+// One read at a time. A handful of overlapping File Provider opens fills
+// libuv's thread pool and the list never returns.
+const CHAT_LIST_READ_WIDTH = 1;
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Retry a File Provider deadlock without the process-wide CloudStorage queue.
+ * The chat list reads many small headers at once. One-at-a-time is what made
+ * the sidebar time out.
+ * @template T
+ * @param {() => Promise<T>} fn
+ */
+async function retryCloudRead(fn) {
+  let last;
+  for (let i = 0; i < 4; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      last = err;
+      if (!isTransientCloudError(err) || i === 3) throw err;
+      await delay(40 * (i + 1));
+    }
+  }
+  throw last;
+}
+
+/**
+ * @template T
+ * @param {T[]} items
+ * @param {number} width
+ * @param {(item: T, index: number) => Promise<void>} fn
+ */
+async function mapPool(items, width, fn) {
+  let cursor = 0;
+  const runners = Math.min(width, items.length);
+  await Promise.all(
+    Array.from({ length: runners }, async () => {
+      while (cursor < items.length) {
+        const index = cursor;
+        cursor += 1;
+        await fn(items[index], index);
+      }
+    })
+  );
+}
+
+function chatIndexPath(dir) {
+  const key = createHash("sha1").update(dir).digest("hex").slice(0, 16);
+  return join(homedir(), "Library/Application Support/yanylevin/chat-history-index", `${key}.json`);
+}
+
+/**
+ * @param {string} dir
+ * @returns {Promise<Map<string, { mtimeMs: number, size: number, row: object }>>}
+ */
+async function loadChatListIndex(dir) {
+  /** @type {Map<string, { mtimeMs: number, size: number, row: object }>} */
+  const map = new Map();
+  try {
+    const parsed = JSON.parse(await readFile(chatIndexPath(dir), "utf8"));
+    const files = parsed?.files;
+    if (!files || typeof files !== "object") return map;
+    for (const [sessionId, entry] of Object.entries(files)) {
+      if (!entry || typeof entry !== "object") continue;
+      const row = /** @type {{ row?: object, mtimeMs?: number, size?: number }} */ (entry);
+      if (!row.row || typeof row.row !== "object") continue;
+      map.set(sessionId, {
+        mtimeMs: Number(row.mtimeMs) || 0,
+        size: Number(row.size) || 0,
+        row: row.row,
+      });
+    }
+  } catch {
+    /* first list, or a torn index */
+  }
+  return map;
+}
+
+/**
+ * @param {string} dir
+ * @param {Map<string, { mtimeMs: number, size: number, row: object }>} map
+ */
+async function saveChatListIndex(dir, map) {
+  const file = chatIndexPath(dir);
+  /** @type {Record<string, { mtimeMs: number, size: number, row: object }>} */
+  const files = {};
+  for (const [sessionId, entry] of map) files[sessionId] = entry;
+  await mkdir(dirname(file), { recursive: true });
+  const tmp = `${file}.${process.pid}.tmp`;
+  await writeFile(tmp, JSON.stringify({ version: 1, files }));
+  await rename(tmp, file);
+}
+
+/**
+ * @param {string} abs
+ */
+async function readChatListHead(abs) {
+  const fh = await open(abs, "r");
+  try {
+    const buf = Buffer.alloc(CHAT_LIST_HEAD_BYTES);
+    const { bytesRead } = await fh.read(buf, 0, CHAT_LIST_HEAD_BYTES, 0);
+    return buf.slice(0, bytesRead).toString("utf8");
+  } finally {
+    await fh.close();
+  }
+}
+
 async function readChatHistoryRows(opts) {
   const email = canonicalizeEmail(opts?.email);
   const exclude = sanitizeSessionId(opts?.excludeSessionId);
   const dir = absChatDir(email, opts?.workspace, opts?.root);
   let names;
   try {
-    names = await readdir(dir);
+    names = await retryCloudRead(() => readdir(dir));
   } catch (err) {
     if (err && /** @type {{ code?: string }} */ (err).code === "ENOENT") {
       return [];
@@ -1263,41 +1378,100 @@ async function readChatHistoryRows(opts) {
     throw err;
   }
 
-  /** @type {{
-   *   sessionId: string,
-   *   title: string,
-   *   visibility: 'showing'|'hidden',
-   *   ephemeral: boolean,
-   *   updated: string,
-   *   preview: string,
-   *   started: string,
-   *   mtimeMs: number,
-   * }[]} */
-  const rows = [];
+  /** @type {{ sessionId: string, abs: string }[]} */
+  const files = [];
   for (const name of names) {
     if (!name.endsWith(".md")) continue;
     const sessionId = sanitizeSessionId(name.slice(0, -3));
     if (!sessionId || sessionId === exclude) continue;
-    const abs = join(dir, name);
+    files.push({ sessionId, abs: join(dir, name) });
+  }
+
+  const indexed = isCloudStoragePath(dir);
+  const index = indexed ? await loadChatListIndex(dir) : new Map();
+  /** @type {{ sessionId: string, abs: string, mtimeMs: number, size: number }[]} */
+  const stale = [];
+  /** @type {Map<string, { mtimeMs: number, size: number, row: object }>} */
+  const nextIndex = new Map();
+  /** @type {object[]} */
+  const rows = [];
+  let failed = 0;
+
+  await mapPool(files, indexed ? CHAT_LIST_READ_WIDTH : 1, async (file) => {
+    let info;
     try {
-      const [st, text] = await Promise.all([stat(abs), readFile(abs, "utf8")]);
+      info = await retryCloudRead(() => stat(file.abs));
+    } catch (err) {
+      if (isTransientCloudError(err)) failed += 1;
+      const prev = index.get(file.sessionId);
+      if (prev?.row) rows.push({ ...prev.row, mtimeMs: prev.mtimeMs });
+      return;
+    }
+    const prev = index.get(file.sessionId);
+    if (
+      prev &&
+      prev.mtimeMs === info.mtimeMs &&
+      prev.size === info.size &&
+      prev.row
+    ) {
+      nextIndex.set(file.sessionId, prev);
+      rows.push({ ...prev.row, mtimeMs: info.mtimeMs });
+      return;
+    }
+    stale.push({
+      sessionId: file.sessionId,
+      abs: file.abs,
+      mtimeMs: info.mtimeMs,
+      size: info.size,
+    });
+  });
+
+  await mapPool(stale, indexed ? CHAT_LIST_READ_WIDTH : 1, async (file) => {
+    try {
+      const text = await retryCloudRead(() => readChatListHead(file.abs));
       const meta = parseChatHistoryMeta(text);
-      rows.push({
-        sessionId,
+      const row = {
+        sessionId: file.sessionId,
         title: meta.title,
         visibility: meta.visibility,
         ephemeral: meta.ephemeral,
-        updated: meta.updated || new Date(st.mtimeMs).toISOString(),
+        updated: meta.updated || new Date(file.mtimeMs).toISOString(),
         preview: meta.preview,
         started: meta.started,
         starter: meta.starter,
         workspace: meta.workspace || normalizeJypeWorkspace(opts?.workspace),
-        mtimeMs: st.mtimeMs,
+        mtimeMs: file.mtimeMs,
+      };
+      rows.push(row);
+      nextIndex.set(file.sessionId, {
+        mtimeMs: file.mtimeMs,
+        size: file.size,
+        row,
       });
-    } catch {
-      /* skip unreadable */
+    } catch (err) {
+      if (isTransientCloudError(err)) failed += 1;
+      const prev = index.get(file.sessionId);
+      if (prev?.row) {
+        nextIndex.set(file.sessionId, prev);
+        rows.push({ ...prev.row, mtimeMs: prev.mtimeMs });
+      }
+    }
+  });
+
+  if (!rows.length && files.length && failed) {
+    const err = new Error("chat history could not be read");
+    err.status = 503;
+    throw err;
+  }
+
+  if (indexed) {
+    try {
+      await saveChatListIndex(dir, nextIndex);
+    } catch (err) {
+      console.error("[chat-history] index", err);
     }
   }
+
   rows.sort(
     (a, b) =>
       Date.parse(b.updated) - Date.parse(a.updated) ||

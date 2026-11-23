@@ -16,6 +16,9 @@
     <key>PATH</key>
     <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
   </dict>
+  <!-- Without this, reading a file OneDrive evicted to the cloud fails with errno -11 instead of downloading it. -->
+  <key>MaterializeDatalessFiles</key>
+  <true/>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
