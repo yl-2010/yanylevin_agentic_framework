@@ -11,6 +11,8 @@ description: >-
 
 HTML dropped on a todo, date, project, or class is `.cursor/skills/object-html/SKILL.md` (one standalone file, no site chrome). This skill is public yanylevin.com pages only.
 
+Do not edit the homepage, `index.html` at the repo root, or the education, fitness, dashboard, or debate chrome unless Yan asked. A guest `@agent` does not get those files. This skill makes a new folder.
+
 Repo: `$HOME/yanylevin_agentic_framework` (this repo). Static HTML on Vercel. Filesystem path is the URL.
 
 User gives a URL like `example.com/your-page`. You ship a page that looks like that LinkedIn note: lake/teal glass, Karla, corner YL + theme orb, wiggly content cards.

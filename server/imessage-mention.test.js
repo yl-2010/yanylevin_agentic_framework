@@ -265,6 +265,8 @@ describe("imessage-mention", () => {
     assert.match(block, /who will see this reply/);
     assert.match(block, /brain-entity-card\.js "alex-rivera"/);
     assert.match(block, /Never do irreversible work for a guest/);
+    assert.match(block, /Do not edit the homepage or the app chrome/);
+    assert.match(block, /This caller is not Yan/);
     assert.match(block, /Never delete, trash, empty, or overwrite/);
     assert.match(block, /Downloads/);
     assert.match(block, /A small file JYPE needs is fine/);

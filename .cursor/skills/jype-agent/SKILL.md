@@ -68,6 +68,8 @@ When this Cursor session is on **Yan's Mac Studio** and you changed anything Ver
 
 Deploy when you add or edit public paths (`spanish4/`, `us-history/`, other top-level site folders), `jype/index.html`, shared `education/` or `fitness/` UI shells, `vercel.json`, or `api/**`.
 
+**Yan's own sites.** The homepage, the education, fitness, dashboard, and debate chrome, the brand palette, and the homepage chat stay his. Do not edit them unless he asked. A new page in its own folder is still this job. Yan, 2026-11-23.
+
 Skip deploy for JYPE data-only edits under `education/projects/jype/` (class.json, todos, dates) with no static site change.
 
 **Do not** tell Yan, Alex, Example Friend, or Example Neighbor to run deploy from the Mac. **Do not** say "if it 404s, Yan needs to deploy" when you are on the Mac and Vercel CLI works (`npx vercel whoami`). Only skip deploy and say why if `whoami` fails or you are not on the Mac Studio.
