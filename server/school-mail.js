@@ -162,6 +162,16 @@ export function stripHtml(html, max = 8000) {
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
+    .replace(/&apos;/gi, "'")
+    .replace(/&#(\d+);/g, (_, n) => {
+      const c = Number(n);
+      return c > 0 && c < 0x110000 ? String.fromCodePoint(c) : "";
+    })
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => {
+      const c = parseInt(n, 16);
+      return c > 0 && c < 0x110000 ? String.fromCodePoint(c) : "";
+    })
+    .replace(/\u00a0/g, " ")
     .replace(/\s+\n/g, "\n")
     .replace(/[ \t]{2,}/g, " ")
     .trim()

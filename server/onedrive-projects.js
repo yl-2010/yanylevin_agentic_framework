@@ -27,6 +27,7 @@ export const USAGE_DIR = join(YAN_BACKEND_DIR, "usage");
 export const FUTURE_AGENTS_DIR = join(YAN_BACKEND_DIR, "future-agents");
 export const GRADE_WATCHES_DIR = join(YAN_BACKEND_DIR, "grade-watches");
 export const STUDY_DIR = join(YAN_BACKEND_DIR, "study");
+export const AP_STUDY_DIR = join(YAN_BACKEND_DIR, "ap-study");
 export const CHAT_LOG_PATH = join(YAN_BACKEND_DIR, "chat-log.md");
 export const LOGIN_LOG_PATH = join(YAN_BACKEND_DIR, "login-log.md");
 export const AGENT_ACTIONS_PATH = join(YAN_BACKEND_DIR, "agent-actions.jsonl");

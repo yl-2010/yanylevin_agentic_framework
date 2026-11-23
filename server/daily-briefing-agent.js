@@ -701,7 +701,7 @@ export function buildUnslopPrompt({ dateKey, timezone, force, dueTime }) {
     `If ${draft} is missing, do not copy yesterday's todo news. Stop and say the news draft is missing.`,
     `Write ${YAN_EDUCATION_DIR}/todos/${dateKey}-daily-briefing/todo.json:`,
     `Title like "August 12th Daily Briefing". kind dailyBriefing. dueDate ${dateKey}, dueTime ${dueTime}. showInDates false. done false. createdAt is now, not a copy of yesterday.`,
-    "capsules: agent-recap first (from agent recap draft, keep noVote true), then ~10 news capsules. Top-level citations from news draft only, alphabetical by name.",
+    "capsules: agent-recap first (from agent recap draft, keep noVote true), then ~10 news capsules. Do not add an AP Study capsule. Code inserts that after the recap. Top-level citations from news draft only, alphabetical by name.",
     "Capsule thumbs are 3-way: up, down, null (neutral). Agent recap has noVote and no citations.",
     "Then rewrite /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education/daily-briefing/taste.md from last week's news thumbs only (not agent recap).",
     rebuild,
@@ -862,6 +862,11 @@ async function runDailyBriefingOnce({ force = false, dateKey: dateKeyOpt, runner
       unslopModel
     );
     if (outcome.transientFailed) return phaseFailed("unslop", outcome, dateKey);
+
+    const { attachApStudyToBriefing } = await import("./ap-study.js");
+    await attachApStudyToBriefing(dateKey).catch((err) =>
+      console.error("[daily-briefing] ap study capsule", err)
+    );
 
     await gitAddCommitPush({
       paths: [YAN_EDUCATION_DIR],

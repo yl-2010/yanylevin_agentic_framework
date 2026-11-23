@@ -75,10 +75,20 @@ export function parseArgs(argv) {
     id: "",
     notebook: "",
     section: "",
+    sectionId: "",
+    title: "",
+    images: /** @type {string[]} */ ([]),
+    pdf: "",
+    out: "",
   };
   while (args.length) {
     const a = args.shift();
     if (a === "--force") out.force = true;
+    else if (a === "--section-id") out.sectionId = String(args.shift() || "").trim();
+    else if (a === "--title") out.title = String(args.shift() || "").trim();
+    else if (a === "--image") out.images.push(String(args.shift() || "").trim());
+    else if (a === "--pdf") out.pdf = String(args.shift() || "").trim();
+    else if (a === "--out") out.out = String(args.shift() || "").trim();
     else if (a === "--headed") out.headed = true;
     else if (a === "--html") out.html = true;
     else if (a === "--dry-run") out.dryRun = true;
@@ -98,7 +108,7 @@ export function parseArgs(argv) {
       const rest = [a];
       while (args.length && !String(args[0]).startsWith("--")) rest.push(args.shift());
       out.query = rest.join(" ").trim();
-    } else if ((cmd === "page" || cmd === "pages") && !out.id && !String(a).startsWith("--")) {
+    } else if ((cmd === "page" || cmd === "pages" || cmd === "ink") && !out.id && !String(a).startsWith("--")) {
       out.id = String(a || "").trim();
     } else {
       throw new Error(`unknown arg: ${a}`);
@@ -774,6 +784,205 @@ async function readPageHtml(token, pageId) {
   throw err;
 }
 
+/**
+ * Token for scripts outside this CLI (AP study). Logs in through hidden
+ * Chrome when the saved one is stale.
+ * @param {{ root?: string, headed?: boolean, force?: boolean }} [opts]
+ */
+export async function onenoteToken(opts = {}) {
+  return resolveToken({ root: opts.root || schoolOnenoteDir(), ...opts });
+}
+
+/**
+ * @param {"GET"|"POST"|"PATCH"|"DELETE"} method
+ * @param {string} url
+ * @param {string} token
+ * @param {{ json?: unknown, form?: FormData, raw?: boolean }} [opts]
+ */
+export async function graphRequest(method, url, token, opts = {}) {
+  let lastErr;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    /** @type {Record<string, string>} */
+    const headers = { Authorization: `Bearer ${token}` };
+    /** @type {any} */
+    let body;
+    if (opts.json !== undefined) {
+      headers["Content-Type"] = "application/json";
+      body = JSON.stringify(opts.json);
+    } else if (opts.form) {
+      body = opts.form;
+    }
+    const res = await fetch(url, { method, headers, body });
+    if (res.status === 429 || res.status === 502 || res.status === 503 || res.status === 504) {
+      lastErr = new Error(`OneNote API ${res.status}`);
+      lastErr.status = res.status;
+      const wait = Number(res.headers.get("retry-after")) * 1000 || 1500 * 2 ** attempt;
+      console.error(`[onenote] ${method} ${res.status}, retry ${attempt + 1}`);
+      await sleep(wait);
+      continue;
+    }
+    if (opts.raw) {
+      if (!res.ok) {
+        const err = new Error(`OneNote API ${res.status}`);
+        err.status = res.status;
+        throw err;
+      }
+      return {
+        contentType: res.headers.get("content-type") || "",
+        buffer: Buffer.from(await res.arrayBuffer()),
+      };
+    }
+    const text = await res.text();
+    if (!res.ok) {
+      const snippet = redactSecrets(text).replace(/\s+/g, " ").slice(0, 300);
+      const err = new Error(`OneNote API ${res.status}: ${snippet}`);
+      err.status = res.status;
+      throw err;
+    }
+    return text.trim() ? JSON.parse(text) : {};
+  }
+  throw lastErr || new Error("OneNote API retry exhausted");
+}
+
+/**
+ * Find or create a notebook Yan owns (lives in his school OneDrive).
+ * @param {string} token
+ * @param {string} name
+ */
+export async function ensureOwnedNotebook(token, name) {
+  const list = await graphRequest(
+    "GET",
+    `${GRAPH_BASE}/me/onenote/notebooks?$filter=displayName eq '${name.replace(/'/g, "''")}'&$select=id,displayName,links`,
+    token
+  ).catch(() => ({ value: [] }));
+  const hit = (list.value || []).find((n) => n.displayName === name);
+  if (hit) return { id: hit.id, name: hit.displayName, created: false };
+  const made = await graphRequest("POST", `${GRAPH_BASE}/me/onenote/notebooks`, token, {
+    json: { displayName: name },
+  });
+  return { id: made.id, name: made.displayName, created: true };
+}
+
+/**
+ * @param {string} token
+ * @param {string} notebookId
+ * @param {string} name
+ */
+export async function ensureSection(token, notebookId, name) {
+  const nb = encodeURIComponent(notebookId);
+  const list = await graphRequest(
+    "GET",
+    `${GRAPH_BASE}/me/onenote/notebooks/${nb}/sections?$select=id,displayName`,
+    token
+  );
+  const hit = (list.value || []).find((s) => s.displayName === name);
+  if (hit) return { id: hit.id, name: hit.displayName, created: false };
+  const made = await graphRequest("POST", `${GRAPH_BASE}/me/onenote/notebooks/${nb}/sections`, token, {
+    json: { displayName: name },
+  });
+  return { id: made.id, name: made.displayName, created: true };
+}
+
+/**
+ * Multipart page create. `html` refers to parts as `name:<part>`.
+ * @param {string} token
+ * @param {string} sectionId
+ * @param {{ html: string, parts?: { name: string, type: string, data: Buffer, filename?: string }[] }} page
+ */
+export async function createOnenotePage(token, sectionId, page) {
+  const form = new FormData();
+  form.append("Presentation", new Blob([page.html], { type: "text/html" }));
+  for (const part of page.parts || []) {
+    form.append(part.name, new Blob([part.data], { type: part.type }), part.filename || part.name);
+  }
+  const made = await graphRequest(
+    "POST",
+    `${GRAPH_BASE}/me/onenote/sections/${encodeURIComponent(sectionId)}/pages`,
+    token,
+    { form }
+  );
+  return {
+    id: made.id,
+    title: made.title,
+    webUrl: made.links?.oneNoteWebUrl?.href || "",
+    clientUrl: made.links?.oneNoteClientUrl?.href || "",
+  };
+}
+
+/**
+ * @param {string} token
+ * @param {string} pageId
+ */
+export async function deleteOnenotePage(token, pageId) {
+  await graphRequest("DELETE", `${GRAPH_BASE}/me/onenote/pages/${encodeURIComponent(pageId)}`, token);
+}
+
+/**
+ * Page HTML plus InkML. Owned notebooks resolve on /me; class notebooks
+ * fall back to the site route through readPageHtml's search.
+ * @param {string} token
+ * @param {string} pageId
+ * @param {string} [siteId]
+ */
+export async function readOnenotePageInk(token, pageId, siteId = "") {
+  const base = siteId
+    ? `${GRAPH_BASE}/sites/${encodeURIComponent(siteId)}/onenote/pages/${encodeURIComponent(pageId)}`
+    : `${GRAPH_BASE}/me/onenote/pages/${encodeURIComponent(pageId)}`;
+  const res = await graphRequest("GET", `${base}/content?includeInkML=true`, token, { raw: true });
+  const { splitInkMultipart } = await import("./onenote-ink.js");
+  return splitInkMultipart(res.buffer.toString("utf8"), res.contentType);
+}
+
+/**
+ * @param {string} token
+ * @param {string} sectionId
+ */
+export async function listOwnedSectionPages(token, sectionId) {
+  return listAllSectionPages(token, { siteId: "", sectionId });
+}
+
+/**
+ * Class notebook outline: section and page titles, plus text of pages whose
+ * title matches `docPattern` (syllabus, schedule, course overview).
+ * @param {string} token
+ * @param {string} notebookName
+ * @param {{ sectionPattern?: RegExp, docPattern?: RegExp, maxDocs?: number, maxChars?: number }} [opts]
+ */
+export async function readClassNotebookOutline(token, notebookName, opts = {}) {
+  const sectionPattern = opts.sectionPattern || /^_Content Library$|^$/;
+  const docPattern =
+    opts.docPattern || /syllab|overview|schedule|calendar|pacing|course (info|outline|guide|map)|unit plan/i;
+  const maxDocs = opts.maxDocs ?? 4;
+  const maxChars = opts.maxChars ?? 6000;
+  const notebooks = await listNotebooks(token);
+  const picked = pickByName(notebooks, notebookName);
+  if (!picked.match) throw Object.assign(new Error(`notebook not found: ${notebookName}`), { status: 404 });
+  const tree = await loadNotebookTree(token, picked.match);
+  const sections = [];
+  const docs = [];
+  for (const sec of tree.sections) {
+    if (!sectionPattern.test(sec.group)) continue;
+    const pages = await listAllSectionPages(token, { siteId: tree.siteId, sectionId: sec.id });
+    sections.push({
+      name: sec.name,
+      group: sec.group,
+      pages: pages.map((p) => ({ title: p.title, modified: p.modified })),
+    });
+    for (const p of pages) {
+      if (docs.length >= maxDocs) break;
+      if (!docPattern.test(`${sec.name} ${p.title}`)) continue;
+      const url = tree.siteId ? buildSitePageContentUrl(tree.siteId, p.id) : buildPageContentUrl(p.id);
+      try {
+        const html = await apiGet(url, token, { html: true });
+        docs.push({ section: sec.name, title: p.title, text: stripHtml(String(html.html || html || ""), maxChars) });
+      } catch (err) {
+        console.warn(`[onenote] outline page skipped: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+  }
+  return { notebook: tree.notebook.name, siteId: tree.siteId, sections, docs };
+}
+
 async function withToken(parsed, root, fn) {
   let token;
   try {
@@ -1128,6 +1337,60 @@ export async function runSchoolOnenote(argv, opts = {}) {
         text: stripHtml(html, PAGE_TEXT_MAX),
         ...(parsed.html ? { html: html.slice(0, PAGE_TEXT_MAX) } : {}),
       };
+    });
+  }
+
+  if (cmd === "create-page") {
+    if (!parsed.sectionId) return { ok: false, error: "create-page needs --section-id" };
+    if (!parsed.images.length && !parsed.pdf) {
+      return { ok: false, error: "create-page needs --image and/or --pdf" };
+    }
+    return withToken(parsed, root, async (token) => {
+      const { buildPrintoutPageHtml } = await import("./ap-study-onenote.js");
+      /** @type {{ name: string, type: string, data: Buffer, filename?: string }[]} */
+      const parts = [];
+      for (let i = 0; i < parsed.images.length; i++) {
+        parts.push({
+          name: `page${i + 1}`,
+          type: "image/png",
+          data: await readFile(parsed.images[i]),
+          filename: `page${i + 1}.png`,
+        });
+      }
+      if (parsed.pdf) {
+        parts.push({
+          name: "pdf",
+          type: "application/pdf",
+          data: await readFile(parsed.pdf),
+          filename: parsed.pdf.split("/").pop() || "work.pdf",
+        });
+      }
+      const html = buildPrintoutPageHtml({
+        title: parsed.title || "Untitled",
+        pageCount: parsed.images.length,
+        pdfName: parsed.pdf ? parsed.pdf.split("/").pop() || "work.pdf" : "",
+      });
+      const page = await createOnenotePage(token, parsed.sectionId, { html, parts });
+      return { ok: true, account: SCHOOL_EMAIL, page };
+    });
+  }
+
+  if (cmd === "ink") {
+    if (!parsed.id) return { ok: false, error: "ink needs a page id" };
+    return withToken(parsed, root, async (token) => {
+      const { parseInkml, pageImages, strokesOnImage } = await import("./onenote-ink.js");
+      const { html, inkml } = await readOnenotePageInk(token, parsed.id);
+      if (parsed.out) await writeFile(parsed.out, inkml || "");
+      const { traces } = parseInkml(inkml);
+      const images = pageImages(html).map((img) => ({
+        alt: img.alt,
+        left: img.left,
+        top: img.top,
+        width: img.width,
+        height: img.height,
+        strokes: strokesOnImage(traces, img).length,
+      }));
+      return { ok: true, account: SCHOOL_EMAIL, id: parsed.id, traces: traces.length, images };
     });
   }
 

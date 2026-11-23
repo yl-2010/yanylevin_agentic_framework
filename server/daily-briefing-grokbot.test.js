@@ -145,6 +145,21 @@ describe("grokbot validation", () => {
     }
   });
 
+  it("allows the AP study card after the recap", () => {
+    const ap = {
+      id: "ap-study",
+      title: "AP Study",
+      category: "other",
+      noVote: true,
+      vote: null,
+      body: "AP: Physics 2 diagnostic, 30 min. It's in OneNote under AP Study 2026-27.",
+    };
+    const capsules = [RECAP, ap, ...Array.from({ length: 10 }, (_, i) => newsCap(`story-${i}`))];
+    const result = validateBriefingTodo(todo({ capsules }), { dateKey: "2026-11-13", dueTime: "07:00" });
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.ok, true);
+  });
+
   it("keeps thumbs on a forced rebuild", () => {
     const capsules = [RECAP, newsCap("a", { vote: "up" }), newsCap("b", { vote: "down" })];
     assert.equal(validateBriefingTodo(todo({ capsules }), { dateKey: "2026-11-13", dueTime: "07:00" }).ok, false);

@@ -42,6 +42,7 @@ import {
 import { healthTokenMatches, writeHealthDump } from "./phone-health.js";
 import { writeLifeStateIntent } from "./life-state-intent.js";
 import { briefingRunner, startDailyBriefingScheduler } from "./daily-briefing-agent.js";
+import { startApStudyScheduler } from "./ap-study.js";
 import { startLocationHistoryScheduler } from "./location-history-agent.js";
 import { startLocationEnrichmentScheduler } from "./location-enrichment-agent.js";
 import { startContextSynthesisScheduler } from "./context-synthesis-agent.js";
@@ -1668,6 +1669,7 @@ app.use((_req, res) => {
 });
 
     startDailyBriefingScheduler();
+    startApStudyScheduler();
     startLocationHistoryScheduler();
     startLocationEnrichmentScheduler();
     startHealthTakeawaysScheduler();

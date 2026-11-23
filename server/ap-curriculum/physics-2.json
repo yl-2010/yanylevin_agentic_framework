@@ -1,0 +1,76 @@
+{
+  "exam": "physics-2",
+  "name": "AP Physics 2: Algebra-Based",
+  "short": "Physics 2",
+  "examDate": "2027-05-06",
+  "ced": "AP Physics 2 CED, effective fall 2024 (Units 9-15; fluids moved to Physics 1)",
+  "format": "Section I: 40 multiple choice, 80 min. Section II: 4 FRQs in 100 min: mathematical routines, translation between representations, experimental design and analysis, qualitative/quantitative translation. Algebra and trig only.",
+  "units": [
+    { "id": "9", "name": "Thermodynamics", "weight": [15, 18], "topics": [
+      { "id": "9.1", "name": "Kinetic theory of temperature and pressure" },
+      { "id": "9.2", "name": "The ideal gas law" },
+      { "id": "9.3", "name": "Thermal energy transfer and equilibrium" },
+      { "id": "9.4", "name": "The first law of thermodynamics (PV diagrams)" },
+      { "id": "9.5", "name": "Specific heat and thermal conductivity" },
+      { "id": "9.6", "name": "Entropy and the second law" }
+    ]},
+    { "id": "10", "name": "Electric Force, Field, and Potential", "weight": [15, 18], "topics": [
+      { "id": "10.1", "name": "Electric charge and electric force" },
+      { "id": "10.2", "name": "Conservation of charge and charging" },
+      { "id": "10.3", "name": "Electric fields" },
+      { "id": "10.4", "name": "Electric potential energy" },
+      { "id": "10.5", "name": "Electric potential" },
+      { "id": "10.6", "name": "Capacitors" },
+      { "id": "10.7", "name": "Conservation of electric energy" }
+    ]},
+    { "id": "11", "name": "Electric Circuits", "weight": [15, 18], "topics": [
+      { "id": "11.1", "name": "Electric current" },
+      { "id": "11.2", "name": "Simple circuits" },
+      { "id": "11.3", "name": "Resistance, resistivity, and Ohm's law" },
+      { "id": "11.4", "name": "Electric power" },
+      { "id": "11.5", "name": "Compound DC circuits" },
+      { "id": "11.6", "name": "Kirchhoff's loop rule" },
+      { "id": "11.7", "name": "Kirchhoff's junction rule" },
+      { "id": "11.8", "name": "RC circuits" }
+    ]},
+    { "id": "12", "name": "Magnetism and Electromagnetism", "weight": [12, 15], "topics": [
+      { "id": "12.1", "name": "Magnetic fields and materials" },
+      { "id": "12.2", "name": "Magnetism and moving charges" },
+      { "id": "12.3", "name": "Magnetism and current-carrying wires" },
+      { "id": "12.4", "name": "Electromagnetic induction and Faraday's law" }
+    ]},
+    { "id": "13", "name": "Geometric Optics", "weight": [12, 15], "topics": [
+      { "id": "13.1", "name": "Reflection" },
+      { "id": "13.2", "name": "Images formed by mirrors" },
+      { "id": "13.3", "name": "Refraction" },
+      { "id": "13.4", "name": "Images formed by lenses" }
+    ]},
+    { "id": "14", "name": "Waves, Sound, and Physical Optics", "weight": [12, 15], "topics": [
+      { "id": "14.1", "name": "Properties of wave pulses and waves" },
+      { "id": "14.2", "name": "Periodic waves" },
+      { "id": "14.3", "name": "Boundary behavior of waves and polarization" },
+      { "id": "14.4", "name": "Electromagnetic waves" },
+      { "id": "14.5", "name": "The Doppler effect" },
+      { "id": "14.6", "name": "Wave interference and standing waves" },
+      { "id": "14.7", "name": "Diffraction" },
+      { "id": "14.8", "name": "Double-slit interference and diffraction gratings" },
+      { "id": "14.9", "name": "Thin-film interference" }
+    ]},
+    { "id": "15", "name": "Modern Physics", "weight": [12, 15], "topics": [
+      { "id": "15.1", "name": "Quantum theory and wave-particle duality" },
+      { "id": "15.2", "name": "The Bohr model of atomic structure" },
+      { "id": "15.3", "name": "Emission and absorption spectra" },
+      { "id": "15.4", "name": "Blackbody radiation" },
+      { "id": "15.5", "name": "The photoelectric effect" },
+      { "id": "15.6", "name": "Compton scattering" },
+      { "id": "15.7", "name": "Fission, fusion, and nuclear decay" },
+      { "id": "15.8", "name": "Types of radioactive decay and half-life" }
+    ]},
+    { "id": "X", "name": "FRQ types", "weight": [4, 4], "topics": [
+      { "id": "X.1", "name": "Mathematical routines FRQ" },
+      { "id": "X.2", "name": "Translation between representations FRQ" },
+      { "id": "X.3", "name": "Experimental design and analysis FRQ" },
+      { "id": "X.4", "name": "Qualitative/quantitative translation FRQ" }
+    ]}
+  ]
+}

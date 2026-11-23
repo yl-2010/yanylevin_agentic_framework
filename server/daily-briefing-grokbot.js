@@ -187,6 +187,22 @@ export function validateNewsDraft(draft) {
  * @param {string} where
  * @param {string[]} errors
  */
+function checkApStudyCapsule(cap, where, errors) {
+  if (!cap || typeof cap !== "object" || Array.isArray(cap)) {
+    errors.push(`${where}: must be a JSON object`);
+    return;
+  }
+  if (cap.id !== "ap-study") errors.push(`${where}: id must be "ap-study"`);
+  if (cap.category !== "other") errors.push(`${where}: category must be "other"`);
+  if (cap.noVote !== true) errors.push(`${where}: noVote must be true`);
+  if (cap.vote !== null) errors.push(`${where}: vote must be null`);
+  if (!nonEmpty(cap.title)) errors.push(`${where}: title is empty`);
+  if (!nonEmpty(cap.body)) errors.push(`${where}: body is empty`);
+  if (cap.citations != null && !(Array.isArray(cap.citations) && !cap.citations.length)) {
+    errors.push(`${where}: ap study has no citations`);
+  }
+}
+
 function checkRecapCapsule(cap, where, errors) {
   if (!cap || typeof cap !== "object" || Array.isArray(cap)) {
     errors.push(`${where}: must be a JSON object`);
@@ -248,11 +264,17 @@ export function validateBriefingTodo(todo, { dateKey, dueTime, force = false }) 
     const seen = new Set(["agent-recap"]);
     caps.slice(1).forEach((cap, i) => {
       const where = `capsules[${i + 1}]`;
+      if (cap?.id === "ap-study") {
+        checkApStudyCapsule(cap, where, errors);
+        if (seen.has(cap.id)) errors.push(`${where}: duplicate id ${cap.id}`);
+        seen.add(cap.id);
+        return;
+      }
       checkNewsCapsule(cap, where, errors, { allowVotes: force });
       if (cap && seen.has(cap.id)) errors.push(`${where}: duplicate id ${cap.id}`);
       if (cap) seen.add(cap.id);
     });
-    const news = caps.length - 1;
+    const news = caps.filter((c) => c?.id !== "agent-recap" && c?.id !== "ap-study").length;
     if (news < 9 || news > 12) warnings.push(`${news} news capsules; the skill aims for about 10 (9-12)`);
   }
   if (!Array.isArray(todo.citations) || !todo.citations.length) {
@@ -671,6 +693,10 @@ export async function finalize(opts = {}) {
   const status = await readStatus(outDir, dateKey);
   status.phases = status.phases || {};
   const todoPath = briefingTodoPath(dateKey);
+  const { attachApStudyToBriefing } = await import("./ap-study.js");
+  await attachApStudyToBriefing(dateKey).catch((err) =>
+    console.error("[daily-briefing] ap study capsule", err)
+  );
   const result = await validateFile(todoPath, (todo) => validateBriefingTodo(todo, { dateKey, dueTime, force: !!status.force }));
   const errors = [...result.errors];
   const preparedAt = Date.parse(status.phases.unslop?.preparedAt || "");

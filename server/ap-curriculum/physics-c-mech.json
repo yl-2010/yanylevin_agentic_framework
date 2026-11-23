@@ -1,0 +1,71 @@
+{
+  "exam": "physics-c-mech",
+  "name": "AP Physics C: Mechanics",
+  "short": "Physics C",
+  "examDate": "2027-05-03",
+  "ced": "AP Physics C: Mechanics CED, effective fall 2024",
+  "format": "Section I: 40 multiple choice, 80 min. Section II: 4 FRQs in 100 min: mathematical routines, translation between representations, experimental design and analysis, qualitative/quantitative translation. Calculus throughout.",
+  "units": [
+    { "id": "1", "name": "Kinematics", "weight": [10, 15], "topics": [
+      { "id": "1.1", "name": "Scalars and vectors in one dimension" },
+      { "id": "1.2", "name": "Displacement, velocity, and acceleration (calculus)" },
+      { "id": "1.3", "name": "Representing motion" },
+      { "id": "1.4", "name": "Reference frames and relative motion" },
+      { "id": "1.5", "name": "Vectors and motion in two dimensions" }
+    ]},
+    { "id": "2", "name": "Force and Translational Dynamics", "weight": [20, 25], "topics": [
+      { "id": "2.1", "name": "Systems and center of mass" },
+      { "id": "2.2", "name": "Forces and free-body diagrams" },
+      { "id": "2.3", "name": "Newton's third law" },
+      { "id": "2.4", "name": "Newton's first law" },
+      { "id": "2.5", "name": "Newton's second law" },
+      { "id": "2.6", "name": "Gravitational force" },
+      { "id": "2.7", "name": "Kinetic and static friction" },
+      { "id": "2.8", "name": "Spring forces" },
+      { "id": "2.9", "name": "Resistive forces (differential equations)" },
+      { "id": "2.10", "name": "Circular motion" }
+    ]},
+    { "id": "3", "name": "Work, Energy, and Power", "weight": [15, 25], "topics": [
+      { "id": "3.1", "name": "Translational kinetic energy" },
+      { "id": "3.2", "name": "Work (line integrals of force)" },
+      { "id": "3.3", "name": "Potential energy and conservative forces" },
+      { "id": "3.4", "name": "Conservation of energy" },
+      { "id": "3.5", "name": "Power" }
+    ]},
+    { "id": "4", "name": "Linear Momentum", "weight": [10, 20], "topics": [
+      { "id": "4.1", "name": "Linear momentum" },
+      { "id": "4.2", "name": "Change in momentum and impulse" },
+      { "id": "4.3", "name": "Conservation of linear momentum" },
+      { "id": "4.4", "name": "Elastic and inelastic collisions" }
+    ]},
+    { "id": "5", "name": "Torque and Rotational Dynamics", "weight": [10, 15], "topics": [
+      { "id": "5.1", "name": "Rotational kinematics" },
+      { "id": "5.2", "name": "Connecting linear and rotational motion" },
+      { "id": "5.3", "name": "Torque" },
+      { "id": "5.4", "name": "Rotational inertia (integrals, parallel axis)" },
+      { "id": "5.5", "name": "Rotational equilibrium" },
+      { "id": "5.6", "name": "Newton's second law in rotational form" }
+    ]},
+    { "id": "6", "name": "Energy and Momentum of Rotating Systems", "weight": [10, 15], "topics": [
+      { "id": "6.1", "name": "Rotational kinetic energy" },
+      { "id": "6.2", "name": "Torque and work" },
+      { "id": "6.3", "name": "Angular momentum and angular impulse" },
+      { "id": "6.4", "name": "Conservation of angular momentum" },
+      { "id": "6.5", "name": "Rolling" },
+      { "id": "6.6", "name": "Motion of orbiting satellites" }
+    ]},
+    { "id": "7", "name": "Oscillations", "weight": [10, 15], "topics": [
+      { "id": "7.1", "name": "Defining simple harmonic motion" },
+      { "id": "7.2", "name": "Frequency and period of SHM" },
+      { "id": "7.3", "name": "Representing and analyzing SHM" },
+      { "id": "7.4", "name": "Energy of simple harmonic oscillators" },
+      { "id": "7.5", "name": "Simple and physical pendulums" }
+    ]},
+    { "id": "X", "name": "FRQ types", "weight": [4, 4], "topics": [
+      { "id": "X.1", "name": "Mathematical routines FRQ" },
+      { "id": "X.2", "name": "Translation between representations FRQ" },
+      { "id": "X.3", "name": "Experimental design and analysis FRQ" },
+      { "id": "X.4", "name": "Qualitative/quantitative translation FRQ" }
+    ]}
+  ]
+}

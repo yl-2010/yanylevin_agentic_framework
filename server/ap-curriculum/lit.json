@@ -1,0 +1,75 @@
+{
+  "exam": "lit",
+  "name": "AP English Literature and Composition",
+  "short": "Literature",
+  "examDate": "2027-05-05",
+  "ced": "AP English Literature and Composition CED (2019 framework, 9 units)",
+  "format": "Section I: 55 multiple choice on 5 passages (prose fiction, poetry, drama), 60 min (45%). Section II: 3 essays in 120 min (55%): Q1 poetry analysis, Q2 prose fiction analysis, Q3 literary argument on a work of the student's choice. 6-point rubric: thesis 0-1, evidence and commentary 0-4, sophistication 0-1.",
+  "units": [
+    { "id": "1", "name": "Short Fiction I", "weight": [5, 5], "topics": [
+      { "id": "1.CHR", "name": "Character: description, perspective, motive" },
+      { "id": "1.SET", "name": "Setting and its details" },
+      { "id": "1.STR", "name": "Plot and sequence of events" },
+      { "id": "1.NAR", "name": "Narrator and speaker" },
+      { "id": "1.LAN", "name": "Claims and textual evidence" }
+    ]},
+    { "id": "2", "name": "Poetry I", "weight": [5, 5], "topics": [
+      { "id": "2.CHR", "name": "Speaker's attitude and perspective" },
+      { "id": "2.STR", "name": "Line, stanza, and form" },
+      { "id": "2.FIG", "name": "Word choice, imagery, and connotation" },
+      { "id": "2.FIG2", "name": "Simile and metaphor" },
+      { "id": "2.LAN", "name": "Thesis for a poetry argument" }
+    ]},
+    { "id": "3", "name": "Longer Fiction or Drama I", "weight": [5, 5], "topics": [
+      { "id": "3.CHR", "name": "Character relationships and contrasts" },
+      { "id": "3.SET", "name": "Setting and its effect on characters" },
+      { "id": "3.STR", "name": "Conflict, plot, and juxtaposition" },
+      { "id": "3.NAR", "name": "Point of view and narrative distance" },
+      { "id": "3.FIG", "name": "Symbols" },
+      { "id": "3.LAN", "name": "Line of reasoning across a longer work" }
+    ]},
+    { "id": "4", "name": "Short Fiction II", "weight": [5, 5], "topics": [
+      { "id": "4.CHR", "name": "Character change and complexity" },
+      { "id": "4.SET", "name": "Setting as mood and atmosphere" },
+      { "id": "4.STR", "name": "Shifts, pacing, and structure" },
+      { "id": "4.NAR", "name": "Reliability and narrative bias" },
+      { "id": "4.LAN", "name": "Commentary that links evidence to claim" }
+    ]},
+    { "id": "5", "name": "Poetry II", "weight": [5, 5], "topics": [
+      { "id": "5.STR", "name": "Contrasts and shifts in poems" },
+      { "id": "5.FIG", "name": "Extended metaphor and conceit" },
+      { "id": "5.FIG2", "name": "Symbol and allusion in poems" },
+      { "id": "5.LAN", "name": "Body paragraphs for poetry analysis" }
+    ]},
+    { "id": "6", "name": "Longer Fiction or Drama II", "weight": [5, 5], "topics": [
+      { "id": "6.CHR", "name": "Values and motives in conflict" },
+      { "id": "6.STR", "name": "Structure of a longer work" },
+      { "id": "6.NAR", "name": "Narrative perspective and irony" },
+      { "id": "6.FIG", "name": "Imagery and motif patterns" },
+      { "id": "6.LAN", "name": "Argument about a whole work" }
+    ]},
+    { "id": "7", "name": "Short Fiction III", "weight": [5, 5], "topics": [
+      { "id": "7.CHR", "name": "Interpreting complex characters" },
+      { "id": "7.SET", "name": "Setting and theme" },
+      { "id": "7.NAR", "name": "Narration and tone" },
+      { "id": "7.LAN", "name": "Sophistication: complexity and tension" }
+    ]},
+    { "id": "8", "name": "Poetry III", "weight": [5, 5], "topics": [
+      { "id": "8.STR", "name": "Form and meaning (sonnet, villanelle, free verse)" },
+      { "id": "8.FIG", "name": "Ambiguity and multiple meanings" },
+      { "id": "8.LAN", "name": "Timed Q1 poetry analysis" }
+    ]},
+    { "id": "9", "name": "Longer Fiction or Drama III", "weight": [5, 5], "topics": [
+      { "id": "9.CHR", "name": "Character and the work's meaning" },
+      { "id": "9.STR", "name": "Endings and resolution" },
+      { "id": "9.FIG", "name": "Ideas across a full work" },
+      { "id": "9.LAN", "name": "Timed Q3 literary argument" }
+    ]},
+    { "id": "W", "name": "Essays and MCQ pacing", "weight": [55, 55], "topics": [
+      { "id": "W.Q1", "name": "Q1 poetry analysis essay" },
+      { "id": "W.Q2", "name": "Q2 prose fiction analysis essay" },
+      { "id": "W.Q3", "name": "Q3 literary argument essay" },
+      { "id": "W.MCQ", "name": "Passage MCQ pacing (about 1 min per question)" }
+    ]}
+  ]
+}

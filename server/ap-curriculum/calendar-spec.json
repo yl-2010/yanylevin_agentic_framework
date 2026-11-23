@@ -1,0 +1,44 @@
+{
+  "about": "Month each topic has to be taught by, Dec to Mar. learn = learn page plus two graded items. review = already taught in class or a prior AP, one graded item counts. Selectors: U:<unit> or T:<first>-<last> inside one unit.",
+  "start": "2026-11-30",
+  "end": "2027-03-31",
+  "bufferWeeks": ["2026-12-21", "2026-12-28", "2027-03-22"],
+  "weeklyMinutes": {
+    "physics-2": 60,
+    "physics-c-mech": 45,
+    "us-history": 45,
+    "lit": 35,
+    "calc-bc": 25
+  },
+  "floorMinutes": 15,
+  "months": {
+    "2026-12": {
+      "physics-2": { "learn": ["U:9", "T:10.1-10.3"] },
+      "physics-c-mech": { "learn": ["U:1", "U:2"] },
+      "us-history": { "review": ["U:1", "U:2", "U:3"], "learn": ["T:W.SAQ-W.SAQ"] },
+      "lit": { "learn": ["U:1", "U:2", "T:W.Q1-W.Q1"] },
+      "calc-bc": { "learn": ["T:6.11-6.14", "T:7.5-7.5", "T:7.9-7.9"], "review": ["U:1", "U:2"] }
+    },
+    "2027-01": {
+      "physics-2": { "learn": ["T:10.4-10.7", "U:11"] },
+      "physics-c-mech": { "learn": ["U:3", "U:4"] },
+      "us-history": { "learn": ["U:4", "U:5", "T:W.CTX-W.CTX", "T:W.SOURCE-W.SOURCE"] },
+      "lit": { "learn": ["U:3", "U:4", "T:W.Q2-W.Q2"] },
+      "calc-bc": { "review": ["U:8", "U:3", "U:4"], "learn": ["U:9"] }
+    },
+    "2027-02": {
+      "physics-2": { "learn": ["U:12", "U:13"] },
+      "physics-c-mech": { "learn": ["U:5", "U:6"] },
+      "us-history": { "learn": ["U:6", "U:7", "T:W.THESIS-W.THESIS", "T:W.LEQ-W.LEQ"] },
+      "lit": { "learn": ["U:5", "U:6", "T:W.Q3-W.Q3"] },
+      "calc-bc": { "learn": ["T:10.1-10.9"], "review": ["U:5"] }
+    },
+    "2027-03": {
+      "physics-2": { "learn": ["U:14", "U:15", "U:X"] },
+      "physics-c-mech": { "learn": ["U:7", "U:X"] },
+      "us-history": { "learn": ["U:8", "U:9", "T:W.EVID-W.EVID", "T:W.COMPLEX-W.COMPLEX", "T:W.DBQ-W.DBQ"] },
+      "lit": { "learn": ["U:7", "U:8", "U:9", "T:W.MCQ-W.MCQ"] },
+      "calc-bc": { "learn": ["T:10.10-10.15"], "review": ["T:6.1-6.10", "T:7.1-7.4", "T:7.6-7.8"] }
+    }
+  }
+}
