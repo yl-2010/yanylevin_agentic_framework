@@ -73,11 +73,6 @@
         inherits: true;
         initial-value: 0px;
       }
-      @property --chat-busy {
-        syntax: "<number>";
-        inherits: true;
-        initial-value: 0;
-      }
       /* Dark tokens: OS preference (unless forced light) or explicit resolved dark */
       @media (prefers-color-scheme: dark) {
         :root:not([data-resolved-theme="light"]) {
@@ -474,10 +469,6 @@
         --chat-circle: var(--corner-orb);
         /* Match .c-tl size so the panel clears the top liquid-glass orbs */
         --chat-top-orb: var(--corner-orb);
-        --chat-clear-rgb: var(--lg-tint-rgb);
-        --chat-clear-opacity: var(--lg-tint-opacity);
-        --chat-pulse-rgb: var(--chat-orange-rgb);
-        --chat-pulse-opacity: 0.32;
         --chat-top-gap: 0.75rem;
         --chat-panel-top: calc(var(--chat-pad) + var(--chat-top-orb) + var(--chat-top-gap));
         --pill-h: var(--chat-circle);
@@ -691,18 +682,6 @@
         content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit;
         box-shadow: inset 0 0 var(--lg-shadow-blur) var(--lg-shadow-spread) var(--lg-shadow-color);
         background-color: rgba(var(--lg-tint-rgb), var(--lg-tint-opacity)); pointer-events: none;
-      }
-      .yan-chat-pill::before,
-      .yan-chat-panel::before {
-        background-color: color-mix(
-          in srgb,
-          rgba(var(--chat-pulse-rgb), var(--chat-pulse-opacity)) calc(var(--chat-busy) * 100%),
-          rgba(var(--chat-clear-rgb), var(--chat-clear-opacity))
-        );
-        transition: --chat-busy 0.3s ease;
-      }
-      .yan-chat.is-busy {
-        --chat-busy: 1;
       }
       .yan-chat-panel.lg-refraction::after {
         content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
