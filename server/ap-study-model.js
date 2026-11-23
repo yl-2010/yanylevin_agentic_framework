@@ -105,6 +105,15 @@ export function splitTopicKey(key) {
 }
 
 /**
+ * Exam-skill units (Physics "FRQ types", USH "Writing", Lit "Essays and MCQ
+ * pacing") have letter ids. CED content units are numbered.
+ * @param {{ id: string }} unit
+ */
+export function isSkillUnit(unit) {
+  return !/^\d+$/.test(String(unit?.id || ""));
+}
+
+/**
  * Flat topic index with per-topic exam weight (unit midpoint / topic count).
  * @param {Record<string, Curriculum>} curricula
  */
@@ -652,6 +661,7 @@ export function planDay(ctx) {
   const diag = DIAGNOSTIC_DAYS.find((d) => d.date === date);
   if (diag && !prefs.skipDiagnostics) {
     const c = curricula[diag.exam];
+    const keyed = (u) => u.topics.map((t) => ({ key: `${diag.exam}:${t.id}`, name: t.name }));
     return finalize(
       {
         date,
@@ -662,7 +672,8 @@ export function planDay(ctx) {
             exam: diag.exam,
             kind: "diagnostic",
             minutes: DAILY_MINUTES,
-            units: c.units.map((u) => ({ id: u.id, name: u.name })),
+            units: c.units.filter((u) => !isSkillUnit(u)).map((u) => ({ id: u.id, name: u.name, topics: keyed(u) })),
+            skills: c.units.filter(isSkillUnit).flatMap(keyed),
             topics: [],
           },
         ],

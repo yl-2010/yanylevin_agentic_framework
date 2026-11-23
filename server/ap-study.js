@@ -38,8 +38,10 @@ import { harvestInk, publishPrintoutPage, AP_NOTEBOOK_NAME, monthSectionName } f
 import {
   buildAlignPrompt,
   buildGradePrompt,
+  buildRevisePrompt,
   buildWritePrompt,
   checkPacketAgainstPlan,
+  lintPacket,
   normalizeAlign,
   normalizeGrade,
   runJsonAgent,
@@ -487,10 +489,36 @@ export async function writePacket(date) {
     prompt: buildWritePrompt({ date, planFile: "plan.json", contextFile: "context.md" }),
     outFile: "packet.json",
   });
-  const packet = normalizePacket({ ...raw, date });
+  const focus = S.curricula[plan.focusExam]?.short;
+  const title = focus ? `${shortDate(date)} · ${focus}${plan.mode === "diagnostic" ? " diagnostic" : ""}` : raw?.title;
+  let packet = normalizePacket({ ...raw, date, title });
+  const problems = lintPacket(packet, plan);
+  let revised = false;
+  if (problems.length) {
+    await writeJson(join(dayDir, "packet-draft.json"), packet);
+    const fixed = await runJsonAgent({
+      prefix: "ap-study-revise",
+      cwd: dayDir,
+      prompt: buildRevisePrompt({ draftFile: "packet-draft.json", problems }),
+      outFile: "packet.json",
+    }).catch((err) => {
+      console.warn(`[ap-study] revise skipped: ${err instanceof Error ? err.message : err}`);
+      return null;
+    });
+    let next = null;
+    try {
+      if (fixed) next = normalizePacket({ ...fixed.raw, date, title });
+    } catch {
+      next = null;
+    }
+    if (next && lintPacket(next, plan).length < problems.length) {
+      packet = next;
+      revised = true;
+    }
+  }
   const warnings = checkPacketAgainstPlan(packet, plan);
   await writeJson(join(dayDir, "packet.json"), packet);
-  return { ok: true, model, warnings, items: packet.sections.reduce((n, s) => n + s.items.length, 0) };
+  return { ok: true, model, revised, warnings, items: packet.sections.reduce((n, s) => n + s.items.length, 0) };
 }
 
 /** @param {string} date */
@@ -572,7 +600,7 @@ export async function ensureStudyTodo(date, page, plan) {
 
 /** @param {Awaited<ReturnType<typeof loadState>>} S @param {any} plan @param {string} date */
 async function sideNote(S, plan, date) {
-  const rows = [`<p><b>${esc(plan.summary)}</b></p>`, `<p>Write the start time, work top to bottom, write the finish time. Skip anything you have never seen. The key comes tomorrow morning.</p>`];
+  const rows = [`<p><b>${esc(plan.summary)}</b></p>`];
   const pace = await readJson(S.P.pace);
   const behind = pace ? EXAM_IDS.filter((e) => pace.exams[e]?.behindWeeks > 0) : [];
   if (behind.length) {
@@ -600,6 +628,10 @@ export async function publishDay(date, opts = {}) {
     });
     return { ok: true, skipped: true, reason: "published", page: existing, todo: todo?.path || "" };
   }
+  if (existing?.id) {
+    const ink = await harvestInk(existing.id);
+    if (ink.traces > 0) return { ok: false, reason: "the published page already has ink", page: existing };
+  }
   const packet = normalizePacket(await readJson(join(dayDir, "packet.json")));
   const boxes = await readJson(join(dayDir, "boxes.json"));
   const pngs = Array.from({ length: boxes.pages }, (_, i) => join(dayDir, "pages", `page-${i + 1}.png`));
@@ -612,6 +644,12 @@ export async function publishDay(date, opts = {}) {
   });
   const row = { ...page, publishedAt: new Date().toISOString(), pages: pngs.length };
   await writeJson(join(dayDir, "publish.json"), row);
+  if (existing?.id) {
+    const { deleteOnenotePage, onenoteToken } = await import("./school-onenote.js");
+    await deleteOnenotePage(await onenoteToken(), existing.id).catch((err) => {
+      console.error(`[ap-study] could not delete the old ${date} page`, err);
+    });
+  }
   const todo = await ensureStudyTodo(date, row, plan).catch((err) => {
     console.error(`[ap-study] todo failed for ${date}`, err);
     return null;

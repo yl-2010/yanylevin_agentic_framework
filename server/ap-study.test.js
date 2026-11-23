@@ -23,7 +23,15 @@ import {
 } from "./ap-study-model.js";
 import { decodeTrace, parseInkml, strokesInBox, strokesOnImage, HIMETRIC_TO_PX, splitInkMultipart } from "./onenote-ink.js";
 import { normalizePacket, sanitizeSvg, richText } from "./ap-study-render.js";
-import { checkPacketAgainstPlan, normalizeAlign, normalizeGrade, parseJsonLoose } from "./ap-study-agents.js";
+import {
+  buildWritePrompt,
+  checkPacketAgainstPlan,
+  lintPacket,
+  normalizeAlign,
+  normalizeGrade,
+  packetRules,
+  parseJsonLoose,
+} from "./ap-study-agents.js";
 import { buildStudyTodo, fallbackAlign, insertApStudyCapsule, looksLikeTest, mergeStudyTodo, shortDate } from "./ap-study.js";
 
 const curricula = loadCurricula();
@@ -135,6 +143,15 @@ describe("planner", () => {
     const seen = DIAGNOSTIC_DAYS.map((d) => planDay({ date: d.date, curricula, calendar, model }));
     assert.deepEqual(new Set(seen.map((p) => p.focusExam)), new Set(EXAM_IDS));
     for (const p of seen) assert.equal(p.mode, "diagnostic");
+  });
+
+  it("diagnoses content units only, with full topic keys", () => {
+    const plan = planDay({ date: "2026-11-24", curricula, calendar, model });
+    const block = plan.blocks[0];
+    assert.ok(block.units.length > 0);
+    assert.ok(block.units.every((u) => /^\d+$/.test(u.id)));
+    assert.ok(block.units.every((u) => u.topics.every((t) => index[t.key])));
+    assert.deepEqual(block.skills.map((t) => t.key), ["physics-2:X.1", "physics-2:X.2", "physics-2:X.3", "physics-2:X.4"]);
   });
 
   it("splits a normal day into one focus block and review", () => {
@@ -273,6 +290,43 @@ describe("packet", () => {
     assert.equal(grade.items.find((i) => i.id === "q1").score, 1);
     assert.equal(grade.items.find((i) => i.id === "q2").skipped, true);
     assert.deepEqual(grade.learnTopicsSeen, ["physics-2:9.2"]);
+  });
+
+  it("prefixes bare topic keys with the section exam", () => {
+    const p = normalizePacket({ sections: [{ exam: "physics-2", items: [{ topic: "13.3", prompt: "p", answer: "a" }] }] });
+    assert.equal(p.sections[0].items[0].topic, "physics-2:13.3");
+  });
+
+  it("flags the clutter the Nov 24 packet had", () => {
+    const plan = { blocks: [{ units: [{ id: "13", name: "Geometric Optics", topics: [{ key: "physics-2:13.3" }] }] }] };
+    const p = normalizePacket({
+      subtitle: "Eight short checks, easiest Physics 2 ideas first, and it is fine to skip a unit you have never seen.",
+      sections: [
+        {
+          exam: "physics-2",
+          heading: "Physics 2 · Easiest units first",
+          items: [
+            { topic: "physics-2:13.3", prompt: "Geometric optics. The figure shows a ray.", answer: "a", figureSvg: "<svg><text>35 degrees</text></svg>" },
+            { topic: "physics-2:13.3", prompt: "Name each type.\n\n1. Derive.\n\n2. Explain.", answer: "a" },
+          ],
+        },
+      ],
+    });
+    const w = lintPacket(p, plan).join("\n");
+    assert.match(w, /subtitle: clutter "easiest"/);
+    assert.match(w, /subtitle: clutter "Eight short checks"/);
+    assert.match(w, /subtitle: clutter "fine to skip"/);
+    assert.match(w, /heading .*clutter/);
+    assert.match(w, /q1: prompt opens with the unit name/);
+    assert.match(w, /q1 figure: clutter "35 degrees"/);
+    assert.match(w, /q2: numbered list inside the prompt/);
+    assert.deepEqual(lintPacket(normalizePacket(raw), { blocks: [] }), []);
+  });
+
+  it("puts the skill's packet rules in the writer prompt", () => {
+    const rules = packetRules();
+    assert.match(rules, /Only what he needs to answer goes on the page/);
+    assert.ok(buildWritePrompt({ date: "2026-11-24", planFile: "plan.json", contextFile: "context.md" }).includes(rules));
   });
 
   it("parses JSON out of fenced model text", () => {

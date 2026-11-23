@@ -15,6 +15,14 @@ Do not generate a week of packets ahead. Tomorrow's packet is supposed to see to
 
 Once the page is in OneNote, the job writes a College Prep todo for that day (`College Prep/todos/ap-study-<date>/todo.json`). The file tile is the OneNote page. No todo before the page exists. Do not create that todo by hand.
 
+## What a packet looks like
+
+[`packet-rules.md`](packet-rules.md) is the rulebook for what goes on the page. The writer prompt pastes that file in on every run, so editing it changes tomorrow's packet. The short version is that the page holds questions and room to answer them, nothing else. No subtitle recaps, no "easiest units first", no "about 30 min", no unit names in front of questions, no reassurance about skipping.
+
+After writing, `lintPacket` in `server/ap-study-agents.js` looks for the clutter a regex can catch. If it finds any, the model gets one revise pass with the exact lines listed. Leftover hits show up as `warnings` in the run log.
+
+Every model step (align, write, revise, grade) runs on Opus 5.5 high (`AP_STUDY_MODEL`). Yan picked it on 2026-11-23 after the Grok 4.7 packet came out cluttered. There is no Auto fallback. If Opus is out of capacity, the 04:00 job retries 20 and 60 minutes later.
+
 ## Where things live
 
 Data, not in git:
@@ -45,6 +53,8 @@ node --env-file=server/.env server/ap-study.js know --topic calc-bc:10.1 --topic
 
 `run` is the nightly job. Use it when a morning packet never showed up. It will not rewrite a day that is already in OneNote.
 
+**Redo a packet.** `plan`, `write`, `render` for that date, look at `days/<date>/pages/page-*.png`, then `publish --force`. Force publish refuses when the old page has ink. Otherwise it posts the new page, deletes the old one, and repoints the College Prep todo.
+
 ## What he asks
 
 **How am I doing.** Read `status` and `learner/insights/<exam>.md`. Answer with the exam, topics introduced against the calendar, and the weak spots. Do not dump the model.
@@ -57,4 +67,4 @@ node --env-file=server/.env server/ap-study.js know --topic calc-bc:10.1 --topic
 
 **Grade my AP packet.** Run `grade` for the date he means, today if he doesn't say. Do not wait for 04:00.
 
-Week 1 diagnostics are fixed: Nov 24 Physics 2, Nov 25 US History, Nov 26 Physics C, Nov 27 Literature, Nov 28 Calc BC. After that the calendar in `calendar.json` decides the month, and the nightly job decides the day.
+Week 1 diagnostics are fixed: Nov 24 Physics 2, Nov 25 US History, Nov 26 Physics C, Nov 27 Literature, Nov 28 Calc BC. A diagnostic has one question per numbered CED unit plus a self-rating row per unit. Letter units (Physics "FRQ types", USH "Writing", Lit "Essays and MCQ pacing") are exam skills. They get no question and no rating row of their own. The writer folds them into content questions. After that the calendar in `calendar.json` decides the month, and the nightly job decides the day.

@@ -5,7 +5,7 @@
  * per answer. Also draws harvested ink back onto page PNGs for grading.
  */
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 export const PAGE_W = 816;
@@ -89,6 +89,15 @@ function normalizeItem(raw, n) {
 }
 
 /**
+ * "13.3" in a physics-2 section is "physics-2:13.3". The learner model drops bare keys.
+ * @param {string} exam
+ * @param {string} topic
+ */
+function fullKey(exam, topic) {
+  return topic && exam && !topic.includes(":") ? `${exam}:${topic}` : topic;
+}
+
+/**
  * @param {any} raw packet.json from the writer
  */
 export function normalizePacket(raw) {
@@ -99,20 +108,22 @@ export function normalizePacket(raw) {
   let n = 0;
   const ids = new Set();
   const sections = sectionsIn.slice(0, 8).map((s) => {
+    const exam = str(s?.exam, 40);
     const items = (Array.isArray(s?.items) ? s.items : []).slice(0, 20).map((it) => {
       n += 1;
       const item = normalizeItem(it, n);
+      item.topic = fullKey(exam, item.topic);
       while (ids.has(item.id)) item.id = `${item.id}x`;
       ids.add(item.id);
       return item;
     });
     return {
-      exam: str(s?.exam, 40),
+      exam,
       kind: SECTION_KINDS.has(s?.kind) ? s.kind : "review",
       heading: str(s?.heading, 160),
       minutes: Math.max(1, Math.min(30, Number(s?.minutes) || 5)),
       learn: (Array.isArray(s?.learn) ? s.learn : []).slice(0, 4).map((l) => ({
-        topic: str(l?.topic, 60),
+        topic: fullKey(exam, str(l?.topic, 60)),
         title: str(l?.title, 160),
         body: str(l?.body, 5000),
         example: l?.example
@@ -154,6 +165,7 @@ export function richText(text) {
   return paras
     .map((p) => {
       let h = esc(p)
+        .replace(/(\d) (?=(?:[A-Za-zΩµ°]{1,3}|m\/s|eV)(?![A-Za-z]))/g, "$1&nbsp;")
         .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
         .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
         .replace(/\n/g, "<br />");
@@ -205,20 +217,19 @@ function wellHtml(itemId, part, lines, grid) {
 export function renderWorkHtml(packet, opts = {}) {
   const blocks = [];
   blocks.push(`<div class="blk head" data-item="_head">
-    <div class="title-row"><h1>${esc(packet.title)}</h1><div class="date">${esc(packet.date)}</div></div>
+    <h1>${esc(packet.title)}</h1>
     ${packet.subtitle ? `<p class="sub">${esc(packet.subtitle)}</p>` : ""}
     <div class="times">
       <div class="tbox" data-item="_start"><span>Start</span></div>
       <div class="tbox" data-item="_finish"><span>Finish</span></div>
-      <div class="hint">Write the clock time in each box. 30 minutes total.</div>
+      <div class="tbox howit" data-item="_rating"><span>How it went, 1 rough to 5 easy</span><b>1</b><b>2</b><b>3</b><b>4</b><b>5</b></div>
     </div>
   </div>`);
+  const showHeadings = packet.sections.length > 1;
   let qn = 0;
   for (const s of packet.sections) {
     const exam = opts.curricula?.[s.exam]?.short || s.exam;
-    blocks.push(
-      `<div class="blk sec" data-keep="1"><h2>${esc(s.heading || exam)}</h2><span class="mins">about ${Math.round(s.minutes)} min</span></div>`
-    );
+    if (showHeadings) blocks.push(`<div class="blk sec" data-keep="1"><h2>${esc(s.heading || exam)}</h2></div>`);
     for (const l of s.learn) {
       blocks.push(`<div class="blk learn" data-learn="${esc(l.topic)}">
         <div class="learn-tag">Learn</div><h3>${esc(l.title)}</h3>
@@ -231,7 +242,7 @@ export function renderWorkHtml(packet, opts = {}) {
       qn += 1;
       if (it.type === "rating") {
         blocks.push(`<div class="blk item rating" data-item="${esc(it.id)}">
-          <div class="prompt">${numbered(`${qn}.`, it.prompt || "How well do you know each unit? Circle one per row. 1 = never seen it, 5 = could teach it.")}</div>
+          <div class="prompt">${numbered(`${qn}.`, "Circle one per unit. 1 = never studied it, 5 = could teach it.")}</div>
           <table class="rate">${it.ratings
             .map(
               (r) =>
@@ -250,7 +261,7 @@ export function renderWorkHtml(packet, opts = {}) {
         );
       }
       head.push(`<div class="blk item" data-item="${esc(it.id)}" data-keep="1">
-        <div class="q-row"><div class="prompt">${numbered(`${qn}.`, it.prompt)}</div><div class="pts">${it.points ? `${it.points} pt${it.points === 1 ? "" : "s"}` : ""}</div></div>
+        <div class="q-row"><div class="prompt">${numbered(`${qn}.`, it.prompt)}</div><div class="pts">${it.points && !it.parts.length ? `${it.points} pt${it.points === 1 ? "" : "s"}` : ""}</div></div>
         ${it.figureSvg ? `<div class="fig">${it.figureSvg}</div>` : ""}
         ${it.choices.length ? `<ol class="choices" type="A">${it.choices.map((c) => `<li>${richText(c)}</li>`).join("")}</ol>` : ""}
       </div>`);
@@ -267,10 +278,7 @@ export function renderWorkHtml(packet, opts = {}) {
       }
     }
   }
-  blocks.push(`<div class="blk foot" data-item="_rating">
-    <div class="howit">How did it go? <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span> <em>(1 = rough, 5 = easy)</em></div>
-  </div>`);
-  blocks.push(`<div class="blk notes" data-item="_notes"><div class="nl">Anything you want tomorrow's packet to know</div></div>`);
+  blocks.push(`<div class="blk notes" data-item="_notes"><div class="nl">Note for tomorrow's packet</div></div>`);
   return pageShell(packet.title, blocks.join("\n"), "work");
 }
 
@@ -281,24 +289,25 @@ export function renderWorkHtml(packet, opts = {}) {
  */
 export function renderKeyHtml(packet, opts = {}) {
   const blocks = [];
-  blocks.push(`<div class="blk head"><div class="title-row"><h1>Key: ${esc(packet.title)}</h1><div class="date">${esc(packet.date)}</div></div></div>`);
+  blocks.push(`<div class="blk head"><h1>Key: ${esc(packet.title)}</h1></div>`);
+  const showHeadings = packet.sections.length > 1;
   let qn = 0;
   for (const s of packet.sections) {
     const exam = opts.curricula?.[s.exam]?.short || s.exam;
-    blocks.push(`<div class="blk sec" data-keep="1"><h2>${esc(s.heading || exam)}</h2></div>`);
+    if (showHeadings) blocks.push(`<div class="blk sec" data-keep="1"><h2>${esc(s.heading || exam)}</h2></div>`);
     for (const it of s.items) {
       qn += 1;
       if (it.type === "rating") continue;
       const fb = opts.feedback?.[it.id];
       const answer = it.parts.length
-        ? it.parts.map((p) => `<div class="kp"><strong>(${esc(p.label)})</strong> ${richText(p.answer)}</div>`).join("")
+        ? it.parts.map((p) => `<div class="kp">${numbered(`(${p.label})`, p.answer, "pl-label")}</div>`).join("")
         : richText(it.answer);
       blocks.push(`<div class="blk kitem">
         <div class="kq">${numbered(`${qn}.`, it.prompt.length > 600 ? `${it.prompt.slice(0, 600)}...` : it.prompt)}</div>
         ${it.choices.length ? `<ol class="choices" type="A">${it.choices.map((c) => `<li>${richText(c)}</li>`).join("")}</ol>` : ""}
         <div class="ka">${answer}</div>
-        ${it.rubric ? `<div class="kr"><span>Rubric</span>${richText(it.rubric)}</div>` : ""}
-        ${fb ? `<div class="kf"><span>Your work</span>${richText(fb)}</div>` : ""}
+        ${it.rubric ? `<div class="kr"><div class="klabel">Rubric</div>${richText(it.rubric)}</div>` : ""}
+        ${fb ? `<div class="kf"><div class="klabel">Your work</div>${richText(fb)}</div>` : ""}
       </div>`);
     }
   }
@@ -325,21 +334,20 @@ function pageShell(title, flow, mode) {
   .page { position: relative; width: ${PAGE_W}px; height: ${PAGE_H}px; overflow: hidden; break-after: page; page-break-after: always; background: #fff; }
   .page:last-child { break-after: auto; page-break-after: auto; }
   .body { position: absolute; left: 48px; top: 44px; width: 720px; }
-  .pfoot { position: absolute; left: 48px; right: 48px; bottom: 22px; font: 11px "Helvetica Neue", Arial, sans-serif; color: #7a828c; display: flex; justify-content: space-between; }
+  .pfoot { position: absolute; left: 48px; right: 48px; bottom: 22px; font: 11px "Helvetica Neue", Arial, sans-serif; color: #7a828c; text-align: right; }
   .blk { padding-bottom: 10px; }
   p { margin: 0 0 6px; }
   h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; font-weight: 600; }
   h2 { font-size: 16px; margin: 0; font-weight: 600; }
   h3 { font-size: 15px; margin: 2px 0 6px; font-weight: 600; }
-  .title-row { display: flex; justify-content: space-between; align-items: baseline; }
-  .date { font: 13px "Helvetica Neue", Arial, sans-serif; color: #59616b; }
   .sub { color: #3b4249; margin-top: 4px; }
+  .head { border-bottom: 1.5px solid #1f6f78; padding-bottom: 12px; margin-bottom: 12px; }
   .times { display: flex; gap: 14px; align-items: center; margin-top: 10px; }
   .tbox { width: 150px; height: 46px; border: 1.5px solid #3b4249; border-radius: 6px; position: relative; }
   .tbox span { position: absolute; left: 8px; top: 3px; font: 11px "Helvetica Neue", Arial, sans-serif; color: #59616b; }
-  .hint { font: 12px "Helvetica Neue", Arial, sans-serif; color: #59616b; }
-  .sec { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1.5px solid #1f6f78; padding-top: 10px; margin-bottom: 8px; }
-  .sec .mins { font: 12px "Helvetica Neue", Arial, sans-serif; color: #1f6f78; }
+  .tbox.howit { width: auto; flex: 1; display: flex; justify-content: flex-end; align-items: flex-end; gap: 12px; padding: 0 12px 5px 0; }
+  .tbox.howit b { display: inline-block; width: 26px; height: 26px; line-height: 24px; text-align: center; border: 1.3px solid #59616b; border-radius: 50%; font: 12px "Helvetica Neue", Arial, sans-serif; }
+  .sec { border-bottom: 1.5px solid #1f6f78; padding-top: 10px; margin-bottom: 8px; }
   .learn { background: #f2f7f7; border-left: 4px solid #1f6f78; padding: 10px 14px 10px; margin-bottom: 10px; }
   .learn-tag, .ex-tag { font: 600 10.5px "Helvetica Neue", Arial, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: #1f6f78; }
   .example { margin-top: 8px; padding-top: 6px; border-top: 1px dashed #9dbfc2; }
@@ -367,11 +375,7 @@ function pageShell(title, flow, mode) {
   .rate .rl { width: 60%; }
   .rate .rc { text-align: center; }
   .rate .rc span { display: inline-block; width: 30px; height: 30px; line-height: 28px; border: 1.3px solid #59616b; border-radius: 50%; font: 13px "Helvetica Neue", Arial, sans-serif; }
-  .foot { border-top: 1.5px solid #1f6f78; padding-top: 12px; }
-  .howit { display: flex; gap: 12px; align-items: center; }
-  .howit span { display: inline-block; width: 34px; height: 34px; line-height: 32px; text-align: center; border: 1.3px solid #59616b; border-radius: 50%; font: 14px "Helvetica Neue", Arial, sans-serif; }
-  .howit em { font: 12px "Helvetica Neue", Arial, sans-serif; color: #59616b; }
-  .notes { height: 120px; border: 1.3px dashed #9aa3ad; border-radius: 6px; position: relative; padding: 0; margin-bottom: 4px; }
+  .notes { height: 110px; border: 1.3px dashed #9aa3ad; border-radius: 6px; position: relative; padding: 0; margin-bottom: 4px; }
   .notes .nl { position: absolute; left: 10px; top: 6px; font: 11.5px "Helvetica Neue", Arial, sans-serif; color: #59616b; }
   .kitem { border-bottom: 1px solid #e3e7eb; padding: 8px 0 10px; }
   .kq { color: #3b4249; font-size: 13.5px; }
@@ -379,7 +383,7 @@ function pageShell(title, flow, mode) {
   .kp { margin-bottom: 4px; }
   .kr, .kf { margin-top: 6px; font-size: 13px; padding-left: 12px; border-left: 3px solid #d5dbe1; }
   .kf { border-left-color: #c47a2c; }
-  .kr span, .kf span { display: block; font: 600 10.5px "Helvetica Neue", Arial, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: #59616b; }
+  .klabel { display: block; font: 600 10.5px "Helvetica Neue", Arial, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: #59616b; }
   .katex-display { margin: 6px 0; }
 </style></head>
 <body data-mode="${mode}">
@@ -424,6 +428,11 @@ window.__paginate = async function () {
     body.appendChild(b);
     const bh = h(b);
     if (used + bh <= CONTENT_H + 0.5) { used += bh; continue; }
+    if (b.classList.contains("notes") && CONTENT_H - used - 12 >= 70) {
+      b.style.height = (CONTENT_H - used - 12) + "px";
+      used = CONTENT_H;
+      continue;
+    }
     if (b.classList.contains("well")) {
       const lines = Number(b.dataset.lines);
       const room = Math.floor((CONTENT_H - used - 12) / LINE);
@@ -464,12 +473,10 @@ window.__paginate = async function () {
   const pages = Array.from(pagesEl.children).filter((p) => p.querySelector(".body").children.length);
   for (const p of Array.from(pagesEl.children)) if (!pages.includes(p)) p.remove();
   const total = pages.length;
-  const title = document.title;
   pages.forEach((p, i) => {
     const f = document.createElement("div");
     f.className = "pfoot";
-    f.innerHTML = "<span></span><span>" + (i + 1) + " / " + total + "</span>";
-    f.firstChild.textContent = title;
+    f.textContent = (i + 1) + " / " + total;
     p.appendChild(f);
   });
   const boxes = {};
@@ -527,6 +534,10 @@ export async function printPages(html, outDir, prefix, pdfName) {
       const path = join(outDir, `${prefix}-${i + 1}.png`);
       await handles[i].screenshot({ path });
       pngs.push(path);
+    }
+    for (const name of await readdir(outDir)) {
+      const m = name.match(new RegExp(`^${prefix}-(\\d+)\\.png$`));
+      if (m && Number(m[1]) > handles.length) await rm(join(outDir, name), { force: true });
     }
     const pdfPath = join(outDir, pdfName);
     await page.emulateMedia({ media: "print" });

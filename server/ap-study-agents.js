@@ -4,22 +4,35 @@
  * Each runs a local Cursor agent in the day folder and reads back one JSON file.
  */
 
+import { readFileSync } from "node:fs";
 import { readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   promptWithAuthRetry,
   reloadCursorApiKeyFromEnv,
   requireCursorApiKey,
 } from "./cursor-sdk-auth.js";
 
+/** Yan picked Opus 5.5 high for every AP step. No Auto fallback: a capacity miss retries later. */
 export const AP_STUDY_MODEL = {
-  id: "grok-4.7",
+  id: "claude-opus-5-5",
   params: [
-    { id: "context", value: "256k" },
-    { id: "reasoning_effort", value: "high" },
+    { id: "cyber", value: "false" },
+    { id: "context", value: "300k" },
+    { id: "effort", value: "high" },
     { id: "fast", value: "false" },
   ],
 };
+
+export const PACKET_RULES_PATH = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  ".cursor",
+  "skills",
+  "ap-study",
+  "packet-rules.md"
+);
 
 /**
  * @param {{ id: string, params?: { id: string, value: string }[] }} spec
@@ -93,6 +106,7 @@ export async function runJsonAgent({ prefix, cwd, prompt, outFile }) {
     prompt,
     model,
     cwd,
+    fallbackModel: null,
     laterDelaysMs: [],
     usage: { person: "Yan", kind: "ap-study", prompt: prompt.slice(0, 4000) },
   });
@@ -171,14 +185,14 @@ export function normalizeAlign(raw, index) {
 // ---------------------------------------------------------------- write
 
 const PACKET_SCHEMA = `{
-  "title": "Tue Nov 24 · Physics 2 focus",
+  "title": "the code sets this",
   "date": "YYYY-MM-DD",
-  "subtitle": "one line on what today covers",
+  "subtitle": "",
   "sections": [
     {
       "exam": "<exam id from plan>",
       "kind": "learn | review | checkpoint | diagnostic | exam-practice",
-      "heading": "Physics 2 · Ideal gases",
+      "heading": "Physics 2 · The ideal gas law",
       "minutes": 20,
       "learn": [
         {
@@ -192,9 +206,9 @@ const PACKET_SCHEMA = `{
       "items": [
         {
           "id": "q1",
-          "topic": "<topic key>",
+          "topic": "<full topic key, like physics-2:9.2>",
           "type": "mcq | short | frq | essay | graph | derivation | rating",
-          "prompt": "question text",
+          "prompt": "question text, starting with the question",
           "passageTitle": "optional",
           "passage": "optional source text, one line per line",
           "lineNumbers": true,
@@ -216,10 +230,19 @@ const PACKET_SCHEMA = `{
   ]
 }`;
 
+export function packetRules(path = PACKET_RULES_PATH) {
+  try {
+    return readFileSync(path, "utf8").trim();
+  } catch {
+    return "";
+  }
+}
+
 /**
- * @param {{ date: string, planFile: string, contextFile: string }} o
+ * @param {{ date: string, planFile: string, contextFile: string, rules?: string }} o
  */
 export function buildWritePrompt(o) {
+  const rules = o.rules ?? packetRules();
   return `You write Yan's daily AP study packet for ${o.date}. He prints nothing. He writes on the PDF pages in OneNote with a stylus, so every answer needs space on the page.
 
 Read ${o.planFile} first. It is the plan the code already picked: which exam gets the focus block, which topics to teach, which to review, and minutes per block. Do not change the topics or the minutes. Then read ${o.contextFile}. It has his mastery and past mistakes per topic, insights about how he learns each subject, recent feedback, what his school classes are doing, and his preferences.
@@ -235,9 +258,9 @@ How to build it:
 - Learn topics with mode review are things his school class already taught. Skip the long card. Give a 3 to 5 line refresher card, then items.
 - Review topics: items only, about 2.5 minutes each. Aim at his past mistakes from the context file.
 - Checkpoint blocks: one mixed set covering the listed topics, AP difficulty, no learn cards.
-- Diagnostic blocks: one item per unit that tests the core idea of that unit, easiest units first, then one rating item listing every unit (type rating, ratings with unitId and label, prompt can be empty). Cap at 30 minutes total. Tell him in the subtitle that it is fine to skip what he has never seen.
-- Exam-practice blocks: AP free-response or a full-length MCQ set in real exam format and timing. When a block has released: true, adapt a released College Board FRQ only if you know it exactly. Otherwise write an original one in the same style and say so in the heading.
-- Every item gets a topic key from the plan, an answer, and a rubric for anything over 1 point. MCQ answers start with the letter.
+- Diagnostic blocks: see Diagnostics in the packet rules below.
+- Exam-practice blocks: AP free-response or a full-length MCQ set in real exam format and timing. When a block has released: true, adapt a released College Board FRQ only if you know it exactly. Otherwise write an original one in the same style. Put "original" in the rubric, not on the page.
+- Every item gets a full topic key from the plan, an answer, and a rubric for anything over 1 point. MCQ answers start with the letter.
 - Item ids are q1, q2, q3 in order across the whole packet.
 - Write space: workLines is lines of about 30px. Short answer 4 to 6, physics or calc parts 6 to 10, an SAQ part 4, a thesis 3, an LEQ or DBQ paragraph 14, a full Lit essay 40. Use grid: true for graphs and free-body diagrams.
 
@@ -250,7 +273,60 @@ Subject notes:
 Formatting:
 - Math in \\\\( \\\\) for inline or $$ $$ for display. Never single dollar signs.
 - SVG figures: plain black lines and text, width at most 600, no scripts, no external images.
-- No emojis. Straight quotes.`;
+- No emojis. Straight quotes.
+${rules ? `\n${rules}\n\nBefore you write packet.json, reread every subtitle, heading, prompt, and figure against these rules and cut whatever breaks one.` : ""}`;
+}
+
+/**
+ * @param {{ draftFile: string, problems: string[], rules?: string }} o
+ */
+export function buildRevisePrompt(o) {
+  const rules = o.rules ?? packetRules();
+  return `Read ${o.draftFile}. It is today's AP packet. A check found these problems:
+
+${o.problems.map((p) => `- ${p}`).join("\n")}
+
+Fix them, and anything else that breaks the rules below. Keep the questions, topics, answers, and points unless a rule says to change them. Write the fixed packet to packet.json in this folder and nothing else.
+
+${rules}`;
+}
+
+const CLUTTER = [
+  /\beasiest\b/i,
+  /\b(two|three|four|five|six|seven|eight|nine|ten|\d+) short (checks|questions)\b/i,
+  /\babout\s+\d+\s*min/i,
+  /\bfine to skip\b/i,
+  /\bminutes total\b/i,
+  /\btake your time\b/i,
+  /\b\d+\s+degrees\b/i,
+];
+
+/**
+ * Text that breaks packet-rules.md and a rule can catch.
+ * @param {any} packet normalized
+ * @param {any} plan
+ */
+export function lintPacket(packet, plan) {
+  const warnings = [];
+  const unitNames = (plan.blocks || []).flatMap((b) => [
+    ...(b.units || []).map((u) => u.name),
+    ...(b.topics || []).map((t) => t.unit),
+  ]);
+  const check = (where, text) => {
+    for (const re of CLUTTER) if (re.test(String(text || ""))) warnings.push(`${where}: clutter "${String(text).match(re)[0]}"`);
+  };
+  check("subtitle", packet.subtitle);
+  for (const s of packet.sections || []) {
+    check(`heading ${s.heading}`, s.heading);
+    for (const it of s.items || []) {
+      check(it.id, it.prompt);
+      check(`${it.id} figure`, it.figureSvg.replace(/<[^>]+>/g, " "));
+      const lead = String(it.prompt || "").split(/[.:]/)[0].trim().toLowerCase();
+      if (lead && unitNames.some((n) => String(n || "").toLowerCase() === lead)) warnings.push(`${it.id}: prompt opens with the unit name`);
+      if (/(^|\n)\s*1\.\s/.test(it.prompt)) warnings.push(`${it.id}: numbered list inside the prompt`);
+    }
+  }
+  return warnings;
 }
 
 /**
@@ -261,13 +337,21 @@ Formatting:
 export function checkPacketAgainstPlan(packet, plan) {
   const warnings = [];
   const keys = new Set((plan.blocks || []).flatMap((b) => (b.topics || []).map((t) => t.key)));
+  const allowed = new Set([
+    ...keys,
+    ...(plan.blocks || []).flatMap((b) => [
+      ...(b.units || []).flatMap((u) => (u.topics || []).map((t) => t.key)),
+      ...(b.skills || []).map((t) => t.key),
+    ]),
+  ]);
   for (const s of packet.sections || []) {
     for (const it of s.items || []) {
       if (it.type === "rating") continue;
       if (!it.topic) warnings.push(`${it.id}: no topic`);
-      else if (keys.size && !keys.has(it.topic)) warnings.push(`${it.id}: topic ${it.topic} not in plan`);
+      else if (allowed.size && !allowed.has(it.topic)) warnings.push(`${it.id}: topic ${it.topic} not in plan`);
     }
   }
+  warnings.push(...lintPacket(packet, plan));
   for (const key of keys) {
     const hit = (packet.sections || []).some((s) => (s.items || []).some((it) => it.topic === key));
     if (!hit) warnings.push(`plan topic ${key} has no item`);
