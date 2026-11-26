@@ -195,9 +195,10 @@ export function placeMarks(input) {
 }
 
 /**
- * Place marks on the inked pages and save previews (pages/marked-N.png) that
- * draw them the way OneNote will.
- * @param {{ inkPngs: string[], boxes: any[], notes: Record<string, string>, bboxes: number[][][], head?: string, previewDir?: string }} o
+ * Place marks on the inked pages and draw them into the images
+ * (`<outDir>/marked-N.png`), which become the page images OneNote shows.
+ * OneNote draws page images above text boxes, so marks must be pixels.
+ * @param {{ inkPngs: string[], boxes: any[], notes: Record<string, string>, bboxes: number[][][], head?: string, outDir: string }} o
  */
 export async function layoutMarks(o) {
   const { chromium } = await import("playwright-core");
@@ -210,25 +211,26 @@ export async function layoutMarks(o) {
     const marks = placeMarks({ boxes: o.boxes, notes: o.notes, grids, bboxes: o.bboxes, head: o.head }).map(
       ({ page, left, top, width, text }) => ({ page, left, top, width, text })
     );
-    if (o.previewDir) {
-      for (let i = 0; i < o.inkPngs.length; i++) {
-        const b64 = (await readFile(o.inkPngs[i])).toString("base64");
-        const divs = marks
-          .filter((m) => m.page === i)
-          .map(
-            (m) =>
-              `<div style="position:absolute;left:${m.left}px;top:${m.top}px;width:${m.width}px;color:#D00000;font:10pt Calibri,Carlito,Arial,sans-serif;line-height:${LINE_PX}px">${m.text
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")}</div>`
-          )
-          .join("");
-        await tab.setContent(
-          `<html><body style="margin:0"><div style="position:relative;width:${PAGE_W}px;height:${PAGE_H}px"><img src="data:image/png;base64,${b64}" style="position:absolute;left:0;top:0;width:${PAGE_W}px;height:${PAGE_H}px"/>${divs}</div></body></html>`
-        );
-        await tab.screenshot({ path: join(o.previewDir, `marked-${i + 1}.png`), clip: { x: 0, y: 0, width: PAGE_W, height: PAGE_H } });
-      }
+    const pngs = [];
+    for (let i = 0; i < o.inkPngs.length; i++) {
+      const b64 = (await readFile(o.inkPngs[i])).toString("base64");
+      const divs = marks
+        .filter((m) => m.page === i)
+        .map(
+          (m) =>
+            `<div style="position:absolute;left:${m.left}px;top:${m.top}px;width:${m.width}px;color:#D00000;font:10pt Calibri,Carlito,Arial,sans-serif;line-height:${LINE_PX}px">${m.text
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")}</div>`
+        )
+        .join("");
+      await tab.setContent(
+        `<html><body style="margin:0"><div style="position:relative;width:${PAGE_W}px;height:${PAGE_H}px"><img src="data:image/png;base64,${b64}" style="position:absolute;left:0;top:0;width:${PAGE_W}px;height:${PAGE_H}px"/>${divs}</div></body></html>`
+      );
+      const path = join(o.outDir, `marked-${i + 1}.png`);
+      await tab.screenshot({ path, clip: { x: 0, y: 0, width: PAGE_W, height: PAGE_H } });
+      pngs.push(path);
     }
-    return marks;
+    return { marks, pngs };
   } finally {
     await browser.close();
   }

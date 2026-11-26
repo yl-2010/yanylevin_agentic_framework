@@ -27,9 +27,11 @@ Every model step (align, write, revise, grade) runs on Opus 5.5 high (`AP_STUDY_
 
 Grading writes `notes` in `grade.json`, one per answer box: `"q1-a": "0/2 | W on gas = −PΔV | = −400 J"`. Score first, then up to 3 comments of 8 words or fewer. Full credit is just the score. Unicode math, no LaTeX. The model never gives coordinates.
 
-`markDay` in `server/ap-study.js` does the rest. The score goes beside the box's "pts" label. Comments go in the nearest blank spot after his last line of ink in that box, between ruled lines (`server/ap-study-marks.js`). It reposts the page with his ink baked into the images and the marks as absolute divs, deletes the inked page, and repoints the todo. `ink/original.inkml` keeps the raw ink. `pages/marked-N.png` is a preview of what OneNote shows. Check it before telling Yan it looks right.
+`markDay` in `server/ap-study.js` does the rest. The score goes beside the box's "pts" label. Comments go in the nearest blank spot after his last line of ink in that box, between ruled lines (`server/ap-study-marks.js`). It draws his ink and the red marks into `pages/marked-N.png`, reposts the page with those images, deletes the inked page, and repoints the todo and `status.json`. `ink/original.inkml` keeps the raw ink. `marked-N.png` is exactly what OneNote shows. Check it before telling Yan it looks right.
 
-The Graph PATCH API cannot place text on an existing page. Appending to `body` lands in the first div, and new divs lose their position. Do not try to patch marks onto a live page.
+Do not put marks on a page as text. The Graph PATCH API cannot place text on an existing page (appending to `body` lands in the first div). On a new page, OneNote draws the page images over any text box, and it stores a fractional px offset as 0. Both failed on 2026-11-25: one red block at the top, and no marks over the images.
+
+Graph page ids change after OneNote syncs a page. The `page-id=` GUID in `clientUrl` does not. Read or delete a saved page through `resolvePageId` / `deletePublishedPage` in `server/ap-study-onenote.js`, never by the raw id in `publish.json`.
 
 To add or fix one mark: `node --env-file=server/.env server/ap-study.js mark --date <d> --note 'q3-b=1/2 | why: R goes 2→3 Ω'`. That reposts the page, so only run it after grading.
 

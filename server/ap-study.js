@@ -34,7 +34,14 @@ import {
   aprilPriorityList,
 } from "./ap-study-model.js";
 import { normalizePacket, renderPacket, renderInk, esc } from "./ap-study-render.js";
-import { harvestInk, publishPrintoutPage, AP_NOTEBOOK_NAME, monthSectionName } from "./ap-study-onenote.js";
+import {
+  harvestInk,
+  publishPrintoutPage,
+  resolvePageId,
+  deletePublishedPage,
+  AP_NOTEBOOK_NAME,
+  monthSectionName,
+} from "./ap-study-onenote.js";
 import { layoutMarks } from "./ap-study-marks.js";
 import {
   buildAlignPrompt,
@@ -616,12 +623,31 @@ async function sideNote(S, plan, date) {
   return rows.join("");
 }
 
+/**
+ * The day's publish.json with the page's current Graph id, saved back when it
+ * changed. Null when the page is no longer in OneNote.
+ * @param {string} dayDir
+ * @param {any} row
+ * @param {string} [token]
+ */
+async function currentPage(dayDir, row, token) {
+  if (!row?.id) return null;
+  const { onenoteToken } = await import("./school-onenote.js");
+  const id = await resolvePageId(token || (await onenoteToken()), row);
+  if (!id) return null;
+  if (id === row.id) return row;
+  const next = { ...row, id };
+  await writeJson(join(dayDir, "publish.json"), next);
+  return next;
+}
+
 /** @param {string} date */
 export async function publishDay(date, opts = {}) {
   const S = await loadState();
   const dayDir = join(S.P.days, date);
-  const existing = await readJson(join(dayDir, "publish.json"));
+  let existing = await readJson(join(dayDir, "publish.json"));
   const plan = await readJson(join(dayDir, "plan.json"));
+  if (existing?.id && opts.force) existing = await currentPage(dayDir, existing);
   if (existing?.id && !opts.force) {
     const todo = await ensureStudyTodo(date, existing, plan).catch((err) => {
       console.error(`[ap-study] todo failed for ${date}`, err);
@@ -646,8 +672,8 @@ export async function publishDay(date, opts = {}) {
   const row = { ...page, publishedAt: new Date().toISOString(), pages: pngs.length };
   await writeJson(join(dayDir, "publish.json"), row);
   if (existing?.id) {
-    const { deleteOnenotePage, onenoteToken } = await import("./school-onenote.js");
-    await deleteOnenotePage(await onenoteToken(), existing.id).catch((err) => {
+    const { onenoteToken } = await import("./school-onenote.js");
+    await deletePublishedPage(await onenoteToken(), existing).catch((err) => {
       console.error(`[ap-study] could not delete the old ${date} page`, err);
     });
   }
@@ -681,7 +707,9 @@ export async function gradeDay(date, opts = {}) {
   let crops = saved?.crops || [];
   let totalStrokes = saved?.strokes || 0;
   if (!saved) {
-    const ink = await harvestInk(publish.id);
+    const live = await currentPage(dayDir, publish);
+    if (!live) return { ok: false, date, reason: "page not found in OneNote" };
+    const ink = await harvestInk(live.id);
     const pngs = Array.from({ length: boxes.pages }, (_, i) => join(dayDir, "pages", `page-${i + 1}.png`));
     const pages = pngs.map((png, i) => ({ png, strokes: ink.pages[i]?.strokes || [] }));
     totalStrokes = pages.reduce((n, p) => n + p.strokes.length, 0);
@@ -747,8 +775,8 @@ function strokeBox(s) {
 }
 
 /**
- * Repost the day's page with his ink baked in and red marks from grade.json
- * (plus `extra`, box id -> note) placed beside his work. Deletes the page it
+ * Repost the day's page with his ink and red marks from grade.json (plus
+ * `extra`, box id -> note) drawn into the page images. Deletes the page it
  * replaces and repoints the College Prep todo.
  * @param {string} date
  * @param {Record<string, string>} [extra]
@@ -771,26 +799,30 @@ export async function markDay(date, extra = {}) {
     head = `${earned}/${pts}${grade.summary ? ` · ${grade.summary}` : ""}`;
   }
   const inkPngs = Array.from({ length: boxes.pages }, (_, i) => join(dayDir, "ink", `ink-page-${i + 1}.png`));
-  const marks = await layoutMarks({ inkPngs, boxes: boxes.boxes, notes, bboxes, head, previewDir: join(dayDir, "pages") });
+  const { marks, pngs } = await layoutMarks({ inkPngs, boxes: boxes.boxes, notes, bboxes, head, outDir: join(dayDir, "pages") });
 
-  const { onenoteToken, readOnenotePageInk, deleteOnenotePage } = await import("./school-onenote.js");
+  const { onenoteToken, readOnenotePageInk } = await import("./school-onenote.js");
   const token = await onenoteToken();
-  if (!publish.marked) {
-    const ink = await readOnenotePageInk(token, publish.id);
+  const live = await currentPage(dayDir, publish, token);
+  if (live && !publish.marked) {
+    const ink = await readOnenotePageInk(token, live.id);
     await writeFile(join(dayDir, "ink", "original.inkml"), ink.inkml);
   }
   const page = await publishPrintoutPage({
     dateKey: date,
     title: publish.title,
-    pngPaths: inkPngs,
+    pngPaths: pngs,
     pdfPath: join(dayDir, "pages", "work.pdf"),
-    marks,
     token,
   });
   const row = { ...page, publishedAt: new Date().toISOString(), pages: boxes.pages, marked: true };
   await writeJson(join(dayDir, "publish.json"), row);
   await writeJson(join(dayDir, "marks.json"), { at: row.publishedAt, marks });
-  await deleteOnenotePage(token, publish.id).catch((err) => console.error(`[ap-study] could not delete the old ${date} page`, err));
+  if (live) {
+    await deletePublishedPage(token, live).catch((err) => console.error(`[ap-study] could not delete the old ${date} page`, err));
+  }
+  const status = await readJson(S.P.status);
+  if (status?.date === addDays(date, 1)) await writeStatus(S.P, status.date, status.error || "");
   const plan = await readJson(join(dayDir, "plan.json"));
   await ensureStudyTodo(date, row, plan).catch((err) => console.error(`[ap-study] todo failed for ${date}`, err));
   return { ok: true, date, marks: marks.length, url: row.webUrl };

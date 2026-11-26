@@ -33,7 +33,7 @@ import {
   parseJsonLoose,
 } from "./ap-study-agents.js";
 import { buildStudyTodo, fallbackAlign, insertApStudyCapsule, looksLikeTest, mergeStudyTodo, shortDate } from "./ap-study.js";
-import { buildPrintoutPageHtml } from "./ap-study-onenote.js";
+import { buildPrintoutPageHtml, stablePageId } from "./ap-study-onenote.js";
 import { CELL, inkEnd, noteSize, parseNote, placeMarks } from "./ap-study-marks.js";
 
 const curricula = loadCurricula();
@@ -452,8 +452,19 @@ describe("overrides", () => {
     assert.equal(Math.abs(by("W = −PΔV").top - 470) <= 8, true);
     assert.ok(by("1/1"));
     assert.ok(by("1/3"));
-    const html = buildPrintoutPageHtml({ title: "t", pageCount: 1, marks });
-    assert.match(html, /color:#D00000;font-size:10pt/);
+  });
+
+  it("keeps marks out of the page HTML, since OneNote draws images over text", () => {
+    const html = buildPrintoutPageHtml({ title: "t", pageCount: 2 });
+    assert.equal((html.match(/<img /g) || []).length, 2);
+    assert.doesNotMatch(html, /D00000/i);
+  });
+
+  it("finds the stable page GUID in OneNote links", () => {
+    const guid = "e656a5ad-8191-488e-a888-510f3c9fca11";
+    assert.equal(stablePageId({ clientUrl: `onenote:https://x/Nov%202026.one#T&section-id=a745&page-id=${guid}&end` }), guid);
+    assert.equal(stablePageId({ webUrl: `https://x?wd=target%28Nov%202026.one%7Ca745%2FTue%7C${guid}%2F%29` }), guid);
+    assert.equal(stablePageId({}), "");
   });
 
   it("inserts the briefing card after the recap", () => {

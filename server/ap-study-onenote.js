@@ -7,15 +7,19 @@
  *
  * Red marks go on a rebuilt page, not the inked one. The Graph PATCH API
  * cannot add a positioned div to an existing page (body appends land inside
- * the first div), so grading reposts the page with his ink baked into the
- * images and each mark as its own absolute div.
+ * the first div), and OneNote draws page images above text boxes, so grading
+ * reposts the page with his ink and the marks both drawn into the images.
  */
 
 import { readFile } from "node:fs/promises";
 import {
+  GRAPH_BASE,
   createOnenotePage,
+  deleteOnenotePage,
   ensureOwnedNotebook,
   ensureSection,
+  graphRequest,
+  listOwnedSectionPages,
   onenoteToken,
   readOnenotePageInk,
 } from "./school-onenote.js";
@@ -28,7 +32,6 @@ export const PAGE_LEFT = 48;
 export const PAGE_TOP = 96;
 export const PAGE_GAP = 48;
 export const SIDE_LEFT = PAGE_LEFT + PAGE_W + 48;
-export const MARK_COLOR = "#D00000";
 
 /**
  * @param {number} index zero-based page index
@@ -49,19 +52,7 @@ function esc(s) {
 }
 
 /**
- * @typedef {{ page: number, left: number, top: number, width: number, text: string }} Mark
- */
-
-/**
- * @param {Mark} m
- */
-export function markHtml(m) {
-  const slot = pageSlot(m.page);
-  return `<div style="position:absolute;left:${PAGE_LEFT + m.left}px;top:${slot.top + m.top}px;width:${m.width}px"><p style="color:${MARK_COLOR};font-size:10pt;margin-top:0pt;margin-bottom:0pt">${esc(m.text)}</p></div>`;
-}
-
-/**
- * @param {{ title: string, pageCount: number, pdfName?: string, sideHtml?: string, partPrefix?: string, marks?: Mark[] }} opts
+ * @param {{ title: string, pageCount: number, pdfName?: string, sideHtml?: string, partPrefix?: string }} opts
  */
 export function buildPrintoutPageHtml(opts) {
   const prefix = opts.partPrefix || "page";
@@ -79,8 +70,7 @@ export function buildPrintoutPageHtml(opts) {
   const side = opts.sideHtml
     ? `<div style="position:absolute;left:${SIDE_LEFT}px;top:${PAGE_TOP}px;width:440px">${opts.sideHtml}</div>`
     : "";
-  const marks = (opts.marks || []).map(markHtml).join("");
-  return `<!DOCTYPE html><html><head><title>${esc(opts.title)}</title><meta name="created" content="${new Date().toISOString()}" /></head><body data-absolute-enabled="true">${imgs.join("")}${marks}${side}${pdf}</body></html>`;
+  return `<!DOCTYPE html><html><head><title>${esc(opts.title)}</title><meta name="created" content="${new Date().toISOString()}" /></head><body data-absolute-enabled="true">${imgs.join("")}${side}${pdf}</body></html>`;
 }
 
 /**
@@ -94,7 +84,7 @@ export function monthSectionName(dateKey) {
 }
 
 /**
- * @param {{ dateKey: string, title: string, pngPaths: string[], pdfPath?: string, sideHtml?: string, marks?: Mark[], token?: string }} opts
+ * @param {{ dateKey: string, title: string, pngPaths: string[], pdfPath?: string, sideHtml?: string, token?: string }} opts
  */
 export async function publishPrintoutPage(opts) {
   const token = opts.token || (await onenoteToken());
@@ -120,10 +110,53 @@ export async function publishPrintoutPage(opts) {
     pageCount: opts.pngPaths.length,
     pdfName,
     sideHtml: opts.sideHtml,
-    marks: opts.marks,
   });
   const page = await createOnenotePage(token, section.id, { html, parts });
   return { ...page, notebookId: notebook.id, sectionId: section.id, section: section.name };
+}
+
+/**
+ * Page GUID from a OneNote client or web link. Graph page ids change after
+ * OneNote syncs a page; this GUID does not.
+ * @param {{ clientUrl?: string, webUrl?: string }} row
+ */
+export function stablePageId(row) {
+  const client = String(row?.clientUrl || "").match(/[?&]page-id=([0-9a-f-]{36})/i);
+  if (client) return client[1].toLowerCase();
+  const web = String(row?.webUrl || "").match(/%7C([0-9a-f-]{36})%2F%29/i);
+  return web ? web[1].toLowerCase() : "";
+}
+
+/**
+ * Current Graph id for a page row saved at publish time, or "" if the page
+ * is gone.
+ * @param {string} token
+ * @param {{ id?: string, sectionId?: string, clientUrl?: string, webUrl?: string }} row
+ */
+export async function resolvePageId(token, row) {
+  if (!row?.id) return "";
+  try {
+    await graphRequest("GET", `${GRAPH_BASE}/me/onenote/pages/${encodeURIComponent(row.id)}?$select=id`, token);
+    return row.id;
+  } catch (err) {
+    if (Number(/** @type {any} */ (err)?.status) !== 404) throw err;
+  }
+  const stable = stablePageId(row);
+  if (!stable || !row.sectionId) return "";
+  const pages = await listOwnedSectionPages(token, row.sectionId);
+  return pages.find((p) => stablePageId(p) === stable)?.id || "";
+}
+
+/**
+ * Delete a published page by its current id. A page that is already gone
+ * counts as deleted.
+ * @param {string} token
+ * @param {{ id?: string, sectionId?: string, clientUrl?: string, webUrl?: string }} row
+ */
+export async function deletePublishedPage(token, row) {
+  const id = await resolvePageId(token, row);
+  if (id) await deleteOnenotePage(token, id);
+  return { id, deleted: Boolean(id) };
 }
 
 /**
