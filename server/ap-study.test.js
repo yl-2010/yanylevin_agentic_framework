@@ -33,6 +33,8 @@ import {
   parseJsonLoose,
 } from "./ap-study-agents.js";
 import { buildStudyTodo, fallbackAlign, insertApStudyCapsule, looksLikeTest, mergeStudyTodo, shortDate } from "./ap-study.js";
+import { buildPrintoutPageHtml } from "./ap-study-onenote.js";
+import { CELL, inkEnd, noteSize, parseNote, placeMarks } from "./ap-study-marks.js";
 
 const curricula = loadCurricula();
 const spec = loadCalendarSpec();
@@ -292,6 +294,21 @@ describe("packet", () => {
     assert.deepEqual(grade.learnTopicsSeen, ["physics-2:9.2"]);
   });
 
+  it("keeps margin notes for real boxes and folds them into item feedback", () => {
+    const packet = normalizePacket(raw);
+    const grade = normalizeGrade(
+      {
+        items: [{ id: "q2", points: 2, earned: 1 }],
+        notes: { "q2-a": "1/2. Units  are\nm/s.", q9: "no such item", head: "code owns this", "q1": "" },
+      },
+      packet,
+      index,
+      [{ item: "q2", part: "a", strokes: 3 }]
+    );
+    assert.deepEqual(grade.notes, { "q2-a": "1/2. Units are m/s." });
+    assert.equal(grade.items.find((i) => i.id === "q2").feedback, "(a) 1/2. Units are m/s.");
+  });
+
   it("prefixes bare topic keys with the section exam", () => {
     const p = normalizePacket({ sections: [{ exam: "physics-2", items: [{ topic: "13.3", prompt: "p", answer: "a" }] }] });
     assert.equal(p.sections[0].items[0].topic, "physics-2:13.3");
@@ -408,6 +425,35 @@ describe("overrides", () => {
     const kept = mergeStudyTodo({ ...todo, done: true, completedAt: "2026-11-24T20:00:00.000Z" }, { ...todo, name: "Tue Nov 24 AP study" });
     assert.equal(kept.done, true);
     assert.equal(kept.completedAt, "2026-11-24T20:00:00.000Z");
+  });
+
+  it("splits a note into the score and short comments", () => {
+    assert.deepEqual(parseNote("0/2 | W on gas = −PΔV | = −400 J"), { score: "0/2", comments: ["W on gas = −PΔV", "= −400 J"] });
+    assert.deepEqual(parseNote("Tb = 3Ta is right"), { score: "", comments: ["Tb = 3Ta is right"] });
+    assert.equal(noteSize("= −(2×10⁵)(2×10⁻³) = −400 J").height, 20);
+  });
+
+  it("puts the score by the points label and comments right after his ink", () => {
+    const cols = Math.ceil(816 / CELL);
+    const rows = Math.ceil(1056 / CELL);
+    const grid = () => ({ cols, rows, occ: new Uint8Array(cols * rows) });
+    const boxes = [
+      { item: "_head", part: "", page: 0, x: 48, y: 44, width: 720, height: 100 },
+      { item: "q1", part: "a", page: 0, x: 48, y: 458, width: 720, height: 182 },
+      { item: "q2", part: "", page: 0, x: 48, y: 700, width: 720, height: 120 },
+    ];
+    const bboxes = [[[60, 470, 140, 500]]];
+    assert.deepEqual(inkEnd(bboxes[0], boxes[1]), { x: 140, y: 470, bottom: 500 });
+    const marks = placeMarks({ boxes, notes: { "q1-a": "0/2 | W = −PΔV", q2: "1/1" }, grids: [grid()], bboxes, head: "1/3" });
+    const by = (t) => marks.find((m) => m.text === t);
+    assert.equal(by("0/2").left >= 760, true);
+    assert.equal(Math.abs(by("0/2").top - 458) <= 8, true);
+    assert.equal(Math.abs(by("W = −PΔV").left - 150) <= 8, true);
+    assert.equal(Math.abs(by("W = −PΔV").top - 470) <= 8, true);
+    assert.ok(by("1/1"));
+    assert.ok(by("1/3"));
+    const html = buildPrintoutPageHtml({ title: "t", pageCount: 1, marks });
+    assert.match(html, /color:#D00000;font-size:10pt/);
   });
 
   it("inserts the briefing card after the recap", () => {

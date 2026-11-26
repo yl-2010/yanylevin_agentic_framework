@@ -9,7 +9,7 @@ description: >-
 
 # AP study
 
-Yan only. One 30-minute PDF a day, written on with a stylus in the school OneNote notebook **AP Study 2026-27**. The 04:00 job grades the last few days, plans the day, writes the packet, and puts it on a page. The key and feedback land the next morning, under that day's page.
+Yan only. One 30-minute PDF a day, written on with a stylus in the school OneNote notebook **AP Study 2026-27**. The 04:00 job grades the last few days, plans the day, writes the packet, and puts it on a page. The next morning that same page comes back with red teacher marks on it. There is no separate key page.
 
 Do not generate a week of packets ahead. Tomorrow's packet is supposed to see today's ink.
 
@@ -22,6 +22,16 @@ Once the page is in OneNote, the job writes a College Prep todo for that day (`C
 After writing, `lintPacket` in `server/ap-study-agents.js` looks for the clutter a regex can catch. If it finds any, the model gets one revise pass with the exact lines listed. Leftover hits show up as `warnings` in the run log.
 
 Every model step (align, write, revise, grade) runs on Opus 5.5 high (`AP_STUDY_MODEL`). Yan picked it on 2026-11-23 after the Grok 4.7 packet came out cluttered. There is no Auto fallback. If Opus is out of capacity, the 04:00 job retries 20 and 60 minutes later.
+
+## Red marks
+
+Grading writes `notes` in `grade.json`, one per answer box: `"q1-a": "0/2 | W on gas = −PΔV | = −400 J"`. Score first, then up to 3 comments of 8 words or fewer. Full credit is just the score. Unicode math, no LaTeX. The model never gives coordinates.
+
+`markDay` in `server/ap-study.js` does the rest. The score goes beside the box's "pts" label. Comments go in the nearest blank spot after his last line of ink in that box, between ruled lines (`server/ap-study-marks.js`). It reposts the page with his ink baked into the images and the marks as absolute divs, deletes the inked page, and repoints the todo. `ink/original.inkml` keeps the raw ink. `pages/marked-N.png` is a preview of what OneNote shows. Check it before telling Yan it looks right.
+
+The Graph PATCH API cannot place text on an existing page. Appending to `body` lands in the first div, and new divs lose their position. Do not try to patch marks onto a live page.
+
+To add or fix one mark: `node --env-file=server/.env server/ap-study.js mark --date <d> --note 'q3-b=1/2 | why: R goes 2→3 Ω'`. That reposts the page, so only run it after grading.
 
 ## Where things live
 
@@ -40,7 +50,7 @@ Exams: `physics-2`, `physics-c-mech`, `us-history`, `lit`, `calc-bc`. Topic keys
 
 ## Commands
 
-From the repo root. Add `--env-file=server/.env` when the command talks to OneNote (`syllabi`, `publish`, `grade`, `run`, `pace`, `ink-check`).
+From the repo root. Add `--env-file=server/.env` when the command talks to OneNote (`syllabi`, `publish`, `grade`, `mark`, `run`, `pace`, `ink-check`).
 
 ```bash
 node server/ap-study.js status
@@ -49,7 +59,7 @@ node server/ap-study.js run --date 2026-11-25
 node --env-file=server/.env server/ap-study.js know --topic calc-bc:10.1 --topic calc-bc:10.2
 ```
 
-`grade` reads the ink and posts the key. Say you graded it, and the percent. A page with no ink is a missed day, not a zero.
+`grade` reads the ink, grades, and reposts the page with red marks. Say you graded it, and the score. A page with no ink is a missed day, not a zero. A marked page regrades from the saved `crops.json`, because its ink now lives in the images.
 
 `run` is the nightly job. Use it when a morning packet never showed up. It will not rewrite a day that is already in OneNote.
 

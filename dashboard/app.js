@@ -232,7 +232,7 @@
         {
           id: "ap-study",
           name: "AP study",
-          model: "Grok 4.7 high",
+          model: "Opus 5.5 high",
           kind: "clock",
         },
       ],

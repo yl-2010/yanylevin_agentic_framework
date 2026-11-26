@@ -3,11 +3,11 @@
  * Daily AP study packets. One 30 minute packet per day across five AP exams,
  * written by a model from the learner model, printed to PDF pages, and put in
  * the "AP Study 2026-27" OneNote notebook. Yan writes on the pages with a
- * stylus. The next run reads his ink, grades it, updates the model, and posts
- * the key with feedback.
+ * stylus. The next run reads his ink, grades it, updates the model, and writes
+ * reposts that page with red marks beside each answer.
  *
  * node server/ap-study.js seed | calendar | syllabi | plan | write | render |
- *   publish | grade | run | pace | status | ink-check   [--date YYYY-MM-DD] [--force]
+ *   publish | grade | mark | run | pace | status | ink-check   [--date YYYY-MM-DD] [--force]
  */
 
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile, copyFile, open } from "node:fs/promises";
@@ -33,8 +33,9 @@ import {
   weekday,
   aprilPriorityList,
 } from "./ap-study-model.js";
-import { normalizePacket, renderPacket, renderFeedbackKey, renderInk, esc } from "./ap-study-render.js";
+import { normalizePacket, renderPacket, renderInk, esc } from "./ap-study-render.js";
 import { harvestInk, publishPrintoutPage, AP_NOTEBOOK_NAME, monthSectionName } from "./ap-study-onenote.js";
+import { layoutMarks } from "./ap-study-marks.js";
 import {
   buildAlignPrompt,
   buildGradePrompt,
@@ -661,7 +662,7 @@ export async function publishDay(date, opts = {}) {
 
 /**
  * @param {string} date
- * @param {{ force?: boolean, publishKey?: boolean }} [opts]
+ * @param {{ force?: boolean, marks?: boolean }} [opts]
  */
 export async function gradeDay(date, opts = {}) {
   const S = await loadState();
@@ -674,19 +675,33 @@ export async function gradeDay(date, opts = {}) {
   const packet = normalizePacket(await readJson(join(dayDir, "packet.json")));
   const plan = await readJson(join(dayDir, "plan.json"));
   const boxes = await readJson(join(dayDir, "boxes.json"));
-  const ink = await harvestInk(publish.id);
-  const pngs = Array.from({ length: boxes.pages }, (_, i) => join(dayDir, "pages", `page-${i + 1}.png`));
-  const pages = pngs.map((png, i) => ({ png, strokes: ink.pages[i]?.strokes || [] }));
-  const totalStrokes = pages.reduce((n, p) => n + p.strokes.length, 0);
+  // A marked page has his ink baked into the images, so regrade from the saved crops.
+  const saved = publish.marked ? await readJson(join(dayDir, "crops.json")) : null;
+  if (publish.marked && !saved) return { ok: false, date, reason: "marked page has no saved crops" };
+  let crops = saved?.crops || [];
+  let totalStrokes = saved?.strokes || 0;
+  if (!saved) {
+    const ink = await harvestInk(publish.id);
+    const pngs = Array.from({ length: boxes.pages }, (_, i) => join(dayDir, "pages", `page-${i + 1}.png`));
+    const pages = pngs.map((png, i) => ({ png, strokes: ink.pages[i]?.strokes || [] }));
+    totalStrokes = pages.reduce((n, p) => n + p.strokes.length, 0);
+    if (totalStrokes > 0) {
+      const rendered = await renderInk(pages, boxes.boxes, join(dayDir, "ink"));
+      crops = rendered.crops.map((c) => ({
+        ...c,
+        path: c.path ? relative(dayDir, c.path) : "",
+        ...(c.item.startsWith("_") ? {} : { box: c.part ? `${c.item}-${c.part}` : c.item }),
+      }));
+      await writeJson(join(dayDir, "crops.json"), { strokes: totalStrokes, crops });
+      await writeJson(join(dayDir, "ink", "strokes.json"), pages.map((p) => p.strokes.map(strokeBox)));
+    }
+  }
 
   /** @type {any} */
   let grade;
   if (totalStrokes === 0) {
     grade = { date, status: "skipped", items: [], learnTopicsSeen: [], selfRatings: [], insights: {}, summary: "" };
   } else {
-    const rendered = await renderInk(pages, boxes.boxes, join(dayDir, "ink"));
-    const crops = rendered.crops.map((c) => ({ ...c, path: c.path ? relative(dayDir, c.path) : "" }));
-    await writeJson(join(dayDir, "crops.json"), { strokes: totalStrokes, crops });
     const { raw, model } = await runJsonAgent({
       prefix: "ap-study-grade",
       cwd: dayDir,
@@ -702,7 +717,7 @@ export async function gradeDay(date, opts = {}) {
 
   if (S.model.appliedDays[date] === "skipped" && grade.status === "graded") delete S.model.appliedDays[date];
   if (opts.force && S.model.appliedDays[date] === "graded") {
-    console.warn(`[ap-study] ${date} was already applied to the model; regrade updates grade.json and the key only`);
+    console.warn(`[ap-study] ${date} was already applied to the model; regrade updates grade.json and the marks only`);
   }
   const applied = applyGrade(S.model, S.curricula, S.calendar, date, grade);
   await writeJson(S.P.model, S.model);
@@ -714,42 +729,71 @@ export async function gradeDay(date, opts = {}) {
     if (!prev.includes(`## ${date}`)) await writeFile(path, `${prev.trimEnd()}\n\n## ${date}\n\n${note}\n`);
   }
 
-  let keyPage = null;
-  if (grade.status === "graded" && opts.publishKey !== false) {
-    keyPage = await publishKey(S, date, packet, grade).catch((err) => {
-      console.error(`[ap-study] key page failed for ${date}`, err);
+  let marks = null;
+  if (grade.status === "graded" && opts.marks !== false) {
+    marks = await markDay(date).catch((err) => {
+      console.error(`[ap-study] marks failed for ${date}`, err);
       return null;
     });
   }
-  return { ok: true, date, status: grade.status, strokes: totalStrokes, applied, keyPage: keyPage?.webUrl || "" };
+  return { ok: true, date, status: grade.status, strokes: totalStrokes, applied, marks };
+}
+
+/** @param {{ points: [number, number][] }} s */
+function strokeBox(s) {
+  const xs = s.points.map((p) => p[0]);
+  const ys = s.points.map((p) => p[1]);
+  return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)].map((v) => Math.round(v));
 }
 
 /**
- * @param {Awaited<ReturnType<typeof loadState>>} S
+ * Repost the day's page with his ink baked in and red marks from grade.json
+ * (plus `extra`, box id -> note) placed beside his work. Deletes the page it
+ * replaces and repoints the College Prep todo.
  * @param {string} date
- * @param {any} packet
- * @param {any} grade
+ * @param {Record<string, string>} [extra]
  */
-async function publishKey(S, date, packet, grade) {
+export async function markDay(date, extra = {}) {
+  const S = await loadState();
   const dayDir = join(S.P.days, date);
-  /** @type {Record<string, string>} */
-  const feedback = {};
-  for (const it of grade.items) {
-    feedback[it.id] = it.skipped ? "Skipped." : `${it.earned} of ${it.points}. ${it.feedback}`;
+  const publish = await readJson(join(dayDir, "publish.json"));
+  if (!publish?.id) return { ok: false, date, reason: "not published" };
+  const grade = await readJson(join(dayDir, "grade.json"));
+  const boxes = await readJson(join(dayDir, "boxes.json"));
+  const bboxes = await readJson(join(dayDir, "ink", "strokes.json"));
+  if (!bboxes) return { ok: false, date, reason: "no ink/strokes.json; grade first" };
+  const notes = { ...(grade?.notes || {}), ...extra };
+  let head = "";
+  if (grade?.status === "graded") {
+    const done = grade.items.filter((i) => !i.skipped);
+    const pts = done.reduce((s, i) => s + i.points, 0);
+    const earned = done.reduce((s, i) => s + i.earned, 0);
+    head = `${earned}/${pts}${grade.summary ? ` · ${grade.summary}` : ""}`;
   }
-  const out = await renderFeedbackKey(packet, dayDir, feedback, { curricula: S.curricula });
-  const done = grade.items.filter((i) => !i.skipped);
-  const pct = done.length ? Math.round((done.reduce((s, i) => s + i.earned, 0) / done.reduce((s, i) => s + i.points, 0)) * 100) : 0;
+  const inkPngs = Array.from({ length: boxes.pages }, (_, i) => join(dayDir, "ink", `ink-page-${i + 1}.png`));
+  const marks = await layoutMarks({ inkPngs, boxes: boxes.boxes, notes, bboxes, head, previewDir: join(dayDir, "pages") });
+
+  const { onenoteToken, readOnenotePageInk, deleteOnenotePage } = await import("./school-onenote.js");
+  const token = await onenoteToken();
+  if (!publish.marked) {
+    const ink = await readOnenotePageInk(token, publish.id);
+    await writeFile(join(dayDir, "ink", "original.inkml"), ink.inkml);
+  }
   const page = await publishPrintoutPage({
     dateKey: date,
-    title: `${shortDate(date)} key + feedback`,
-    pngPaths: out.pngs,
-    pdfPath: out.pdfPath,
-    sideHtml: `<p><b>${done.length} of ${grade.items.length} answered, ${pct}%.</b></p><p>${esc(grade.summary)}</p>`,
+    title: publish.title,
+    pngPaths: inkPngs,
+    pdfPath: join(dayDir, "pages", "work.pdf"),
+    marks,
+    token,
   });
-  const row = { ...page, publishedAt: new Date().toISOString() };
-  await writeJson(join(dayDir, "key-publish.json"), row);
-  return row;
+  const row = { ...page, publishedAt: new Date().toISOString(), pages: boxes.pages, marked: true };
+  await writeJson(join(dayDir, "publish.json"), row);
+  await writeJson(join(dayDir, "marks.json"), { at: row.publishedAt, marks });
+  await deleteOnenotePage(token, publish.id).catch((err) => console.error(`[ap-study] could not delete the old ${date} page`, err));
+  const plan = await readJson(join(dayDir, "plan.json"));
+  await ensureStudyTodo(date, row, plan).catch((err) => console.error(`[ap-study] todo failed for ${date}`, err));
+  return { ok: true, date, marks: marks.length, url: row.webUrl };
 }
 
 // ---------------------------------------------------------------- pace page
@@ -866,13 +910,13 @@ async function writeStatus(P, date, error = "") {
   const pub = await readJson(join(P.days, date, "publish.json"));
   const prevDate = addDays(date, -1);
   const prev = await readJson(join(P.days, prevDate, "grade.json"));
-  const keyPub = await readJson(join(P.days, prevDate, "key-publish.json"));
+  const prevPub = await readJson(join(P.days, prevDate, "publish.json"));
   const pace = await readJson(P.pace);
   let yesterday = null;
   if (prev?.status === "graded") {
     const done = prev.items.filter((i) => !i.skipped);
     const pts = done.reduce((s, i) => s + i.points, 0);
-    yesterday = { answered: done.length, items: prev.items.length, percent: pts ? Math.round((done.reduce((s, i) => s + i.earned, 0) / pts) * 100) : 0, keyUrl: keyPub?.webUrl || "" };
+    yesterday = { answered: done.length, items: prev.items.length, percent: pts ? Math.round((done.reduce((s, i) => s + i.earned, 0) / pts) * 100) : 0, marksUrl: prevPub?.marked ? prevPub.webUrl : "" };
   } else if (prev?.status === "skipped") {
     yesterday = { skipped: true };
   }
@@ -940,7 +984,7 @@ export async function apStudyBriefingCapsule(date) {
   if (s.error && !s.url) lines.push(`Today's packet failed: ${s.error}`);
   else if (s.summary) lines.push(`${s.summary}.${s.url ? " It's in OneNote under AP Study 2026-27." : ""}`);
   if (s.yesterday?.skipped) lines.push("Yesterday's packet had no ink, so it counted as a missed day.");
-  else if (s.yesterday) lines.push(`Yesterday: ${s.yesterday.answered} of ${s.yesterday.items} answered, ${s.yesterday.percent}%. The key and feedback are posted.`);
+  else if (s.yesterday) lines.push(`Yesterday: ${s.yesterday.answered} of ${s.yesterday.items} answered, ${s.yesterday.percent}%.${s.yesterday.marksUrl ? " Red marks are on that page." : ""}`);
   if (s.behind?.length) lines.push(`Behind: ${s.behind.map((b) => `${name(b.exam)} by ${b.weeks} wk`).join(", ")}.`);
   if (!lines.length) return null;
   return { id: "ap-study", title: "AP Study", category: "other", noVote: true, vote: null, body: lines.join("\n"), citations: [] };
@@ -1043,15 +1087,19 @@ export function startApStudyScheduler() {
 
 /** @param {string[]} argv */
 function parseCli(argv) {
-  const out = { cmd: argv[0] || "help", date: "", force: false, page: "", align: true, noKey: false, topics: [] };
+  const out = { cmd: argv[0] || "help", date: "", force: false, page: "", align: true, noMarks: false, topics: [], notes: {} };
   for (let i = 1; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--date") out.date = argv[++i] || "";
     else if (a === "--force") out.force = true;
     else if (a === "--page") out.page = argv[++i] || "";
     else if (a === "--no-align") out.align = false;
-    else if (a === "--no-key") out.noKey = true;
+    else if (a === "--no-marks") out.noMarks = true;
     else if (a === "--topic") out.topics.push(argv[++i] || "");
+    else if (a === "--note") {
+      const [id, ...rest] = String(argv[++i] || "").split("=");
+      if (id && rest.length) out.notes[id.trim()] = rest.join("=");
+    }
   }
   return out;
 }
@@ -1064,7 +1112,8 @@ const USAGE = `node server/ap-study.js <command> [--date YYYY-MM-DD] [--force]
   write       write packet.json from plan.json
   render      print packet pages, key, and answer boxes
   publish     put the day's pages in OneNote
-  grade       read ink, grade, update model, post key (--no-key skips the key page)
+  grade       read ink, grade, update model, repost the page with red marks (--no-marks skips them)
+  mark        repost the marks from grade.json; --note q3-b="1/2 | comment" adds or replaces one box
   run         nightly job for a date (default today)
   pace        Sunday pace check and OneNote page
   status      summary JSON
@@ -1090,7 +1139,9 @@ export async function runCli(argv) {
     case "publish":
       return publishDay(date, { force: a.force });
     case "grade":
-      return gradeDay(date, { force: a.force, publishKey: !a.noKey });
+      return gradeDay(date, { force: a.force, marks: !a.noMarks });
+    case "mark":
+      return markDay(date, a.notes);
     case "run":
       return runDay({ date, force: a.force });
     case "pace":

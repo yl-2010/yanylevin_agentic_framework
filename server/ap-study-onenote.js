@@ -4,6 +4,11 @@
  *
  * Page images sit at fixed absolute px so ink maps back onto the render.
  * Notes text goes in a column to the right so it never pushes an image.
+ *
+ * Red marks go on a rebuilt page, not the inked one. The Graph PATCH API
+ * cannot add a positioned div to an existing page (body appends land inside
+ * the first div), so grading reposts the page with his ink baked into the
+ * images and each mark as its own absolute div.
  */
 
 import { readFile } from "node:fs/promises";
@@ -23,6 +28,7 @@ export const PAGE_LEFT = 48;
 export const PAGE_TOP = 96;
 export const PAGE_GAP = 48;
 export const SIDE_LEFT = PAGE_LEFT + PAGE_W + 48;
+export const MARK_COLOR = "#D00000";
 
 /**
  * @param {number} index zero-based page index
@@ -43,7 +49,19 @@ function esc(s) {
 }
 
 /**
- * @param {{ title: string, pageCount: number, pdfName?: string, sideHtml?: string, partPrefix?: string }} opts
+ * @typedef {{ page: number, left: number, top: number, width: number, text: string }} Mark
+ */
+
+/**
+ * @param {Mark} m
+ */
+export function markHtml(m) {
+  const slot = pageSlot(m.page);
+  return `<div style="position:absolute;left:${PAGE_LEFT + m.left}px;top:${slot.top + m.top}px;width:${m.width}px"><p style="color:${MARK_COLOR};font-size:10pt;margin-top:0pt;margin-bottom:0pt">${esc(m.text)}</p></div>`;
+}
+
+/**
+ * @param {{ title: string, pageCount: number, pdfName?: string, sideHtml?: string, partPrefix?: string, marks?: Mark[] }} opts
  */
 export function buildPrintoutPageHtml(opts) {
   const prefix = opts.partPrefix || "page";
@@ -61,7 +79,8 @@ export function buildPrintoutPageHtml(opts) {
   const side = opts.sideHtml
     ? `<div style="position:absolute;left:${SIDE_LEFT}px;top:${PAGE_TOP}px;width:440px">${opts.sideHtml}</div>`
     : "";
-  return `<!DOCTYPE html><html><head><title>${esc(opts.title)}</title><meta name="created" content="${new Date().toISOString()}" /></head><body data-absolute-enabled="true">${imgs.join("")}${side}${pdf}</body></html>`;
+  const marks = (opts.marks || []).map(markHtml).join("");
+  return `<!DOCTYPE html><html><head><title>${esc(opts.title)}</title><meta name="created" content="${new Date().toISOString()}" /></head><body data-absolute-enabled="true">${imgs.join("")}${marks}${side}${pdf}</body></html>`;
 }
 
 /**
@@ -75,7 +94,7 @@ export function monthSectionName(dateKey) {
 }
 
 /**
- * @param {{ dateKey: string, title: string, pngPaths: string[], pdfPath?: string, sideHtml?: string, token?: string }} opts
+ * @param {{ dateKey: string, title: string, pngPaths: string[], pdfPath?: string, sideHtml?: string, marks?: Mark[], token?: string }} opts
  */
 export async function publishPrintoutPage(opts) {
   const token = opts.token || (await onenoteToken());
@@ -101,6 +120,7 @@ export async function publishPrintoutPage(opts) {
     pageCount: opts.pngPaths.length,
     pdfName,
     sideHtml: opts.sideHtml,
+    marks: opts.marks,
   });
   const page = await createOnenotePage(token, section.id, { html, parts });
   return { ...page, notebookId: notebook.id, sectionId: section.id, section: section.name };

@@ -369,7 +369,7 @@ export function checkPacketAgainstPlan(packet, plan) {
 export function buildGradePrompt(o) {
   return `You grade Yan's AP study packet from ${o.date}. He wrote on the pages with a stylus in OneNote.
 
-Read ${o.packetFile}. It has every question with the answer and rubric. Read ${o.planFile} for planned minutes. Read ${o.cropsFile}. It lists one image per answer box with the stroke count drawn in it. Open each image with a nonzero stroke count and read his handwriting. ink/ has full pages with his ink drawn on them if a crop cuts something off. Boxes named _start and _finish hold the clock times he started and finished. _rating is a 1 to 5 strip where he circled how the day went. _notes is a free note to you.
+Read ${o.packetFile}. It has every question with the answer and rubric. Read ${o.planFile} for planned minutes. Read ${o.cropsFile}. It lists one image per answer box with its box id and the stroke count drawn in it. Open each image with a nonzero stroke count and read his handwriting. ink/ has full pages with his ink drawn on them if a crop cuts something off. Boxes named _start and _finish hold the clock times he started and finished. _rating is a 1 to 5 strip where he circled how the day went. _notes is a free note to you.
 
 Write grade.json in this folder and nothing else:
 
@@ -392,24 +392,24 @@ Write grade.json in this folder and nothing else:
       "score": 0.75,
       "skipped": false,
       "readAs": "short transcription of what he wrote",
-      "errorTags": ["units"],
-      "feedback": "2 to 3 sentences to him. What was right, the exact mistake, how to fix it next time."
+      "errorTags": ["units"]
     }
   ],
+  "notes": { "q1-a": "0/2 | W on gas = −PΔV | = −400 J, it expands" },
   "insights": { "<exam id>": "1 to 3 sentences on patterns in how he works this subject. Only if today shows something new." },
-  "summary": "2 sentences for the top of tomorrow's key page"
+  "summary": "at most 10 words for the top of his page: the main habit to fix"
 }
 
 Rules:
-- One entry per question. Grade multi-part questions as one entry with points and earned summed over parts. Put each part's result in the feedback.
+- One entry per question. Grade multi-part questions as one entry with points and earned summed over parts.
+- notes are a teacher's red pen on his page. The code writes each one right next to his work in that box. Key is the crop's box (q3, or q3-b for a part). Value is "earned/points | comment | comment": the score for that box, then 1 to 3 comments of at most 8 words each, like margin marks. Name the slip, the missing step, or the right answer. Full credit is just the score. A stem box (q3 on a multi-part question) has no score and gets a comment only when his work there needs one. Plain text with Unicode math (−, ×, ², √, Δ, θ), no LaTeX, no full sentences.
 - score = earned / points, from 0 to 1. Grade like an AP reader with the rubric. Partial credit counts.
 - skipped: true when the box has no ink or only stray marks. Do not grade skipped items and do not guess what he meant.
 - MCQ: he circles or writes a letter. Read which one.
 - errorTags: short kebab-case tags for the kind of mistake (sign-error, units, wrong-formula, setup, algebra, misread-question, thesis-not-defensible, no-evidence, summary-not-analysis, timeline, vocab). Reuse tags across days. Empty when correct.
 - learnTopicsSeen: a learn card counts as seen when he attempted at least one item on that topic.
 - selfRatings: only from rating items. Read the circled 1 to 5 for each unit row.
-- minutesSpent: finish minus start when both are readable, else 0.
-- Write feedback to him directly ("you"), plain and specific. No praise padding.`;
+- minutesSpent: finish minus start when both are readable, else 0.`;
 }
 
 /**
@@ -450,6 +450,20 @@ export function normalizeGrade(raw, packet, index, crops) {
     if (src.type === "rating" || seen.has(id)) continue;
     items.push({ id, topic: src.topic, exam: src.exam, points: Number(src.points) || 1, earned: 0, score: 0, skipped: true, readAs: "", errorTags: [], feedback: "" });
   }
+  /** @type {Record<string, string>} */
+  const notes = {};
+  for (const [k, v] of Object.entries(raw?.notes && typeof raw.notes === "object" ? raw.notes : {})) {
+    const id = String(k).trim();
+    const text = String(v ?? "").replace(/\s+/g, " ").trim();
+    if (/^q\d+(-[\w.]+)?$/.test(id) && byId.has(id.split("-")[0]) && text) notes[id] = text.slice(0, 400);
+  }
+  for (const it of items) {
+    if (it.feedback) continue;
+    it.feedback = Object.entries(notes)
+      .filter(([k]) => k === it.id || k.startsWith(`${it.id}-`))
+      .map(([k, v]) => (k === it.id ? v : `(${k.slice(it.id.length + 1)}) ${v}`))
+      .join(" ");
+  }
   const learnKeys = new Set((packet.sections || []).flatMap((s) => (s.learn || []).map((l) => l.topic)));
   const attempted = new Set(items.filter((i) => !i.skipped).map((i) => i.topic));
   const learnTopicsSeen = [...learnKeys].filter((k) => attempted.has(k));
@@ -467,6 +481,7 @@ export function normalizeGrade(raw, packet, index, crops) {
     learnTopicsSeen,
     selfRatings,
     items,
+    notes,
     insights: Object.fromEntries(
       Object.entries(raw?.insights || {})
         .filter(([, v]) => String(v || "").trim())

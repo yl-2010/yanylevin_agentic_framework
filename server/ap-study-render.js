@@ -285,7 +285,7 @@ export function renderWorkHtml(packet, opts = {}) {
 /**
  * Compact key: prompt, answer, rubric. No writing space.
  * @param {ReturnType<typeof normalizePacket>} packet
- * @param {{ curricula?: Record<string, any>, feedback?: Record<string, string> }} [opts]
+ * @param {{ curricula?: Record<string, any> }} [opts]
  */
 export function renderKeyHtml(packet, opts = {}) {
   const blocks = [];
@@ -298,7 +298,6 @@ export function renderKeyHtml(packet, opts = {}) {
     for (const it of s.items) {
       qn += 1;
       if (it.type === "rating") continue;
-      const fb = opts.feedback?.[it.id];
       const answer = it.parts.length
         ? it.parts.map((p) => `<div class="kp">${numbered(`(${p.label})`, p.answer, "pl-label")}</div>`).join("")
         : richText(it.answer);
@@ -306,9 +305,7 @@ export function renderKeyHtml(packet, opts = {}) {
         <div class="kq">${numbered(`${qn}.`, it.prompt.length > 600 ? `${it.prompt.slice(0, 600)}...` : it.prompt)}</div>
         ${it.choices.length ? `<ol class="choices" type="A">${it.choices.map((c) => `<li>${richText(c)}</li>`).join("")}</ol>` : ""}
         <div class="ka">${answer}</div>
-        ${it.rubric ? `<div class="kr"><div class="klabel">Rubric</div>${richText(it.rubric)}</div>` : ""}
-        ${fb ? `<div class="kf"><div class="klabel">Your work</div>${richText(fb)}</div>` : ""}
-      </div>`);
+        ${it.rubric ? `<div class="kr"><div class="klabel">Rubric</div>${richText(it.rubric)}</div>` : ""}      </div>`);
     }
   }
   return pageShell(`Key: ${packet.title}`, blocks.join("\n"), "key");
@@ -563,17 +560,6 @@ export async function renderPacket(packet, dayDir, opts = {}) {
     JSON.stringify({ pageWidth: PAGE_W, pageHeight: PAGE_H, pages: work.pageCount, boxes: work.boxes, learn: work.learn }, null, 2)
   );
   return { work, key };
-}
-
-/**
- * Key pages with per-question feedback, for the morning-after page.
- * @param {ReturnType<typeof normalizePacket>} packet
- * @param {string} dayDir
- * @param {Record<string, string>} feedback item id -> note
- * @param {{ curricula?: Record<string, any> }} [opts]
- */
-export async function renderFeedbackKey(packet, dayDir, feedback, opts = {}) {
-  return printPages(renderKeyHtml(packet, { ...opts, feedback }), join(dayDir, "pages"), "feedback", "key-feedback.pdf");
 }
 
 // ---------------------------------------------------------------- ink overlay
