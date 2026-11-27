@@ -5,6 +5,8 @@ import {
   attachCanvasCompletion,
   attachCanvasGrades,
   assignmentLooksComplete,
+  canvasCourseTerm,
+  classGradebookCourse,
   courseMapTarget,
   formatAssignmentWork,
   formatCourseScoreLabel,
@@ -243,6 +245,238 @@ describe("attachCanvasGrades", () => {
     });
     assert.equal(tree.classes[0].canvasScoreLabel, undefined);
   });
+
+  it("uses only the current term for a year-long class grade", () => {
+    const tree = {
+      classes: [
+        {
+          id: "spanish-4",
+          canvasLink: "https://canvas.instructure.com/courses/3638875/grades",
+          todos: [
+            {
+              id: "fall-hw",
+              canvasId: 11,
+              canvasLink:
+                "https://canvas.instructure.com/courses/3638875/assignments/11",
+            },
+            {
+              id: "winter-hw",
+              canvasId: 22,
+              canvasLink:
+                "https://canvas.instructure.com/courses/3638876/assignments/22",
+            },
+          ],
+        },
+      ],
+    };
+    attachCanvasGrades(
+      tree,
+      {
+        courses: [
+          {
+            id: 3638875,
+            name: "Spanish 4 (Fall)",
+            htmlUrl: "https://canvas.instructure.com/courses/3638875",
+            currentScore: 97.44,
+          },
+          {
+            id: 3638876,
+            name: "Spanish 4 (Winter)",
+            htmlUrl: "https://canvas.instructure.com/courses/3638876",
+            currentScore: null,
+          },
+        ],
+        assignments: [
+          {
+            id: 11,
+            courseId: 3638875,
+            score: 9,
+            pointsPossible: 10,
+            workflowState: "graded",
+          },
+          {
+            id: 22,
+            courseId: 3638876,
+            score: null,
+            pointsPossible: 10,
+            workflowState: "unsubmitted",
+          },
+        ],
+      },
+      { 3638875: "spanish-4", 3638876: "spanish-4" },
+      { term: "winter", termsByClass: { "spanish-4": ["year"] } }
+    );
+    assert.equal(tree.classes[0].canvasScoreLabel, undefined);
+    assert.equal(tree.classes[0].canvasScore, undefined);
+    assert.equal(
+      tree.classes[0].canvasLink,
+      "https://canvas.instructure.com/courses/3638876/grades"
+    );
+    assert.equal(tree.classes[0].todos[0].canvasWork.display, "9/10");
+    assert.equal(
+      tree.classes[0].todos[0].canvasLink,
+      "https://canvas.instructure.com/courses/3638875/assignments/11"
+    );
+    assert.equal(tree.classes[0].todos[1].canvasWork.display, "/10");
+  });
+
+  it("leaves the class grade blank when this term's course is not published", () => {
+    const tree = {
+      classes: [
+        {
+          id: "physics",
+          canvasLink: "https://canvas.instructure.com/courses/3646086/grades",
+          todos: [
+            {
+              id: "fall-lab",
+              canvasId: 7,
+              canvasLink:
+                "https://canvas.instructure.com/courses/3646086/assignments/7",
+            },
+          ],
+        },
+      ],
+    };
+    attachCanvasGrades(
+      tree,
+      {
+        courses: [
+          {
+            id: 3646086,
+            name: "Physics (Fall)",
+            htmlUrl: "https://canvas.instructure.com/courses/3646086",
+            currentScore: 98.58,
+          },
+        ],
+        assignments: [
+          {
+            id: 7,
+            courseId: 3646086,
+            score: 18,
+            pointsPossible: 20,
+            workflowState: "graded",
+          },
+        ],
+      },
+      { 3646086: "physics" },
+      { term: "winter", termsByClass: { physics: ["year"] } }
+    );
+    assert.equal(tree.classes[0].canvasScoreLabel, undefined);
+    assert.equal(tree.classes[0].canvasLink, undefined);
+    assert.equal(tree.classes[0].todos[0].canvasWork.display, "18/20");
+    assert.equal(
+      tree.classes[0].todos[0].canvasLink,
+      "https://canvas.instructure.com/courses/3646086/assignments/7"
+    );
+  });
+
+  it("paints the winter percent once that course has a posted grade", () => {
+    const tree = {
+      classes: [
+        {
+          id: "american-literature",
+          canvasLink: "https://canvas.instructure.com/courses/1/grades",
+        },
+      ],
+    };
+    attachCanvasGrades(
+      tree,
+      {
+        courses: [
+          { id: 1, name: "American Literature (Fall)", currentScore: 96.91 },
+          {
+            id: 2,
+            name: "American Literature (Winter)",
+            htmlUrl: "https://canvas.instructure.com/courses/2",
+            currentScore: 88,
+          },
+        ],
+        assignments: [
+          { id: 3, courseId: 1, score: 10, pointsPossible: 10, workflowState: "graded" },
+          { id: 4, courseId: 2, score: 8, pointsPossible: 10, workflowState: "graded" },
+        ],
+      },
+      { 1: "american-literature", 2: "american-literature" },
+      { term: "winter", termsByClass: { "american-literature": ["year"] } }
+    );
+    assert.equal(tree.classes[0].canvasScoreLabel, "88%");
+    assert.equal(
+      tree.classes[0].canvasLink,
+      "https://canvas.instructure.com/courses/2/grades"
+    );
+  });
+
+  it("does not retarget a trimester class that is out of season", () => {
+    const tree = {
+      classes: [
+        {
+          id: "data-science-1",
+          canvasLink: "https://canvas.instructure.com/courses/3639020/grades",
+        },
+      ],
+    };
+    attachCanvasGrades(
+      tree,
+      {
+        courses: [
+          {
+            id: 3639020,
+            name: "Data Science 1 (Fall)",
+            currentScore: 100,
+          },
+        ],
+        assignments: [
+          {
+            id: 5,
+            courseId: 3639020,
+            score: 10,
+            pointsPossible: 10,
+            workflowState: "graded",
+          },
+        ],
+      },
+      { 3639020: "data-science-1" },
+      { term: "winter", termsByClass: { "data-science-1": ["fall"] } }
+    );
+    assert.equal(tree.classes[0].canvasScoreLabel, "100%");
+    assert.equal(
+      tree.classes[0].canvasLink,
+      "https://canvas.instructure.com/courses/3639020/grades"
+    );
+  });
+});
+
+describe("classGradebookCourse", () => {
+  it("reads the term out of the Canvas title", () => {
+    assert.equal(canvasCourseTerm("United States History (Fall 2026)"), "fall");
+    assert.equal(canvasCourseTerm("Spanish 4 (Winter)"), "winter");
+    assert.equal(canvasCourseTerm("College Counseling 2028"), null);
+  });
+
+  it("skips a class that is not in this term", () => {
+    const courses = [{ id: 1, name: "P.E. Yoga (US) (Fall)" }];
+    assert.deepEqual(classGradebookCourse(courses, "winter", ["fall", "spring"]), {
+      skip: true,
+      absent: false,
+      course: null,
+    });
+  });
+
+  it("clears a year-long class until the current term's course exists", () => {
+    const courses = [{ id: 1, name: "Physics (Fall)", currentScore: 98 }];
+    assert.equal(classGradebookCourse(courses, "winter", ["year"]).absent, true);
+    assert.equal(
+      classGradebookCourse(
+        [
+          { id: 1, name: "Physics (Fall)" },
+          { id: 2, name: "Physics (Winter)" },
+        ],
+        "winter",
+        ["year"]
+      ).course.id,
+      2
+    );
+  });
 });
 
 describe("attachCanvasComments", () => {
@@ -336,6 +570,50 @@ describe("attachCanvasComments", () => {
         comment: "Nice work.",
       },
     ]);
+  });
+
+  it("keeps comments from both terms on the same class", () => {
+    const tree = {
+      classes: [
+        {
+          id: "spanish-4",
+          todos: [
+            {
+              id: "fall-hw",
+              canvasId: 11,
+              canvasLink:
+                "https://canvas.instructure.com/courses/3638875/assignments/11",
+            },
+            {
+              id: "winter-hw",
+              canvasId: 22,
+              canvasLink:
+                "https://canvas.instructure.com/courses/3638876/assignments/22",
+            },
+          ],
+        },
+      ],
+    };
+    attachCanvasComments(tree, [
+      {
+        id: 1,
+        assignmentId: 11,
+        courseId: 3638875,
+        own: false,
+        createdAt: "2026-11-01T18:00:00Z",
+        comment: "fall note",
+      },
+      {
+        id: 2,
+        assignmentId: 22,
+        courseId: 3638876,
+        own: false,
+        createdAt: "2026-12-02T18:00:00Z",
+        comment: "winter note",
+      },
+    ]);
+    assert.equal(tree.classes[0].todos[0].canvasComments[0].comment, "fall note");
+    assert.equal(tree.classes[0].todos[1].canvasComments[0].comment, "winter note");
   });
 
   it("clears a stale comment when the live list no longer has it", () => {

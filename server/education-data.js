@@ -3061,6 +3061,20 @@ async function loadEducationTree(
       : { activeClassIdsByDate, todayKey, ...(nowContext ? { nowContext } : {}) }),
   };
 
+  /** @type {Record<string, string[]>} */
+  const termsByClass = {};
+  for (const cls of sourceClasses || []) {
+    if (!cls?.id) continue;
+    termsByClass[String(cls.id)] = classTrimesters(cls);
+  }
+  const canvasTerm = effectiveTrimesterForVisibility(todayKey, schedule);
+  // Not sent to the client. Live overlay reads it off the cached tree.
+  Object.defineProperty(tree, "canvasTermContext", {
+    value: { term: canvasTerm, termsByClass },
+    enumerable: false,
+    configurable: true,
+  });
+
   if (!includeFixtures) {
     try {
       const snapPath = join(root, ".canvas", "snapshot.json");
@@ -3070,7 +3084,10 @@ async function loadEducationTree(
         const snapshot = JSON.parse(snapRaw);
         const mapRaw = await readFile(mapPath, "utf8").catch(() => "");
         const courseMap = mapRaw ? JSON.parse(mapRaw) : null;
-        attachCanvasOverlay(tree, snapshot, courseMap);
+        attachCanvasOverlay(tree, snapshot, courseMap, {
+          term: canvasTerm,
+          termsByClass,
+        });
       }
     } catch (err) {
       console.error("[education-data] canvas grades", err);

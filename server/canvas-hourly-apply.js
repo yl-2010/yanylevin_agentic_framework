@@ -15,11 +15,19 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { listTopLevelProjects, YAN_EDUCATION_DIR } from "./onedrive-projects.js";
 import { withCloudRetry } from "./cloud-storage-io.js";
 import { canvasDescriptionUpdate, formatAssignmentDescription } from "./canvas-sync.js";
-import { classIdsFromCourseMap, courseMapTarget } from "./canvas-grades.js";
+import {
+  classGradebookCourse,
+  classIdsFromCourseMap,
+  courseMapTarget,
+  gradebookUrlForCourse,
+} from "./canvas-grades.js";
 import { classMeetingsBetween } from "./education-class-todo.js";
 import {
   classPeriodOnDate,
+  classTrimesters,
+  effectiveTrimesterForVisibility,
   listClassEntriesForRoot,
+  scheduleTodayKey,
 } from "./education-data.js";
 import { highestTodoTag, stripTodoTagPrefix } from "./todo-tags.js";
 import {
@@ -514,12 +522,17 @@ async function loadContext() {
   const classById = new Map(entries.map((e) => [e.id, e]));
   /** @type {Map<string, object>} */
   const classProps = new Map();
+  /** @type {Map<string, string>} */
+  const classJsonPath = new Map();
   for (const entry of entries) {
     const classPath = await resolveBookkeepingFile(entry.objectDir, "class.json");
     if (!classPath) continue;
     try {
       const props = await readCloudJson(classPath);
-      if (props) classProps.set(entry.id, props);
+      if (props) {
+        classProps.set(entry.id, props);
+        classJsonPath.set(entry.id, classPath);
+      }
     } catch {
       /* skip */
     }
@@ -543,8 +556,57 @@ async function loadContext() {
     deletedTodos,
     classById,
     classProps,
+    classJsonPath,
     projectById,
   };
+}
+
+/**
+ * Year-long (and in-season) class gradebooks follow the current term only.
+ * A trimester class that is not in this term keeps the link it already has.
+ */
+async function syncClassGradebookLinks({
+  courseMap,
+  courseById,
+  classProps,
+  classJsonPath,
+  term,
+  dryRun,
+  log,
+  errors,
+}) {
+  for (const [classId, props] of classProps) {
+    /** @type {object[]} */
+    const courses = [];
+    for (const [courseId, value] of Object.entries(courseMap || {})) {
+      const target = courseMapTarget(value);
+      if (target?.kind !== "class" || target.id !== classId) continue;
+      const course = courseById.get(Number(courseId));
+      if (course) courses.push(course);
+    }
+    const decision = classGradebookCourse(courses, term, classTrimesters(props));
+    if (decision.skip) continue;
+    const next = decision.course ? gradebookUrlForCourse(decision.course) : "";
+    const current = String(props.canvasLink || "").trim();
+    if ((next && current === next) || (!next && !current)) continue;
+    const classPath = classJsonPath.get(classId);
+    if (!classPath) continue;
+    if (dryRun) {
+      log.push(`canvasLink ${classId}`);
+      continue;
+    }
+    if (next) props.canvasLink = next;
+    else delete props.canvasLink;
+    try {
+      await writeCloudJson(classPath, props);
+    } catch (err) {
+      if (current) props.canvasLink = current;
+      else delete props.canvasLink;
+      errors.push(`canvasLink ${classId}: ${err?.message || err}`);
+      continue;
+    }
+    log.push(`canvasLink ${classId}`);
+  }
 }
 
 /**
@@ -553,8 +615,16 @@ async function loadContext() {
 export async function applyCanvasHourlyTodos(opts = {}) {
   const dryRun = Boolean(opts.dryRun);
   const skipCreate = Boolean(opts.skipCreate);
-  const { snapshot, courseMap, schedule, deletedTodos, classById, classProps, projectById } =
-    await loadContext();
+  const {
+    snapshot,
+    courseMap,
+    schedule,
+    deletedTodos,
+    classById,
+    classProps,
+    classJsonPath,
+    projectById,
+  } = await loadContext();
   const mappedIds = new Set(Object.keys(courseMap).map(Number));
   const assignments = (snapshot.assignments || []).filter((a) =>
     mappedIds.has(Number(a.courseId))
@@ -593,6 +663,16 @@ export async function applyCanvasHourlyTodos(opts = {}) {
   const courseById = new Map(
     (snapshot.courses || []).filter((c) => c?.id != null).map((c) => [Number(c.id), c])
   );
+  await syncClassGradebookLinks({
+    courseMap,
+    courseById,
+    classProps,
+    classJsonPath,
+    term: effectiveTrimesterForVisibility(scheduleTodayKey(schedule), schedule),
+    dryRun,
+    log,
+    errors,
+  });
 
   async function ensureProjectCanvasLink(project) {
     if (!project || linkedProjects.has(project.id)) return;

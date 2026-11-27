@@ -25,7 +25,11 @@ import {
   schedulerWait,
   zonedLocalToUtc,
 } from "./daily-briefing-agent.js";
-import { listClassEntriesForRoot, scheduleTodayKey } from "./education-data.js";
+import {
+  effectiveTrimesterForVisibility,
+  listClassEntriesForRoot,
+  scheduleTodayKey,
+} from "./education-data.js";
 import { scheduleOnedriveSnapshotRefresh } from "./education-onedrive-snapshot.js";
 import { formatDeletedBlock, loadDeletedMarkdown } from "./education-match.js";
 import { gitAddCommitPush } from "./git-publish.js";
@@ -1954,7 +1958,7 @@ export function buildCanvasSyncPrompt({
     `New-assignment log: ${CANVAS_REL}/last-hourly-sync.json. Read it. Fix mistakes the daytime Composer pass made when it created a new todo (wrong tags, HW: prefixes left on names, Adv Calc HW dues pulled back to Canvas time, Data Science number/stat visual due pulled back to 2026-11-18, American Lit Venn due pulled back to 2026-10-20, yoga CW hiddenFromHome, missing canvasId, duplicate todos, course-map drift). Day 12 problem set (canvasId 40440347) stays 2026-10-27 09:55. Yan set that to the start of Tuesday calc. Do not shift it to the previous period C. Review problems from MA 2 (canvasId 40440348) stays 2026-10-29 12:25. Yan put that back on the original Thursday. Do not shift it to the previous period C. SP1 presentation problem (canvasId 40468349) stays HW, due 2026-11-04 12:25. Yan said it was homework. Do not retag it MA because the title says presentation. Do not shift it to the previous period C. Independent Research Project Preliminary Data Collection and Analysis (canvasId 40476875) stays HW. Yan said it was homework on 2026-11-05. Do not retag it MA because the title says project. STUDY GUIDE: MA Oral Final: Stereotypes Project 2026 (canvasId 40481133) stays HW, due 2026-11-13 08:30. It is the study guide for the oral, not the oral. Do not retag it MA because the title says final or project. Due and title updates on todos that already exist are applied in code each hour. Review those too.`,
     "Yan is a 2026-27 junior. Those academic dashboard classes are often missing from Canvas until school publishes them. That is expected.",
     "FIRST: map snapshot courses to Yan's class folders (OneDrive `.education` under the grade folder, skip free-period shells and fixtures). The snapshot already dropped non-dashboard enrollments. If ZERO dashboard classes appear in Canvas, STOP immediately. Do not invent Class of 2028, EPS Library, Iceland EBC, Graphic Design, or prior-year shells. Do not create todos. One short note is enough.",
-    "If at least one class maps: set class.json canvasLink to that course gradebook (htmlUrl + /grades). Create or update todos for every Canvas assignment on those mapped classes only. Set canvasLink and canvasId. Tag CW/HW/QA/MA. A title with more than one tag keeps the highest. Order is CW, then HW, then QA, then MA, so CW/HW and [CW/HW] are HW. Do not use the points guess when the title already has a tag. Store name without a CW/HW/QA/MA prefix (HW: Signed Syllabus → Signed Syllabus, [CW/HW] Breast Cancer Prediction → Breast Cancer Prediction). Use snapshot dueDate/dueTime.",
+    "If at least one class maps: set class.json canvasLink to that course gradebook (htmlUrl + /grades). A year-long class keeps every term's course id in course-map.json so todos, todo scores, assignment links, and teacher comments from each term stay together. class.json canvasLink is only the current trimester gradebook. Code already sets that on hourly apply. If this term's course is not published, leave canvasLink clear. Do not point a year-long class at last term. A trimester class that is not in season yet keeps its existing canvasLink. Create or update todos for every Canvas assignment on those mapped classes only. Set canvasLink and canvasId. Tag CW/HW/QA/MA. A title with more than one tag keeps the highest. Order is CW, then HW, then QA, then MA, so CW/HW and [CW/HW] are HW. Do not use the points guess when the title already has a tag. Store name without a CW/HW/QA/MA prefix (HW: Signed Syllabus → Signed Syllabus, [CW/HW] Breast Cancer Prediction → Breast Cancer Prediction). Use snapshot dueDate/dueTime.",
     "Todo descriptions keep the full Canvas assignment body. The snapshot description is already markdown (paragraphs, lists, bold, links). Do not summarize it and do not drop a sentence, number, name, or link. Do not paste the course syllabus into a todo. Rewrite a description only to make those same words easier to scan. If the todo already has a line Canvas does not, such as an extension or a corrected due, keep that line.",
     "A course-map value project:<id> is not a class. College Counseling 2028 is project:college-prep. Code already writes those assignments as College Prep todos and sets project.json canvasLink to the gradebook. Do not create a class for that course. Do not move those todos onto a class. Review their tags and dues on the project. Syllabus dates for that course go in the project dates folder.",
     "Pull major syllabus / calendar-event dates onto .date.json with canvasLink. OneDrive class bookkeeping is Finder-hidden: .todo.json, .date.json, .CONTEXT.md. Do not write a plain todo.json next to .todo.json.",
@@ -2278,7 +2282,14 @@ export async function applyLiveCanvasOverlay(tree, { force = false } = {}) {
     ]);
     if (snapshot) {
       const map = await readCourseMap();
-      attachCanvasOverlay(tree, snapshot, map);
+      const ctx = tree?.canvasTermContext || {};
+      const term =
+        ctx.term ||
+        effectiveTrimesterForVisibility(tree?.todayKey, tree?.schedule);
+      attachCanvasOverlay(tree, snapshot, map, {
+        term,
+        termsByClass: ctx.termsByClass || null,
+      });
     }
     attachCanvasComments(tree, comments);
   } catch (err) {

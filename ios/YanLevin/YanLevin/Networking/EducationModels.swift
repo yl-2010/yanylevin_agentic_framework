@@ -248,16 +248,10 @@ struct EducationClass: Decodable, Identifiable, Hashable {
 
     var pageTodos: [EducationTodo] { (todos ?? []) + (classOnlyTodos ?? []) }
 
-    /// Gradebook URL from `canvasLink`, else the first child assignment/syllabus link.
+    /// Class gradebook. Omitted until this term's Canvas course exists.
+    /// Todo and date buttons keep their own links.
     var canvasURL: URL? {
-        if let direct = CanvasLMS.webURL(from: canvasLink) { return direct }
-        for todo in pageTodos {
-            if let url = CanvasLMS.gradebookURL(from: todo.canvasLink) { return url }
-        }
-        for date in dates ?? [] {
-            if let url = CanvasLMS.gradebookURL(from: date.canvasLink) { return url }
-        }
-        return nil
+        CanvasLMS.webURL(from: canvasLink)
     }
 
     var descriptionText: String {

@@ -84,6 +84,51 @@ export function canvasAssignmentIdFromLink(raw) {
   return m ? Number(m[1]) : null;
 }
 
+/** Fall, winter, or spring when the Canvas title names the term. */
+export function canvasCourseTerm(name) {
+  const m = String(name || "").match(/\b(fall|winter|spring)\b/i);
+  return m ? m[1].toLowerCase() : null;
+}
+
+export function gradebookUrlForCourse(course, base = "https://canvas.instructure.com") {
+  const html = String(course?.htmlUrl || "").replace(/\/+$/, "");
+  if (/^https?:\/\//i.test(html)) {
+    if (/\/grades$/i.test(html)) return html;
+    return `${html}/grades`;
+  }
+  const id = Number(course?.id);
+  if (!Number.isFinite(id)) return "";
+  const root = String(base || "").replace(/\/+$/, "");
+  return `${root}/courses/${id}/grades`;
+}
+
+/**
+ * Class grade and class Canvas button for one term.
+ * Year-long classes, and a class that includes `term`, use only the course
+ * named for that term. A class that is not in this term is left alone.
+ * `absent` means the gradebook should be cleared (this term's course is not up).
+ * @param {object[]} courses
+ * @param {string|null|undefined} term
+ * @param {string[]|null|undefined} classTerms
+ * @returns {{ skip: boolean, absent: boolean, course: object|null }}
+ */
+export function classGradebookCourse(courses, term, classTerms) {
+  const list = (Array.isArray(courses) ? courses : []).filter((c) => c && c.id != null);
+  const terms = Array.isArray(classTerms) ? classTerms : [];
+  const inTerm = terms.includes("year") || (Boolean(term) && terms.includes(term));
+  if (!inTerm) return { skip: true, absent: false, course: null };
+  const named = list.filter((c) => canvasCourseTerm(c.name) === term);
+  if (named.length) {
+    named.sort((a, b) => Number(b.id) - Number(a.id));
+    return { skip: false, absent: false, course: named[0] };
+  }
+  const labeled = list.some((c) => canvasCourseTerm(c.name));
+  if (!labeled && list.length) {
+    return { skip: false, absent: false, course: list[0] };
+  }
+  return { skip: false, absent: true, course: null };
+}
+
 /**
  * course-map values are class folder ids, or `project:<id>` for a project.
  * @param {unknown} value
@@ -188,13 +233,72 @@ function assignmentsById(snapshot) {
   return map;
 }
 
+function mappedCoursesForClass(classId, courseMap, coursesById) {
+  /** @type {object[]} */
+  const out = [];
+  const seen = new Set();
+  if (!courseMap || typeof courseMap !== "object") return out;
+  for (const [courseId, value] of Object.entries(courseMap)) {
+    const target = courseMapTarget(value);
+    const id = Number(courseId);
+    if (target?.kind !== "class" || target.id !== classId || !Number.isFinite(id)) continue;
+    if (seen.has(id)) continue;
+    const course = coursesById.get(id);
+    if (!course) continue;
+    seen.add(id);
+    out.push(course);
+  }
+  return out;
+}
+
+function coursesForClass(cls, courseMap, coursesById) {
+  const list = mappedCoursesForClass(String(cls?.id || ""), courseMap, coursesById);
+  const seen = new Set(list.map((c) => Number(c.id)));
+  const fromLink = canvasCourseIdFromLink(cls?.canvasLink);
+  if (fromLink != null && !seen.has(fromLink)) {
+    const course = coursesById.get(fromLink);
+    if (course) list.push(course);
+  }
+  return list;
+}
+
+function legacyCourse(cls, coursesById, classByCanvas) {
+  const fromLink = canvasCourseIdFromLink(cls?.canvasLink);
+  const fromMap = classByCanvas.get(String(cls?.id || ""));
+  const courseId = fromLink != null ? fromLink : fromMap;
+  return courseId != null ? coursesById.get(Number(courseId)) || null : null;
+}
+
+/**
+ * Canvas current_score is n/a until a grade is posted. Don't paint a
+ * leftover final_score or a 0 with nothing graded. Clears a stale label.
+ */
+function paintCourseScore(target, course, snapshot) {
+  const courseId = course?.id != null ? Number(course.id) : null;
+  const score = course ? finiteFrom(course.currentScore) : null;
+  const hasPostedWork =
+    courseId != null &&
+    (snapshot?.assignments || []).some((row) => assignmentHasPostedScore(row, courseId));
+  if (score != null && hasPostedWork) {
+    target.canvasScore = score;
+    target.canvasScoreLabel = formatCourseScoreLabel(score);
+    return;
+  }
+  delete target.canvasScore;
+  delete target.canvasScoreLabel;
+}
+
 /**
  * Attach live Canvas labels onto an education tree. Mutates `tree`.
+ * When `opts.term` and `opts.termsByClass` are set, a year-long class (and a
+ * class in that term) takes its grade and canvasLink from that term's course
+ * only. Todo scores still come from each assignment, including older terms.
  * @param {object} tree
  * @param {object|null} snapshot
  * @param {Record<string, string>|null} [courseMap]
+ * @param {{ term?: string|null, termsByClass?: Record<string, string[]>|null }} [opts]
  */
-export function attachCanvasGrades(tree, snapshot, courseMap = null) {
+export function attachCanvasGrades(tree, snapshot, courseMap = null, opts = null) {
   if (!tree || !snapshot) return tree;
   const classByCanvas = invertCourseMap(courseMap);
   const projectByCanvas = invertProjectMap(courseMap);
@@ -204,6 +308,8 @@ export function attachCanvasGrades(tree, snapshot, courseMap = null) {
       .map((c) => [Number(c.id), c])
   );
   const byAssignment = assignmentsById(snapshot);
+  const term = opts?.term || null;
+  const termsByClass = opts?.termsByClass || null;
 
   const paintTodo = (todo) => {
     if (!todo || typeof todo !== "object") return;
@@ -216,19 +322,27 @@ export function attachCanvasGrades(tree, snapshot, courseMap = null) {
 
   const paintClass = (cls) => {
     if (!cls || typeof cls !== "object") return;
-    const fromLink = canvasCourseIdFromLink(cls.canvasLink);
-    const fromMap = classByCanvas.get(String(cls.id || ""));
-    const courseId = fromLink != null ? fromLink : fromMap;
-    const course = courseId != null ? coursesById.get(Number(courseId)) : null;
-    const score = finiteFrom(course?.currentScore);
-    const hasPostedWork = (snapshot.assignments || []).some((row) =>
-      assignmentHasPostedScore(row, courseId)
-    );
-    // Canvas current_score is n/a until a grade is posted. Don't paint a
-    // leftover final_score (History 12% / F) or a 0 with nothing graded.
-    if (score != null && hasPostedWork) {
-      cls.canvasScore = score;
-      cls.canvasScoreLabel = formatCourseScoreLabel(score);
+    const classTerms = termsByClass?.[String(cls.id || "")] || null;
+    const useTerm = Boolean(term && Array.isArray(classTerms));
+    if (!useTerm) {
+      paintCourseScore(cls, legacyCourse(cls, coursesById, classByCanvas), snapshot);
+    } else {
+      const decision = classGradebookCourse(
+        coursesForClass(cls, courseMap, coursesById),
+        term,
+        classTerms
+      );
+      if (decision.skip) {
+        paintCourseScore(cls, legacyCourse(cls, coursesById, classByCanvas), snapshot);
+      } else if (decision.absent || !decision.course) {
+        delete cls.canvasLink;
+        delete cls.canvasScore;
+        delete cls.canvasScoreLabel;
+      } else {
+        const link = gradebookUrlForCourse(decision.course);
+        if (link) cls.canvasLink = link;
+        paintCourseScore(cls, decision.course, snapshot);
+      }
     }
     for (const t of cls.todos || []) paintTodo(t);
     for (const t of cls.classOnlyTodos || []) paintTodo(t);
@@ -240,14 +354,7 @@ export function attachCanvasGrades(tree, snapshot, courseMap = null) {
     const fromMap = projectByCanvas.get(String(project.id || ""));
     const courseId = fromLink != null ? fromLink : fromMap;
     const course = courseId != null ? coursesById.get(Number(courseId)) : null;
-    const score = finiteFrom(course?.currentScore);
-    const hasPostedWork = (snapshot.assignments || []).some((row) =>
-      assignmentHasPostedScore(row, courseId)
-    );
-    if (score != null && hasPostedWork) {
-      project.canvasScore = score;
-      project.canvasScoreLabel = formatCourseScoreLabel(score);
-    }
+    paintCourseScore(project, course, snapshot);
     for (const t of project.todos || []) paintTodo(t);
   };
 
@@ -303,9 +410,10 @@ export function attachCanvasCompletion(tree, snapshot) {
  * @param {object} tree
  * @param {object|null} snapshot
  * @param {Record<string, string>|null} [courseMap]
+ * @param {{ term?: string|null, termsByClass?: Record<string, string[]>|null }} [opts]
  */
-export function attachCanvasOverlay(tree, snapshot, courseMap = null) {
-  attachCanvasGrades(tree, snapshot, courseMap);
+export function attachCanvasOverlay(tree, snapshot, courseMap = null, opts = null) {
+  attachCanvasGrades(tree, snapshot, courseMap, opts);
   attachCanvasCompletion(tree, snapshot);
   return tree;
 }

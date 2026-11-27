@@ -412,17 +412,7 @@
   }
 
   function classCanvasLink(cls) {
-    const direct = normalizeCanvasLink(cls && cls.canvasLink);
-    if (direct) return direct;
-    const kids = [
-      ...flattenTodos(tree, { classId: cls && cls.id }),
-      ...((cls && cls.dates) || []),
-    ];
-    for (const item of kids) {
-      const g = gradebookUrlFromCanvasLink(item && item.canvasLink);
-      if (g) return g;
-    }
-    return "";
+    return normalizeCanvasLink(cls && cls.canvasLink);
   }
 
   function loadFilters() {
