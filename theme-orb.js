@@ -4,8 +4,9 @@
  * Theme is session-only.
  *
  * On education, dashboard, usage, and debate, a logged-in L of glass squares
- * sits in the bottom-left. Drag the circle into the empty cell and it becomes
- * a square that still toggles the theme. Drag it back out and it is a circle.
+ * sits in the bottom-left (usage, brain, dashboard). Drag the circle into the
+ * empty cell and it becomes a square that still toggles the theme. Drag it
+ * back out and it is a circle.
  *
  * Any other page with the top YL squircle and this circle grows the same
  * bottom-left dock and the bottom-right agent chat when the Google session
@@ -284,16 +285,13 @@
     snapToSlot(el);
   });
 
-  const YL_PATH =
-    "M229.4,214.58c0,11.34-9.21,20.52-20.55,20.51l-117.33-.11c-2.66-.02-5.21-.49-7.64-1.48-9.37-3.58-14.91-14.5-12.23-24.2.17-.64.37-1.29.61-1.92,0,0,22.86-63.64,22.86-63.64L26.54,49.57c-6.68-9.17-4.66-22.01,4.51-28.69,9.17-6.67,22.01-4.65,28.68,4.51l52.17,71.64,23.93-66.63c3.8-10.58,15.47-16.08,26.05-12.28,10.59,3.81,16.09,15.47,12.28,26.05l-53.8,149.78,88.53.08c11.34.01,20.53,9.21,20.51,20.55Z";
-
   function dockMarkup() {
     return `
       <a class="corner social-orb dock-usage squircle" data-liquid-glass="squircle" data-filter-id="lg-dock-usage" href="/usage/" aria-label="Usage">
         <svg viewBox="0 0 24 24" aria-hidden="true" draggable="false"><path fill="currentColor" d="M4 13.2c0-.7.5-1.2 1.2-1.2h1.6c.7 0 1.2.5 1.2 1.2v6.1c0 .7-.5 1.2-1.2 1.2H5.2c-.7 0-1.2-.5-1.2-1.2v-6.1Zm6-8.4c0-.7.5-1.2 1.2-1.2h1.6c.7 0 1.2.5 1.2 1.2v14.5c0 .7-.5 1.2-1.2 1.2h-1.6c-.7 0-1.2-.5-1.2-1.2V4.8Zm6 4.2c0-.7.5-1.2 1.2-1.2h1.6c.7 0 1.2.5 1.2 1.2v10.3c0 .7-.5 1.2-1.2 1.2h-1.6c-.7 0-1.2-.5-1.2-1.2V9Z"/></svg>
       </a>
-      <a class="corner social-orb dock-home squircle" data-liquid-glass="squircle" data-filter-id="lg-dock-home" href="/" aria-label="Yan Levin">
-        <svg viewBox="0 0 252 252" aria-hidden="true" draggable="false"><path fill="currentColor" d="${YL_PATH}"/></svg>
+      <a class="corner social-orb dock-home squircle" data-liquid-glass="squircle" data-filter-id="lg-dock-home" href="/brain/" aria-label="Brain">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" draggable="false"><g stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 11.7C2.4 8.2 5.3 5.7 8.4 6.1C8.7 4.1 10.7 2.8 13 3.1C15 3.4 16.5 4.9 17 6.8C17.9 6.3 19.3 6.6 20 7.6C21.2 9.3 20.8 11.5 19.2 12.5C20.7 13.2 21.4 15 20.8 16.7C20.3 18.3 18.6 19.3 17 19C17 20.3 15.8 21.6 14 21.6C12.2 21.6 11.2 20 11.6 18.4C9.8 17.3 7.6 16.8 5.8 16C3.6 15.1 2.7 13.7 2.6 11.7Z"/><path d="M8.15 6.4C7.55 8.15 8.15 9.7 9.85 10.55"/><path d="M10.15 12.5C10.55 10.55 11.65 9.25 13.35 8.85"/><path d="M14.15 8.05C16.05 9.65 17.15 12.35 16.55 15.25"/><path d="M17.15 14.85C18.25 15 19.05 14.45 19.35 13.55"/></g></svg>
       </a>
       <a class="corner social-orb dock-dash squircle" data-liquid-glass="squircle" data-filter-id="lg-dock-dash" href="/dashboard/" aria-label="Dashboard">
         <svg viewBox="0 0 24 24" aria-hidden="true" draggable="false"><g fill="currentColor"><rect x="2.2" y="3" width="4.4" height="18" rx="1.15"/><rect x="10" y="3" width="11.8" height="7.3" rx="1.15"/><rect x="10" y="13.7" width="11.8" height="7.3" rx="1.15"/></g></svg>
@@ -303,10 +301,15 @@
   function markDock(dock) {
     const path = location.pathname.replace(/\/+$/, "") || "/";
     const usage = dock.querySelector(".dock-usage");
+    const home = dock.querySelector(".dock-home");
     const dash = dock.querySelector(".dock-dash");
     if (usage) {
       if (path === "/usage") usage.setAttribute("aria-current", "page");
       else usage.removeAttribute("aria-current");
+    }
+    if (home) {
+      if (path === "/brain") home.setAttribute("aria-current", "page");
+      else home.removeAttribute("aria-current");
     }
     if (dash) {
       if (path === "/dashboard") dash.setAttribute("aria-current", "page");

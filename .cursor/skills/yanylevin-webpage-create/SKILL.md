@@ -81,7 +81,7 @@ Every page needs:
 6. Top-left YL squircle linking to `https://yanylevin.com/`
 7. Top-right empty circle, `aria-label="Toggle theme"`, `draggable="false"`
 8. Hidden SVG `<defs id="liquid-glass-defs">`
-9. Scripts, in this order: `/liquid-glass.js`, `/theme-orb.js?v=owner-corners1`, `/yl-home-link.js`
+9. Scripts, in this order: `/liquid-glass.js`, `/theme-orb.js?v=dock-brain1`, `/yl-home-link.js`
 
 Do not paste the bottom dock or the chat circle into the page. `theme-orb.js` adds both when the Google session is `you@example.com`. Logged-out visitors and every other account keep the top two corners only.
 
@@ -129,7 +129,7 @@ Skeleton (keep the YL path exactly):
       <defs id="liquid-glass-defs"></defs>
     </svg>
     <script src="/liquid-glass.js?v=chrome-perf9"></script>
-    <script src="/theme-orb.js?v=owner-corners1"></script>
+    <script src="/theme-orb.js?v=dock-brain1"></script>
     <script src="/yl-home-link.js?v=3"></script>
   </body>
 </html>
