@@ -38,7 +38,7 @@ function buildPrompt({ slugs, batch, batchCount }) {
     `You are batch ${batch}/${batchCount} of a one-time brain migration for Yan (you@example.com).`,
     "Local only. Never spawn a Cursor cloud agent. ",
     "Do not run git. Do not run scripts. Do not edit generated files",
-    `(${BRAIN_REL}/people/index.md, ${BRAIN_REL}/people/graph.md, ${BRAIN_REL}/education/**).`,
+    `(${BRAIN_REL}/people/index.md, ${BRAIN_REL}/people/graph.md, ${BRAIN_REL}/home/**).`,
     "",
     `Read ${BRAIN_REL}/schema.md FIRST and follow its contract exactly, including the`,
     "frontmatter parsing rules (scalars bare, arrays/objects as one-line JSON, edges as a",

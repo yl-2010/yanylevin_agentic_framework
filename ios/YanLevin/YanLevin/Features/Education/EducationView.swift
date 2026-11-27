@@ -153,7 +153,7 @@ struct EducationView: View {
     private var educationNavTitle: String {
         if educationFocus.isJype { return "JYPE" }
         if educationFocus.isDebate { return "Debate" }
-        return "Education"
+        return "Home"
     }
 
     private var educationPalette: YLPalette {
@@ -169,10 +169,10 @@ struct EducationView: View {
     @ViewBuilder
     private var educationPanels: some View {
         if store.isLoading && store.tree == nil {
-            ProgressView("Loading education…")
+            ProgressView("Loading home…")
                 .frame(maxWidth: .infinity, minHeight: 200)
         } else if let err = store.errorText, store.tree == nil {
-            ContentUnavailableView("Education unavailable", systemImage: "wifi.exclamationmark", description: Text(err))
+            ContentUnavailableView("Home unavailable", systemImage: "wifi.exclamationmark", description: Text(err))
         } else if isWide {
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 14) {

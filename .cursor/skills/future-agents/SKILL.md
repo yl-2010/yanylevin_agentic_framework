@@ -58,7 +58,7 @@ A JYPE agent schedules into JYPE chat history. A personal agent schedules into t
 
 ## What time
 
-Read `.cursor/skills/class-schedule/SKILL.md` when the ask is a period, a bell, or "at the end of class". Open that person's `education/<email>/schedule.json`, including `dayOverrides` for the date. Do not use `education/projects/jype/schedule.json` for bells. That file is trimester bounds only.
+Read `.cursor/skills/class-schedule/SKILL.md` when the ask is a period, a bell, or "at the end of class". Open that person's `home/<email>/schedule.json`, including `dayOverrides` for the date. Do not use `home/projects/jype/schedule.json` for bells. That file is trimester bounds only.
 
 When they want something ready at the bell, schedule 5 minutes before the period ends. The run needs that buffer so the message is there when the period ends, not after.
 

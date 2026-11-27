@@ -15,7 +15,7 @@ import {
   sanitizeChatTitle,
   scheduledTaskFromUserMessage,
   withScheduledTitlePrefix,
-} from "./education-chat-history.js";
+} from "./home-chat-history.js";
 
 const TITLE_TIMEOUT_MS = 40_000;
 export const TITLE_MODEL = "openai/gpt-oss-20b";

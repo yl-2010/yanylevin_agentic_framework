@@ -12,18 +12,18 @@ disable-model-invocation: true
 Canonical weekly PDF (shared):
 
 ```
-education/2026-27 Weekly Class Schedule.pdf
+home/2026-27 Weekly Class Schedule.pdf
 ```
 
 Per-user JSON (keep aligned with that PDF):
 
 ```
-education/<email>/schedule.json
+home/<email>/schedule.json
 ```
 
-Example: `education/you@example.com/schedule.json`
+Example: `home/you@example.com/schedule.json`
 
-That JSON is Yan's (or Alex's) live bell schedule. A classmate's recurring classes live on their brain card as `people/<slug>/schedule.md`, not here. Do not dump Four11 PDFs or schedule screenshots into `education/<email>/`.
+That JSON is Yan's (or Alex's) live bell schedule. A classmate's recurring classes live on their brain card as `people/<slug>/schedule.md`, not here. Do not dump Four11 PDFs or schedule screenshots into `home/<email>/`.
 
 Express injects a Live context clock plus the current class (in class, heading there, or a free period), and next or previous when you are between classes. Trust that for what class is now. Do not guess from the clock alone. Classes are in person: say "in a class", never "class meeting". The rest of the day and the week are not in the prompt. Open this skill, the PDF, or `schedule.json` when you need another period, or when editing the schedule.
 
@@ -48,4 +48,4 @@ Home **Classes** is two day panels, each sorted by **clock start time** (never p
 - Final-exam days (no `allPeriods`): Fall Nov 18–20, Winter Mar 3–5, Spring Jun 4/7/8 — labels `ABC` / `DEF` / `GH` with exam bells. Only enrolled periods appear in the UI.
 - Day panels match classes by period using server-provided `activeClassIdsByDate` (so Fall G vs Winter G never collide). The UI does not show or mention trimester type.
 
-When creating or editing class folders / free-period shells, also Read `.cursor/skills/personal-agent/education-dashboard.md`.
+When creating or editing class folders / free-period shells, also Read `.cursor/skills/personal-agent/home-dashboard.md`.

@@ -16,7 +16,7 @@ Clock times are America/Los_Angeles (Seattle), except workouts after 2026-08-12 
 
 ## Files
 
-All under `education/you@example.com/health/`:
+All under `home/you@example.com/health/`:
 
 | File | Role |
 |------|------|

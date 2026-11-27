@@ -1,6 +1,6 @@
 /**
  * Record account-deletion requests (App Store 5.1.1(v)).
- * Append-only audit; does not wipe education folders automatically.
+ * Append-only audit; does not wipe home folders automatically.
  */
 
 import { appendFile, mkdir } from "node:fs/promises";
@@ -30,7 +30,7 @@ export async function recordAccountDeletionRequest({ email, at = new Date() } = 
     "",
     `- email: \`${normalized}\``,
     `- utc: ${iso}`,
-    `- note: Session revoked on client. Login/chat logs retained for audit unless manually redacted. Education folder not auto-deleted.`,
+    `- note: Session revoked on client. Login/chat logs retained for audit unless manually redacted. Home folder not auto-deleted.`,
     "",
     "---",
     "",

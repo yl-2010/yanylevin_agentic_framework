@@ -51,7 +51,7 @@ export function buildGlossarySeedPrompt({ dateKey, timezone }) {
     `Today's date key: ${dateKey} (timezone ${timezone}).`,
     "Write terms only through node server/brain-glossary.js add --term \"...\" --gloss \"...\" [--aliases \"a, b\"] [--see orgs/slug].",
     "Do not hand-edit glossary files or glossary/index.md. The add command regenerates the index and sets last_touched.",
-    "Do not git commit. Education-sync publishes glossary markdown.",
+    "Do not git commit. Home-sync publishes glossary markdown.",
     `Read ${brain}/identity.md, ${brain}/identity-school.md, ${brain}/identity-accounts.md, ${brain}/identity-logistics.md, ${brain}/patterns.md, and ${brain}/threads/.`,
     `Read the newest 14 files in ${brain}/journal/.`,
     `Read frontmatter only of ${brain}/orgs/, ${brain}/groups/, and ${brain}/places/. When an abbreviation is that entity's shorthand, add a pointer with --see. Do not copy the card into the gloss.`,

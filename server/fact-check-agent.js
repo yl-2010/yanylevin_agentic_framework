@@ -23,7 +23,7 @@ import {
 } from "./cursor-sdk-auth.js";
 import { gitAddCommitPush } from "./git-publish.js";
 import { BRAIN_REL, YAN_EMAIL } from "./context-synthesis-agent.js";
-import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { YAN_HOME_DIR } from "./onedrive-projects.js";
 import { weekDateHelper } from "./local-clock.js";
 import {
   isLocationBrainBusy,
@@ -36,7 +36,7 @@ import { HEALTH_REL } from "./phone-health.js";
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = "/tmp/yanylevin-fact-check.lock";
-const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
+const META_PATH = join(YAN_HOME_DIR, "daily-briefing", "meta.json");
 const BRAIN_STATE_PATH = join(BRAIN_REL, "state.json");
 const LOCK_STALE_MS = 90 * 60 * 1000;
 const WAIT_MS = 90 * 60 * 1000;
@@ -195,7 +195,7 @@ export function buildFactCheckPrompt({ dateKey, timezone, journalKey, force }) {
     `Today's date key: ${dateKey} (timezone ${timezone}). Journal file is ${brain}/journal/${journalKey}.md.`,
     weekDateHelper(dateKey, timezone),
     "Do not compile news or the Daily Briefing. Those run at 06:00 on the context you leave clean.",
-    `Read git-visible overnight writes under ${brain}/, ${loc}/, ${health}/, and education dates/classes/projects/todos if phase 4 or Canvas touched them.`,
+    `Read git-visible overnight writes under ${brain}/, ${loc}/, ${health}/, and home dates/classes/projects/todos if phase 4 or Canvas touched them.`,
     "Life-state source: /tmp/yanylevin-context-life-state.json or node server/life-state.js day <journalKey>. The 01:30 cleanup already rewrote yesterday's JSONL. Check activity claims (in class, showering, gym, sleep) against that timeline. Do not rewrite the JSONL. Prefer correcting journal/takeaways for activity. places.md is name, address, times only; if a stay has rooms, apps, class periods, gym sets, shower, or sleep, strip that.",
     "Re-read iMessage with who/fromMe/speaker (never handle as speaker in a 1:1). JSON at is UTC ISO with Z; use atLocal for Pacific clocks.",
     "Mail claims (flights, refunds, bookings, 'not in mail') need Mail.app (personal-mail skill). List with `node server/apple-mail.js since --since <ISO>`. Do not AppleScript `whose date received` on Exchange. That call stalls. /tmp/yanylevin-apple-mail-export only exists during a one-shot fill and is deleted after; a missing dump is expected. mailSince is new overnight mail only; search older mail with an earlier --since. Round-trips: every leg. timezoneAfter is not a boarding pass.",
@@ -371,11 +371,11 @@ async function runFactCheckOnce({ force = false, dateKey: dateKeyOpt } = {}) {
         BRAIN_REL,
         LOCATION_HISTORY_REL,
         HEALTH_REL,
-        `${YAN_EDUCATION_DIR}/dates`,
-        `${YAN_EDUCATION_DIR}/classes`,
-        `${YAN_EDUCATION_DIR}/todos`,
+        `${YAN_HOME_DIR}/dates`,
+        `${YAN_HOME_DIR}/classes`,
+        `${YAN_HOME_DIR}/todos`,
       ],
-      message: `education: ${dateKey} fact-check`,
+      message: `home: ${dateKey} fact-check`,
     });
     return {
       ok: true,

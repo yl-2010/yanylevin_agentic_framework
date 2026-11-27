@@ -9,8 +9,8 @@
 import { cp, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { gradeDirFromMeta } from "./education-onedrive.js";
-import { syncOnedriveObjectVisibility } from "./education-onedrive-visibility.js";
+import { gradeDirFromMeta } from "./home-onedrive.js";
+import { syncOnedriveObjectVisibility } from "./home-onedrive-visibility.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const EMAIL = "you@example.com";
@@ -127,7 +127,7 @@ async function rmdirIfEmpty(dir) {
 
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
-  const root = join(ROOT, "education", EMAIL);
+  const root = join(ROOT, "home", EMAIL);
   const meta = JSON.parse(await readFile(join(root, "meta.json"), "utf8"));
   const gradeDir = gradeDirFromMeta(meta);
   if (!gradeDir) throw new Error("onedriveRoot/gradeFolder missing");

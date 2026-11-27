@@ -642,7 +642,7 @@ describe("usage clumps", () => {
     assert.equal(hourly.kind, "canvas-hourly");
     assert.equal(hourly.person, "Yan");
     const nightly = classifyLocalPrompt(
-      "Follow .cursor/skills/personal-canvas/SKILL.md. Sync Canvas into Yan's education dashboard.",
+      "Follow .cursor/skills/personal-canvas/SKILL.md. Sync Canvas into Yan's home dashboard.",
       "yanylevin"
     );
     assert.equal(nightly.kind, "canvas-nightly");

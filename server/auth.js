@@ -11,9 +11,9 @@ const ACCEPTED_JWT_PAIRS = [
   // Short Mac API tokens (web mint + Vercel proxies)
   { issuer: "yanylevin-next", audience: "yanylevin-mac-api" },
   // iOS mobile session (Keychain)
-  { issuer: "yanylevin-ios", audience: "yanylevin-education" },
-  // Web education/fitness session cookie as Bearer (if presented)
-  { issuer: "yanylevin-education", audience: "yanylevin-education" },
+  { issuer: "yanylevin-ios", audience: "yanylevin-home" },
+  // Web home/fitness session cookie as Bearer (if presented)
+  { issuer: "yanylevin-home", audience: "yanylevin-home" },
 ];
 
 export function getAuthConfig() {

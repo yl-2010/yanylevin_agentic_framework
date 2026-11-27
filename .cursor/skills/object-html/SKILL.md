@@ -1,7 +1,7 @@
 ---
 name: object-html
 description: >-
-  Create a self-contained static HTML file for an education object
+  Create a self-contained static HTML file for an home object
   (todo, date, project, class, or user-level folder). Quotes.html lake/teal
   theme with light and dark palettes; desktop follows sunrise/sunset, phone
   follows the device. Class HTML is stored in that class's OneDrive folder.
@@ -13,7 +13,7 @@ description: >-
 
 **One `.html` file. That is the whole page.** Inline `<style>` and `<script>`. No `styles.css`, no `theme.js`, no `sun-theme.js` sitting next to it, no `<link>` / `<script src>`. The dashboard opens a blob of that single file (web) or Quick Look (iOS). Sibling assets do not load.
 
-Dropped next to `todo.json` / `date.json` / `project.json`, or in the class OneDrive folder only when the page is class-level (not a todo). No `/education/styles.css`, no liquid glass, no Karla, no YL orbs.
+Dropped next to `todo.json` / `date.json` / `project.json`, or in the class OneDrive folder only when the page is class-level (not a todo). No `/home/styles.css`, no liquid glass, no Karla, no YL orbs.
 
 Public yanylevin.com pages are `.cursor/skills/yanylevin-webpage-create/SKILL.md`. Chat HTML fences are `.cursor/skills/chat-widgets/SKILL.md`. Copies of a live liquid-glass page into a project stay copies of that page.
 
@@ -32,14 +32,14 @@ Apply Unslop to headings and agent-written copy. Quoted source text can keep the
 |---|---|
 | Quotes on a class todo | that class’s OneDrive Finder folder `/quotes.html` (`HW Sep 15 Title/quotes.html`) |
 | Errors on a class todo | `…/<Finder name>/errores.html` (or `errors.html`) |
-| Notes on a project | `education/<email>/projects/<id>/notes.html` |
-| Anything on a **class** page | the visible class OneDrive folder (e.g. `…/11th Grade/H. Physics/quotes.html`). Not `.education/`, not `education/<email>/classes/`. |
+| Notes on a project | `home/<email>/projects/<id>/notes.html` |
+| Anything on a **class** page | the visible class OneDrive folder (e.g. `…/11th Grade/H. Physics/quotes.html`). Not `.education/`, not `home/<email>/classes/`. |
 
 Todo / date / project HTML still sits beside the properties JSON. Class HTML shows in the class file tiles from OneDrive (live). Basename the user would tap. Show in the file tiles unless they asked to hide (`hiddenFiles`).
 
 Images that must work in a blob are data URIs. No Google Fonts.
 
-Class OneDrive writes are not git education data. Do not `npm run deploy:web`. Do not restart the Express API. The SSE watcher on the grade folder refreshes the class page.
+Class OneDrive writes are not git home data. Do not `npm run deploy:web`. Do not restart the Express API. The SSE watcher on the grade folder refreshes the class page.
 
 ## 2. Theme
 
@@ -50,7 +50,7 @@ Both palettes live in the same `<style>` block. Solar math lives in the same fil
 | Phone, iOS Quick Look, no JS | `@media (prefers-color-scheme: dark)` |
 | Desktop browser (hover + fine pointer) | Sunrise → sunset light, else dark. Same lat/lng and solar math as `yan-sun-theme.js` |
 
-That matches `/education`: desktop follows the sun, phone stays on the device.
+That matches `/home`: desktop follows the sun, phone stays on the device.
 
 **Light vs dark may change colors only.** The dark block retints the custom properties below. It must not change `font-family`, font size, weight, line-height, letter-spacing, `border-radius`, padding, margin, max-width, or `text-transform`.
 
@@ -110,7 +110,7 @@ html[data-resolved-theme="dark"] {
 
 Need both the media query **and** `html[data-resolved-theme="dark"]`. Desktop night with OS set to light only hits the attribute. Desktop day with OS set to dark is why the media query is `:not([data-resolved-theme="light"])`.
 
-**JYPE objects** (`education/projects/jype/…`) use the same layout with the red wash from `/jype/styles.css`, not lake/teal. Accent values come from `brand/palette.mjs` (jype):
+**JYPE objects** (`home/projects/jype/…`) use the same layout with the red wash from `/jype/styles.css`, not lake/teal. Accent values come from `brand/palette.mjs` (jype):
 
 <!-- brand:object-html-jype -->
 ```css

@@ -1,6 +1,6 @@
 /**
  * Import an Apple Health XML export (the zip from Health → Export All Health Data)
- * into education/<email>/health/raw as yearly dumps matching the shortcut schema.
+ * into home/<email>/health/raw as yearly dumps matching the shortcut schema.
  *
  * Skips raw heart-rate beats, CDA, GPX, and 18+ types. Compact JSON so git stays
  * under GitHub's 100MB file cap. Pretty-printing a full history would not.

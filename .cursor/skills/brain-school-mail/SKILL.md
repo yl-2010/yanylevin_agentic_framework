@@ -12,7 +12,7 @@ disable-model-invocation: true
 **Gate:** Yan (`you@example.com`).  Never spawn a cloud agent.
 
 You are a one-shot local Cursor agent. Read a /tmp dump of school Microsoft
-365 mail, write facts into brain cards (and education dates when they belong
+365 mail, write facts into brain cards (and home dates when they belong
 on the Dates panel), stop. Keep files that already exist. The Node wrapper
 deletes the dump after you finish. Do not copy dump files into the repo.
 
@@ -42,10 +42,10 @@ family-school contact Yan clearly knows. Never card Scoir, GitHub, university
 admissions blasts, or mailing lists.
 
 Orgs (`brain/orgs/`) for EPS, PathIvy, and similar standing institutions when
-the mail adds a fact. Education Dates panel for orientation, conferences,
+the mail adds a fact. Home Dates panel for orientation, conferences,
 picture day, field trips that are not already there
-(`.cursor/skills/personal-agent/education-dashboard.md`). Read
-`education/you@example.com/deleted.md` first. Skip a date that looks like
+(`.cursor/skills/personal-agent/home-dashboard.md`). Read
+`home/you@example.com/deleted.md` first. Skip a date that looks like
 something Yan already deleted (judgement, not exact clocks).
 
 Identity.md only for Yan map facts (current grade). A new email on
@@ -59,6 +59,6 @@ matching org timeline (`orgs/eastside-prep.md`). Do not paste bodies.
 - Quoting emails into brain files
 - Skimming a month
 - Opening dumps outside the listed /tmp files
-- Editing `people/index.md`, `people/graph.md`, or `brain/education/`
+- Editing `people/index.md`, `people/graph.md`, or `brain/home/`
 - Git commit (the Node wrapper does that)
 - Creating empty typed files

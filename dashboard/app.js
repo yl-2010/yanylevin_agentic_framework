@@ -61,8 +61,8 @@
     return lines.join("\n").slice(0, 3500);
   }
 
-  window.__eduUserEmail = () => userEmail;
-  window.__eduUiContext = () => ({
+  window.__homeUserEmail = () => userEmail;
+  window.__homeUiContext = () => ({
     client: "web",
     path: window.location.pathname + window.location.search,
     view: "dashboard",

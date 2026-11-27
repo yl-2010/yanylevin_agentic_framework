@@ -8,7 +8,7 @@ description: >-
 
 # Agent recap
 
-Yan-only (`education/you@example.com/`). Local Cursor agent, never cloud. Model: **grok-4.7 high** (reasoning_effort=high, fast=false, context=256k).
+Yan-only (`home/you@example.com/`). Local Cursor agent, never cloud. Model: **grok-4.7 high** (reasoning_effort=high, fast=false, context=256k).
 
 Phase 2 of the morning pipeline (`server/daily-briefing-agent.js`), after the news draft and before unslop.
 
@@ -63,10 +63,10 @@ Use this order. **Omit a section entirely** when it does not apply that day (do 
      the Shortcut ingest, not `healthAt` and not a health-takeaways skip
      when there are no new dumps.
    - Anything else from logs or notes that Yan must fix before things work again.
-   - An URGENT bullet stays every morning until the failure is gone. Read the last 7 daily briefing todos (`education/you@example.com/todos/<dateKey>-daily-briefing/todo.json`, capsule `agent-recap`). If a bullet was URGENT on one of those mornings and you cannot show it is fixed, put it on today's card. A quiet night is not a fix. One morning that forgot the bullet does not clear it. Rewrite the detail from what you checked this morning. Do not paste the old sentence. School OneNote is the case that dropped off after one day. Signed out, or the 1:00 Canvas sync leaving page links unwritten, stays URGENT until a night lists pages and writes the links.
+   - An URGENT bullet stays every morning until the failure is gone. Read the last 7 daily briefing todos (`home/you@example.com/todos/<dateKey>-daily-briefing/todo.json`, capsule `agent-recap`). If a bullet was URGENT on one of those mornings and you cannot show it is fixed, put it on today's card. A quiet night is not a fix. One morning that forgot the bullet does not clear it. Rewrite the detail from what you checked this morning. Do not paste the old sentence. School OneNote is the case that dropped off after one day. Signed out, or the 1:00 Canvas sync leaving page links unwritten, stays URGENT until a night lists pages and writes the links.
 
 2. **`Actions:`** (only when the nightly-actions phase did something)
-   - Bullet list of sends (iMessage, Mail), calendar writes, education dates/todos/projects, or small repo work Yan directed.
+   - Bullet list of sends (iMessage, Mail), calendar writes, home dates/todos/projects, or small repo work Yan directed.
    - Pull from git commits, `[nightly-actions]` log lines, and the actions
      Cursor transcript. Calendar creates do not appear in git.
    - `notes.calendar` is written by synthesis **before** actions. It is not a
@@ -87,7 +87,7 @@ Use this order. **Omit a section entirely** when it does not apply that day (do 
 3. Yesterday's journal: `brain/journal/<dateKey minus 1>.md` when it exists.
 4. `location/state.json`, `health/state.json`, `daily-briefing/chat-title-refresh-state.json` if prefetch is thin. `lifeState` on the prefetch is the 5-minute log + iPhone heartbeat health; do not re-scan JSONL unless an issue is unclear. `healthShortcut` on the prefetch is Shortcut `lastIngestAt` vs 12 hours; do not re-read raw dumps unless the issue is unclear.
 5. `~/Library/Logs/personal-agent/personal-agent-server.log` tail (prefetch includes filtered lines; read more if needed).
-6. `git log` for today's `education:` commits (nightly pipeline, canvas, health, location).
+6. `git log` for today's `home:` commits (nightly pipeline, canvas, health, location).
 
 ## Overnight agents to cover
 

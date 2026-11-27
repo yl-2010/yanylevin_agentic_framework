@@ -275,7 +275,7 @@ describe("calendar on-demand prompt", () => {
     assert.match(prompt, /survey, poll, or form a student sent to his school email/);
     assert.match(prompt, /Do not move an existing event to another calendar/);
     assert.match(prompt, /signed up for that visit/);
-    assert.match(prompt, /education todos/);
+    assert.match(prompt, /home todos/);
     assert.match(prompt, /Jev is that classifier, not a person/);
     assert.match(prompt, /Next Saturday is the second/);
     assert.match(prompt, /Look up the real start and end/);

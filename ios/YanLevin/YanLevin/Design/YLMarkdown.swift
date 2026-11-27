@@ -64,7 +64,7 @@ enum YLMarkdown {
         return cache
     }()
 
-    /// Same `$...$` / `$$...$$` / `\(...\)` / `\[...\]` rules as `education/markdown.js`. Code stays literal.
+    /// Same `$...$` / `$$...$$` / `\(...\)` / `\[...\]` rules as `home/markdown.js`. Code stays literal.
     static func containsMath(_ source: String) -> Bool {
         var s = source.replacingOccurrences(of: "\r\n", with: "\n")
         if s.range(

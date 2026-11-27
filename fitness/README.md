@@ -1,6 +1,6 @@
 # Fitness data
 
-Per-user gym logs live here (same pattern as `education/<email>/`).
+Per-user gym logs live here (same pattern as `home/<email>/`).
 
 Default template: `you@example.com/`. Rename to match `OWNER_EMAIL`.
 

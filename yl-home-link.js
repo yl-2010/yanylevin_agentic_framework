@@ -1,12 +1,12 @@
 /**
- * Authorized (full-access) Google sessions: top-left YL logo → /education/.
- * On education, shift-click goes to /dashboard/ instead.
+ * Authorized (full-access) Google sessions: top-left YL logo → /home/.
+ * On home, shift-click goes to /dashboard/ instead.
  * Everyone else keeps the page's default href (main site / #top).
  */
 (() => {
   const el = document.querySelector("a.c-tl");
-  const onEducation =
-    location.pathname === "/education" || location.pathname.startsWith("/education/");
+  const onHome =
+    location.pathname === "/home" || location.pathname.startsWith("/home/");
 
   fetch("/api/auth/session", {
     credentials: "same-origin",
@@ -15,8 +15,8 @@
     .then((res) => res.json().catch(() => ({})))
     .then((data) => {
       if (el && data && data.authenticated && data.access === "full") {
-        el.setAttribute("href", "/education/");
-        if (onEducation) {
+        el.setAttribute("href", "/home/");
+        if (onHome) {
           el.addEventListener("click", (event) => {
             if (
               !event.shiftKey ||

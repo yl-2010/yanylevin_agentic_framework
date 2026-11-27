@@ -28,7 +28,7 @@ node server/calendar-cli.js update --id "<eventIdentifier>" --title "Dentist (mo
 node server/calendar-cli.js delete --id "<eventIdentifier>"
 ```
 
-`delete` records the event itself. It appends `education/you@example.com/calendar/deleted-events.jsonl` and a row in `education/you@example.com/deleted.md`:
+`delete` records the event itself. It appends `home/you@example.com/calendar/deleted-events.jsonl` and a row in `home/you@example.com/deleted.md`:
 
 `- deleted YYYY-MM-DD HH:MM | calendar | Title | on YYYY-MM-DD HH:MM | Calendar Name | was <eventIdentifier>`
 
@@ -89,9 +89,9 @@ If `yl-calendar` returns Calendar access denied, Calendar.app osascript still wo
 
 ## Schoolwork vs Calendar
 
-- Homework, CW/HW/QA/MA, class due dates → education todos/dates (education-dashboard skill)
+- Homework, CW/HW/QA/MA, class due dates → home todos/dates (home-dashboard skill)
 - Appointments, family, travel, timed events → Apple Calendar
-- If Yan says to put a specific homework item or todo on the calendar, write the Calendar event **and** keep the education todo
+- If Yan says to put a specific homework item or todo on the calendar, write the Calendar event **and** keep the home todo
 
 Do not duplicate the EPS bell schedule (`schedule.json`) as Calendar events unless asked.
 
@@ -103,7 +103,7 @@ Leave these off unless Yan explicitly asked for that item on the calendar:
 
 - College spam. Recruitment and marketing from colleges, Scoir blasts, apply-now mail, and info sessions he did not register for. A date in the email is not an event.
 - The weekly EPS college-visit list. School sends one about once a week. Do not add each visit. Only a visit Yan said he signed up for, or a form receipt for that visit. The announcement is not a signup.
-- Education todos, homework, Canvas assignments, and other dashboard items. Those stay on the education dashboard.
+- Home todos, homework, Canvas assignments, and other dashboard items. Those stay on the home dashboard.
 
 EPS Ventures stays off unless there is a signup confirmation, a form receipt or Yan said he signed up. A Student News or Weekly News announcement is not enough.
 

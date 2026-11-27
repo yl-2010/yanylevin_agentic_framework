@@ -8,7 +8,7 @@ import { canonicalizeEmail } from "./identity.js";
 import { JYPE_DIR } from "./onedrive-projects.js";
 
 export const JYPE_WORKSPACE = "jype";
-export const JYPE_ROOT_REL = "education/projects/jype";
+export const JYPE_ROOT_REL = "home/projects/jype";
 
 /** Personal Gmail used for Google login on /jype. */
 export const JYPE_MEMBERS = Object.freeze({

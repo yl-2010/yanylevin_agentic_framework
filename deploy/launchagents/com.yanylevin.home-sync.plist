@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.personalagent.home-sync</string>
+  <key>WorkingDirectory</key>
+  <string>$HOME/yanylevin_agentic_framework</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/node</string>
+    <string>$HOME/yanylevin_agentic_framework/scripts/home-folder-sync.mjs</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <!-- Without this, reading a file OneDrive evicted to the cloud fails with errno -11 instead of downloading it. -->
+  <key>MaterializeDatalessFiles</key>
+  <true/>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/you/Library/Logs/personal-agent/personal-agent-home-sync.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/you/Library/Logs/personal-agent/personal-agent-home-sync.log</string>
+</dict>
+</plist>

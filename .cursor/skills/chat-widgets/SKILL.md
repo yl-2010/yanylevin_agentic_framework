@@ -2,7 +2,7 @@
 name: chat-widgets
 description: >-
   Format Personal Agent chat widgets (map, html, image fences) for iOS Chat
-  and /education web chat. Use when emitting maps, location cards, images,
+  and /home web chat. Use when emitting maps, location cards, images,
   charts, or interactive viz under the markdown bubble.
 disable-model-invocation: true
 ---

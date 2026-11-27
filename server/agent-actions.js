@@ -1,7 +1,7 @@
 /**
  * Append-only log of side effects Yan would not already see.
  * Mail sends, lights, the vacuum, and password uses belong here.
- * Education dashboard writes do not. Dates, todos, and projects already show on /education.
+ * Home dashboard writes do not. Dates, todos, and projects already show on /home.
  * Moving a message into a folder does not.
  * Teams and iMessage sends do not. Those already show in the chat.
  * Calendar writes do not, including nightly ones. Those already show on the calendar.
@@ -48,7 +48,7 @@ export function isFolderChange(summary) {
 export function isDashboardAction(kind, agent = "", summary = "") {
   const id = String(kind || "").trim();
   if (HIDDEN_KINDS.has(id)) return false;
-  if (id.startsWith("education-")) return false;
+  if (id.startsWith("home-")) return false;
   if (HIDDEN_AGENTS.has(String(agent || "").trim())) return false;
   if (isFolderChange(summary)) return false;
   return true;

@@ -1,6 +1,6 @@
 /* Debate wash: muted gray-lavender in light, navy-gray-purple with a hint of blue in dark.
    Colors live in brand/palette.mjs (debate). The second selector gives this rule the same
-   weight as the dark rules in /education/styles.css, so it wins in every theme state.
+   weight as the dark rules in /home/styles.css, so it wins in every theme state.
    No orange on /debate. Chat and selected chips use the debate accent (Yan, 2026-11-09). */
 :root,
 :root:not([data-resolved-theme="light"]) {
@@ -101,7 +101,7 @@ html[data-resolved-theme="dark"] {
   margin-top: 0.75rem;
 }
 
-.edu-filter.debate-switch-link {
+.home-filter.debate-switch-link {
   flex: 0 0 2.75rem;
   width: 2.75rem;
   height: 2.75rem;

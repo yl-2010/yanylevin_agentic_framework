@@ -33,7 +33,7 @@ function safeQuizId(quizId) {
 export function quizAttemptPath(email, quizId) {
   return join(
     ROOT,
-    "education",
+    "home",
     safeEmail(email),
     "quiz-attempts",
     `${safeQuizId(quizId)}.json`

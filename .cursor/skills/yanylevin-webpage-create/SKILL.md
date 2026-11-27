@@ -11,7 +11,7 @@ description: >-
 
 HTML dropped on a todo, date, project, or class is `.cursor/skills/object-html/SKILL.md` (one standalone file, no site chrome). This skill is public yanylevin.com pages only.
 
-Do not edit the homepage, `index.html` at the repo root, or the education, fitness, dashboard, or debate chrome unless Yan asked. A guest `@agent` does not get those files. This skill makes a new folder.
+Do not edit the homepage, `index.html` at the repo root, or the home, fitness, dashboard, or debate chrome unless Yan asked. A guest `@agent` does not get those files. This skill makes a new folder.
 
 Repo: `$HOME/yanylevin_agentic_framework` (this repo). Static HTML on Vercel. Filesystem path is the URL.
 
@@ -27,9 +27,9 @@ Do not run the frontend-design "unique aesthetic" playbook. This is the existing
 
 **Colors.** Every page picks one of three themes. Never type brand hex into page CSS. Use `var(--accent)`, `var(--bloom-a)`, and the other tokens.
 
-- **Personal (default).** Load `/education/styles.css` only. The page follows the personal color in `brand/palette.mjs`. Personal chat uses this unless Yan names another theme.
+- **Personal (default).** Load `/home/styles.css` only. The page follows the personal color in `brand/palette.mjs`. Personal chat uses this unless Yan names another theme.
 - **JYPE.** Also load `/jype/styles.css` after it. The page follows the JYPE color. Use this for the JYPE agent, the JYPE site, or when Yan says JYPE theme.
-- **Unique color on yanylevin chrome.** Only when Yan asks for its own color. Load `/education/styles.css` for the glass and orbs. Then pin `--accent`, `--bloom-a`, `--bloom-b`, `--bloom-c`, `--bg-0`, and `--bg-1` with literal hex in the page CSS, in `:root`, the dark media query, and `html[data-resolved-theme="dark"]`. Copy the pattern from `mama-birthday-2026/styles.css`. That color stays fixed when the palette changes.
+- **Unique color on yanylevin chrome.** Only when Yan asks for its own color. Load `/home/styles.css` for the glass and orbs. Then pin `--accent`, `--bloom-a`, `--bloom-b`, `--bloom-c`, `--bg-0`, and `--bg-1` with literal hex in the page CSS, in `:root`, the dark media query, and `html[data-resolved-theme="dark"]`. Copy the pattern from `mama-birthday-2026/styles.css`. That color stays fixed when the palette changes.
 
 Apply Unslop to every heading and sentence on the page. No em dashes.
 
@@ -48,9 +48,9 @@ When JYPE, close friends, or Yan ask for a study guide, large plan, or blueprint
 
 1. Ship a public page with this skill.
 2. Nest it under the class or group folder (`spanish4/fall-qa-1`, `jype/what-to-do-with-particle`).
-3. Add a `sites[]` URL tile. JYPE agent, or Yan sending the URL to a JYPE member / JYPE group: `education/projects/jype/classes/<id>/class.json`. Yan making the page for himself: OneDrive `.education/class.json` only. Do not copy personal pages onto JYPE because the class is shared. Update that class’s public index if one exists. The `/notes` hub can list the page, but do not create a Notes project.
+3. Add a `sites[]` URL tile. JYPE agent, or Yan sending the URL to a JYPE member / JYPE group: `home/projects/jype/classes/<id>/class.json`. Yan making the page for himself: OneDrive `.education/class.json` only. Do not copy personal pages onto JYPE because the class is shared. Update that class’s public index if one exists. The `/notes` hub can list the page, but do not create a Notes project.
 4. Breadcrumb every page: Home · Notes · Class.
-5. Theme follows who asked. Personal chat (`/education`, Yan's 1:1, this agent on the Mac) loads `/education/styles.css` only. That is the yanylevin theme. Do not load `/jype/styles.css` unless Yan says JYPE theme. JYPE agent pages, and pages Yan is making for the JYPE site, still load `/jype/styles.css` after education CSS. Yan, 2026-10-30.
+5. Theme follows who asked. Personal chat (`/home`, Yan's 1:1, this agent on the Mac) loads `/home/styles.css` only. That is the yanylevin theme. Do not load `/jype/styles.css` unless Yan says JYPE theme. JYPE agent pages, and pages Yan is making for the JYPE site, still load `/jype/styles.css` after home CSS. Yan, 2026-10-30.
 6. Reply with the live URL.
 
 Hub: `yanylevin.com/notes`. Homepage More and the gated Apps tile both point there. YL orb still goes home.
@@ -65,7 +65,7 @@ Add a trailing-slash redirect in `vercel.json` next to the other app redirects:
 }
 ```
 
-Git does **not** auto-deploy. After push, run `npm run deploy:web` or the page stays on GitHub only. `scripts/vercel-ignore.sh` is a leftover skip-build safety net; ignored builds still burned Hobby quota, which is why auto-deploy is off. A public page must live **outside** `education/<email>/`, `fitness/<email>/`, chat/login logs, and `ios/` or it is not a site deploy.
+Git does **not** auto-deploy. After push, run `npm run deploy:web` or the page stays on GitHub only. `scripts/vercel-ignore.sh` is a leftover skip-build safety net; ignored builds still burned Hobby quota, which is why auto-deploy is off. A public page must live **outside** `home/<email>/`, `fitness/<email>/`, chat/login logs, and `ios/` or it is not a site deploy.
 
 ## 2. Page chrome (required)
 
@@ -76,7 +76,7 @@ Every page needs:
 1. Theme boot script (sets `data-theme` / `data-resolved-theme` before paint)
 2. Favicons `/favicon.svg` + `/favicon-dark.svg`
 3. Karla from Google Fonts
-4. `/education/styles.css` (tokens, body wash, corner orbs)
+4. `/home/styles.css` (tokens, body wash, corner orbs)
 5. A page CSS file for layout + `.sheet`
 6. Top-left YL squircle linking to `https://yanylevin.com/`
 7. Top-right empty circle, `aria-label="Toggle theme"`, `draggable="false"`
@@ -85,7 +85,7 @@ Every page needs:
 
 Do not paste the bottom dock or the chat circle into the page. `theme-orb.js` adds both when the Google session is `you@example.com`. Logged-out visitors and every other account keep the top two corners only.
 
-The bottom-left shape is the usage / home / dashboard L. The bottom-right shape is the agent chat circle. That chat is the personal agent, and the JYPE agent on `/jype/`. Pages that already have `#app-dock` or `#edu-chat` keep those. Celebration sites stay off this chrome. Object HTML stays off it too.
+The bottom-left shape is the usage / home / dashboard L. The bottom-right shape is the agent chat circle. That chat is the personal agent, and the JYPE agent on `/jype/`. Pages that already have `#app-dock` or `#home-chat` keep those. Celebration sites stay off this chrome. Object HTML stays off it too.
 
 Skeleton (keep the YL path exactly):
 
@@ -114,7 +114,7 @@ Skeleton (keep the YL path exactly):
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/education/styles.css?v=chrome-perf6" />
+    <link rel="stylesheet" href="/home/styles.css?v=chrome-perf6" />
     <link rel="stylesheet" href="/YOUR/PATH/styles.css" />
   </head>
   <body>
@@ -155,13 +155,13 @@ Copy glass CSS from the LinkedIn report (which matches `.dash-entry`): frosted b
 
 **Never animate `transform` on `.sheet`.** Magnetic hover writes `el.style.transform`. A CSS animation with `fill-mode: both` or `forwards` that sets `transform: none` wins over that inline style, so the card sits still. Dashboard chat cards fade **opacity only** (`dash-fade`, `backwards`). Login chips that must slide use `backwards` (not `both`) so transform is free after the intro. Hero titles may still use a transform rise. Cards may not.
 
-Do **not** invent `glass-card` / `panel` / `edu-panel` on a public page. A new class sits still until you add it to `isStaticContentBox()` and `STATIC_BOX_SEL` in `liquid-glass.js`.
+Do **not** invent `glass-card` / `panel` / `home-panel` on a public page. A new class sits still until you add it to `isStaticContentBox()` and `STATIC_BOX_SEL` in `liquid-glass.js`.
 
 Corner orbs (`.corner`) are already magnetic. Do not add `sheet` to them.
 
 Copy the rest of the report CSS as needed: `.report` width `min(42rem, calc(100% - 2rem))`, top padding `clamp(7.5rem, 14vh, 9rem)` so copy clears the orbs, `.report-hero` / `.report-meta`, staggered **opacity** delays on sheets, `prefers-reduced-motion`.
 
-Tokens come from `/education/styles.css`: `--fg`, `--muted`, `--accent`, `--hairline`, `--display`, `--ease`, `--lg-*`.
+Tokens come from `/home/styles.css`: `--fg`, `--muted`, `--accent`, `--hairline`, `--display`, `--ease`, `--lg-*`.
 
 ## 4. Content shape
 
@@ -176,13 +176,13 @@ For a note or report:
 
 Write like a person. Short sentences mixed with longer ones. No "Additionally", no title-case headings, no emoji in headings.
 
-## 5. Education copy (only if asked)
+## 5. Home copy (only if asked)
 
-Public URL is not the education dashboard. Putting HTML only under `education/<email>/...` does not publish it.
+Public URL is not the home dashboard. Putting HTML only under `home/<email>/...` does not publish it.
 
 If the user wants a copy on a project:
 
-1. `cp` the same `index.html` to `education/you@example.com/projects/<id>/<basename>.html`
+1. `cp` the same `index.html` to `home/you@example.com/projects/<id>/<basename>.html`
 2. Add that **exact basename** to `hiddenFiles` on `project.json` if they asked to hide it from the UI. Skip this for `CONTEXT.md` / `context.md` (already hidden).
 
 ```json
@@ -193,9 +193,9 @@ If the user wants a copy on a project:
 }
 ```
 
-Use absolute site paths (`/education/styles.css`, `/liquid-glass.js`, `/your/page/styles.css`) so a blob open from the dashboard still themes. Do not rename to a dotfile. LaunchAgent `com.personalagent.education-sync` often commits the education tree on its own. You still commit the **public** `foo/bar/` files.
+Use absolute site paths (`/home/styles.css`, `/liquid-glass.js`, `/your/page/styles.css`) so a blob open from the dashboard still themes. Do not rename to a dotfile. LaunchAgent `com.personalagent.home-sync` often commits the home tree on its own. You still commit the **public** `foo/bar/` files.
 
-ExampleCo's project folder: `education/you@example.com/projects/sockethr/`.
+ExampleCo's project folder: `home/you@example.com/projects/sockethr/`.
 
 ## 6. Ship
 
@@ -219,11 +219,11 @@ If they stay `class="sheet"` only, `liquid-glass.js` did not treat them as stati
 
 - [ ] Folder `path/index.html` matches the URL the user gave
 - [ ] `vercel.json` trailing-slash redirect
-- [ ] Public files not only under `education/<email>/`
-- [ ] YL squircle, theme orb, Karla, education CSS, page CSS, three scripts, `liquid-glass-defs`
+- [ ] Public files not only under `home/<email>/`
+- [ ] YL squircle, theme orb, Karla, home CSS, page CSS, three scripts, `liquid-glass-defs`
 - [ ] Bottom dock and chat left to `theme-orb.js`. They show only for Yan's Google session. Do not hardcode them
 - [ ] Content cards are `.sheet` with unique `data-filter-id`
 - [ ] Card enter animation is opacity only (no `transform`, no `both` fill)
 - [ ] Unslop on all copy
 - [ ] Pushed `main`, `npm run deploy:web`, live URL 200
-- [ ] Education copy + `hiddenFiles` only when asked
+- [ ] Home copy + `hiddenFiles` only when asked

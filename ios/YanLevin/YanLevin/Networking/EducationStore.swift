@@ -83,7 +83,7 @@ enum EducationRoute: Hashable {
 
 @MainActor
 final class EducationFocusStore: ObservableObject {
-    /// Education tab `NavigationStack` path — Chat reads the last entry for agent context.
+    /// Home tab `NavigationStack` path — Chat reads the last entry for agent context.
     @Published var path: [EducationRoute] = []
     /// Visible Education page is within a few points of the top.
     @Published var visiblePageIsAtTop = true
@@ -367,7 +367,7 @@ final class EducationFocusStore: ObservableObject {
         return []
     }
 
-    /// Same shape as web `__eduUiContext` for `/api/education/agent/message`.
+    /// Same shape as web `__homeUiContext` for `/api/home/agent/message`.
     func agentUiContext(tree: EducationTreeResponse?) -> AgentUiContext {
         var ctx: AgentUiContext
         switch path.last {
@@ -375,7 +375,7 @@ final class EducationFocusStore: ObservableObject {
             ctx = AgentUiContext(
                 client: "ios",
                 view: "home",
-                title: isDebate ? "Debate home" : (isJype ? "JYPE home" : "Education home")
+                title: isDebate ? "Debate home" : (isJype ? "JYPE home" : "Home")
             )
 
         case .classDetail(let cls):
@@ -765,7 +765,7 @@ final class EducationStore: ObservableObject {
     var workspace: String = ""
 
     private var apiPrefix: String {
-        workspace == "jype" ? "api/jype" : "api/education"
+        workspace == "jype" ? "api/jype" : "api/home"
     }
 
     private func api(_ suffix: String) -> String {
@@ -778,7 +778,7 @@ final class EducationStore: ObservableObject {
     private var agentPollTask: Task<Void, Never>?
     private var persistAgentChatTask: Task<Void, Never>?
     private var persistEmail: String?
-    /// Last `/api/education/data` payload. Identical bytes skip `@Published tree`
+    /// Last `/api/home/data` payload. Identical bytes skip `@Published tree`
     /// so Chat map cards are not rebuilt on every agent-file SSE tick.
     private var lastEducationData: Data?
     /// Local checkoffs keep winning for 30s while Canvas/live overlay catches up.
@@ -1027,7 +1027,7 @@ final class EducationStore: ObservableObject {
     }
 
     /// Keep education data fresh while this view task is alive.
-    /// SSE for instant updates + polling fallback (same idea as `/education` web).
+    /// SSE for instant updates + polling fallback (same idea as `/home` web).
     /// Stop is tied to task cancellation — do not also stop from `onDisappear`
     /// (iPad sidebar tabs can fire disappear without tearing the view down).
     func runLiveSession(token: String) async {
@@ -1806,7 +1806,7 @@ final class EducationStore: ObservableObject {
                 bearer: token
             )
             guard let sid = res.sessionId, !sid.isEmpty else {
-                errorText = res.error ?? "Could not start education agent."
+                errorText = res.error ?? "Could not start home agent."
                 return nil
             }
             if ticket.viewGen == agentViewGen, agentSessionId == nil {
@@ -1828,7 +1828,7 @@ final class EducationStore: ObservableObject {
         if let error, case let APIError.http(code, _) = error, code == 429 {
             message = "Queue full (max 8). Wait for a reply before sending more."
         } else {
-            message = "Education agent unavailable (Mac / Cursor offline)."
+            message = "Home agent unavailable (Mac / Cursor offline)."
         }
         agentMessages.append(ChatMessage(role: "assistant", content: message))
         persistAgentChatNow()

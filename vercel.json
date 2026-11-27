@@ -10,8 +10,8 @@
       "permanent": true
     },
     {
-      "source": "/education",
-      "destination": "/education/",
+      "source": "/home",
+      "destination": "/home/",
       "permanent": true
     },
     {
@@ -32,24 +32,24 @@
   ],
   "rewrites": [
     {
-      "source": "/education/class/:classId",
-      "destination": "/education/index.html"
+      "source": "/home/class/:classId",
+      "destination": "/home/index.html"
     },
     {
-      "source": "/education/project/:projectId",
-      "destination": "/education/index.html"
+      "source": "/home/project/:projectId",
+      "destination": "/home/index.html"
     },
     {
-      "source": "/education/todo/:todoId/capsule/:capsuleId",
-      "destination": "/education/index.html"
+      "source": "/home/todo/:todoId/capsule/:capsuleId",
+      "destination": "/home/index.html"
     },
     {
-      "source": "/education/todo/:todoId",
-      "destination": "/education/index.html"
+      "source": "/home/todo/:todoId",
+      "destination": "/home/index.html"
     },
     {
-      "source": "/education/date/:dateId",
-      "destination": "/education/index.html"
+      "source": "/home/date/:dateId",
+      "destination": "/home/index.html"
     },
     {
       "source": "/debate/class/:classId",
@@ -76,8 +76,8 @@
       "destination": "/debate/index.html"
     },
     {
-      "source": "/api/education/:path*",
-      "destination": "/api/education-api?p=:path*"
+      "source": "/api/home/:path*",
+      "destination": "/api/home-api?p=:path*"
     },
     {
       "source": "/api/fitness/:path*",

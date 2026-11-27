@@ -12,7 +12,7 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { listTopLevelProjects, YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { listTopLevelProjects, YAN_HOME_DIR } from "./onedrive-projects.js";
 import { withCloudRetry } from "./cloud-storage-io.js";
 import { canvasDescriptionUpdate, formatAssignmentDescription } from "./canvas-sync.js";
 import {
@@ -21,20 +21,20 @@ import {
   courseMapTarget,
   gradebookUrlForCourse,
 } from "./canvas-grades.js";
-import { classMeetingsBetween } from "./education-class-todo.js";
+import { classMeetingsBetween } from "./home-class-todo.js";
 import {
   classPeriodOnDate,
   classTrimesters,
   effectiveTrimesterForVisibility,
   listClassEntriesForRoot,
   scheduleTodayKey,
-} from "./education-data.js";
+} from "./home-data.js";
 import { highestTodoTag, stripTodoTagPrefix } from "./todo-tags.js";
 import {
   findMatchingTodo,
   loadDeletedMarkdown,
   namesAreSimilar,
-} from "./education-match.js";
+} from "./home-match.js";
 import {
   classObjectFinderName,
   formatFinderShortDate,
@@ -42,7 +42,7 @@ import {
   objectDirId,
   resolveBookkeepingFile,
   uniqueFinderFolderName,
-} from "./education-onedrive.js";
+} from "./home-onedrive.js";
 
 /** OneDrive grade-folder names for Yan's mapped Canvas classes (hourly fast path). */
 const MAPPED_ONEDRIVE_FOLDERS = {
@@ -55,7 +55,7 @@ const MAPPED_ONEDRIVE_FOLDERS = {
   physics: "H. Physics",
 };
 
-const YAN_ROOT = YAN_EDUCATION_DIR;
+const YAN_ROOT = YAN_HOME_DIR;
 const CANVAS_DIR = join(YAN_ROOT, ".canvas");
 
 let cloudWriteChain = Promise.resolve();

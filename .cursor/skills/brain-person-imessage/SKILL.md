@@ -63,6 +63,6 @@ Ambiguous first names: skip.
 - Quoting texts into brain files
 - Skimming a month
 - Opening dumps outside the listed /tmp files
-- Editing `people/index.md`, `people/graph.md`, or `brain/education/`
+- Editing `people/index.md`, `people/graph.md`, or `brain/home/`
 - Git commit (the Node wrapper does that)
 - Creating empty typed files

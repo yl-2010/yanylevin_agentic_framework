@@ -9,13 +9,13 @@ const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 describe("repoGitPaths", () => {
   it("keeps repo-relative paths and drops OneDrive", () => {
     const kept = repoGitPaths([
-      "education/you@example.com/meta.json",
+      "home/you@example.com/meta.json",
       "$HOME/Documents/11th Grade/H. Physics/.education/class.json",
       "../outside.txt",
       "--force",
       "",
     ]);
-    assert.deepEqual(kept, ["education/you@example.com/meta.json"]);
+    assert.deepEqual(kept, ["home/you@example.com/meta.json"]);
   });
 
   it("accepts an absolute path that is still in the repo", () => {

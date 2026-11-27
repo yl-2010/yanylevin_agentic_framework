@@ -1,6 +1,6 @@
 /**
  * Browser helper: mint a short Mac JWT via Vercel, then call api.yanylevin.com
- * for education/fitness (data, SSE, agent) so Vercel Fluid is not held open.
+ * for home/fitness (data, SSE, agent) so Vercel Fluid is not held open.
  */
 (() => {
   const DEFAULT_API_BASE = "https://api.yanylevin.com";
@@ -122,7 +122,7 @@
   }
 
   /**
-   * @param {string} path e.g. "/api/education/data"
+   * @param {string} path e.g. "/api/home/data"
    * @param {RequestInit & { json?: unknown, timeoutMs?: number }} [opts]
    */
   async function macFetch(path, opts = {}) {
@@ -173,7 +173,7 @@
    * onChange gets the parsed `change` payload ({} if it was not JSON). After a
    * reconnect it also fires once with { source: "reconnect" }, since events
    * sent while the stream was down are gone.
-   * @param {string} path e.g. "/api/education/events"
+   * @param {string} path e.g. "/api/home/events"
    * @param {{ onEvent?: (name: string, data: string) => void, onChange?: (data: Record<string, unknown>) => void, onError?: (err: unknown) => void }} handlers
    * @returns {{ close: () => void }}
    */

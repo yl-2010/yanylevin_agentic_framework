@@ -1,0 +1,4506 @@
+/**
+ * /home personal academic OS — read UI + done checkbox write.
+ * Data/SSE: Mac api.yanylevin.com via YanMacApi (not Vercel Fluid).
+ * Auth session stays same-origin on Vercel.
+ */
+(() => {
+  const stages = {
+    loading: document.getElementById("stage-loading"),
+    login: document.getElementById("stage-login"),
+    denied: document.getElementById("stage-denied"),
+    full: document.getElementById("stage-full"),
+  };
+  const appEl = document.getElementById("home-app");
+  const CFG = {
+    basePath: "/home",
+    apiPrefix: "/api/home",
+    workspace: "",
+    showGrades: true,
+    showFilters: true,
+    staticClasses: false,
+    allowedAccess: ["full"],
+    allowedEmails: [],
+    title: "Home",
+    site: "",
+    homeProjectId: "",
+    showCases: false,
+    hideSchedule: false,
+    hideProjects: false,
+    ...(window.YL_HOME || {}),
+  };
+  const BASE = String(CFG.basePath || "/home").replace(/\/+$/, "") || "/home";
+  const API = String(CFG.apiPrefix || "/api/home").replace(/\/+$/, "") || "/api/home";
+  const BASE_RE = BASE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  /**
+   * Keep in sync with server/home-route-id.js.
+   * encodeURIComponent leaves `#` as `%23`. Drag-to-tab decodes that into a
+   * real hash, so Spanish QA #1 (and anything else with `#`) opens Missing.
+   */
+  function encodeRouteId(id) {
+    return encodeURIComponent(String(id ?? "")).replace(/%/g, "*");
+  }
+  function decodeRouteId(raw) {
+    const s = String(raw ?? "");
+    if (!s) return s;
+    try {
+      const decoded = s.includes("*")
+        ? decodeURIComponent(s.replace(/\*/g, "%"))
+        : decodeURIComponent(s);
+      return decoded.normalize("NFC");
+    } catch {
+      try {
+        return s.normalize("NFC");
+      } catch {
+        return s;
+      }
+    }
+  }
+  function recoverHashSplitId(id, params) {
+    const src = String(window.location.hash || "");
+    if (src.length < 2 || !src.startsWith("#")) return { id, params };
+    const rest = src.slice(1);
+    const qAt = rest.indexOf("?");
+    const namePart = qAt >= 0 ? rest.slice(0, qAt) : rest;
+    const extraQuery = qAt >= 0 ? rest.slice(qAt + 1) : "";
+    const looksSplit =
+      /(?:^|&)(class|project|classId|projectId)=/.test(extraQuery) ||
+      /^\d+(\s|$)/.test(namePart);
+    if (!looksSplit || String(id).includes("#")) return { id, params };
+    let nameDecoded = namePart;
+    try {
+      nameDecoded = decodeURIComponent(namePart.replace(/\+/g, " "));
+    } catch {
+      /* keep */
+    }
+    const recovered = `${id}#${nameDecoded}`.normalize("NFC");
+    if (!extraQuery) return { id: recovered, params };
+    const merged = new URLSearchParams(params);
+    new URLSearchParams(extraQuery).forEach((value, key) => {
+      if (!merged.get(key)) merged.set(key, value);
+    });
+    return { id: recovered, params: merged };
+  }
+  function sameObjectId(a, b) {
+    return String(a || "").normalize("NFC") === String(b || "").normalize("NFC");
+  }
+
+  function spaHome() {
+    return `${BASE}/`;
+  }
+  function spaClass(id) {
+    return `${BASE}/class/${encodeRouteId(id)}`;
+  }
+  function spaProject(id) {
+    return `${BASE}/project/${encodeRouteId(id)}`;
+  }
+  function spaTodo(id, q = "") {
+    return `${BASE}/todo/${encodeRouteId(id)}${q}`;
+  }
+  function spaDate(id, q = "") {
+    return `${BASE}/date/${encodeRouteId(id)}${q}`;
+  }
+  function spaCapsule(todoId, capsuleId, q = "") {
+    return `${BASE}/todo/${encodeRouteId(todoId)}/capsule/${encodeRouteId(
+      capsuleId
+    )}${q}`;
+  }
+  function spaCase(id, side) {
+    const s = String(side || "aff").toLowerCase() === "neg" ? "neg" : "aff";
+    return `${BASE}/case/${encodeRouteId(id)}/${s}`;
+  }
+  function debateCaseHref(id, side) {
+    const s = String(side || "aff").toLowerCase() === "neg" ? "neg" : "aff";
+    return `/debate/case/${encodeRouteId(id)}/${s}`;
+  }
+  function homeScopeProjectId() {
+    return String(CFG.homeProjectId || "").trim() || "";
+  }
+  function isSpaHref(href) {
+    try {
+      const u = new URL(href, window.location.origin);
+      const p = u.pathname.replace(/\/+$/, "") || "/";
+      if (p === BASE) return true;
+      return new RegExp(`^${BASE_RE}/(class|project|todo|date|case)/`).test(p);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Project that should leave this dashboard (Yan’s JYPE tile → /jype/).
+   * @param {object|null|undefined} p
+   * @returns {string}
+   */
+  function projectPortalHref(p) {
+    const raw = String(p?.href || "").trim();
+    if (raw) {
+      try {
+        const u = new URL(raw, window.location.origin);
+        const path = (u.pathname.replace(/\/+$/, "") || "/") + "/";
+        if (path === `${BASE}/`) return "";
+      } catch {
+        /* keep raw */
+      }
+      return raw;
+    }
+    if (!CFG.workspace && String(p?.id || "").toLowerCase() === "jype") {
+      return "/jype/";
+    }
+    if (!CFG.workspace && String(p?.id || "").toLowerCase() === "debate") {
+      return "/debate/";
+    }
+    return "";
+  }
+
+  /**
+   * Full page load. Do not pushState inside the home SPA.
+   * @param {string} href
+   * @returns {boolean}
+   */
+  function assignProjectPortal(href) {
+    const raw = String(href || "").trim();
+    if (!raw) return false;
+    try {
+      window.location.assign(new URL(raw, window.location.origin).href);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Circular Canvas LMS logomark (monochrome). */
+  const CANVAS_ICON_SVG =
+    '<svg viewBox="0 0 26.7 26.8" aria-hidden="true" focusable="false" draggable="false" fill="currentColor"><path d="M3.9 13.5c0-2-1.5-3.6-3.4-3.8C.2 10.9 0 12.1 0 13.5s.2 2.6.5 3.8c1.9-.2 3.4-1.9 3.4-3.8z"/><circle cx="6.2" cy="13.4" r="1.2"/><path d="M22.8 13.5c0 2 1.5 3.6 3.4 3.8.3-1.2.5-2.5.5-3.8s-.2-2.6-.5-3.8c-1.9.2-3.4 1.8-3.4 3.8z"/><circle cx="20.2" cy="13.4" r="1.2"/><path d="M13.3 23c-2 0-3.6 1.5-3.8 3.4 1.2.3 2.5.5 3.8.5 1.3 0 2.6-.2 3.8-.5-.2-1.9-1.8-3.4-3.8-3.4z"/><circle cx="13.2" cy="20.4" r="1.2"/><path d="M13.3 4c2 0 3.6-1.5 3.8-3.4-1.2-.3-2.5-.5-3.8-.5-1.3 0-2.6.2-3.8.5C9.7 2.5 11.3 4 13.3 4z"/><circle cx="13.2" cy="6.4" r="1.2"/><path d="M20 20.2c-1.4 1.4-1.5 3.6-.3 5.1 2.2-1.3 4.1-3.2 5.4-5.4-1.5-1.2-3.7-1.1-5.1.3z"/><circle cx="18.2" cy="18.4" r="1.2"/><path d="M6.6 6.8C8 5.4 8.1 3.2 6.9 1.7 4.7 3 2.8 4.9 1.5 7.1 3 8.3 5.2 8.2 6.6 6.8z"/><circle cx="8.2" cy="8.4" r="1.2"/><path d="M20 6.8c1.4 1.4 3.6 1.5 5.1.3-1.3-2.2-3.2-4.1-5.4-5.4-1.2 1.5-1.1 3.7.3 5.1z"/><circle cx="18.2" cy="8.4" r="1.2"/><path d="M6.6 20.2c-1.4-1.4-3.6-1.5-5.1-.3 1.3 2.2 3.2 4.1 5.4 5.4 1.2-1.6 1.1-3.7-.3-5.1z"/><circle cx="8.2" cy="18.4" r="1.2"/></svg>';
+
+  const FILTER_KEY = "yl-edu-type-filters";
+  const DATE_FILTER_KEY = "yl-edu-date-filters";
+  const TAGS = ["MA", "QA", "HW", "CW", "none"];
+  const DATE_FILTERS_HOME = ["ma", "class", "loose"];
+  const DATE_FILTERS_CLASS = ["ma", "class"];
+  const DATE_FILTERS_PROJECT = ["ma", "loose"];
+  const DATES_COLLAPSED_LIMIT = 6;
+  const TODOS_COLLAPSED_LIMIT = 6;
+  /** Expanded OneDrive folder keys, survives SSE re-renders. */
+  const expandedFolders = new Set();
+  const GRAD_CAP_SVG =
+    '<svg class="home-filter-cap" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3zm-7 12.18v2.66c0 .74 1.94 2.16 7 2.16s7-1.42 7-2.16v-2.66l-7 3.82-7-3.82z"/></svg>';
+  const THUMB_UP_SVG =
+    '<svg class="home-vote-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path fill="currentColor" d="M14.6 3.2c.9.1 1.5.9 1.4 1.8l-.3 2.5h3.6c1.4 0 2.5 1.3 2.3 2.7l-1.1 7.4A2.5 2.5 0 0 1 18 20H9.2V8.8L12.8 3.8A2 2 0 0 1 14.6 3.2ZM7.2 9v11H4.6A1.6 1.6 0 0 1 3 18.4v-8C3 9.6 3.7 9 4.6 9h2.6Z"/></svg>';
+  const THUMB_DOWN_SVG =
+    '<svg class="home-vote-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path fill="currentColor" d="M9.4 20.8c-.9-.1-1.5-.9-1.4-1.8l.3-2.5H4.7c-1.4 0-2.5-1.3-2.3-2.7l1.1-7.4A2.5 2.5 0 0 1 6 4h8.8v11.2L11.2 20.2a2 2 0 0 1-1.8.6ZM16.8 15V4h2.6C20.3 4 21 4.6 21 5.6v8c0 .9-.7 1.6-1.6 1.6h-2.6Z"/></svg>';
+  const MONTHS = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "July",
+    "Aug",
+    "Sept",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  const MONTHS_FULL = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  const WEEKDAYS = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  const WEEKDAYS_SHORT = ["Sun", "Mon", "Tues", "Wed", "Thurs", "Fri", "Sat"];
+
+  /** @type {any} */
+  let tree = null;
+  /** @type {string} */
+  let userEmail = "";
+
+  const PRASHAM_EMAILS = new Set([
+    "you@example.com",
+    "you@icloud.com",
+    "you@example.com",
+    "friend@school.example",
+  ]);
+
+  function isPrashamEmail(email) {
+    return PRASHAM_EMAILS.has(String(email || "").trim().toLowerCase());
+  }
+
+  /**
+   * Flat frost for Alex on /home, and for every account on /jype.
+   * Yan's /home and /debate stay on the normal liquid-glass path.
+   */
+  function applyGlassMode() {
+    const root = document.documentElement;
+    const onJype = CFG.workspace === "jype" || BASE === "/jype";
+    const onHome = BASE === "/home";
+    if (onJype) {
+      if (root.dataset.lgCheap !== "1") {
+        root.dataset.lgCheap = "1";
+        window.reinitLiquidGlass?.();
+      }
+      return;
+    }
+    if (!onHome || !userEmail) return;
+    const cheap = isPrashamEmail(userEmail);
+    const was = root.dataset.lgCheap === "1";
+    if (cheap) root.dataset.lgCheap = "1";
+    else delete root.dataset.lgCheap;
+    try {
+      sessionStorage.setItem("yl-edu-lg", cheap ? "cheap" : "full");
+    } catch (e) {
+      /* private mode */
+    }
+    if (was !== cheap) window.reinitLiquidGlass?.();
+  }
+  /** Snapshot to skip no-op SSE/poll refreshes. */
+  let treeFingerprint = "";
+  /** Recent local checkoffs win over a slower Canvas overlay. */
+  const localDoneLocks = new Map();
+  /** Recent thumbs win over a refresh that still has the old vote. */
+  const localVoteLocks = new Map();
+  /** Entrance fade only on first paint after a real browser load. */
+  let didEntrance = false;
+  /** @type {Set<string>} */
+  let typeFilter = loadFilters();
+  /** @type {Set<string>} */
+  let dateFilter = loadDateFilters();
+  /** Dates panel: collapsed shows upcoming 6; expanded shows all. */
+  let datesExpanded = false;
+  /** Projects panel: collapsed shows main. Expanded adds hidden. Backend never arrives. */
+  let projectsExpanded = false;
+  /** Class comments panel: collapsed shows the 3 newest. */
+  let classCommentsExpanded = false;
+  let projectCommentsExpanded = false;
+  /** Home comments panel: same collapse, only the fresh window. */
+  let homeCommentsExpanded = false;
+  /** TODO panel: web starts fully expanded; collapsed shows 6 and hides type filters. */
+  let todoExpanded = true;
+  /** Completed panel: starts expanded; collapsed shows 6. No type filters of its own. */
+  let completedExpanded = true;
+  let route = parseRoute();
+
+  function show(name) {
+    Object.keys(stages).forEach((key) => {
+      const el = stages[key];
+      if (!el || key === "loading") return;
+      el.hidden = key !== name;
+    });
+    const loading = stages.loading;
+    if (name === "loading") {
+      if (loading) {
+        loading.classList.remove("is-leaving");
+        loading.hidden = false;
+      }
+    } else if (loading && !loading.hidden && typeof window.ylHideLoader === "function") {
+      window.ylHideLoader();
+    } else if (loading) {
+      loading.hidden = true;
+    }
+    if (name === "full" && appEl && !didEntrance) {
+      didEntrance = true;
+      appEl.classList.add("is-settled");
+      void appEl.offsetWidth;
+      appEl.classList.remove("is-settled");
+      window.setTimeout(() => appEl.classList.add("is-settled"), 1100);
+    }
+    queueMicrotask(() => window.reinitLiquidGlass?.());
+  }
+
+  /** Normalize / accept http(s) Canvas URLs only. */
+  function normalizeCanvasLink(raw) {
+    const s = String(raw || "").trim();
+    if (!s) return "";
+    try {
+      const u = new URL(s);
+      if (u.protocol !== "http:" && u.protocol !== "https:") return "";
+      return u.href;
+    } catch {
+      return "";
+    }
+  }
+
+  function canvasOrbHtml(rawLink, scoreLabel) {
+    const href = normalizeCanvasLink(rawLink);
+    if (!href) return "";
+    const label = String(scoreLabel || "").trim();
+    const compact = label.length > 5 ? " home-canvas-orb-score--compact" : "";
+    const inner = label
+      ? `<span class="home-canvas-orb-score${compact}">${escapeHtml(label)}</span>`
+      : CANVAS_ICON_SVG;
+    const aria = label ? `Open in Canvas, ${label}` : "Open in Canvas";
+    return `<div class="home-canvas-slot"><a class="corner circle home-canvas-orb${
+      label ? " home-canvas-orb--score" : ""
+    }" data-liquid-glass="circle" data-filter-id="lg-home-canvas" href="${escapeHtml(
+      href
+    )}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(
+      aria
+    )}">${inner}</a></div>`;
+  }
+
+  function todoScoreLabel(t) {
+    return String(t?.canvasWork?.display || "").trim();
+  }
+
+  function classScoreLabel(cls) {
+    return String(cls?.canvasScoreLabel || "").trim();
+  }
+
+  function scoreHtml(label, canvasLink) {
+    const text = String(label || "").trim();
+    if (!text) return "";
+    const href = normalizeCanvasLink(canvasLink);
+    if (!href) return `<span class="home-score">${escapeHtml(text)}</span>`;
+    return `<a class="home-score" href="${escapeHtml(
+      href
+    )}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(
+      `Open in Canvas, ${text}`
+    )}">${escapeHtml(text)}</a>`;
+  }
+
+  /** Course gradebook from a Canvas assignment/syllabus/course URL. */
+  function gradebookUrlFromCanvasLink(raw) {
+    const href = normalizeCanvasLink(raw);
+    if (!href) return "";
+    try {
+      const u = new URL(href);
+      const m = u.pathname.match(/\/courses\/(\d+)/);
+      if (!m) return "";
+      u.pathname = `/courses/${m[1]}/grades`;
+      u.search = "";
+      u.hash = "";
+      return u.href;
+    } catch {
+      return "";
+    }
+  }
+
+  function projectScoreLabel(project) {
+    return String(project?.canvasScoreLabel || "").trim();
+  }
+
+  function projectCanvasLink(project) {
+    const direct = normalizeCanvasLink(project && project.canvasLink);
+    if (direct) return direct;
+    const kids = [
+      ...flattenTodos(tree, { projectId: project && project.id }),
+      ...((project && project.dates) || []),
+    ];
+    for (const item of kids) {
+      const g = gradebookUrlFromCanvasLink(item && item.canvasLink);
+      if (g) return g;
+    }
+    return "";
+  }
+
+  function classCanvasLink(cls) {
+    return normalizeCanvasLink(cls && cls.canvasLink);
+  }
+
+  function loadFilters() {
+    try {
+      const raw = localStorage.getItem(FILTER_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr) && arr.length) return new Set(arr.map(String));
+      }
+    } catch {
+      /* ignore */
+    }
+    return new Set(TAGS);
+  }
+
+  function saveFilters() {
+    try {
+      localStorage.setItem(FILTER_KEY, JSON.stringify([...typeFilter]));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function loadDateFilters() {
+    try {
+      const raw = localStorage.getItem(DATE_FILTER_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr) && arr.length) {
+          const known = arr.map(String).filter((k) => DATE_FILTERS_HOME.includes(k));
+          if (known.length) return new Set(known);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    return new Set(DATE_FILTERS_HOME);
+  }
+
+  function saveDateFilters() {
+    try {
+      localStorage.setItem(DATE_FILTER_KEY, JSON.stringify([...dateFilter]));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function todayKey() {
+    if (tree?.todayKey) return String(tree.todayKey);
+    const t = todayParts();
+    return ymd(t.y, t.m, t.day);
+  }
+
+  function parseRoute() {
+    const path = window.location.pathname.replace(/\/+$/, "") || "/";
+    let params = new URLSearchParams(window.location.search);
+    const classFromQuery = () =>
+      params.get("class") || params.get("classId") || null;
+    const projectFromQuery = () =>
+      params.get("project") || params.get("projectId") || null;
+    const queryClass = () => {
+      const raw = classFromQuery();
+      return raw ? decodeRouteId(raw) : null;
+    };
+    const queryProject = () => {
+      const raw = projectFromQuery();
+      return raw ? decodeRouteId(raw) : null;
+    };
+    let m = path.match(new RegExp(`^${BASE_RE}/class/([^/]+)$`));
+    if (m) return { view: "class", classId: decodeRouteId(m[1]), projectId: null, itemId: null, capsuleId: null };
+    m = path.match(new RegExp(`^${BASE_RE}/project/([^/]+)$`));
+    if (m) {
+      return {
+        view: "project",
+        classId: null,
+        projectId: decodeRouteId(m[1]),
+        itemId: null,
+      };
+    }
+    m = path.match(new RegExp(`^${BASE_RE}/todo/([^/]+)/capsule/([^/]+)$`));
+    if (m) {
+      const recovered = recoverHashSplitId(decodeRouteId(m[1]), params);
+      params = recovered.params;
+      return {
+        view: "capsule",
+        classId: queryClass(),
+        projectId: queryProject(),
+        itemId: recovered.id,
+        capsuleId: decodeRouteId(m[2]),
+      };
+    }
+    m = path.match(new RegExp(`^${BASE_RE}/todo/([^/]+)$`));
+    if (m) {
+      const recovered = recoverHashSplitId(decodeRouteId(m[1]), params);
+      params = recovered.params;
+      return {
+        view: "todo",
+        classId: queryClass(),
+        projectId: queryProject(),
+        itemId: recovered.id,
+      };
+    }
+    m = path.match(new RegExp(`^${BASE_RE}/date/([^/]+)$`));
+    if (m) {
+      const recovered = recoverHashSplitId(decodeRouteId(m[1]), params);
+      params = recovered.params;
+      return {
+        view: "date",
+        classId: queryClass(),
+        projectId: queryProject(),
+        itemId: recovered.id,
+      };
+    }
+    m = path.match(new RegExp(`^${BASE_RE}/case/([^/]+)/(aff|neg)$`, "i"));
+    if (m) {
+      return {
+        view: "case",
+        classId: null,
+        projectId: homeScopeProjectId() || "debate",
+        itemId: null,
+        caseId: decodeRouteId(m[1]),
+        caseSide: String(m[2] || "aff").toLowerCase(),
+      };
+    }
+    return { view: "home", classId: null, projectId: null, itemId: null };
+  }
+
+  /** @type {Map<string, { x: number, y: number }>} */
+  const scrollPositions = new Map();
+  try {
+    if (history.scrollRestoration) history.scrollRestoration = "manual";
+  } catch {
+    /* ignore */
+  }
+
+  function routeScrollQuery(r) {
+    if (r?.projectId) return `?project=${encodeURIComponent(r.projectId)}`;
+    if (r?.classId) return `?class=${encodeURIComponent(r.classId)}`;
+    return "";
+  }
+
+  function routeScrollKey(r = route) {
+    const view = r?.view || "home";
+    if (view === "class" && r.classId) {
+      return spaClass(r.classId);
+    }
+    if (view === "project" && r.projectId) {
+      return spaProject(r.projectId);
+    }
+    if (view === "capsule" && r.itemId && r.capsuleId) {
+      return spaCapsule(r.itemId, r.capsuleId, routeScrollQuery(r));
+    }
+    if (view === "todo" && r.itemId) {
+      return spaTodo(r.itemId, routeScrollQuery(r));
+    }
+    if (view === "date" && r.itemId) {
+      return spaDate(r.itemId, routeScrollQuery(r));
+    }
+    if (view === "case" && r.caseId) {
+      return spaCase(r.caseId, r.caseSide);
+    }
+    return spaHome();
+  }
+
+  function captureScroll(key = routeScrollKey()) {
+    scrollPositions.set(key, { x: window.scrollX, y: window.scrollY });
+  }
+
+  function applyScroll(mode, keepX = 0, keepY = 0) {
+    let x = keepX;
+    let y = keepY;
+    if (mode === "restore") {
+      const pos = scrollPositions.get(routeScrollKey());
+      x = pos?.x ?? 0;
+      y = pos?.y ?? 0;
+    } else if (mode === "top") {
+      x = 0;
+      y = 0;
+    }
+    requestAnimationFrame(() => {
+      window.scrollTo({ left: x, top: y, behavior: "instant" });
+    });
+  }
+
+  function navigate(path, { replace = false, scroll = "top" } = {}) {
+    captureScroll();
+    const url = path.startsWith("/") ? path : `${BASE}/${path}`;
+    if (replace) history.replaceState({}, "", url);
+    else history.pushState({}, "", url);
+    route = parseRoute();
+    render({ scroll });
+    maybeTouchProjectOpened();
+    fetchData({ live: true }).catch((err) => console.error("[edu live]", err));
+  }
+
+  const AGENT_NAV_STORE = "home-agent-navigate-id";
+  /** @type {string|null} */
+  let lastAgentNavigateId = null;
+  try {
+    lastAgentNavigateId = sessionStorage.getItem(AGENT_NAV_STORE) || null;
+  } catch {
+    /* ignore */
+  }
+
+  /**
+   * @param {string} id
+   */
+  function rememberAgentNavigateId(id) {
+    lastAgentNavigateId = id;
+    try {
+      sessionStorage.setItem(AGENT_NAV_STORE, id);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /**
+   * @param {string} href
+   * @returns {boolean}
+   */
+  function sameHomeHref(href) {
+    try {
+      const next = new URL(href, window.location.origin);
+      const norm = (p) => String(p || "").replace(/\/+$/, "") || "/";
+      return (
+        norm(next.pathname) === norm(window.location.pathname) &&
+        next.search === window.location.search
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * @param {unknown} target
+   * @returns {string|null}
+   */
+  function homeNavigateHrefFromTarget(target) {
+    if (!target || typeof target !== "object") return null;
+    const src = /** @type {Record<string, unknown>} */ (target);
+    const view = String(src.view || "")
+      .trim()
+      .toLowerCase();
+    const classId = String(src.classId || "").trim();
+    const projectId = String(src.projectId || "").trim();
+    const todoId = String(src.todoId || "").trim();
+    const dateId = String(src.dateId || "").trim();
+    const capsuleId = String(src.capsuleId || "").trim();
+    const caseId = String(src.caseId || "").trim();
+    const caseSide = String(src.caseSide || src.side || "aff").trim();
+    const q = projectId
+      ? `?project=${encodeURIComponent(projectId)}`
+      : classId
+        ? `?class=${encodeURIComponent(classId)}`
+        : "";
+    if (view === "home") {
+      if (String(src.site || "").toLowerCase() === "debate" && BASE !== "/debate") {
+        return "/debate/";
+      }
+      return spaHome();
+    }
+    if (view === "class" && classId) {
+      return spaClass(classId);
+    }
+    if (view === "project" && projectId) {
+      return spaProject(projectId);
+    }
+    if (view === "todo" && todoId) {
+      return spaTodo(todoId, q);
+    }
+    if (view === "date" && dateId) {
+      return spaDate(dateId, q);
+    }
+    if (view === "capsule" && todoId && capsuleId) {
+      return spaCapsule(todoId, capsuleId, q);
+    }
+    if (view === "case" && caseId) {
+      if (BASE === "/debate") return spaCase(caseId, caseSide);
+      return debateCaseHref(caseId, caseSide);
+    }
+    return null;
+  }
+
+  /**
+   * Agent (or in-chat link) opening an home page. Chat panel stays put.
+   * @param {unknown} target
+   * @returns {boolean}
+   */
+  function applyHomeNavigate(target) {
+    if (!target || typeof target !== "object") return false;
+    const src = /** @type {Record<string, unknown>} */ (target);
+    const id = String(src.id || "").trim();
+    if (id && id === lastAgentNavigateId) return false;
+    const href = homeNavigateHrefFromTarget(src);
+    if (!href) return false;
+    if (id) rememberAgentNavigateId(id);
+    if (href.startsWith("/debate") && BASE !== "/debate") {
+      return assignProjectPortal(href);
+    }
+    if (sameHomeHref(href)) return false;
+    navigate(href);
+    return true;
+  }
+
+  /**
+   * @param {string} rawHref
+   * @returns {string|null}
+   */
+  function homePathFromHref(rawHref) {
+    let href = String(rawHref || "").trim();
+    if (href === "/education" || href.startsWith("/education/") || href.startsWith("/education?")) {
+      href = "/home" + href.slice("/education".length);
+    }
+    if (!href) return null;
+    try {
+      if (href.startsWith(BASE) || href.startsWith("/home") || href.startsWith("/jype") || href.startsWith("/debate")) {
+        const u = new URL(href, window.location.origin);
+        if (isSpaHref(u.pathname + u.search)) return u.pathname + u.search;
+      }
+      const u = new URL(href, window.location.origin);
+      if (u.origin === window.location.origin && isSpaHref(u.pathname + u.search)) {
+        return u.pathname + u.search;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
+  /**
+   * @param {string} rawHref
+   * @returns {boolean}
+   */
+  function applyHomeNavigatePath(rawHref) {
+    const href = String(rawHref || "").trim();
+    if (href.startsWith("/debate") && BASE !== "/debate") {
+      return assignProjectPortal(href);
+    }
+    const path = homePathFromHref(rawHref);
+    if (!path) return false;
+    if (!sameHomeHref(path)) navigate(path);
+    return true;
+  }
+
+  /** @type {string|null} */
+  let lastOpenedProjectId = null;
+  /** @type {number} */
+  let lastOpenedAtMs = 0;
+
+  function maybeTouchProjectOpened() {
+    const id = route.view === "project" ? String(route.projectId || "").trim() : "";
+    if (!id) return;
+    const now = Date.now();
+    if (id === lastOpenedProjectId && now - lastOpenedAtMs < 2000) return;
+    lastOpenedProjectId = id;
+    lastOpenedAtMs = now;
+    const mac = window.YanMacApi;
+    if (!mac?.macFetch) return;
+    mac
+      .macFetch(`${API}/project/${encodeURIComponent(id)}/opened`, {
+        method: "POST",
+        json: {},
+        timeoutMs: 15_000,
+      })
+      .catch((err) => console.warn("[edu project opened]", err));
+  }
+
+  function pad2(n) {
+    return String(n).padStart(2, "0");
+  }
+
+  function todayParts(d = new Date()) {
+    return {
+      y: d.getFullYear(),
+      m: d.getMonth() + 1,
+      day: d.getDate(),
+      weekday: d.getDay(), // 0 Sun
+      minutes: d.getHours() * 60 + d.getMinutes(),
+    };
+  }
+
+  /** Calendar parts in the schedule timezone (school days are Pacific dates). */
+  function zonedParts(date, timeZone) {
+    const tz = String(timeZone || "").trim();
+    if (!tz) return todayParts(date);
+    try {
+      const bag = {};
+      new Intl.DateTimeFormat("en-US", {
+        timeZone: tz,
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        weekday: "short",
+        hourCycle: "h23",
+      })
+        .formatToParts(date)
+        .forEach((part) => {
+          if (part.type !== "literal") bag[part.type] = part.value;
+        });
+      const weekday = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[
+        bag.weekday
+      ];
+      const y = Number(bag.year);
+      const m = Number(bag.month);
+      const day = Number(bag.day);
+      if (
+        !Number.isFinite(y) ||
+        !Number.isFinite(m) ||
+        !Number.isFinite(day) ||
+        weekday == null
+      ) {
+        return todayParts(date);
+      }
+      return { y, m, day, weekday, minutes: 0 };
+    } catch {
+      return todayParts(date);
+    }
+  }
+
+  function ymd(y, m, d) {
+    return `${y}-${pad2(m)}-${pad2(d)}`;
+  }
+
+  function parseYmd(s) {
+    const m = String(s || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return null;
+    return { y: +m[1], m: +m[2], day: +m[3] };
+  }
+
+  function addDays(y, m, d, n) {
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() + n);
+    return {
+      y: dt.getFullYear(),
+      m: dt.getMonth() + 1,
+      day: dt.getDate(),
+      weekday: dt.getDay(),
+    };
+  }
+
+  function timeToMinutes(t) {
+    const m = String(t || "").match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+    return +m[1] * 60 + +m[2];
+  }
+
+  const CLASS_HIGHLIGHT_LEAD_MINUTES = 10;
+
+  /** Port of server/home-data.js meetingHighlightStartMin. */
+  function meetingHighlightStartMin(meetings, index, leadMinutes = CLASS_HIGHLIGHT_LEAD_MINUTES) {
+    const meeting = meetings?.[index];
+    if (!meeting || meeting.startMin == null) return null;
+    const prevEnd = index > 0 ? meetings[index - 1]?.endMin : null;
+    if (prevEnd == null) return meeting.startMin - leadMinutes;
+    const gap = meeting.startMin - prevEnd;
+    if (gap < leadMinutes) return prevEnd;
+    return meeting.startMin - leadMinutes;
+  }
+
+  function isMeetingHighlighted(meetings, index, nowMinutes, leadMinutes = CLASS_HIGHLIGHT_LEAD_MINUTES) {
+    const meeting = meetings?.[index];
+    if (!meeting || meeting.startMin == null || meeting.endMin == null) return false;
+    const highlightStart = meetingHighlightStartMin(meetings, index, leadMinutes);
+    if (highlightStart == null) return false;
+    return nowMinutes >= highlightStart && nowMinutes < meeting.endMin;
+  }
+
+  function use24Hour() {
+    return false;
+  }
+
+  function formatTime(t) {
+    const mins = timeToMinutes(t);
+    if (mins == null) return "";
+    const h24 = Math.floor(mins / 60);
+    const mi = mins % 60;
+    if (use24Hour()) return `${pad2(h24)}:${pad2(mi)}`;
+    const ap = h24 >= 12 ? "pm" : "am";
+    const h12 = h24 % 12 || 12;
+    return `${h12}:${pad2(mi)} ${ap}`;
+  }
+
+  function ordinal(n) {
+    const v = n % 100;
+    if (v >= 11 && v <= 13) return `${n}th`;
+    switch (n % 10) {
+      case 1:
+        return `${n}st`;
+      case 2:
+        return `${n}nd`;
+      case 3:
+        return `${n}rd`;
+      default:
+        return `${n}th`;
+    }
+  }
+
+  function daysBetween(a, b) {
+    const ua = Date.UTC(a.y, a.m - 1, a.day);
+    const ub = Date.UTC(b.y, b.m - 1, b.day);
+    return Math.round((ub - ua) / 86400000);
+  }
+
+  /**
+   * Natural due/event datetime for list rows (compact relative phrasing).
+   * @param {string|null|undefined} dateStr YYYY-MM-DD
+   * @param {string|null|undefined} timeStr HH:MM
+   */
+  function formatNaturalWhen(dateStr, timeStr) {
+    const target = parseYmd(dateStr);
+    if (!target) {
+      return timeStr ? formatTime(timeStr) : "";
+    }
+
+    const now = todayParts();
+    const targetWeekday = new Date(target.y, target.m - 1, target.day).getDay();
+    const delta = daysBetween(now, target);
+    const clock = timeStr ? formatTime(timeStr) : "";
+    const dayAbbr = WEEKDAYS_SHORT[targetWeekday];
+
+    // Calendar weeks run Sun–Sat. Include weekday abbr for this week + next week.
+    const weekStart = addDays(now.y, now.m, now.day, -now.weekday);
+    const weekOffset = daysBetween(weekStart, target);
+    const inThisOrNextWeek = weekOffset >= 0 && weekOffset <= 13;
+
+    if (delta === 0) {
+      return clock ? `${clock} today` : "today";
+    }
+    if (delta === 1) {
+      return clock ? `${clock} tomorrow` : "tomorrow";
+    }
+    if (delta === -1) {
+      return clock ? `${clock} yesterday` : "yesterday";
+    }
+
+    const showYear = target.y !== now.y;
+    const showMonth = target.m !== now.m || target.y !== now.y || delta < 0;
+    const dayPart = showMonth
+      ? `${MONTHS[target.m - 1]} ${ordinal(target.day)}`
+      : `the ${ordinal(target.day)}`;
+    const yearPart = showYear ? `, ${target.y}` : "";
+    const dateCore = `${dayPart}${yearPart}`;
+    const dated = inThisOrNextWeek ? `${dayAbbr} ${dateCore}` : dateCore;
+
+    // Overdue prior days (before yesterday): no time.
+    if (delta < -1) {
+      return dated;
+    }
+
+    if (clock) return `${clock} on ${dated}`;
+    return dated;
+  }
+
+  /**
+   * Expanded todo/date view: always "08:00 on Friday, August 28th"
+   * with (Today)/(Tomorrow)/(Yesterday) when relevant.
+   * @param {string|null|undefined} dateStr YYYY-MM-DD
+   * @param {string|null|undefined} timeStr HH:MM
+   */
+  function formatDetailWhen(dateStr, timeStr) {
+    const target = parseYmd(dateStr);
+    if (!target) {
+      return timeStr ? formatTime(timeStr) : "";
+    }
+
+    const now = todayParts();
+    const delta = daysBetween(now, target);
+    const clock = timeStr ? formatTime(timeStr) : "";
+    const weekday = WEEKDAYS[new Date(target.y, target.m - 1, target.day).getDay()];
+    const month = MONTHS_FULL[target.m - 1];
+    const day = ordinal(target.day);
+    const yearPart = target.y !== now.y ? `, ${target.y}` : "";
+    let relative = "";
+    if (delta === 0) relative = " (Today)";
+    else if (delta === 1) relative = " (Tomorrow)";
+    else if (delta === -1) relative = " (Yesterday)";
+
+    const dated = `${weekday}, ${month} ${day}${yearPart}${relative}`;
+    if (clock) return `${clock} on ${dated}`;
+    return dated;
+  }
+
+  /** Canvas comment stamp. Same phrasing as a todo row. */
+  function formatCommentWhen(iso) {
+    const ms = Date.parse(String(iso || ""));
+    if (!Number.isFinite(ms)) return "";
+    const d = new Date(ms);
+    const dateStr = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    const timeStr = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    return formatNaturalWhen(dateStr, timeStr);
+  }
+
+  function commentStamp(row, key = "createdAt") {
+    if (key === "visibleAt") return String(row?.visibleAt || row?.createdAt || "");
+    return String(row?.[key] || "");
+  }
+
+  function commentSort(a, b, key = "createdAt") {
+    const byTime = commentStamp(b, key).localeCompare(commentStamp(a, key));
+    if (byTime !== 0) return byTime;
+    return (Number(b?.id) || 0) - (Number(a?.id) || 0);
+  }
+
+  function commentEntryHtml(row, { todoName = "", href = "", canvasLink = "" } = {}) {
+    const text = String(row?.comment || "").trim();
+    if (!text) return "";
+    const when = formatCommentWhen(row?.createdAt);
+    const name = String(todoName || "").trim();
+    const nameHtml = name
+      ? `<a class="home-comment-todo" href="${escapeHtml(href)}">${name}</a>`
+      : "";
+    const canvas = normalizeCanvasLink(canvasLink);
+    const body = canvas
+      ? `<a class="home-comment-body" href="${escapeHtml(
+          canvas
+        )}" target="_blank" rel="noopener noreferrer" aria-label="Open in Canvas">${escapeHtml(
+          text
+        )}</a>`
+      : `<p class="home-comment-body">${escapeHtml(text)}</p>`;
+    return `<div class="home-comment">
+      ${nameHtml}
+      ${when ? `<p class="home-detail-meta">${escapeHtml(when)}</p>` : ""}
+      ${body}
+    </div>`;
+  }
+
+  function commentsPanelHtml(
+    rows,
+    { filterId, expandable = false, expanded = false, expandAttr = "", sortKey = "createdAt" } = {}
+  ) {
+    const list = (Array.isArray(rows) ? rows : []).filter((row) =>
+      String(row?.comment || "").trim()
+    );
+    if (!list.length) return "";
+    list.sort((a, b) => commentSort(a, b, sortKey));
+    const visible = expandable && !expanded ? list.slice(0, 3) : list;
+    const body = visible
+      .map((row, i) => {
+        const entry = commentEntryHtml(row, {
+          todoName: row.todoNameHtml || "",
+          href: row.href || "",
+          canvasLink: row.canvasLink || "",
+        });
+        if (!entry) return "";
+        const sep = i === 0 ? "" : `<div class="home-comment-sep" aria-hidden="true"></div>`;
+        return `${sep}${entry}`;
+      })
+      .join("");
+    const titleHtml = expandable
+      ? `<button type="button" class="home-comments-toggle" ${
+          expandAttr || "data-comments-expand"
+        } aria-expanded="${expanded ? "true" : "false"}" aria-label="${
+          expanded ? "Collapse comments" : "Expand comments"
+        }">Comments</button>`
+      : "";
+    return panelHtml("Comments", body, {
+      extraClass: expandable
+        ? "home-panel--comment home-panel--class-comments"
+        : "home-panel--comment",
+      filterId,
+      titleHtml,
+    });
+  }
+
+  function commentBoxesHtml(comments, canvasLink) {
+    const rows = (Array.isArray(comments) ? comments : []).map((row) => ({
+      ...row,
+      canvasLink: canvasLink || "",
+    }));
+    return commentsPanelHtml(rows, { filterId: "lg-home-todo-comments" });
+  }
+
+  function classCommentsHtml(cls) {
+    const rows = [];
+    flattenTodos(tree, { classId: cls.id }).forEach((t) => {
+      const comments = Array.isArray(t.canvasComments) ? t.canvasComments : [];
+      const tag = todoTagKey(t);
+      comments.forEach((row) => {
+        const text = String(row?.comment || "").trim();
+        if (!text) return;
+        rows.push({
+          ...row,
+          comment: text,
+          href: todoHref(t),
+          canvasLink: t.canvasLink || "",
+          todoNameHtml: taggedNameHtml(tag, t.name || t.id),
+        });
+      });
+    });
+    return commentsPanelHtml(rows, {
+      filterId: "lg-home-class-comments",
+      expandable: true,
+      expanded: classCommentsExpanded,
+    });
+  }
+
+  function projectCommentsHtml(project) {
+    const rows = [];
+    flattenTodos(tree, { projectId: project.id }).forEach((t) => {
+      const comments = Array.isArray(t.canvasComments) ? t.canvasComments : [];
+      const tag = todoTagKey(t);
+      comments.forEach((row) => {
+        const text = String(row?.comment || "").trim();
+        if (!text) return;
+        rows.push({
+          ...row,
+          comment: text,
+          href: todoHref(t),
+          canvasLink: t.canvasLink || "",
+          todoNameHtml: taggedNameHtml(tag, t.name || t.id),
+        });
+      });
+    });
+    return commentsPanelHtml(rows, {
+      filterId: "lg-home-project-comments",
+      expandable: true,
+      expanded: projectCommentsExpanded,
+      expandAttr: "data-project-comments-expand",
+    });
+  }
+
+  /**
+   * A day has school when the schedule would put blocks on it.
+   * Weekends, closed dates, and weekdays with no periods stay off.
+   */
+  function dayHasScheduleBlocks(parts, schedule) {
+    const override = dayOverride(parts, schedule);
+    const slots = Array.isArray(override?.slots)
+      ? override.slots
+      : Array.isArray(override?.meetings)
+        ? override.meetings
+        : null;
+    if (slots) {
+      return slots.some((slot) => String(slot?.period || "").trim());
+    }
+    return periodsForDay(parts, schedule).length > 0;
+  }
+
+  function commentPostedOnSchoolDay(iso, schedule) {
+    const ms = Date.parse(String(iso || ""));
+    if (!Number.isFinite(ms)) return false;
+    const parts = zonedParts(new Date(ms), schedule?.timezone);
+    return isSchoolDay(parts, schedule) && dayHasScheduleBlocks(parts, schedule);
+  }
+
+  /** Window starts when the comment becomes visible. School-day release lasts 24h. A day without blocks lasts 48h. */
+  function homeCommentStillVisible(iso, schedule, nowMs = Date.now()) {
+    const ms = Date.parse(String(iso || ""));
+    if (!Number.isFinite(ms)) return false;
+    const hours = commentPostedOnSchoolDay(iso, schedule) ? 24 : 48;
+    return nowMs - ms < hours * 60 * 60 * 1000;
+  }
+
+  function homeCommentsHtml() {
+    const schedule = tree?.schedule || {};
+    const rows = [];
+    flattenTodos(tree, { includeHiddenFromHome: true }).forEach((t) => {
+      const comments = Array.isArray(t.canvasComments) ? t.canvasComments : [];
+      const tag = todoTagKey(t);
+      comments.forEach((row) => {
+        const text = String(row?.comment || "").trim();
+        if (!text || !homeCommentStillVisible(commentStamp(row, "visibleAt"), schedule)) return;
+        rows.push({
+          ...row,
+          comment: text,
+          href: todoHref(t),
+          canvasLink: t.canvasLink || "",
+          todoNameHtml: taggedNameHtml(tag, t.name || t.id),
+        });
+      });
+    });
+    return commentsPanelHtml(rows, {
+      filterId: "lg-home-home-comments",
+      expandable: true,
+      expanded: homeCommentsExpanded,
+      expandAttr: "data-home-comments-expand",
+      sortKey: "visibleAt",
+    });
+  }
+
+  function weekdayLabel(weekday, y, m, d) {
+    return `${WEEKDAYS_SHORT[weekday]} ${m}/${d}`;
+  }
+
+  function closedSet(schedule) {
+    const set = new Set();
+    const list = schedule?.closedDates;
+    if (Array.isArray(list)) list.forEach((x) => set.add(String(x)));
+    return set;
+  }
+
+  function dateKeyOf(parts) {
+    return ymd(parts.y, parts.m, parts.day);
+  }
+
+  function isSchoolDay(parts, schedule) {
+    if (parts.weekday === 0 || parts.weekday === 6) return false;
+    const key = dateKeyOf(parts);
+    if (closedSet(schedule).has(key)) return false;
+    const start = schedule?.schoolStart ? String(schedule.schoolStart) : "";
+    const end = schedule?.schoolEnd ? String(schedule.schoolEnd) : "";
+    if (start && key < start) return false;
+    if (end && key > end) return false;
+    return true;
+  }
+
+  function nextSchoolDay(from, schedule, skipToday = true) {
+    let cur = skipToday
+      ? addDays(from.y, from.m, from.day, 1)
+      : { y: from.y, m: from.m, day: from.day, weekday: from.weekday };
+    for (let i = 0; i < 120; i++) {
+      if (isSchoolDay(cur, schedule)) return cur;
+      cur = addDays(cur.y, cur.m, cur.day, 1);
+    }
+    return null;
+  }
+
+  function periodsForDay(parts, schedule) {
+    const map = schedule?.weekdayPeriods || {};
+    const key = String(parts.weekday);
+    const periods = map[key];
+    return Array.isArray(periods) ? periods : [];
+  }
+
+  function bells(schedule) {
+    return Array.isArray(schedule?.bells) ? schedule.bells : [];
+  }
+
+  function dayOverride(parts, schedule) {
+    const map = schedule?.dayOverrides;
+    if (!map || typeof map !== "object") return null;
+    const o = map[dateKeyOf(parts)];
+    return o && typeof o === "object" ? o : null;
+  }
+
+  function isAllPeriodsDay(parts, schedule) {
+    return Boolean(dayOverride(parts, schedule)?.allPeriods);
+  }
+
+  function isFreePeriodClass(cls) {
+    return Boolean(cls && cls.freePeriod === true);
+  }
+
+  /** Schedule row uses "Free Period"; todos/dates use "Free Period C". */
+  function classContextName(cls) {
+    if (!cls) return "";
+    if (isFreePeriodClass(cls)) {
+      const p = String(cls.period || "").toUpperCase();
+      return p ? `Free Period ${p}` : "Free Period";
+    }
+    return cls.name || cls.id || "";
+  }
+
+  function classScheduleName(cls) {
+    if (!cls) return "";
+    if (isFreePeriodClass(cls)) return "Free Period";
+    return cls.name || cls.id || "";
+  }
+
+  /** Prefer a real class over a free-period shell for the same letter. */
+  function trimesterForDate(dateKey, schedule) {
+    const key = String(dateKey || "");
+    const map = schedule?.trimesters;
+    if (!map || typeof map !== "object") return null;
+    for (const name of ["fall", "winter", "spring"]) {
+      const range = map[name];
+      if (!range || typeof range !== "object") continue;
+      const start = String(range.start || "");
+      const end = String(range.end || "");
+      if (start && end && key >= start && key <= end) return name;
+    }
+    return null;
+  }
+
+  function classPeriodLetter(cls, dateKey, schedule) {
+    const map = cls?.periods && typeof cls.periods === "object" ? cls.periods : null;
+    if (map) {
+      const term = trimesterForDate(dateKey, schedule);
+      if (term && map[term]) return String(map[term]).toUpperCase();
+    }
+    return String(cls?.period || "").toUpperCase();
+  }
+
+  function classForPeriod(visible, period, dateKey, schedule) {
+    const letter = String(period || "").toUpperCase();
+    if (!letter) return null;
+    const matches = (visible || []).filter(
+      (c) => classPeriodLetter(c, dateKey, schedule) === letter
+    );
+    if (!matches.length) return null;
+    return matches.find((c) => !isFreePeriodClass(c)) || matches[0];
+  }
+
+  /**
+   * Classes for a calendar day: [{ class, period, start, end, startMin, endMin }]
+   */
+  function classesForDay(parts, schedule, classes) {
+    const dayKey = dateKeyOf(parts);
+    const allowed = tree?.activeClassIdsByDate?.[dayKey];
+    const allowedSet = Array.isArray(allowed) ? new Set(allowed) : null;
+    const visible = (classes || []).filter((c) => {
+      if (isFixture(c)) return false;
+      if (allowedSet) return allowedSet.has(c.id);
+      return true;
+    });
+    /** @type {any[]} */
+    const out = [];
+    const override = dayOverride(parts, schedule);
+    const overrideSlots = Array.isArray(override?.slots)
+      ? override.slots
+      : Array.isArray(override?.meetings)
+        ? override.meetings
+        : null;
+
+    if (overrideSlots) {
+      overrideSlots.forEach((slot) => {
+        const period = String(slot?.period || "").toUpperCase();
+        if (!period) return;
+        const cls = classForPeriod(visible, period, dayKey, schedule);
+        if (!cls) return;
+        const start = slot.start;
+        const end = slot.end;
+        out.push({
+          class: cls,
+          period,
+          start,
+          end,
+          startMin: timeToMinutes(start),
+          endMin: timeToMinutes(end),
+        });
+      });
+    } else {
+      const periods = periodsForDay(parts, schedule);
+      const bellList = bells(schedule);
+      periods.forEach((period, i) => {
+        const bell = bellList[i];
+        if (!bell) return;
+        const cls = classForPeriod(visible, period, dayKey, schedule);
+        if (!cls) return;
+        out.push({
+          class: cls,
+          period,
+          start: bell.start,
+          end: bell.end,
+          startMin: timeToMinutes(bell.start),
+          endMin: timeToMinutes(bell.end),
+        });
+      });
+    }
+    out.sort((a, b) => (a.startMin ?? 0) - (b.startMin ?? 0));
+    return out;
+  }
+
+  /** Day-type code like AH / AD / EH / DA / HE (no dash). */
+  function dayTypeCode(parts, schedule) {
+    const override = dayOverride(parts, schedule);
+    const raw = override?.label != null ? String(override.label) : "";
+    const fromLabel = raw.replace(/[^A-Za-z]/g, "").toUpperCase();
+    if (fromLabel) return fromLabel;
+    const periods = Array.isArray(override?.slots)
+      ? override.slots.map((m) => String(m?.period || "").toUpperCase()).filter(Boolean)
+      : Array.isArray(override?.meetings)
+        ? override.meetings.map((m) => String(m?.period || "").toUpperCase()).filter(Boolean)
+      : periodsForDay(parts, schedule).map((p) => String(p).toUpperCase());
+    if (!periods.length) return "";
+    if (periods.length === 1) return periods[0];
+    return `${periods[0]}${periods[periods.length - 1]}`;
+  }
+
+  function daySectionTitle(parts, schedule) {
+    const type = dayTypeCode(parts, schedule);
+    const when = weekdayLabel(parts.weekday, parts.y, parts.m, parts.day);
+    if (!type) {
+      return { plain: when, html: escapeHtml(when) };
+    }
+    return {
+      plain: `${type} ${when}`,
+      html: `<span class="home-day-type">${escapeHtml(type)}</span>${escapeHtml(when)}`,
+    };
+  }
+
+  const SCHOOL_DAY_END_BUFFER_MINUTES = 15;
+  const DEFAULT_LAST_BELL_END_MINUTES = 15 * 60;
+
+  /** Last bell end for that calendar day (override slots, else default bells). */
+  function lastBellEndMinutes(parts, schedule) {
+    const override = dayOverride(parts, schedule);
+    const overrideSlots = Array.isArray(override?.slots)
+      ? override.slots
+      : Array.isArray(override?.meetings)
+        ? override.meetings
+        : null;
+    let max = null;
+    const consider = (end) => {
+      const mins = timeToMinutes(end);
+      if (mins == null) return;
+      if (max == null || mins > max) max = mins;
+    };
+    if (overrideSlots) {
+      overrideSlots.forEach((slot) => consider(slot?.end));
+      if (max != null) return max;
+    }
+    bells(schedule).forEach((bell) => consider(bell?.end));
+    return max != null ? max : DEFAULT_LAST_BELL_END_MINUTES;
+  }
+
+  /** Today still counts as a schedule panel until last bell plus 15 minutes. */
+  function schoolDayStillInSession(now, schedule) {
+    if (!isSchoolDay(now, schedule)) return false;
+    return now.minutes < lastBellEndMinutes(now, schedule) + SCHOOL_DAY_END_BUFFER_MINUTES;
+  }
+
+  function classSections(schedule, classes) {
+    const now = todayParts();
+    const showToday = schoolDayStillInSession(now, schedule);
+    let day1;
+    let day2;
+    if (showToday) {
+      day1 = { y: now.y, m: now.m, day: now.day, weekday: now.weekday };
+      day2 = nextSchoolDay(now, schedule, true);
+    } else {
+      day1 = nextSchoolDay(now, schedule, true);
+      day2 = day1 ? nextSchoolDay(day1, schedule, true) : null;
+    }
+
+    const sections = [];
+    if (day1) {
+      const allPeriods = isAllPeriodsDay(day1, schedule);
+      const title = daySectionTitle(day1, schedule);
+      sections.push({
+        label: title.plain,
+        labelHtml: title.html,
+        dateKey: dateKeyOf(day1),
+        isToday: showToday && day1.y === now.y && day1.m === now.m && day1.day === now.day,
+        classes: classesForDay(day1, schedule, classes),
+        nowMinutes: now.minutes,
+        allPeriods,
+      });
+      // A-H days: one panel with every class — skip the following-day box.
+      if (allPeriods) return sections;
+    }
+    if (day2) {
+      const title = daySectionTitle(day2, schedule);
+      sections.push({
+        label: title.plain,
+        labelHtml: title.html,
+        dateKey: dateKeyOf(day2),
+        isToday: false,
+        classes: classesForDay(day2, schedule, classes),
+        nowMinutes: now.minutes,
+        allPeriods: isAllPeriodsDay(day2, schedule),
+      });
+    }
+    return sections;
+  }
+
+  /** Fixture trees stay on disk for agents; never show in the web UI. */
+  function isFixture(obj) {
+    if (!obj || typeof obj !== "object") return false;
+    if (obj.fixture === true) return true;
+    const id = String(obj.id || "");
+    return id.startsWith("_example-");
+  }
+
+  function classPageTodos(c) {
+    return [...(c.todos || []), ...(c.classOnlyTodos || [])];
+  }
+
+  function flattenTodos(
+    data,
+    { classId = null, projectId = null, includeHiddenFromHome = false } = {}
+  ) {
+    /** @type {any[]} */
+    const out = [];
+    if (projectId) {
+      const p = (data.projects || []).find((x) => x.id === projectId);
+      if (p && !isFixture(p)) {
+        (p.todos || []).forEach((t) => {
+          if (isFixture(t)) return;
+          out.push({
+            ...t,
+            classId: null,
+            className: null,
+            projectId: p.id,
+            projectName: p.name || p.id,
+          });
+        });
+      }
+      return out;
+    }
+    if (classId) {
+      const c = (data.classes || []).find((x) => x.id === classId);
+      if (c && !isFixture(c)) {
+        classPageTodos(c).forEach((t) => {
+          if (isFixture(t)) return;
+          out.push({
+            ...t,
+            classId: c.id,
+            className: classContextName(c),
+            projectId: null,
+            projectName: null,
+          });
+        });
+      }
+      return out;
+    }
+    (data.todos || []).forEach((t) => {
+      if (isFixture(t)) return;
+      out.push({
+        ...t,
+        classId: null,
+        className: null,
+        projectId: null,
+        projectName: null,
+      });
+    });
+    (data.classes || []).forEach((c) => {
+      if (isFixture(c)) return;
+      const list = includeHiddenFromHome ? classPageTodos(c) : c.todos || [];
+      list.forEach((t) => {
+        if (isFixture(t)) return;
+        out.push({
+          ...t,
+          classId: c.id,
+          className: classContextName(c),
+          projectId: null,
+          projectName: null,
+        });
+      });
+    });
+    (data.projects || []).forEach((p) => {
+      if (isFixture(p)) return;
+      (p.todos || []).forEach((t) => {
+        if (isFixture(t)) return;
+        out.push({
+          ...t,
+          classId: null,
+          className: null,
+          projectId: p.id,
+          projectName: p.name || p.id,
+        });
+      });
+    });
+    return out;
+  }
+
+  function flattenDates(data, { classId = null, projectId = null } = {}) {
+    /** @type {any[]} */
+    const out = [];
+    if (projectId) {
+      const p = (data.projects || []).find((x) => x.id === projectId);
+      if (p && !isFixture(p)) {
+        (p.dates || []).forEach((d) => {
+          if (isFixture(d)) return;
+          out.push({
+            ...d,
+            classId: null,
+            className: null,
+            projectId: p.id,
+            projectName: p.name || p.id,
+          });
+        });
+      }
+      return out;
+    }
+    if (classId) {
+      const c = (data.classes || []).find((x) => x.id === classId);
+      if (c && !isFixture(c)) {
+        (c.dates || []).forEach((d) => {
+          if (isFixture(d)) return;
+          out.push({
+            ...d,
+            classId: c.id,
+            className: classContextName(c),
+            projectId: null,
+            projectName: null,
+          });
+        });
+      }
+      return out;
+    }
+    (data.dates || []).forEach((d) => {
+      if (isFixture(d)) return;
+      out.push({
+        ...d,
+        classId: null,
+        className: null,
+        projectId: null,
+        projectName: null,
+      });
+    });
+    (data.classes || []).forEach((c) => {
+      if (isFixture(c)) return;
+      (c.dates || []).forEach((d) => {
+        if (isFixture(d)) return;
+        out.push({
+          ...d,
+          classId: c.id,
+          className: classContextName(c),
+          projectId: null,
+          projectName: null,
+        });
+      });
+    });
+    (data.projects || []).forEach((p) => {
+      if (isFixture(p)) return;
+      (p.dates || []).forEach((d) => {
+        if (isFixture(d)) return;
+        out.push({
+          ...d,
+          classId: null,
+          className: null,
+          projectId: p.id,
+          projectName: p.name || p.id,
+        });
+      });
+    });
+    return out;
+  }
+
+  function findTodoById(id, { classId = null, projectId = null } = {}) {
+    const wantClass = classId || null;
+    const wantProject = projectId || null;
+    const all = flattenTodos(tree, { includeHiddenFromHome: true }).filter((t) =>
+      sameObjectId(t.id, id)
+    );
+    if (!all.length) return null;
+    const scoped = all.find(
+      (t) =>
+        sameObjectId(t.classId || "", wantClass || "") &&
+        sameObjectId(t.projectId || "", wantProject || "")
+    );
+    if (scoped) return scoped;
+    if (all.length === 1) return all[0];
+    return null;
+  }
+
+  function findDateById(id, { classId = null, projectId = null } = {}) {
+    const wantClass = classId || null;
+    const wantProject = projectId || null;
+    const all = flattenDates(tree).filter((d) => sameObjectId(d.id, id));
+    if (!all.length) return null;
+    const scoped = all.find(
+      (d) =>
+        sameObjectId(d.classId || "", wantClass || "") &&
+        sameObjectId(d.projectId || "", wantProject || "")
+    );
+    if (scoped) return scoped;
+    if (all.length === 1) return all[0];
+    return null;
+  }
+
+  function todoHref(t) {
+    const q = t.projectId
+      ? `?project=${encodeURIComponent(t.projectId)}`
+      : t.classId
+        ? `?class=${encodeURIComponent(t.classId)}`
+        : "";
+    return spaTodo(t.id, q);
+  }
+
+  function dateHref(d) {
+    const q = d.projectId
+      ? `?project=${encodeURIComponent(d.projectId)}`
+      : d.classId
+        ? `?class=${encodeURIComponent(d.classId)}`
+        : "";
+    return spaDate(d.id, q);
+  }
+
+  function capsuleHref(todo, capsuleId) {
+    const qs = todoHref(todo).split("?")[1];
+    return spaCapsule(todo.id, capsuleId, qs ? `?${qs}` : "");
+  }
+
+  function citationHost(url) {
+    try {
+      return new URL(url).hostname.replace(/^www\./, "") || url;
+    } catch {
+      return url;
+    }
+  }
+
+  function parseCitations(raw) {
+    if (!Array.isArray(raw)) return [];
+    /** @type {{ name: string, url: string }[]} */
+    const out = [];
+    for (const item of raw) {
+      if (typeof item === "string") {
+        const t = item.trim();
+        if (!t) continue;
+        if (/^https?:\/\//i.test(t)) {
+          out.push({ name: citationHost(t), url: t });
+        } else {
+          out.push({ name: t, url: "" });
+        }
+        continue;
+      }
+      if (!item || typeof item !== "object") continue;
+      const name = String(
+        item.name || item.title || item.source || item.outlet || ""
+      ).trim();
+      const url = String(item.url || item.href || "").trim();
+      if (!name && !url) continue;
+      out.push({ name: name || citationHost(url), url });
+    }
+    return uniqueSortedCitations(out);
+  }
+
+  function uniqueSortedCitations(list) {
+    /** @type {Map<string, { name: string, url: string }>} */
+    const byKey = new Map();
+    for (const c of list) {
+      const name = String(c?.name || "").trim();
+      if (!name) continue;
+      const url = String(c?.url || "").trim();
+      const key = name.toLowerCase();
+      const prev = byKey.get(key);
+      if (!prev) byKey.set(key, { name, url });
+      else if (!prev.url && url) byKey.set(key, { name: prev.name, url });
+    }
+    return [...byKey.values()].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    );
+  }
+
+  function overallCitations(todo) {
+    const fromTodo = parseCitations(todo?.citations);
+    const fromCaps = (Array.isArray(todo?.capsules) ? todo.capsules : []).flatMap(
+      (c) => parseCitations(c?.citations || c?.sources)
+    );
+    return uniqueSortedCitations([...fromTodo, ...fromCaps]);
+  }
+
+  function citationsHtml(citations, filterId) {
+    const list = Array.isArray(citations) ? citations : [];
+    if (!list.length) return "";
+    const items = list
+      .map((c) => {
+        const name = String(c?.name || "").trim();
+        if (!name) return "";
+        const url = String(c?.url || "").trim();
+        if (url && /^https?:\/\//i.test(url)) {
+          return `<li><a class="home-citation-link" href="${escapeHtml(
+            url
+          )}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a></li>`;
+        }
+        return `<li>${escapeHtml(name)}</li>`;
+      })
+      .filter(Boolean)
+      .join("");
+    if (!items) return "";
+    return `<section class="home-panel home-citations-panel" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
+      filterId
+    )}"><h2 class="home-panel-title">Citations</h2><ul class="home-citations-list">${items}</ul></section>`;
+  }
+
+  function formatCapsuleCitationsText(capsule) {
+    return parseCitations(capsule?.citations || capsule?.sources)
+      .map((c) => (c.url ? `${c.name}: ${c.url}` : c.name))
+      .join("\n");
+  }
+
+  function todoTagKey(t) {
+    const tag = t.tag ? String(t.tag).toUpperCase() : "";
+    if (tag === "CW" || tag === "HW" || tag === "QA" || tag === "MA") return tag;
+    return "none";
+  }
+
+  function stripTodoTagPrefix(name) {
+    const raw = String(name || "").trim();
+    const stripped = raw.replace(/^(CW|HW|QA|MA)(?:\s*:\s*|\s+)/i, "").trim();
+    return stripped || raw;
+  }
+
+  function taggedNameHtml(tag, name) {
+    const title = escapeHtml(stripTodoTagPrefix(name));
+    if (!tag || tag === "none") return title;
+    return `<span class="home-name-tag">${escapeHtml(tag)}</span> ${title}`;
+  }
+
+  /** Effective Dates visibility: MA defaults on; others default off. */
+  function todoShowsInDates(t) {
+    if (!t || t.done) return false;
+    if (typeof t.showInDates === "boolean") return t.showInDates;
+    return todoTagKey(t) === "MA";
+  }
+
+  function dateItemFilterKey(item) {
+    if (item.isMA) return "ma";
+    // Class-linked → grad cap. Projects (including PathIvy) + user-level → loose (dot).
+    if (item.classId && !item.projectId) return "class";
+    return "loose";
+  }
+
+  function dateItemSortKey(item) {
+    const dt = item.date || "9999-99-99";
+    const tm = item.time || "99:99";
+    return `${dt}T${tm}`;
+  }
+
+  /**
+   * Important dates + open todos with showInDates (MA default on).
+   * @param {{ classId?: string|null, projectId?: string|null }} [scope]
+   */
+  function collectDateItems({ classId = null, projectId = null } = {}) {
+    /** @type {any[]} */
+    const out = [];
+    flattenDates(tree, { classId, projectId }).forEach((d) => {
+      out.push({
+        source: "date",
+        id: d.id,
+        name: d.name || d.id,
+        date: d.date || null,
+        time: d.time || null,
+        classId: d.classId || null,
+        className: d.className || null,
+        projectId: d.projectId || null,
+        projectName: d.projectName || null,
+        isMA: false,
+        href: dateHref(d),
+      });
+    });
+    flattenTodos(tree, {
+      classId,
+      projectId,
+      includeHiddenFromHome: true,
+    }).forEach((t) => {
+      if (!todoShowsInDates(t)) return;
+      const isMA = todoTagKey(t) === "MA";
+      out.push({
+        source: "todo",
+        id: t.id,
+        name: t.name || t.id,
+        date: t.dueDate || null,
+        time: t.dueTime || null,
+        classId: t.classId || null,
+        className: t.className || null,
+        projectId: t.projectId || null,
+        projectName: t.projectName || null,
+        isMA,
+        tag: todoTagKey(t),
+        href: todoHref(t),
+        canvasLink: t.canvasLink || null,
+        canvasWork: t.canvasWork || null,
+      });
+    });
+    return out;
+  }
+
+  function matchesFilter(t) {
+    if (!CFG.showFilters) return true;
+    return typeFilter.has(todoTagKey(t));
+  }
+
+  /** Home TODO/Completed omit these; class and project pages still show them. */
+  function todoHiddenFromHome(t) {
+    return Boolean(t && t.hiddenFromHome);
+  }
+
+  /**
+   * Open TODO order: earliest dueDate first (overdue included), undated last;
+   * same date → timed before date-only; same due → older createdAt above newer;
+   * final tie → id.
+   */
+  function dueSortKey(t) {
+    const d = t.dueDate || "9999-99-99";
+    const tm = t.dueTime || "99:99";
+    const created = t.createdAt || "";
+    const id = t.id || "";
+    return `${d}T${tm}\t${created}\t${id}`;
+  }
+
+  /** Most recently checked-off first; todos without completedAt sink to the bottom. */
+  function completedSortKey(t) {
+    return t.completedAt || "";
+  }
+
+  /**
+   * Completed rows stay in due-day blocks so the hairline is a real section.
+   * The newest check-off in a day pulls that whole day up. Inside the day,
+   * newest check-off first.
+   */
+  function sortCompletedTodos(todos) {
+    const groups = new Map();
+    for (const t of todos) {
+      const day = todoDayKey(t);
+      const list = groups.get(day);
+      if (list) list.push(t);
+      else groups.set(day, [t]);
+    }
+    const blocks = [];
+    for (const [day, list] of groups) {
+      list.sort((a, b) => completedSortKey(b).localeCompare(completedSortKey(a)));
+      blocks.push({ day, list, newest: completedSortKey(list[0]) });
+    }
+    blocks.sort((a, b) => {
+      const byNewest = b.newest.localeCompare(a.newest);
+      if (byNewest) return byNewest;
+      if (!a.day && b.day) return 1;
+      if (a.day && !b.day) return -1;
+      return b.day.localeCompare(a.day);
+    });
+    return blocks.flatMap((block) => block.list);
+  }
+
+  function todoListKey(t) {
+    return `${t?.projectId || ""}\t${t?.classId || ""}\t${t?.id || ""}`;
+  }
+
+  function dateSortKey(d) {
+    const dt = d.date || "9999-99-99";
+    const tm = d.time || "99:99";
+    return `${dt}T${tm}`;
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function markdownHtml(src) {
+    const api = window.YLMarkdown;
+    if (api && typeof api.render === "function") return api.render(src);
+    return escapeHtml(src);
+  }
+
+  function descriptionHtml(desc) {
+    const text = String(desc || "").trim();
+    if (!text) return `<p class="home-empty">No description</p>`;
+    return `<div class="home-detail-desc md-body">${markdownHtml(text)}</div>`;
+  }
+
+  function markdownPanelHtml(md, filterId) {
+    return `<section class="home-panel home-panel--desc" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
+      filterId
+    )}"><div class="md-body">${markdownHtml(md)}</div></section>`;
+  }
+
+  function backHrefForItem(item) {
+    if (item?.projectId) return spaProject(item.projectId);
+    if (item?.classId) return spaClass(item.classId);
+    return spaHome();
+  }
+
+  function filterBarHtml() {
+    return `<div class="home-filters" role="group" aria-label="Type filters">${TAGS.map(
+      (tag) => {
+        const on = typeFilter.has(tag);
+        const short = tag === "none" ? "·" : tag;
+        const label = tag === "none" ? "none" : tag;
+        return `<label
+          class="home-filter circle${on ? " is-on" : ""}"
+          data-liquid-glass="circle"
+          data-filter-id="lg-home-filter-${tag}"
+          title="${escapeHtml(label)}"
+          aria-label="${escapeHtml(label)}"
+        ><input type="checkbox" data-filter="${tag}" ${
+          on ? "checked" : ""
+        } /><span>${escapeHtml(short)}</span></label>`;
+      }
+    ).join("")}</div>`;
+  }
+
+  function projectFilterLabel(p) {
+    const raw = String(p?.filter || "").trim();
+    if (!raw) return "";
+    return raw.toUpperCase();
+  }
+
+  function dateFilterLabel(key, looseLabel) {
+    if (key === "ma") return "MA";
+    if (key === "class") return "class";
+    return looseLabel || "none";
+  }
+
+  function dateFilterGlyph(key, looseLabel) {
+    if (key === "ma") return "MA";
+    if (key === "class") return GRAD_CAP_SVG;
+    if (looseLabel) return escapeHtml(looseLabel);
+    return "·";
+  }
+
+  function dateFilterBarHtml(keys, looseLabel) {
+    return `<div class="home-filters" role="group" aria-label="Date filters">${keys
+      .map((key) => {
+        const on = dateFilter.has(key);
+        const label = dateFilterLabel(key, looseLabel);
+        const glyph = dateFilterGlyph(key, looseLabel);
+        return `<label
+          class="home-filter circle${on ? " is-on" : ""}"
+          data-liquid-glass="circle"
+          data-filter-id="lg-home-date-filter-${key}"
+          title="${escapeHtml(label)}"
+          aria-label="${escapeHtml(label)}"
+        ><input type="checkbox" data-date-filter="${key}" ${
+          on ? "checked" : ""
+        } /><span>${glyph}</span></label>`;
+      })
+      .join("")}</div>`;
+  }
+
+  function datesPanelHtml(
+    { classId = null, projectId = null } = {},
+    filterId = "lg-home-dates"
+  ) {
+    const classScoped = Boolean(classId);
+    const projectScoped = Boolean(projectId);
+    const keys = classScoped
+      ? DATE_FILTERS_CLASS
+      : projectScoped
+        ? DATE_FILTERS_PROJECT
+        : DATE_FILTERS_HOME;
+    const looseLabel = projectScoped
+      ? projectFilterLabel(
+          (tree?.projects || []).find((p) => p.id === projectId && !isFixture(p))
+        )
+      : "";
+    const today = todayKey();
+    const upcoming = collectDateItems({ classId, projectId })
+      .filter((item) =>
+        CFG.showFilters ? dateFilter.has(dateItemFilterKey(item)) : true
+      )
+      .filter((item) => item.date && String(item.date) >= today)
+      .sort((a, b) => dateItemSortKey(a).localeCompare(dateItemSortKey(b)));
+    const visible = datesExpanded
+      ? upcoming
+      : upcoming.slice(0, DATES_COLLAPSED_LIMIT);
+    const titleHtml = `<button type="button" class="home-dates-toggle" data-dates-expand aria-expanded="${
+      datesExpanded ? "true" : "false"
+    }">Dates</button>`;
+    return panelHtml("Dates", listOrEmpty(visible.map(dateItemRowHtml).join("")), {
+      filterId,
+      titleHtml,
+      headExtra: CFG.showFilters ? dateFilterBarHtml(keys, looseLabel) : "",
+    });
+  }
+
+  function todoPanelHtml(openTodos, filterId = "lg-home-todo") {
+    const visible = todoExpanded
+      ? openTodos
+      : openTodos.slice(0, TODOS_COLLAPSED_LIMIT);
+    const titleHtml = `<button type="button" class="home-todos-toggle" data-todos-expand aria-expanded="${
+      todoExpanded ? "true" : "false"
+    }" aria-label="${
+      todoExpanded ? "Collapse todos" : "Expand todos"
+    }">TODO</button>`;
+    return panelHtml("TODO", listOrEmpty(todoListItemsHtml(visible)), {
+      filterId,
+      titleHtml,
+      headExtra: CFG.showFilters && todoExpanded ? filterBarHtml() : "",
+    });
+  }
+
+  function completedPanelHtml(completedTodos, filterId) {
+    const visible = completedExpanded
+      ? completedTodos
+      : completedTodos.slice(0, TODOS_COLLAPSED_LIMIT);
+    const titleHtml = `<button type="button" class="home-completed-toggle" data-completed-expand aria-expanded="${
+      completedExpanded ? "true" : "false"
+    }" aria-label="${
+      completedExpanded ? "Collapse completed" : "Expand completed"
+    }">Completed</button>`;
+    return panelHtml("Completed", listOrEmpty(todoListItemsHtml(visible)), {
+      filterId,
+      extraClass: "home-panel--completed",
+      titleHtml,
+    });
+  }
+
+  function todoCheckHtml({ done, filterId }) {
+    return `<span class="home-check-host"><button type="button" class="home-check${
+      done ? " is-checked" : ""
+    }" data-liquid-glass="circle" data-filter-id="${escapeHtml(
+      filterId
+    )}" data-todo-toggle aria-pressed="${Boolean(
+      done
+    )}" aria-label="Mark done"><span class="home-check-dot" aria-hidden="true"></span></button></span>`;
+  }
+
+  function todoRowHtml(t) {
+    const done = Boolean(t.done);
+    const tag = todoTagKey(t);
+    const due =
+      t.dueDate || t.dueTime
+        ? `<span class="home-meta">${escapeHtml(
+            formatNaturalWhen(t.dueDate, t.dueTime)
+          )}</span>`
+        : "";
+    const contextName = t.projectName || t.className;
+    const klass = contextName
+      ? `<span class="home-meta">${escapeHtml(contextName)}</span>`
+      : "";
+    const href = todoHref(t);
+    const classAttr = t.classId
+      ? ` data-todo-class-id="${escapeHtml(t.classId)}"`
+      : "";
+    const projectAttr = t.projectId
+      ? ` data-todo-project-id="${escapeHtml(t.projectId)}"`
+      : "";
+    const checkFilterId = `lg-home-check-${
+      t.projectId ? `p-${t.projectId}-${t.id}` : t.classId ? `${t.classId}-${t.id}` : t.id
+    }`;
+    return `<li class="home-row home-todo${done ? " is-done" : ""}" data-todo-id="${escapeHtml(
+      t.id
+    )}" data-due-date="${escapeHtml(t.dueDate || "")}"${classAttr}${projectAttr}>
+      ${todoCheckHtml({ done, filterId: checkFilterId })}
+      <a class="home-row-link" href="${escapeHtml(href)}">
+        <span class="home-name">${taggedNameHtml(tag, t.name || t.id)}</span>
+        ${klass}${due}
+      </a>
+      ${scoreHtml(todoScoreLabel(t), t.canvasLink)}
+    </li>`;
+  }
+
+  function dateRowHtml(d) {
+    const when =
+      d.date || d.time
+        ? `<span class="home-meta">${escapeHtml(formatNaturalWhen(d.date, d.time))}</span>`
+        : "";
+    const contextName = d.projectName || d.className;
+    const klass = contextName
+      ? `<span class="home-meta">${escapeHtml(contextName)}</span>`
+      : "";
+    const href = dateHref(d);
+    return `<li class="home-row">
+      <a class="home-row-link" href="${escapeHtml(href)}">
+        <span class="home-name">${escapeHtml(d.name || d.id)}</span>
+        ${klass}${when}
+      </a>
+    </li>`;
+  }
+
+  function dateItemRowHtml(item) {
+    const when =
+      item.date || item.time
+        ? `<span class="home-meta">${escapeHtml(
+            formatNaturalWhen(item.date, item.time)
+          )}</span>`
+        : "";
+    const contextName = item.projectName || item.className;
+    const klass = contextName
+      ? `<span class="home-meta">${escapeHtml(contextName)}</span>`
+      : "";
+    const nameHtml =
+      item.source === "todo"
+        ? taggedNameHtml(item.tag, item.name)
+        : escapeHtml(item.name);
+    // Todos in Dates always deep-link to the normal todo detail page (never /date/).
+    const href =
+      item.source === "todo"
+        ? todoHref({
+            id: item.id,
+            classId: item.classId || null,
+            projectId: item.projectId || null,
+          })
+        : dateHref({
+            id: item.id,
+            classId: item.classId || null,
+            projectId: item.projectId || null,
+          });
+    const score =
+      item.source === "todo"
+        ? scoreHtml(todoScoreLabel(item), item.canvasLink)
+        : "";
+    return `<li class="home-row">
+      <a class="home-row-link" href="${escapeHtml(href)}" data-date-item-source="${escapeHtml(
+      item.source || "date"
+    )}">
+        <span class="home-name">${nameHtml}</span>
+        ${klass}${when}
+      </a>
+      ${score}
+    </li>`;
+  }
+
+  function projectRowHtml(p) {
+    const portal = projectPortalHref(p);
+    const href = portal || spaProject(p.id);
+    const extra = portal ? ` data-home-portal="1"` : "";
+    return `<li class="home-row home-class-row">
+      <a class="home-row-link" href="${escapeHtml(href)}"${extra}>
+        <span class="home-name">${escapeHtml(p.name || p.id)}</span>
+      </a>
+    </li>`;
+  }
+
+  function projectsPanelHtml(filterId = "lg-home-projects") {
+    const projects = (tree?.projects || []).filter((p) => {
+      if (isFixture(p)) return false;
+      const tier = String(p.tier || "main").trim().toLowerCase();
+      if (tier === "backend") return false;
+      if (tier === "hidden") return projectsExpanded;
+      return true;
+    });
+    const rows = projects.map(projectRowHtml).join("");
+    const titleHtml = `<button type="button" class="home-projects-toggle" data-projects-expand aria-expanded="${
+      projectsExpanded ? "true" : "false"
+    }" aria-label="${
+      projectsExpanded ? "Collapse projects" : "Expand projects"
+    }">Projects</button>`;
+    return panelHtml("Projects", listOrEmpty(rows), { filterId, titleHtml });
+  }
+
+  function findCaseById(caseId) {
+    const id = String(caseId || "").trim();
+    if (!id) return null;
+    const projects = tree?.projects || [];
+    for (const p of projects) {
+      if (isFixture(p)) continue;
+      const hit = (p.cases || []).find((c) => c && String(c.id) === id);
+      if (hit) return { ...hit, projectId: p.id, projectName: p.name || p.id };
+    }
+    return null;
+  }
+
+  function debateCases() {
+    const scope = homeScopeProjectId();
+    const projects = (tree?.projects || []).filter((p) => !isFixture(p));
+    const p = scope
+      ? projects.find((x) => x.id === scope)
+      : projects.find((x) => Array.isArray(x.cases) && x.cases.length);
+    return ((p && p.cases) || []).filter((c) => c && !isFixture(c));
+  }
+
+  function casePairHtml(c) {
+    const name = escapeHtml(c.name || c.id);
+    const affHref = BASE === "/debate" ? spaCase(c.id, "aff") : debateCaseHref(c.id, "aff");
+    const negHref = BASE === "/debate" ? spaCase(c.id, "neg") : debateCaseHref(c.id, "neg");
+    const fid = String(c.id || "").replace(/[^a-z0-9]+/gi, "-");
+    return `<li class="home-case">
+      <a class="home-row-link home-case-side" data-liquid-glass="rounded" data-filter-id="lg-home-case-${escapeHtml(
+        fid
+      )}-aff" href="${escapeHtml(affHref)}">
+        <span class="home-name">${name}</span>
+        <span class="home-tag">Aff</span>
+      </a>
+      <a class="home-row-link home-case-side" data-liquid-glass="rounded" data-filter-id="lg-home-case-${escapeHtml(
+        fid
+      )}-neg" href="${escapeHtml(negHref)}">
+        <span class="home-name">${name}</span>
+        <span class="home-tag">Neg</span>
+      </a>
+    </li>`;
+  }
+
+  function casesPanelHtml(filterId = "lg-home-cases") {
+    const rows = debateCases().map(casePairHtml).join("");
+    return panelHtml("Cases", listOrEmpty(rows), { filterId });
+  }
+
+  function classRowHtml(m, highlight) {
+    const href = spaClass(m.class.id);
+    // "free" matches the grade caption. It is not a link.
+    const score = !CFG.showGrades
+      ? ""
+      : isFreePeriodClass(m.class)
+        ? `<span class="home-score">free</span>`
+        : scoreHtml(classScoreLabel(m.class), classCanvasLink(m.class));
+    return `<li class="home-row home-class-row${highlight ? " is-current" : ""}">
+      <a class="home-row-link" href="${escapeHtml(href)}">
+        <span class="home-tag home-period">${escapeHtml(m.period)}</span>
+        <span class="home-name">${escapeHtml(classScheduleName(m.class))}</span>
+      </a>
+      ${score}
+    </li>`;
+  }
+
+  function staticClassMeetings(classes) {
+    return [...(classes || [])]
+      .filter((c) => !isFixture(c))
+      .sort((a, b) => {
+        const ao = Number(a.order) || 99;
+        const bo = Number(b.order) || 99;
+        if (ao !== bo) return ao - bo;
+        const ap = classPeriodLetter(a, todayKey(), tree?.schedule || {}) || "";
+        const bp = classPeriodLetter(b, todayKey(), tree?.schedule || {}) || "";
+        return ap.localeCompare(bp);
+      })
+      .map((cls) => ({
+        class: cls,
+        period: classPeriodLetter(cls, todayKey(), tree?.schedule || {}) || "",
+      }));
+  }
+
+  /**
+   * Next class that has not ended yet (today or a future school day).
+   * @returns {{ dateKey: string, start: string, end: string, period: string } | null}
+   */
+  function nextClassOccurrence(cls, schedule) {
+    if (!cls?.period && !(cls?.periods && typeof cls.periods === "object")) return null;
+    const now = todayParts();
+    let day = { y: now.y, m: now.m, day: now.day, weekday: now.weekday };
+    for (let i = 0; i < 60; i++) {
+      if (isSchoolDay(day, schedule)) {
+        const dayClasses = classesForDay(day, schedule, [cls]);
+        for (const m of dayClasses) {
+          const isToday =
+            day.y === now.y && day.m === now.m && day.day === now.day;
+          if (isToday && m.endMin != null && now.minutes >= m.endMin) continue;
+          return {
+            dateKey: ymd(day.y, day.m, day.day),
+            start: m.start,
+            end: m.end,
+            period: m.period,
+          };
+        }
+      }
+      day = addDays(day.y, day.m, day.day, 1);
+    }
+    return null;
+  }
+
+  function ymdPartsFromKey(s) {
+    const p = parseYmd(s);
+    if (!p) return null;
+    const dt = new Date(p.y, p.m - 1, p.day);
+    return { y: p.y, m: p.m, day: p.day, weekday: dt.getDay() };
+  }
+
+  function classMeetingOnDay(cls, day, schedule) {
+    const meetings = classesForDay(day, schedule, [cls]);
+    return meetings.find((m) => m.class?.id === cls.id) || meetings[0] || null;
+  }
+
+  /**
+   * When a checked-off class todo moves to Completed.
+   * Due before/during this class on a meeting day → that period's end.
+   * Due after class that same day → the due time.
+   * Not a meeting day → end of this class's next meeting after the due date.
+   * Null → move immediately.
+   */
+  function classTodoArchiveMeeting(todo, cls, schedule) {
+    const dueDay = ymdPartsFromKey(todo?.dueDate);
+    if (!dueDay || !cls) return null;
+    const dueMin = timeToMinutes(todo.dueTime);
+    const dueMinutes = dueMin == null ? 0 : dueMin;
+
+    if (isSchoolDay(dueDay, schedule)) {
+      const sameDay = classMeetingOnDay(cls, dueDay, schedule);
+      if (sameDay && sameDay.endMin != null) {
+        if (dueMinutes < sameDay.endMin) {
+          return { dateKey: dateKeyOf(dueDay), endMin: sameDay.endMin };
+        }
+        return { dateKey: dateKeyOf(dueDay), endMin: dueMinutes };
+      }
+    }
+
+    let day = addDays(dueDay.y, dueDay.m, dueDay.day, 1);
+    for (let i = 0; i < 120; i++) {
+      if (isSchoolDay(day, schedule)) {
+        const meeting = classMeetingOnDay(cls, day, schedule);
+        if (meeting && meeting.endMin != null) {
+          return { dateKey: dateKeyOf(day), endMin: meeting.endMin };
+        }
+      }
+      day = addDays(day.y, day.m, day.day, 1);
+    }
+    return null;
+  }
+
+  function classTodoReadyForCompleted(todo, cls, schedule, now = todayParts()) {
+    if (!todo?.done) return false;
+    const meeting = classTodoArchiveMeeting(todo, cls, schedule);
+    if (!meeting) return true;
+    const nowKey = dateKeyOf(now);
+    if (nowKey > meeting.dateKey) return true;
+    if (nowKey < meeting.dateKey) return false;
+    return meeting.endMin != null && now.minutes >= meeting.endMin;
+  }
+
+  function partitionClassPageTodos(todos, cls, schedule) {
+    const open = [];
+    const completed = [];
+    for (const t of todos) {
+      if (t.done && classTodoReadyForCompleted(t, cls, schedule)) {
+        completed.push(t);
+      } else {
+        open.push(t);
+      }
+    }
+    open.sort((a, b) => dueSortKey(a).localeCompare(dueSortKey(b)));
+    return { open, completed: sortCompletedTodos(completed) };
+  }
+
+  function msUntilClassTodoArchive(todo, cls, schedule) {
+    const meeting = classTodoArchiveMeeting(todo, cls, schedule);
+    if (!meeting || meeting.endMin == null) return null;
+    const day = parseYmd(meeting.dateKey);
+    if (!day) return null;
+    const end = new Date(
+      day.y,
+      day.m - 1,
+      day.day,
+      Math.floor(meeting.endMin / 60),
+      meeting.endMin % 60,
+      0,
+      0
+    );
+    return end.getTime() - Date.now();
+  }
+
+  let classTodoArchiveTimer = 0;
+
+  function clearClassTodoArchiveTimer() {
+    if (classTodoArchiveTimer) {
+      window.clearTimeout(classTodoArchiveTimer);
+      classTodoArchiveTimer = 0;
+    }
+  }
+
+  function armClassTodoArchiveTimer(cls, todos) {
+    clearClassTodoArchiveTimer();
+    if (!cls || route.view !== "class") return;
+    const schedule = tree?.schedule || {};
+    let soonest = Infinity;
+    for (const t of todos || []) {
+      if (!t.done || classTodoReadyForCompleted(t, cls, schedule)) continue;
+      const ms = msUntilClassTodoArchive(t, cls, schedule);
+      if (ms != null && ms > 0 && ms < soonest) soonest = ms;
+    }
+    if (soonest === Infinity) return;
+    classTodoArchiveTimer = window.setTimeout(() => {
+      classTodoArchiveTimer = 0;
+      if (route.view === "class") render({ scroll: "keep" });
+    }, Math.min(soonest + 250, 2147483647));
+  }
+
+  function formatNextClassWhen(next) {
+    if (!next) return "";
+    const range = `${formatTime(next.start)}–${formatTime(next.end)}`;
+    const target = parseYmd(next.dateKey);
+    if (!target) return range;
+    const now = todayParts();
+    const delta = daysBetween(now, target);
+    if (delta === 0) return `${range} today`;
+    if (delta === 1) return `${range} tomorrow`;
+    const dayAbbr = WEEKDAYS_SHORT[new Date(target.y, target.m - 1, target.day).getDay()];
+    const showYear = target.y !== now.y;
+    const showMonth = target.m !== now.m || target.y !== now.y;
+    const dayPart = showMonth
+      ? `${MONTHS[target.m - 1]} ${ordinal(target.day)}`
+      : `the ${ordinal(target.day)}`;
+    const yearPart = showYear ? `, ${target.y}` : "";
+    const weekStart = addDays(now.y, now.m, now.day, -now.weekday);
+    const weekOffset = daysBetween(weekStart, target);
+    const inThisOrNextWeek = weekOffset >= 0 && weekOffset <= 13;
+    const dateCore = `${dayPart}${yearPart}`;
+    const dated = inThisOrNextWeek ? `${dayAbbr} ${dateCore}` : dateCore;
+    return `${range} on ${dated}`;
+  }
+
+  function panelHtml(title, body, { extraClass = "", headExtra = "", filterId = "", titleHtml = "" } = {}) {
+    const id =
+      filterId ||
+      `lg-home-panel-${String(title)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "")}`;
+    const heading = titleHtml || escapeHtml(title);
+    return `<section class="home-panel${extraClass ? ` ${extraClass}` : ""}" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
+      id
+    )}">
+      <div class="home-panel-head">
+        <h2 class="home-panel-title">${heading}</h2>
+        ${headExtra}
+      </div>
+      ${body}
+    </section>`;
+  }
+
+  /**
+   * Context-file query for /api/home/file.
+   * @param {{ scope: string, id?: string, classId?: string, projectId?: string, name: string, source?: string, path?: string }} opts
+   */
+  function fileQueryValue(value) {
+    const enc = window.YLFileQuery?.encodeHomeFileQueryValue;
+    const s = String(value ?? "");
+    return enc ? enc(s) : s;
+  }
+
+  function fileQueryName(queryString) {
+    const raw = new URLSearchParams(String(queryString || "")).get("name") || "";
+    const dec = window.YLFileQuery?.decodeHomeFileQueryValue;
+    return dec ? dec(raw) : raw;
+  }
+
+  function isRasterImageName(name) {
+    return /\.(png|jpe?g|gif|webp|heic|avif)$/i.test(String(name || ""));
+  }
+
+  function contextFileQuery(opts) {
+    const q = new URLSearchParams();
+    const set = (key, value) => {
+      if (value == null || String(value) === "") return;
+      q.set(key, fileQueryValue(value));
+    };
+    set("scope", opts.scope || "");
+    set("name", opts.name || "");
+    set("id", opts.id);
+    set("classId", opts.classId);
+    set("projectId", opts.projectId);
+    set("source", opts.source);
+    set("rel", opts.path);
+    set("path", opts.path);
+    return q.toString();
+  }
+
+  function folderKey(owner, file) {
+    const path = String(file?.path || file?.name || "").trim();
+    return `${owner.scope || ""}:${owner.id || ""}:${owner.classId || ""}:${path}`;
+  }
+
+  function folderBodyHtml(file, owner, filterId, childPrefix) {
+    const name = String(file?.name || "").trim();
+    const key = folderKey(owner, file);
+    const open = expandedFolders.has(key);
+    const children = filesHtml(file.files, owner, {
+      filterPrefix: childPrefix,
+    });
+    return `<button type="button" class="home-file-tile home-file-folder" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
+      filterId
+    )}" data-home-folder="${escapeHtml(key)}" aria-expanded="${
+      open ? "true" : "false"
+    }" title="${escapeHtml(name)}"><span class="home-file-name">${escapeHtml(
+      name
+    )}</span></button>
+        <div class="home-file-folder-children"${open ? "" : " hidden"}>${
+      children || `<p class="home-empty">Empty folder</p>`
+    }</div>`;
+  }
+
+  /**
+   * Liquid-glass file tiles (API order: filesTop, then newest mtime, then filesBottom).
+   * Folders expand in place. They do not navigate away.
+   * `pair` puts even tiles in the left column and odd tiles in the right.
+   * Each column is its own stack, so opening a folder only grows that column.
+   * @param {{ name: string, kind?: string, source?: string, path?: string, files?: object[] }[]|null|undefined} files
+   * @param {{ scope: string, id?: string, classId?: string, projectId?: string }} owner
+   * @param {{ pair?: boolean, filterPrefix?: string }} [opts]
+   */
+  function pairColumnsHtml(tiles) {
+    const cols = [[], []];
+    tiles.forEach((html, index) => {
+      cols[index % 2].push(
+        `<div class="home-files-item" style="order:${index}">${html}</div>`
+      );
+    });
+    return `<div class="home-files home-files--pair"><div class="home-files-col">${cols[0].join(
+      ""
+    )}</div><div class="home-files-col">${cols[1].join("")}</div></div>`;
+  }
+
+  function filesHtml(files, owner, { pair = false, filterPrefix = "lg-home-file" } = {}) {
+    const list = Array.isArray(files) ? files : [];
+    if (!list.length) return "";
+    const tiles = list
+      .map((f, i) => {
+        const name = String(f?.name || "").trim();
+        if (!name) return "";
+        const filterId = `${filterPrefix}-${i}`;
+        const isFolder = String(f?.kind || "") === "folder";
+        if (isFolder) {
+          return `<div class="home-file-folder-wrap">${folderBodyHtml(
+            f,
+            owner,
+            filterId,
+            `${filterPrefix}-dir-${i}`
+          )}</div>`;
+        }
+        const qs = contextFileQuery({
+          ...owner,
+          name,
+          source: f?.source === "onedrive" ? "onedrive" : undefined,
+          path: f?.path,
+        });
+        const officeUri = String(f?.officeUri || "").trim();
+        const webUrl = String(f?.webUrl || "").trim();
+        const webViewUrl =
+          String(f?.webViewUrl || "").trim() ||
+          (webUrl
+            ? `${webUrl}${webUrl.includes("?") ? "&" : "?"}web=1`
+            : "");
+        if (String(f?.kind || "") === "url" && (f.url || webUrl)) {
+          const href = String(f.url || webUrl).trim();
+          const officeAttr = officeUri
+            ? ` data-home-office="${escapeHtml(officeUri)}"`
+            : "";
+          return `<a class="home-file-tile" href="${escapeHtml(
+            href
+          )}" target="_blank" rel="noopener noreferrer"${officeAttr} data-liquid-glass="rounded" data-filter-id="${escapeHtml(
+            filterId
+          )}" title="${escapeHtml(name)}"><span class="home-file-name">${escapeHtml(
+            name
+          )}</span></a>`;
+        }
+        if (officeUri && webViewUrl) {
+          return `<a class="home-file-tile" href="${escapeHtml(
+            webViewUrl
+          )}" target="_blank" rel="noopener noreferrer" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
+            filterId
+          )}" data-home-office="${escapeHtml(officeUri)}" title="${escapeHtml(
+            name
+          )}"><span class="home-file-name">${escapeHtml(
+            name
+          )}</span></a>`;
+        }
+        return `<a class="home-file-tile" href="${API}/file?${escapeHtml(
+          qs
+        )}" target="_blank" rel="noopener noreferrer" data-liquid-glass="rounded" data-filter-id="${escapeHtml(
+          filterId
+        )}" data-home-file="${escapeHtml(qs)}" title="${escapeHtml(name)}"><span class="home-file-name">${escapeHtml(
+          name
+        )}</span></a>`;
+      })
+      .filter(Boolean);
+    if (!tiles.length) return "";
+    if (pair) return pairColumnsHtml(tiles);
+    return `<div class="home-files">${tiles.join("")}</div>`;
+  }
+
+  function closeFileTab(tab) {
+    if (!tab || tab.closed) return;
+    try {
+      tab.close();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /**
+   * `tab` is a blank window opened in the click, before any await.
+   * Opening after the file fetch loses the click, and the browser drops it.
+   * `noopener` also makes window.open return null when the tab did open,
+   * and the old fallback then set download on a PDF.
+   */
+  function fileTabFallback(tab, fallbackHref) {
+    if (tab && !tab.closed && fallbackHref) {
+      try {
+        tab.location = fallbackHref;
+        return;
+      } catch {
+        /* close below */
+      }
+    }
+    closeFileTab(tab);
+  }
+
+  async function openContextFile(queryString, tab, fallbackHref) {
+    const mac = window.YanMacApi;
+    if (!mac?.macFetch || !queryString) {
+      fileTabFallback(tab, fallbackHref);
+      return;
+    }
+    try {
+      const res = await mac.macFetch(`${API}/file?${queryString}`, {
+        timeoutMs: 120_000,
+        headers: { Accept: "*/*" },
+      });
+      if (!res.ok) {
+        console.error("[home-file]", res.status);
+        fileTabFallback(tab, fallbackHref);
+        return;
+      }
+      let blob = await res.blob();
+      const downloadName = fileQueryName(queryString);
+      const shouldDownload = window.YLFileQuery?.contextFileShouldDownload?.(downloadName);
+      if (shouldDownload === true) {
+        closeFileTab(tab);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = downloadName || "download";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        return;
+      }
+      const type = blob.type || "";
+      if (!type || type === "application/octet-stream") {
+        const ext = String(downloadName || "").split(".").pop()?.toLowerCase();
+        const mime =
+          ext === "pdf"
+            ? "application/pdf"
+            : ext === "html" || ext === "htm"
+              ? "text/html"
+              : "";
+        if (mime) blob = new Blob([blob], { type: mime });
+      }
+      const url = URL.createObjectURL(blob);
+      let opened = tab && !tab.closed ? tab : null;
+      if (!opened) opened = window.open(url, "_blank");
+      else opened.location = url;
+      if (opened) {
+        try {
+          opened.opener = null;
+        } catch {
+          /* blob navigation may already drop the handle */
+        }
+      } else {
+        const a = document.createElement("a");
+        a.href = url;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      console.error("[home-file]", err);
+      fileTabFallback(tab, fallbackHref);
+    }
+  }
+
+  function listOrEmpty(itemsHtml) {
+    if (!itemsHtml) return `<p class="home-empty">Nothing here</p>`;
+    return `<ul class="home-list">${itemsHtml}</ul>`;
+  }
+
+  function todoDayKey(t) {
+    return String(t?.dueDate || "");
+  }
+
+  function todoDaySepHtml() {
+    return `<li class="home-day-sep" aria-hidden="true"></li>`;
+  }
+
+  /** Rows with a hairline between different due dates. */
+  function todoListItemsHtml(todos) {
+    const parts = [];
+    let prev = null;
+    for (const t of todos) {
+      const key = todoDayKey(t);
+      if (prev !== null && key !== prev) parts.push(todoDaySepHtml());
+      parts.push(todoRowHtml(t));
+      prev = key;
+    }
+    return parts.join("");
+  }
+
+  function syncTodoDaySeparators(list) {
+    if (!list) return;
+    list.querySelectorAll(":scope > .home-day-sep").forEach((el) => el.remove());
+    const rows = [...list.querySelectorAll(":scope > .home-todo")];
+    let prev = null;
+    for (const row of rows) {
+      const key = row.getAttribute("data-due-date") || "";
+      if (prev !== null && key !== prev) {
+        const sep = document.createElement("li");
+        sep.className = "home-day-sep";
+        sep.setAttribute("aria-hidden", "true");
+        list.insertBefore(sep, row);
+      }
+      prev = key;
+    }
+  }
+
+  function backLinkHtml(href, filterId = "lg-home-back") {
+    return `<a class="corner circle home-back" data-liquid-glass="circle" data-filter-id="${escapeHtml(
+      filterId
+    )}" href="${escapeHtml(
+      href
+    )}" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>`;
+  }
+
+  function todoLowerHtml(filesHtml, commentsHtml) {
+    if (!commentsHtml) return filesHtml || "";
+    if (!filesHtml) return `<div class="home-todo-comments">${commentsHtml}</div>`;
+    return `<div class="home-todo-split">
+      <div class="home-todo-split-comments">${commentsHtml}</div>
+      <div class="home-todo-split-files">${filesHtml}</div>
+    </div>`;
+  }
+
+  function detailShell(backHref, title, bodyHtml, filterId, { canvasLink = "", filesHtml = "", commentsHtml = "", titleHtml = "", canvasScore = "" } = {}) {
+    const canvas = canvasOrbHtml(canvasLink, canvasScore);
+    return `
+      <header class="home-hero home-hero--detail${canvas ? " home-hero--detail-canvas" : ""}">
+        <div class="home-hero-lead">
+          ${backLinkHtml(backHref)}
+          <h1 class="home-hero-title">${titleHtml || escapeHtml(title)}</h1>
+        </div>
+        ${canvas}
+      </header>
+      <div class="home-grid home-grid--detail">
+        ${panelHtml("Details", bodyHtml, { filterId })}
+      </div>
+      ${todoLowerHtml(filesHtml, commentsHtml)}`;
+  }
+
+  function renderHome() {
+    const scopeId = homeScopeProjectId();
+    const todos = flattenTodos(tree, scopeId ? { projectId: scopeId } : {})
+      .filter(matchesFilter)
+      .filter((t) => !todoHiddenFromHome(t));
+    const open = todos
+      .filter((t) => !t.done)
+      .sort((a, b) => dueSortKey(a).localeCompare(dueSortKey(b)));
+    const completed = sortCompletedTodos(todos.filter((t) => t.done));
+    const sections = classSections(tree.schedule || {}, tree.classes || []);
+
+    const dayPanel = (sec, i) => {
+      const rows = sec.classes
+        .map((m, i) => {
+          const hl = sec.isToday && isMeetingHighlighted(sec.classes, i, sec.nowMinutes);
+          return classRowHtml(m, hl);
+        })
+        .join("");
+      return panelHtml(sec.label, listOrEmpty(rows), {
+        extraClass: "home-panel--day",
+        filterId: `lg-home-day-${sec.dateKey || i}`,
+        titleHtml: sec.labelHtml || "",
+      });
+    };
+
+    const day1 = sections[0] ? dayPanel(sections[0], 0) : "";
+    const day2 = sections[1] ? dayPanel(sections[1], 1) : "";
+    const datesPanel = datesPanelHtml(
+      scopeId ? { projectId: scopeId } : {},
+      "lg-home-dates"
+    );
+    const projectsPanel = CFG.hideProjects ? "" : projectsPanelHtml();
+    const casesPanel = CFG.showCases ? casesPanelHtml() : "";
+    const staticClasses = CFG.staticClasses
+      ? panelHtml(
+          "Classes",
+          listOrEmpty(
+            staticClassMeetings(tree.classes || [])
+              .map((m) => classRowHtml(m, false))
+              .join("")
+          ),
+          { filterId: "lg-home-classes" }
+        )
+      : "";
+    let rightCol;
+    if (CFG.hideSchedule || scopeId) {
+      rightCol = `${casesPanel}${datesPanel}${CFG.hideProjects ? "" : projectsPanel}`;
+    } else if (CFG.staticClasses) {
+      rightCol = `${staticClasses}${projectsPanel}${casesPanel}${datesPanel}`;
+    } else {
+      const commentsPanel = homeCommentsHtml();
+      rightCol =
+        day1 || day2
+          ? `${day1}${casesPanel}${datesPanel}${day2}${projectsPanel}${commentsPanel}`
+          : `${panelHtml("Classes", `<p class="home-empty">No school days</p>`, {
+              filterId: "lg-home-classes",
+            })}${casesPanel}${datesPanel}${projectsPanel}${commentsPanel}`;
+    }
+
+    appEl.innerHTML = `
+      <div class="home-grid home-grid--home">
+        <div class="home-col home-col--main">
+          ${todoPanelHtml(open, "lg-home-todo")}
+          ${completedPanelHtml(completed, "lg-home-completed")}
+        </div>
+        <div class="home-col home-col--side">
+          ${rightCol}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderClass() {
+    const cls = (tree.classes || []).find(
+      (c) => c.id === route.classId && !isFixture(c)
+    );
+    if (!cls) {
+      appEl.innerHTML = detailShell(
+        spaHome(),
+        "Missing",
+        `<p class="home-empty">Class not found.</p>`,
+        "lg-home-missing"
+      );
+      return;
+    }
+    const todos = flattenTodos(tree, { classId: cls.id }).filter(matchesFilter);
+    const { open, completed } = partitionClassPageTodos(
+      todos,
+      cls,
+      tree.schedule || {}
+    );
+
+    const nextWhen = formatNextClassWhen(
+      nextClassOccurrence(cls, tree.schedule || {})
+    );
+    const period = cls.period
+      ? `<span class="home-tag home-period home-period--hero">${escapeHtml(
+          cls.period
+        )}</span>`
+      : "";
+    const name = escapeHtml(classScheduleName(cls));
+    const classDesc = String(cls.description || "").trim();
+    const canvas = CFG.showGrades
+      ? canvasOrbHtml(classCanvasLink(cls), classScoreLabel(cls))
+      : "";
+
+    appEl.innerHTML = `
+      <header class="home-hero home-hero--detail${canvas ? " home-hero--detail-canvas" : ""}">
+        <div class="home-hero-lead">
+          ${backLinkHtml(spaHome(), "lg-home-back-class")}
+          <h1 class="home-hero-title home-hero-title--class">${period}<span class="home-hero-class-name">${name}</span></h1>
+          ${
+            nextWhen
+              ? `<p class="home-hero-sub">${escapeHtml(nextWhen)}</p>`
+              : ""
+          }
+        </div>
+        ${canvas}
+      </header>
+      ${classDesc ? markdownPanelHtml(classDesc, "lg-home-class-desc") : ""}
+      <div class="home-grid home-grid--home">
+        <div class="home-col home-col--main">
+          ${todoPanelHtml(open, "lg-home-class-todo")}
+          ${completedPanelHtml(completed, "lg-home-class-completed")}
+        </div>
+        <div class="home-col home-col--side">
+          ${datesPanelHtml({ classId: cls.id }, "lg-home-class-dates")}
+          ${filesHtml(cls.files, { scope: "class", id: cls.id }, {
+            filterPrefix: "lg-home-class-file",
+          })}
+          ${classCommentsHtml(cls)}
+        </div>
+      </div>
+    `;
+    armClassTodoArchiveTimer(cls, todos);
+  }
+
+  function renderProject() {
+    const project = (tree.projects || []).find(
+      (p) => p.id === route.projectId && !isFixture(p)
+    );
+    if (!project) {
+      appEl.innerHTML = detailShell(
+        spaHome(),
+        "Missing",
+        `<p class="home-empty">Project not found.</p>`,
+        "lg-home-project-missing"
+      );
+      return;
+    }
+    const todos = flattenTodos(tree, { projectId: project.id }).filter(
+      matchesFilter
+    );
+    const open = todos
+      .filter((t) => !t.done)
+      .sort((a, b) => dueSortKey(a).localeCompare(dueSortKey(b)));
+    const completed = sortCompletedTodos(todos.filter((t) => t.done));
+    const name = escapeHtml(project.name || project.id);
+    const projectDesc = String(project.description || "").trim();
+    const canvas = CFG.showGrades
+      ? canvasOrbHtml(projectCanvasLink(project), projectScoreLabel(project))
+      : "";
+
+    appEl.innerHTML = `
+      <header class="home-hero home-hero--detail${canvas ? " home-hero--detail-canvas" : ""}">
+        <div class="home-hero-lead">
+          ${backLinkHtml(spaHome(), "lg-home-back-project")}
+          <h1 class="home-hero-title">${name}</h1>
+        </div>
+        ${canvas}
+      </header>
+      ${projectDesc ? markdownPanelHtml(projectDesc, "lg-home-project-desc") : ""}
+      <div class="home-grid home-grid--home">
+        <div class="home-col home-col--main">
+          ${todoPanelHtml(open, "lg-home-project-todo")}
+          ${completedPanelHtml(completed, "lg-home-project-completed")}
+        </div>
+        <div class="home-col home-col--side">
+          ${datesPanelHtml({ projectId: project.id }, "lg-home-project-dates")}
+          ${filesHtml(project.files, { scope: "project", id: project.id }, {
+            filterPrefix: "lg-home-project-file",
+          })}
+          ${projectCommentsHtml(project)}
+        </div>
+      </div>
+    `;
+  }
+
+  function debateCues(lines) {
+    const items = (Array.isArray(lines) ? lines : [])
+      .map((line) => `<li>${escapeHtml(line)}</li>`)
+      .join("");
+    if (!items) return "";
+    return `<ul class="debate-cues">${items}</ul>`;
+  }
+
+  function debateHttps(url) {
+    const s = String(url || "").trim();
+    return /^https:\/\/[^\s]+$/i.test(s) ? s : "";
+  }
+
+  function debateMarkup(text) {
+    return escapeHtml(text).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  }
+
+  function debateCardHtml(card) {
+    const url = debateHttps(card?.url);
+    if (!url) return "";
+    const cite = `<a class="debate-cite" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(card.tag || "")}</a>`;
+    const summary = String(card.summary || "").trim();
+    const summaryHtml = summary
+      ? `<p class="debate-summary">${escapeHtml(summary)}</p>`
+      : "";
+    const source = String(card.source || "").trim();
+    const sourceHtml = source
+      ? `<p class="debate-source">${escapeHtml(source)}</p>`
+      : "";
+    const means = debateCues(card.means);
+    return `<article class="debate-card">
+      <p class="debate-tag">${cite}</p>
+      ${summaryHtml}
+      <blockquote>${debateMarkup(card.quote || "")}</blockquote>
+      ${sourceHtml}
+      ${means}
+    </article>`;
+  }
+
+  function debateBlockfileHtml(c, sideKey) {
+    const body = c?.[sideKey];
+    const blocks = Array.isArray(body?.blockfile) ? body.blockfile : [];
+    return blocks
+      .map((block, i) => {
+        const label = String(block.label || "A2").trim();
+        const title = String(block.title || "").trim();
+        const heading = label && title ? `${label}. ${title}` : title || label || "A2";
+        const chain = debateCues(block.chain);
+        const cards = (block.cards || []).map((card) => debateCardHtml(card)).join("");
+        const inner = `${chain ? `<div class="debate-chain">${chain}</div>` : ""}${
+          cards ? `<div class="debate-cards">${cards}</div>` : ""
+        }`;
+        return panelHtml(heading, inner, {
+          filterId: `lg-debate-a2-${sideKey}-${i + 1}`,
+          extraClass: "debate-contention",
+        });
+      })
+      .join("");
+  }
+
+  function debateSideHtml(c, sideKey) {
+    const body = c?.[sideKey];
+    if (!body || typeof body !== "object") return "";
+    const blocks = [];
+    const defs = Array.isArray(body.definitions) ? body.definitions : [];
+    if (defs.length) {
+      const rows = defs
+        .map((def) => {
+          const cues = debateCues(def.points || (def.text ? [def.text] : []));
+          const cards = (def.cards || []).map((card) => debateCardHtml(card)).join("");
+          return `<article class="debate-def">
+            <h3>${escapeHtml(def.term || "")}</h3>
+            ${cues}
+            ${cards ? `<div class="debate-cards">${cards}</div>` : ""}
+          </article>`;
+        })
+        .join("");
+      blocks.push(panelHtml("Definitions", rows, { filterId: "lg-debate-defs" }));
+    }
+    const framework = body.framework;
+    if (
+      framework &&
+      (framework.value ||
+        framework.criterion ||
+        (framework.text || []).length ||
+        (framework.cards || []).length)
+    ) {
+      const bits = [];
+      if (framework.value) {
+        bits.push(`<p><span class="debate-k">Value.</span> ${escapeHtml(framework.value)}</p>`);
+      }
+      if (framework.criterion) {
+        bits.push(
+          `<p><span class="debate-k">Criterion.</span> ${escapeHtml(framework.criterion)}</p>`
+        );
+      }
+      bits.push(debateCues(framework.text));
+      const frameworkCards = (framework.cards || [])
+        .map((card) => debateCardHtml(card))
+        .join("");
+      if (frameworkCards) bits.push(`<div class="debate-cards">${frameworkCards}</div>`);
+      blocks.push(panelHtml("Framework", bits.join(""), { filterId: "lg-debate-framework" }));
+    }
+    const contentions = Array.isArray(body.contentions) ? body.contentions : [];
+    contentions.forEach((contention, i) => {
+      const label = String(contention.label || "").trim();
+      const title = String(contention.title || "").trim();
+      const heading = label && title ? `${label}. ${title}` : title || label || "Contention";
+      const chain = debateCues(contention.chain);
+      const cards = (contention.cards || [])
+        .map((card) => debateCardHtml(card))
+        .join("");
+      const inner = `${chain ? `<div class="debate-chain">${chain}</div>` : ""}${
+        cards ? `<div class="debate-cards">${cards}</div>` : ""
+      }`;
+      blocks.push(
+        panelHtml(heading, inner, {
+          filterId: `lg-debate-c${i + 1}`,
+          extraClass: "debate-contention",
+        })
+      );
+    });
+    return blocks.join("");
+  }
+
+  function renderCase() {
+    const c = findCaseById(route.caseId);
+    const sideKey = route.caseSide === "neg" ? "neg" : "aff";
+    const side = sideKey === "neg" ? "Neg" : "Aff";
+    if (!c) {
+      appEl.innerHTML = `
+        <header class="home-hero home-hero--detail">
+          ${backLinkHtml(spaHome(), "lg-home-back-case")}
+          <h1 class="home-hero-title">Missing</h1>
+        </header>
+      `;
+      return;
+    }
+    const title = `${c.name || c.id} · ${side}`;
+    const speech = debateSideHtml(c, sideKey);
+    const blockfile = debateBlockfileHtml(c, sideKey);
+    const resolution = String(c.resolution || "").trim();
+    const resolutionLine = resolution
+      ? `${sideKey === "neg" ? "I negate" : "I affirm"} ${resolution}`
+      : "";
+    const hasSpeech = Boolean(
+      debateSideHtml(c, "aff") ||
+        debateSideHtml(c, "neg") ||
+        debateBlockfileHtml(c, "aff") ||
+        debateBlockfileHtml(c, "neg")
+    );
+    const switchHtml = hasSpeech
+      ? `<nav class="debate-switch" aria-label="Side">${["aff", "neg"]
+          .map((k) => {
+            const on = sideKey === k;
+            return `<a class="home-filter circle debate-switch-link${on ? " is-on" : ""}" data-liquid-glass="circle" data-filter-id="lg-debate-switch-${k}" href="${escapeHtml(
+              spaCase(c.id, k)
+            )}"${on ? ' aria-current="page"' : ""}><span>${k === "neg" ? "Neg" : "Aff"}</span></a>`;
+          })
+          .join("")}</nav>`
+      : "";
+    appEl.innerHTML = `
+      <header class="home-hero home-hero--detail">
+        <div class="home-hero-lead">
+          ${backLinkHtml(spaHome(), "lg-home-back-case")}
+          <h1 class="home-hero-title">${escapeHtml(title)}</h1>
+        </div>
+        ${switchHtml}
+      </header>
+      ${
+        speech || blockfile
+          ? `<div class="debate-case${blockfile ? " debate-case--split" : ""}">
+              ${
+                resolutionLine
+                  ? `<section class="home-panel debate-res" data-liquid-glass="rounded" data-filter-id="lg-debate-res"><p>${escapeHtml(
+                      resolutionLine
+                    )}</p></section>`
+                  : ""
+              }
+              ${
+                blockfile
+                  ? `<div class="debate-col">${speech}</div>
+              <div class="debate-col">
+                <p class="debate-col-label">Blockfile</p>
+                ${blockfile}
+              </div>`
+                  : speech
+              }
+            </div>`
+          : ""
+      }
+    `;
+  }
+
+  function capsuleVoteKey(c) {
+    const v = c && c.vote != null ? String(c.vote).toLowerCase() : "";
+    return v === "up" || v === "down" ? v : "";
+  }
+
+  function voteChipHtml(capsuleId, value, current) {
+    const on = current === value;
+    const label = value === "up" ? "Thumbs up, more like this" : "Thumbs down, less like this";
+    const glyph = value === "up" ? THUMB_UP_SVG : THUMB_DOWN_SVG;
+    return `<button type="button" class="home-filter circle home-vote${
+      on ? " is-on" : ""
+    }" data-liquid-glass="circle" data-filter-id="lg-home-vote-${escapeHtml(
+      capsuleId
+    )}-${value}" data-capsule-vote="${value}" data-capsule-id="${escapeHtml(
+      capsuleId
+    )}" aria-pressed="${on}" aria-label="${label}" title="${label}"><span>${glyph}</span></button>`;
+  }
+
+  function briefingStatusHtml(todo, { when, contextName }) {
+    return `<section class="home-panel home-briefing-status" data-liquid-glass="rounded" data-filter-id="lg-home-briefing-status">
+        <div class="home-detail-row">
+          ${todoCheckHtml({ done: todo.done, filterId: "lg-home-detail-check" })}
+          <span class="home-detail-status">${todo.done ? "Done" : "Open"}</span>
+        </div>
+        ${when ? `<p class="home-detail-meta">${escapeHtml(when)}</p>` : ""}
+        ${contextName ? `<p class="home-detail-meta">${escapeHtml(contextName)}</p>` : ""}
+      </section>`;
+  }
+
+  function capsulesHtml(todo, { link = true } = {}) {
+    const list = Array.isArray(todo.capsules) ? todo.capsules : [];
+    if (!list.length) {
+      return `<section class="home-panel home-capsule-panel" data-liquid-glass="rounded" data-filter-id="lg-home-briefing-empty"><p class="home-empty">Briefing is still compiling.</p></section>`;
+    }
+    const cards = list
+      .map((c, i) => {
+        const id = String(c?.id || `capsule-${i}`);
+        const title = String(c?.title || "").trim() || "Untitled";
+        const body = String(c?.body || "").trim();
+        const noVote = c?.noVote === true;
+        const current = capsuleVoteKey(c);
+        const href = link && !noVote ? capsuleHref(todo, id) : "";
+        const titleHtml = href
+          ? `<a class="home-capsule-link" href="${escapeHtml(href)}">${escapeHtml(title)}</a>`
+          : escapeHtml(title);
+        const bodyHtml = body
+          ? href
+            ? `<a class="home-capsule-link home-capsule-body-link" href="${escapeHtml(
+                href
+              )}"><p class="home-capsule-body">${escapeHtml(body)}</p></a>`
+            : `<p class="home-capsule-body">${escapeHtml(body)}</p>`
+          : "";
+        const votesHtml = noVote
+          ? ""
+          : `<div class="home-capsule-votes" role="group" aria-label="Rate this story. Thumbs up means more like this, thumbs down means less, and neither is a neutral rating.">
+              ${voteChipHtml(id, "up", current)}
+              ${voteChipHtml(id, "down", current)}
+            </div>`;
+        return `<section class="home-panel home-capsule home-capsule-panel${
+          href ? " home-capsule--open" : ""
+        }${noVote ? " home-capsule--no-vote" : ""}" data-liquid-glass="rounded" data-filter-id="lg-home-capsule-${escapeHtml(
+          id
+        )}" data-capsule-id="${escapeHtml(id)}">
+          <div class="home-panel-head">
+            <h2 class="home-panel-title">${titleHtml}</h2>
+            ${votesHtml}
+          </div>
+          ${bodyHtml}
+        </section>`;
+      })
+      .join("");
+    const cites = link ? citationsHtml(overallCitations(todo), "lg-home-briefing-citations") : "";
+    return `${cards}${cites}`;
+  }
+
+  function renderTodoDetail() {
+    const t = findTodoById(route.itemId, {
+      classId: route.classId,
+      projectId: route.projectId,
+    });
+    if (!t) {
+      appEl.innerHTML = detailShell(
+        spaHome(),
+        "Missing",
+        `<p class="home-empty">Todo not found.</p>`,
+        "lg-home-todo-missing"
+      );
+      return;
+    }
+    const tag = todoTagKey(t);
+    const when = formatDetailWhen(t.dueDate, t.dueTime);
+    const desc = String(t.description || "").trim();
+    const capsules = Array.isArray(t.capsules) ? t.capsules : [];
+    const isBriefing =
+      String(t.kind || "") === "dailyBriefing" || capsules.length > 0;
+    const classAttr = t.classId
+      ? ` data-todo-class-id="${escapeHtml(t.classId)}"`
+      : "";
+    const projectAttr = t.projectId
+      ? ` data-todo-project-id="${escapeHtml(t.projectId)}"`
+      : "";
+    const contextName = t.projectName || t.className;
+    const commentsHtml = commentBoxesHtml(t.canvasComments, t.canvasLink);
+    const fileTiles = filesHtml(
+      t.files,
+      {
+        scope: "todo",
+        id: t.id,
+        classId: t.classId,
+        projectId: t.projectId,
+      },
+      {
+        pair: isBriefing || !commentsHtml,
+        filterPrefix: "lg-home-todo-file",
+      }
+    );
+
+    if (isBriefing) {
+      const canvas = canvasOrbHtml(t.canvasLink);
+      appEl.innerHTML = `
+      <header class="home-hero home-hero--detail${canvas ? " home-hero--detail-canvas" : ""}">
+        <div class="home-hero-lead">
+          ${backLinkHtml(backHrefForItem(t))}
+          <h1 class="home-hero-title">${taggedNameHtml(tag, t.name || t.id)}</h1>
+        </div>
+        ${canvas}
+      </header>
+      <div class="home-grid home-grid--detail home-detail" data-todo-id="${escapeHtml(
+        t.id
+      )}"${classAttr}${projectAttr}>
+        ${briefingStatusHtml(t, { when, contextName })}
+        ${capsulesHtml(t)}
+      </div>
+      ${fileTiles}`;
+      return;
+    }
+
+    const body = `
+      <div class="home-detail" data-todo-id="${escapeHtml(t.id)}"${classAttr}${projectAttr}>
+        <div class="home-detail-row">
+          ${todoCheckHtml({ done: t.done, filterId: "lg-home-detail-check" })}
+          <span class="home-detail-status">${t.done ? "Done" : "Open"}</span>
+        </div>
+        ${when ? `<p class="home-detail-meta">${escapeHtml(when)}</p>` : ""}
+        ${contextName ? `<p class="home-detail-meta">${escapeHtml(contextName)}</p>` : ""}
+        ${descriptionHtml(desc)}
+      </div>`;
+    appEl.innerHTML = detailShell(backHrefForItem(t), t.name || t.id, body, "lg-home-todo-detail", {
+      canvasLink: t.canvasLink,
+      filesHtml: fileTiles,
+      commentsHtml,
+      titleHtml: taggedNameHtml(tag, t.name || t.id),
+      canvasScore: todoScoreLabel(t),
+    });
+  }
+
+  function renderCapsuleDetail() {
+    const t = findTodoById(route.itemId, {
+      classId: route.classId,
+      projectId: route.projectId,
+    });
+    const capsuleId = String(route.capsuleId || "");
+    const cap = (t?.capsules || []).find(
+      (c) => c && String(c.id) === capsuleId
+    );
+    if (!t || !cap) {
+      appEl.innerHTML = detailShell(
+        t ? todoHref(t) : spaHome(),
+        "Missing",
+        `<p class="home-empty">News story not found.</p>`,
+        "lg-home-capsule-missing"
+      );
+      return;
+    }
+    const title = String(cap.title || "").trim() || "Untitled";
+    const classAttr = t.classId
+      ? ` data-todo-class-id="${escapeHtml(t.classId)}"`
+      : "";
+    const projectAttr = t.projectId
+      ? ` data-todo-project-id="${escapeHtml(t.projectId)}"`
+      : "";
+    const card = capsulesHtml(
+      { ...t, capsules: [cap] },
+      { link: false }
+    );
+    const cites = citationsHtml(
+      parseCitations(cap.citations || cap.sources),
+      "lg-home-capsule-citations"
+    );
+    appEl.innerHTML = `
+      <header class="home-hero home-hero--detail">
+        <div class="home-hero-lead">
+          ${backLinkHtml(todoHref(t))}
+          <h1 class="home-hero-title">${escapeHtml(title)}</h1>
+        </div>
+      </header>
+      <div class="home-grid home-grid--detail home-detail" data-todo-id="${escapeHtml(
+        t.id
+      )}" data-capsule-id="${escapeHtml(String(cap.id))}"${classAttr}${projectAttr}>
+        ${card}
+        ${cites}
+      </div>`;
+  }
+
+  function renderDateDetail() {
+    const d = findDateById(route.itemId, {
+      classId: route.classId,
+      projectId: route.projectId,
+    });
+    if (!d) {
+      appEl.innerHTML = detailShell(
+        spaHome(),
+        "Missing",
+        `<p class="home-empty">Date not found.</p>`,
+        "lg-home-date-missing"
+      );
+      return;
+    }
+    const when = formatDetailWhen(d.date, d.time);
+    const desc = String(d.description || "").trim();
+    const contextName = d.projectName || d.className;
+    const body = `
+      <div class="home-detail">
+        ${when ? `<p class="home-detail-meta">${escapeHtml(when)}</p>` : ""}
+        ${contextName ? `<p class="home-detail-meta">${escapeHtml(contextName)}</p>` : ""}
+        ${descriptionHtml(desc)}
+      </div>`;
+    const fileTiles = filesHtml(
+      d.files,
+      {
+        scope: "date",
+        id: d.id,
+        classId: d.classId,
+        projectId: d.projectId,
+      },
+      { pair: true, filterPrefix: "lg-home-date-file" }
+    );
+    appEl.innerHTML = detailShell(
+      backHrefForItem(d),
+      d.name || d.id,
+      body,
+      "lg-home-date-detail",
+      { canvasLink: d.canvasLink, filesHtml: fileTiles }
+    );
+  }
+
+  function documentTitleForRoute() {
+    const fallback = CFG.title || "Home";
+    if (!tree || !route) return fallback;
+    if (route.view === "class") {
+      const cls = (tree.classes || []).find(
+        (c) => c.id === route.classId && !isFixture(c)
+      );
+      if (!cls) return fallback;
+      const period = String(cls.period || "").trim();
+      const name = classScheduleName(cls);
+      if (period && name) return `${period} ${name}`;
+      return name || fallback;
+    }
+    if (route.view === "project") {
+      const project = (tree.projects || []).find(
+        (p) => p.id === route.projectId && !isFixture(p)
+      );
+      if (!project) return fallback;
+      return project.name || project.id || fallback;
+    }
+    if (route.view === "todo") {
+      const t = findTodoById(route.itemId, {
+        classId: route.classId,
+        projectId: route.projectId,
+      });
+      if (!t) return fallback;
+      const tag = todoTagKey(t);
+      const name = stripTodoTagPrefix(t.name || t.id);
+      if (tag && tag !== "none") return `${tag} ${name}`;
+      return name || fallback;
+    }
+    if (route.view === "capsule") {
+      const t = findTodoById(route.itemId, {
+        classId: route.classId,
+        projectId: route.projectId,
+      });
+      const cap = (t?.capsules || []).find(
+        (c) => c && String(c.id) === String(route.capsuleId || "")
+      );
+      return String(cap?.title || "").trim() || fallback;
+    }
+    if (route.view === "date") {
+      const d = findDateById(route.itemId, {
+        classId: route.classId,
+        projectId: route.projectId,
+      });
+      return (d && (d.name || d.id)) || fallback;
+    }
+    if (route.view === "case") {
+      const c = findCaseById(route.caseId);
+      const side = route.caseSide === "neg" ? "Neg" : "Aff";
+      if (!c) return fallback;
+      return `${c.name || c.id} · ${side}`;
+    }
+    return fallback;
+  }
+
+  function syncDocumentTitle() {
+    document.title = documentTitleForRoute();
+  }
+
+  function render({ scroll = "keep" } = {}) {
+    if (!appEl || !tree) return;
+    if (route.view === "project") {
+      const portalProject = (tree.projects || []).find(
+        (p) => p.id === route.projectId && !isFixture(p)
+      );
+      if (assignProjectPortal(projectPortalHref(portalProject))) return;
+    }
+    const keepX = window.scrollX;
+    const keepY = window.scrollY;
+    const stageHidden = !stages.full || stages.full.hidden;
+    if (didEntrance || stageHidden) appEl.classList.add("is-settled");
+    else {
+      appEl.classList.remove("is-settled");
+      didEntrance = true;
+      window.setTimeout(() => appEl.classList.add("is-settled"), 1100);
+    }
+
+    clearClassTodoArchiveTimer();
+    if (route.view === "class") renderClass();
+    else if (route.view === "project") renderProject();
+    else if (route.view === "capsule") renderCapsuleDetail();
+    else if (route.view === "todo") renderTodoDetail();
+    else if (route.view === "date") renderDateDetail();
+    else if (route.view === "case") renderCase();
+    else renderHome();
+
+    applyScroll(scroll, keepX, keepY);
+    syncDocumentTitle();
+    queueMicrotask(() => window.reinitLiquidGlass?.());
+  }
+
+  function fingerprintTree(data) {
+    try {
+      return JSON.stringify(data);
+    } catch {
+      return String(Date.now());
+    }
+  }
+
+  function ensurePanelList(panel) {
+    let list = panel.querySelector(":scope > .home-list");
+    if (list) return list;
+    panel.querySelectorAll(":scope > .home-empty").forEach((el) => el.remove());
+    list = document.createElement("ul");
+    list.className = "home-list";
+    panel.appendChild(list);
+    return list;
+  }
+
+  function markPanelEmptyIfNeeded(panel) {
+    const list = panel.querySelector(":scope > .home-list");
+    if (list) {
+      if (list.querySelector(":scope > .home-row")) return;
+      list.remove();
+    }
+    if (!panel.querySelector(":scope > .home-empty")) {
+      const empty = document.createElement("p");
+      empty.className = "home-empty";
+      empty.textContent = "Nothing here";
+      panel.appendChild(empty);
+    }
+  }
+
+  function todoFromRow(child) {
+    const id = child.getAttribute?.("data-todo-id");
+    if (!id) return null;
+    return findTodoById(id, {
+      classId: child.getAttribute("data-todo-class-id") || null,
+      projectId: child.getAttribute("data-todo-project-id") || null,
+    });
+  }
+
+  function insertTodoRowSorted(list, row, todo, isDone) {
+    if (isDone) {
+      const current = [];
+      for (const child of list.children) {
+        if (child === row) continue;
+        const other = todoFromRow(child);
+        if (other) current.push(other);
+      }
+      if (todo) current.push(todo);
+      const ordered = sortCompletedTodos(current);
+      const want = todoListKey(todo);
+      const index = ordered.findIndex((t) => todoListKey(t) === want);
+      const next = index >= 0 ? ordered[index + 1] : null;
+      if (next) {
+        const nextKey = todoListKey(next);
+        for (const child of list.children) {
+          if (child === row) continue;
+          const other = todoFromRow(child);
+          if (other && todoListKey(other) === nextKey) {
+            list.insertBefore(row, child);
+            return;
+          }
+        }
+      }
+      list.appendChild(row);
+      return;
+    }
+
+    const key = dueSortKey(todo || {});
+    const children = [...list.children];
+    for (const child of children) {
+      if (child === row) continue;
+      const other = todoFromRow(child);
+      if (!other) continue;
+      if (key.localeCompare(dueSortKey(other)) < 0) {
+        list.insertBefore(row, child);
+        return;
+      }
+    }
+    list.appendChild(row);
+  }
+
+  function setCheckUi(root, nextDone) {
+    const check = root.matches?.("[data-todo-toggle], .home-check")
+      ? root
+      : root.querySelector?.("[data-todo-toggle], .home-check");
+    if (!check) return;
+    check.classList.toggle("is-checked", nextDone);
+    check.setAttribute("aria-pressed", String(nextDone));
+  }
+
+  function todoDomSelector(todoId, { classId = null, projectId = null } = {}) {
+    const idSel = `[data-todo-id="${CSS.escape(todoId)}"]`;
+    if (projectId) {
+      return `${idSel}[data-todo-project-id="${CSS.escape(projectId)}"]`;
+    }
+    if (classId) {
+      return `${idSel}[data-todo-class-id="${CSS.escape(classId)}"]`;
+    }
+    return `${idSel}:not([data-todo-class-id]):not([data-todo-project-id])`;
+  }
+
+  function prefersReducedMotion() {
+    return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+  }
+
+  function animateTodoRowMove(row, destList, todo, isDone) {
+    const first = prefersReducedMotion() ? null : row.getBoundingClientRect();
+    insertTodoRowSorted(destList, row, todo, isDone);
+    if (!first) return;
+    const last = row.getBoundingClientRect();
+    const dx = first.left - last.left;
+    const dy = first.top - last.top;
+    if (!dx && !dy) return;
+    row.classList.add("is-todo-animating");
+    row.style.transform = `translate(${dx}px, ${dy}px)`;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        row.style.transform = "";
+      });
+    });
+    window.setTimeout(() => {
+      row.classList.remove("is-todo-animating");
+      row.style.transform = "";
+    }, 500);
+  }
+
+  /**
+   * Update only the affected todo UI — no page rebuild, no entrance animation.
+   * @returns {boolean} whether a DOM patch was applied
+   */
+  function patchTodoDoneDom(
+    todoId,
+    nextDone,
+    { classId = null, projectId = null } = {}
+  ) {
+    if (!appEl) return false;
+
+    const sel = todoDomSelector(todoId, { classId, projectId });
+
+    // Detail page
+    const detail = appEl.querySelector(`.home-detail${sel}`);
+    if (detail) {
+      setCheckUi(detail, nextDone);
+      const status = detail.querySelector(".home-detail-status");
+      if (status) status.textContent = nextDone ? "Done" : "Open";
+      return true;
+    }
+
+    const row = appEl.querySelector(`li.home-todo${sel}`);
+    if (!row) return false;
+
+    setCheckUi(row, nextDone);
+    row.classList.toggle("is-done", nextDone);
+
+    const openPanel =
+      appEl.querySelector('[data-filter-id="lg-home-todo"]') ||
+      appEl.querySelector('[data-filter-id="lg-home-class-todo"]') ||
+      appEl.querySelector('[data-filter-id="lg-home-project-todo"]');
+    const donePanel =
+      appEl.querySelector('[data-filter-id="lg-home-completed"]') ||
+      appEl.querySelector('[data-filter-id="lg-home-class-completed"]') ||
+      appEl.querySelector('[data-filter-id="lg-home-project-completed"]');
+    if (!openPanel || !donePanel) return true;
+
+    const todo = findTodoById(todoId, { classId, projectId });
+    let linger = false;
+    if (route.view === "class" && nextDone && classId) {
+      const cls = (tree.classes || []).find((c) => c.id === classId);
+      linger = Boolean(
+        cls && !classTodoReadyForCompleted(todo, cls, tree.schedule || {})
+      );
+    }
+    const stayOpen = !nextDone || linger;
+    const targetPanel = stayOpen ? openPanel : donePanel;
+    const sourcePanel = stayOpen ? donePanel : openPanel;
+    const targetList = ensurePanelList(targetPanel);
+
+    if (row.parentElement !== targetList) {
+      animateTodoRowMove(row, targetList, todo, !stayOpen);
+      syncTodoDaySeparators(openPanel.querySelector(":scope > .home-list"));
+      syncTodoDaySeparators(donePanel.querySelector(":scope > .home-list"));
+      markPanelEmptyIfNeeded(sourcePanel);
+      if (!todoExpanded || !completedExpanded) {
+        window.setTimeout(() => render({ scroll: "keep" }), 520);
+        return true;
+      }
+    }
+    if (route.view === "class" && classId) {
+      const cls = (tree.classes || []).find((c) => c.id === classId);
+      if (cls) {
+        armClassTodoArchiveTimer(
+          cls,
+          flattenTodos(tree, { classId: cls.id })
+        );
+      }
+    }
+    return true;
+  }
+
+  function applyTodoDoneLocal(
+    todoId,
+    nextDone,
+    { classId = null, projectId = null } = {}
+  ) {
+    const wantClass = classId || null;
+    const wantProject = projectId || null;
+    const apply = (list) => {
+      const t = (list || []).find((x) => x.id === todoId);
+      if (t) {
+        t.done = nextDone;
+        if (nextDone) t.completedAt = new Date().toISOString();
+        else delete t.completedAt;
+      }
+    };
+    if (wantProject) {
+      const p = (tree.projects || []).find((x) => x.id === wantProject);
+      if (p) apply(p.todos);
+    } else if (wantClass) {
+      const c = (tree.classes || []).find((x) => x.id === wantClass);
+      if (c) {
+        apply(c.todos);
+        apply(c.classOnlyTodos);
+      }
+    } else {
+      apply(tree.todos);
+    }
+    treeFingerprint = fingerprintTree(tree);
+    rememberLocalDone(todoId, nextDone, {
+      classId: wantClass,
+      projectId: wantProject,
+    });
+  }
+
+  function doneLockKey(todoId, { classId = null, projectId = null } = {}) {
+    if (projectId) return `p/${projectId}/${todoId}`;
+    if (classId) return `${classId}/${todoId}`;
+    return String(todoId);
+  }
+
+  function rememberLocalDone(todoId, nextDone, scope) {
+    localDoneLocks.set(doneLockKey(todoId, scope), {
+      done: Boolean(nextDone),
+      at: Date.now(),
+    });
+  }
+
+  function applyLocalDoneLocks(data) {
+    if (!data || typeof data !== "object") return data;
+    const now = Date.now();
+    for (const [key, lock] of localDoneLocks) {
+      if (now - lock.at > 30_000) {
+        localDoneLocks.delete(key);
+      }
+    }
+    if (!localDoneLocks.size) return data;
+    const paint = (todo, scope) => {
+      if (!todo || typeof todo !== "object") return;
+      const key = doneLockKey(todo.id, scope);
+      const lock = localDoneLocks.get(key);
+      if (!lock) return;
+      todo.done = lock.done;
+      if (lock.done) {
+        if (!todo.completedAt) todo.completedAt = new Date().toISOString();
+      } else {
+        delete todo.completedAt;
+      }
+    };
+    for (const cls of data.classes || []) {
+      const scope = { classId: cls.id, projectId: null };
+      for (const t of cls.todos || []) paint(t, scope);
+      for (const t of cls.classOnlyTodos || []) paint(t, scope);
+    }
+    for (const t of data.todos || []) paint(t, {});
+    for (const p of data.projects || []) {
+      const scope = { classId: null, projectId: p.id };
+      for (const t of p.todos || []) paint(t, scope);
+    }
+    return data;
+  }
+
+  async function fetchData({ live = false } = {}) {
+    const mac = window.YanMacApi;
+    if (!mac) throw new Error("YanMacApi missing");
+    const r = parseRoute();
+    const qs = new URLSearchParams();
+    if (live) qs.set("live", "1");
+    if (r.view && r.view !== "home") qs.set("view", r.view);
+    if (r.itemId && (r.view === "todo" || r.view === "capsule")) {
+      qs.set("todoId", r.itemId);
+    }
+    if (r.itemId && r.view === "date") qs.set("dateId", r.itemId);
+    if (r.classId) qs.set("classId", r.classId);
+    if (r.projectId) qs.set("projectId", r.projectId);
+    const q = qs.toString();
+    const path = q ? `${API}/data?${q}` : `${API}/data`;
+    const res = await mac.macFetch(path, {
+      timeoutMs: live ? 45_000 : 30_000,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `data ${res.status}`);
+    applyLocalDoneLocks(data);
+    applyLocalVoteLocks(data);
+    const nextFp = fingerprintTree(data);
+    if (tree && nextFp === treeFingerprint) return;
+    tree = data;
+    treeFingerprint = nextFp;
+    if (data.email) userEmail = String(data.email).trim().toLowerCase();
+    applyGlassMode();
+    render();
+  }
+
+  async function toggleDone(
+    todoId,
+    nextDone,
+    { classId = null, projectId = null } = {}
+  ) {
+    // Optimistic local + surgical DOM update (no fade / no full rebuild).
+    applyTodoDoneLocal(todoId, nextDone, { classId, projectId });
+    if (!patchTodoDoneDom(todoId, nextDone, { classId, projectId })) {
+      render();
+    }
+
+    try {
+      const mac = window.YanMacApi;
+      if (!mac) throw new Error("YanMacApi missing");
+      const qs = projectId
+        ? `?projectId=${encodeURIComponent(projectId)}`
+        : classId
+          ? `?classId=${encodeURIComponent(classId)}`
+          : "";
+      const res = await mac.macFetch(
+        `${API}/todo/${encodeURIComponent(todoId)}/done${qs}`,
+        {
+          method: "PATCH",
+          json: {
+            done: nextDone,
+            ...(projectId ? { projectId } : {}),
+            ...(classId ? { classId } : {}),
+          },
+          timeoutMs: 30_000,
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `done ${res.status}`);
+    } catch (err) {
+      localDoneLocks.delete(doneLockKey(todoId, { classId, projectId }));
+      applyTodoDoneLocal(todoId, !nextDone, { classId, projectId });
+      localDoneLocks.delete(doneLockKey(todoId, { classId, projectId }));
+      if (!patchTodoDoneDom(todoId, !nextDone, { classId, projectId })) render();
+      throw err;
+    }
+  }
+
+  function applyCapsuleVoteLocal(
+    todoId,
+    capsuleId,
+    nextVote,
+    { classId = null, projectId = null } = {}
+  ) {
+    const wantClass = classId || null;
+    const wantProject = projectId || null;
+    const apply = (list) => {
+      const t = (list || []).find((x) => x.id === todoId);
+      if (!t || !Array.isArray(t.capsules)) return;
+      const cap = t.capsules.find((c) => c && String(c.id) === capsuleId);
+      if (cap) cap.vote = nextVote;
+    };
+    if (wantProject) {
+      const p = (tree.projects || []).find((x) => x.id === wantProject);
+      if (p) apply(p.todos);
+    } else if (wantClass) {
+      const c = (tree.classes || []).find((x) => x.id === wantClass);
+      if (c) {
+        apply(c.todos);
+        apply(c.classOnlyTodos);
+      }
+    } else {
+      apply(tree.todos);
+    }
+    treeFingerprint = fingerprintTree(tree);
+    rememberLocalVote(todoId, capsuleId, nextVote, {
+      classId: wantClass,
+      projectId: wantProject,
+    });
+  }
+
+  function voteLockKey(todoId, capsuleId, scope) {
+    return `${doneLockKey(todoId, scope)}/${capsuleId}`;
+  }
+
+  function rememberLocalVote(todoId, capsuleId, nextVote, scope) {
+    localVoteLocks.set(voteLockKey(todoId, capsuleId, scope), {
+      vote: nextVote || null,
+      at: Date.now(),
+    });
+  }
+
+  function applyLocalVoteLocks(data) {
+    if (!data || typeof data !== "object") return data;
+    const now = Date.now();
+    for (const [key, lock] of localVoteLocks) {
+      if (now - lock.at > 30_000) localVoteLocks.delete(key);
+    }
+    if (!localVoteLocks.size) return data;
+    const paint = (todo, scope) => {
+      if (!todo || !Array.isArray(todo.capsules)) return;
+      for (const cap of todo.capsules) {
+        if (!cap || cap.id == null) continue;
+        const lock = localVoteLocks.get(
+          voteLockKey(todo.id, String(cap.id), scope)
+        );
+        if (!lock) continue;
+        cap.vote = lock.vote;
+      }
+    };
+    for (const cls of data.classes || []) {
+      const scope = { classId: cls.id, projectId: null };
+      for (const t of cls.todos || []) paint(t, scope);
+      for (const t of cls.classOnlyTodos || []) paint(t, scope);
+    }
+    for (const t of data.todos || []) paint(t, {});
+    for (const p of data.projects || []) {
+      const scope = { classId: null, projectId: p.id };
+      for (const t of p.todos || []) paint(t, scope);
+    }
+    return data;
+  }
+
+  function patchCapsuleVoteDom(todoId, capsuleId, nextVote) {
+    if (!appEl) return false;
+    const article = appEl.querySelector(
+      `.home-detail[data-todo-id="${CSS.escape(todoId)}"] .home-capsule[data-capsule-id="${CSS.escape(
+        capsuleId
+      )}"]`
+    );
+    if (!article) return false;
+    article.querySelectorAll("[data-capsule-vote]").forEach((btn) => {
+      const value = btn.getAttribute("data-capsule-vote");
+      const on = value === nextVote;
+      btn.classList.toggle("is-on", on);
+      btn.setAttribute("aria-pressed", String(on));
+    });
+    return true;
+  }
+
+  async function setCapsuleVote(
+    todoId,
+    capsuleId,
+    nextVote,
+    { classId = null, projectId = null } = {}
+  ) {
+    const t = findTodoById(todoId, { classId, projectId });
+    const cap = (t?.capsules || []).find((c) => c && String(c.id) === capsuleId);
+    const prev = cap ? capsuleVoteKey(cap) : "";
+
+    applyCapsuleVoteLocal(todoId, capsuleId, nextVote, { classId, projectId });
+    if (!patchCapsuleVoteDom(todoId, capsuleId, nextVote)) render();
+
+    try {
+      const mac = window.YanMacApi;
+      if (!mac) throw new Error("YanMacApi missing");
+      const qs = projectId
+        ? `?projectId=${encodeURIComponent(projectId)}`
+        : classId
+          ? `?classId=${encodeURIComponent(classId)}`
+          : "";
+      const res = await mac.macFetch(
+        `${API}/todo/${encodeURIComponent(todoId)}/capsule/${encodeURIComponent(
+          capsuleId
+        )}/vote${qs}`,
+        {
+          method: "PATCH",
+          json: {
+            vote: nextVote || null,
+            ...(projectId ? { projectId } : {}),
+            ...(classId ? { classId } : {}),
+          },
+          timeoutMs: 30_000,
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `vote ${res.status}`);
+    } catch (err) {
+      const key = voteLockKey(todoId, capsuleId, { classId, projectId });
+      localVoteLocks.delete(key);
+      applyCapsuleVoteLocal(todoId, capsuleId, prev || null, {
+        classId,
+        projectId,
+      });
+      localVoteLocks.delete(key);
+      if (!patchCapsuleVoteDom(todoId, capsuleId, prev || null)) render();
+      throw err;
+    }
+  }
+
+  function isUnmodifiedLeftClick(event) {
+    return (
+      event.button === 0 &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.shiftKey &&
+      !event.altKey
+    );
+  }
+
+  function bindAppClicks() {
+    appEl?.addEventListener("click", (event) => {
+      const t = /** @type {HTMLElement} */ (event.target);
+
+      const projectsToggle = t.closest?.("[data-projects-expand]");
+      if (projectsToggle) {
+        event.preventDefault();
+        projectsExpanded = !projectsExpanded;
+        render();
+        return;
+      }
+
+      const datesToggle = t.closest?.("[data-dates-expand]");
+      if (datesToggle) {
+        event.preventDefault();
+        datesExpanded = !datesExpanded;
+        render();
+        return;
+      }
+
+      const homeCommentsToggle = t.closest?.("[data-home-comments-expand]");
+      if (homeCommentsToggle) {
+        event.preventDefault();
+        homeCommentsExpanded = !homeCommentsExpanded;
+        render();
+        return;
+      }
+
+      const projectCommentsToggle = t.closest?.("[data-project-comments-expand]");
+      if (projectCommentsToggle) {
+        event.preventDefault();
+        projectCommentsExpanded = !projectCommentsExpanded;
+        render();
+        return;
+      }
+
+      const commentsToggle = t.closest?.("[data-comments-expand]");
+      if (commentsToggle) {
+        event.preventDefault();
+        classCommentsExpanded = !classCommentsExpanded;
+        render();
+        return;
+      }
+
+      const todosToggle = t.closest?.("[data-todos-expand]");
+      if (todosToggle) {
+        event.preventDefault();
+        todoExpanded = !todoExpanded;
+        render();
+        return;
+      }
+
+      const completedToggle = t.closest?.("[data-completed-expand]");
+      if (completedToggle) {
+        event.preventDefault();
+        completedExpanded = !completedExpanded;
+        render();
+        return;
+      }
+
+      const voteChip = t.closest?.("[data-capsule-vote]");
+      if (voteChip) {
+        event.preventDefault();
+        event.stopPropagation();
+        const row = voteChip.closest("[data-todo-id]");
+        const todoId = row?.getAttribute("data-todo-id");
+        const capsuleId = voteChip.getAttribute("data-capsule-id");
+        const value = voteChip.getAttribute("data-capsule-vote");
+        if (!todoId || !capsuleId || !value) return;
+        const classId = row?.getAttribute("data-todo-class-id") || null;
+        const projectId = row?.getAttribute("data-todo-project-id") || null;
+        const on = voteChip.classList.contains("is-on");
+        const next = on ? null : value;
+        setCapsuleVote(todoId, capsuleId, next, { classId, projectId }).catch(
+          (err) => console.error("[edu vote]", err)
+        );
+        return;
+      }
+
+      const dateFilterChip = t.closest?.(".home-filter:not(.debate-switch-link)");
+      if (dateFilterChip?.querySelector("input[data-date-filter]")) {
+        event.preventDefault();
+        const input = dateFilterChip.querySelector("input[data-date-filter]");
+        const key = input?.getAttribute("data-date-filter");
+        if (!key) return;
+        if (dateFilter.has(key)) dateFilter.delete(key);
+        else dateFilter.add(key);
+        if (dateFilter.size === 0) DATE_FILTERS_HOME.forEach((x) => dateFilter.add(x));
+        saveDateFilters();
+        render();
+        return;
+      }
+
+      const filterChip = t.closest?.(".home-filter:not(.debate-switch-link)");
+      if (filterChip) {
+        event.preventDefault();
+        const input = filterChip.querySelector("input[data-filter]");
+        const key = input?.getAttribute("data-filter");
+        if (!key) return;
+        if (typeFilter.has(key)) typeFilter.delete(key);
+        else typeFilter.add(key);
+        if (typeFilter.size === 0) TAGS.forEach((x) => typeFilter.add(x));
+        saveFilters();
+        render();
+        return;
+      }
+
+      const toggle = t.closest?.("[data-todo-toggle]");
+      if (toggle) {
+        event.preventDefault();
+        event.stopPropagation();
+        const row = toggle.closest("[data-todo-id]");
+        const id = row?.getAttribute("data-todo-id");
+        if (!id) return;
+        const classId = row?.getAttribute("data-todo-class-id") || null;
+        const projectId = row?.getAttribute("data-todo-project-id") || null;
+        const next = !toggle.classList.contains("is-checked");
+        toggleDone(id, next, { classId, projectId }).catch((err) =>
+          console.error("[edu done]", err)
+        );
+        return;
+      }
+
+      const folderBtn = t.closest?.("[data-home-folder]");
+      if (folderBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        const key = folderBtn.getAttribute("data-home-folder");
+        if (!key) return;
+        const wrap = folderBtn.closest(".home-file-folder-wrap");
+        const kids = wrap?.querySelector(":scope > .home-file-folder-children");
+        const open = folderBtn.getAttribute("aria-expanded") === "true";
+        if (open) {
+          expandedFolders.delete(key);
+          folderBtn.setAttribute("aria-expanded", "false");
+          if (kids) kids.hidden = true;
+        } else {
+          expandedFolders.add(key);
+          folderBtn.setAttribute("aria-expanded", "true");
+          if (kids) kids.hidden = false;
+        }
+        queueMicrotask(() => window.reinitLiquidGlass?.());
+        return;
+      }
+
+      const officeBtn = t.closest?.("[data-home-office]");
+      if (officeBtn) {
+        if (!isUnmodifiedLeftClick(event)) return;
+        event.preventDefault();
+        const uri = officeBtn.getAttribute("data-home-office");
+        if (uri) window.location.assign(uri);
+        return;
+      }
+
+      const fileBtn = t.closest?.("[data-home-file]");
+      if (fileBtn) {
+        if (!isUnmodifiedLeftClick(event)) return;
+        const qs = fileBtn.getAttribute("data-home-file");
+        // Pictures follow the link. The new tab's address is the file itself,
+        // so dragging that picture into another tab still shows it.
+        if (qs && isRasterImageName(fileQueryName(qs))) return;
+        const name = qs ? fileQueryName(qs) : "";
+        const shouldDownload =
+          window.YLFileQuery?.contextFileShouldDownload?.(name) === true;
+        // PDF and HTML open a copy. The blank tab has to start in this click.
+        // After the file fetch, the browser treats window.open as a popup and
+        // drops it, so the click looks dead. Cmd-click still uses the link.
+        if (!shouldDownload) {
+          const tab = window.open("about:blank", "_blank");
+          if (!tab) return;
+          event.preventDefault();
+          if (qs) openContextFile(qs, tab, fileBtn.href);
+          else closeFileTab(tab);
+          return;
+        }
+        event.preventDefault();
+        if (qs) openContextFile(qs, null);
+        return;
+      }
+
+      const link = t.closest?.("a.home-row-link, a.home-back, a.home-capsule-link, a.home-comment-todo");
+      if (link && link instanceof HTMLAnchorElement) {
+        const href = link.getAttribute("href") || "";
+        if (
+          link.hasAttribute("data-home-portal") &&
+          isUnmodifiedLeftClick(event)
+        ) {
+          event.preventDefault();
+          assignProjectPortal(href);
+          return;
+        }
+        if (isSpaHref(href) && isUnmodifiedLeftClick(event)) {
+          event.preventDefault();
+          navigate(href, {
+            scroll: link.classList.contains("home-back") ? "restore" : "top",
+          });
+        }
+      }
+    });
+  }
+
+  /**
+   * Chat transcripts and drafts live under the watched user folder, but /data
+   * never reads them. Typing saved a draft, and every save refetched the
+   * whole tree twice. Agent status events skip it too: files the agent edits
+   * fire their own watch event, and a finished run calls __homeRefresh.
+   */
+  function chatOnlyChange(payload) {
+    const p = payload && typeof payload === "object" ? payload : {};
+    const source = String(p.source || "");
+    if (source === "drafts") return true;
+    if (source === "agent" && p.status !== "idle") return true;
+    const path = String(p.path || "").replace(/^\.?\//, "");
+    return path.startsWith(".chat-history") || path.startsWith(".chat-drafts");
+  }
+
+  let fetchTimer = 0;
+  /** @type {Promise<void>|null} */
+  let fetchInflight = null;
+  let fetchAgain = false;
+  /** Collapse event bursts into one /data request, never two at once. */
+  function scheduleFetchData() {
+    window.clearTimeout(fetchTimer);
+    fetchTimer = window.setTimeout(() => {
+      fetchTimer = 0;
+      if (fetchInflight) {
+        fetchAgain = true;
+        return;
+      }
+      fetchInflight = fetchData()
+        .catch((err) => console.error("[edu refresh]", err))
+        .finally(() => {
+          fetchInflight = null;
+          if (fetchAgain) {
+            fetchAgain = false;
+            scheduleFetchData();
+          }
+        });
+    }, 250);
+  }
+
+  function subscribeEvents() {
+    const mac = window.YanMacApi;
+    if (!mac) return;
+    mac.subscribeEvents(`${API}/events`, {
+      onEvent: (name, data) => {
+        if (name !== "change") return;
+        try {
+          const parsed = JSON.parse(data || "{}");
+          if (parsed?.navigate) applyHomeNavigate(parsed.navigate);
+        } catch {
+          /* ignore bad SSE JSON */
+        }
+      },
+      onChange: (payload) => {
+        if (!chatOnlyChange(payload)) scheduleFetchData();
+        // Same SSE path refreshes the floating home chat (agent reply / status).
+        try {
+          window.__homeChatRefresh?.(payload);
+        } catch (err) {
+          console.warn("[edu chat refresh]", err);
+        }
+      },
+      onError: (err) => console.warn("[edu sse]", err),
+    });
+    // Polling fallback while page is open (hits Mac, not Vercel)
+    window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      scheduleFetchData();
+      try {
+        window.__homeChatRefresh?.();
+      } catch {
+        /* ignore */
+      }
+    }, 45_000);
+  }
+
+  window.addEventListener("popstate", () => {
+    captureScroll();
+    route = parseRoute();
+    render({ scroll: "restore" });
+    maybeTouchProjectOpened();
+    fetchData({ live: true }).catch((err) => console.error("[edu live]", err));
+  });
+
+  async function boot() {
+    show("loading");
+    let signedIn = false;
+    try {
+      const res = await fetch("/api/auth/session", {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.authenticated) {
+        show("login");
+        return;
+      }
+      signedIn = true;
+      const allowed = Array.isArray(CFG.allowedAccess) ? CFG.allowedAccess : ["full"];
+      if (!allowed.includes(data.access)) {
+        show("denied");
+        return;
+      }
+      userEmail = String(data.email || "")
+        .trim()
+        .toLowerCase();
+      applyGlassMode();
+      const allowedEmails = (Array.isArray(CFG.allowedEmails) ? CFG.allowedEmails : [])
+        .map((e) => String(e || "").trim().toLowerCase())
+        .filter(Boolean);
+      if (allowedEmails.length && !allowedEmails.includes(userEmail)) {
+        show("denied");
+        return;
+      }
+      if (CFG.title) document.title = CFG.title;
+      bindAppClicks();
+      await fetchData();
+      maybeTouchProjectOpened();
+      subscribeEvents();
+      fetchData({ live: true }).catch((err) => console.error("[edu live]", err));
+      if (window.location.pathname === BASE) {
+        navigate(spaHome(), { replace: true, scroll: "keep" });
+      }
+      show("full");
+    } catch (err) {
+      console.error("[edu boot]", err);
+      if (!signedIn) {
+        show("login");
+        return;
+      }
+      const loading = document.getElementById("stage-loading");
+      if (loading) {
+        loading.textContent = "Couldn't load your classes. Refresh the page.";
+        loading.setAttribute("aria-busy", "false");
+      }
+      show("loading");
+    }
+  }
+
+  // Expose refresh for chatbot after agent turns
+  window.__homeRefresh = () => scheduleFetchData();
+  window.__homeNavigate = (target) => applyHomeNavigate(target);
+  window.__homeNavigatePath = (href) => applyHomeNavigatePath(href);
+  window.__homeUserEmail = () =>
+    String(userEmail || tree?.email || "")
+      .trim()
+      .toLowerCase();
+
+  /** Page context for the Personal Agent (home / class / project / todo / date). */
+  window.__homeUiContext = () => {
+    const r = route || parseRoute();
+    /** @type {Record<string, unknown>} */
+    const ctx = {
+      client: "web",
+      path: window.location.pathname + window.location.search,
+      view: r.view || "home",
+    };
+    if (CFG.workspace) ctx.workspace = CFG.workspace;
+    if (CFG.site) ctx.site = String(CFG.site);
+    if (r.view === "class" && r.classId) {
+      const cls = (tree?.classes || []).find((c) => c.id === r.classId);
+      ctx.classId = r.classId;
+      if (cls?.name) ctx.className = cls.name;
+      if (cls?.period) ctx.period = String(cls.period).toUpperCase();
+      if (cls?.freePeriod) ctx.freePeriod = true;
+      ctx.title = cls?.name || r.classId;
+    } else if (r.view === "project" && r.projectId) {
+      const project = (tree?.projects || []).find((p) => p.id === r.projectId);
+      ctx.projectId = r.projectId;
+      if (project?.name) ctx.projectName = project.name;
+      ctx.title = project?.name || r.projectId;
+    } else if (r.view === "todo" && r.itemId) {
+      const t = findTodoById(r.itemId, {
+        classId: r.classId,
+        projectId: r.projectId,
+      });
+      ctx.todoId = r.itemId;
+      if (t?.name) ctx.todoName = t.name;
+      if (t?.tag) ctx.tag = t.tag;
+      if (typeof t?.done === "boolean") ctx.done = t.done;
+      const projectId = t?.projectId || r.projectId;
+      const classId = t?.classId || r.classId;
+      if (projectId) {
+        ctx.projectId = projectId;
+        const project = (tree?.projects || []).find((p) => p.id === projectId);
+        if (project?.name) ctx.projectName = project.name;
+      } else if (classId) {
+        ctx.classId = classId;
+        const cls = (tree?.classes || []).find((c) => c.id === classId);
+        if (cls?.name) ctx.className = cls.name;
+        if (cls?.period) ctx.period = String(cls.period).toUpperCase();
+      }
+      ctx.title = t?.name || r.itemId;
+    } else if (r.view === "capsule" && r.itemId) {
+      const t = findTodoById(r.itemId, {
+        classId: r.classId,
+        projectId: r.projectId,
+      });
+      const cap = (t?.capsules || []).find(
+        (c) => c && String(c.id) === String(r.capsuleId || "")
+      );
+      ctx.todoId = r.itemId;
+      if (t?.name) ctx.todoName = t.name;
+      if (r.capsuleId) ctx.capsuleId = r.capsuleId;
+      if (cap?.title) ctx.capsuleTitle = cap.title;
+      if (cap?.category) ctx.capsuleCategory = String(cap.category);
+      const body = String(cap?.body || "").trim();
+      if (body) ctx.capsuleBody = body;
+      const citeText = formatCapsuleCitationsText(cap);
+      if (citeText) ctx.capsuleCitations = citeText;
+      const projectId = t?.projectId || r.projectId;
+      const classId = t?.classId || r.classId;
+      if (projectId) {
+        ctx.projectId = projectId;
+        const project = (tree?.projects || []).find((p) => p.id === projectId);
+        if (project?.name) ctx.projectName = project.name;
+      } else if (classId) {
+        ctx.classId = classId;
+        const cls = (tree?.classes || []).find((c) => c.id === classId);
+        if (cls?.name) ctx.className = cls.name;
+        if (cls?.period) ctx.period = String(cls.period).toUpperCase();
+      }
+      ctx.title = cap?.title || r.capsuleId || r.itemId;
+    } else if (r.view === "date" && r.itemId) {
+      const d = findDateById(r.itemId, {
+        classId: r.classId,
+        projectId: r.projectId,
+      });
+      ctx.dateId = r.itemId;
+      if (d?.name) ctx.dateName = d.name;
+      if (d?.date) ctx.date = d.date;
+      const projectId = d?.projectId || r.projectId;
+      const classId = d?.classId || r.classId;
+      if (projectId) {
+        ctx.projectId = projectId;
+        const project = (tree?.projects || []).find((p) => p.id === projectId);
+        if (project?.name) ctx.projectName = project.name;
+      } else if (classId) {
+        ctx.classId = classId;
+        const cls = (tree?.classes || []).find((c) => c.id === classId);
+        if (cls?.name) ctx.className = cls.name;
+        if (cls?.period) ctx.period = String(cls.period).toUpperCase();
+      }
+      ctx.title = d?.name || r.itemId;
+    } else if (r.view === "case" && r.caseId) {
+      const c = findCaseById(r.caseId);
+      const side = r.caseSide === "neg" ? "neg" : "aff";
+      ctx.caseId = r.caseId;
+      ctx.caseSide = side;
+      if (c?.name) ctx.caseName = c.name;
+      if (c?.projectId) {
+        ctx.projectId = c.projectId;
+        if (c.projectName) ctx.projectName = c.projectName;
+      }
+      ctx.title = `${c?.name || r.caseId} · ${side === "neg" ? "Neg" : "Aff"}`;
+    } else {
+      ctx.title = !CFG.title || CFG.title === "Home" ? "Home" : `${CFG.title} home`;
+    }
+    return ctx;
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+})();

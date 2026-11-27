@@ -10,7 +10,7 @@ disable-model-invocation: true
 
 # Chat title refresh (JYPE)
 
-**Gate:** local Cursor agent only. Never spawn a cloud agent. Only rewrite `title:` lines in listed `education/projects/jype/.chat-history/<sessionId>.md` files. Do not edit messages, widgets, or personal `education/<email>/.chat-history/` files. Those use `.cursor/skills/chat-title-refresh/SKILL.md`. You will not be given those files.
+**Gate:** local Cursor agent only. Never spawn a cloud agent. Only rewrite `title:` lines in listed `home/projects/jype/.chat-history/<sessionId>.md` files. Do not edit messages, widgets, or personal `home/<email>/.chat-history/` files. Those use `.cursor/skills/chat-title-refresh/SKILL.md`. You will not be given those files.
 
 Model: **composer-2.5** (fast=false).
 

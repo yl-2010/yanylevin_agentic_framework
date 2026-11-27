@@ -10,7 +10,7 @@ import { OWNER_EMAIL } from "./identity.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const REPO_ROOT = path.resolve(__dirname, "..");
-export const EDU_ROOT = process.env.EDU_ROOT || path.join(REPO_ROOT, "education", OWNER_EMAIL);
+export const HOME_ROOT = process.env.HOME_ROOT || path.join(REPO_ROOT, "home", OWNER_EMAIL);
 // BRAIN_ROOT env override exists for tests and dry-runs against scratch copies.
 export const BRAIN_ROOT = process.env.BRAIN_ROOT || path.join(REPO_ROOT, "brain");
 
@@ -128,7 +128,7 @@ function parseFrontmatterSafe(text, filePath, problems) {
   }
 }
 
-// Lists every entity in the brain (people, groups, orgs, places, education
+// Lists every entity in the brain (people, groups, orgs, places, home
 // mirror). Files without valid frontmatter are reported in `problems`, not
 // thrown, so one bad card cannot take the graph down.
 export function listEntities() {
@@ -162,11 +162,11 @@ export function listEntities() {
     }
   }
 
-  const eduMirror = path.join(BRAIN_ROOT, "education");
+  const eduMirror = path.join(BRAIN_ROOT, "home");
   if (fs.existsSync(eduMirror)) {
     for (const filePath of walkMarkdown(eduMirror)) {
       const id = path.relative(BRAIN_ROOT, filePath).replace(/\.md$/, "");
-      const entity = readEntityFile(id, "education", filePath, problems);
+      const entity = readEntityFile(id, "home", filePath, problems);
       if (entity) entities.push(entity);
     }
   }

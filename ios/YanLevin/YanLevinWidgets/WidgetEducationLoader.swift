@@ -7,7 +7,7 @@ enum WidgetEducationLoader {
         }
         do {
             let (data, http) = try await APIClient.shared.requestRaw(
-                "api/education/data",
+                "api/home/data",
                 bearer: token
             )
             guard (200..<300).contains(http.statusCode) else {

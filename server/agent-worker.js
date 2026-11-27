@@ -5,7 +5,7 @@
  * `launchctl kickstart -k com.personalagent.server` no longer kills running turns.
  *
  *   POST /rpc     { method, args } -> personal-agent.js export
- *   GET  /events  SSE of every notifyEducationClients call in this process
+ *   GET  /events  SSE of every notifyHomeClients call in this process
  *   GET  /health
  *   POST /restart-when-idle  exit once no chat is running or queued; launchd
  *                            (KeepAlive) starts the new code. An agent can ask
@@ -173,7 +173,7 @@ export function createAgentWorkerServer({
 
 async function main() {
   const agent = await import("./personal-agent.js");
-  const { onEducationNotify } = await import("./education-events.js");
+  const { onHomeNotify } = await import("./home-events.js");
   /** @type {Record<string, (...args: any[]) => unknown>} */
   const handlers = {};
   for (const name of AGENT_WORKER_METHODS) {
@@ -182,7 +182,7 @@ async function main() {
   }
   const { server } = createAgentWorkerServer({
     handlers,
-    onNotify: onEducationNotify,
+    onNotify: onHomeNotify,
     stats: () => ({ busySessions: agent.busySessionCount() }),
     busy: () => agent.busySessionCount(),
   });

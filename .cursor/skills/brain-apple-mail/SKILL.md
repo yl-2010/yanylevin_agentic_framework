@@ -69,7 +69,7 @@ bodies.
 - Skimming a month
 - Treating the dump as empty
 - Opening dumps outside the listed /tmp files
-- Editing `people/index.md`, `people/graph.md`, or `brain/education/`
+- Editing `people/index.md`, `people/graph.md`, or `brain/home/`
 - Git commit (the Node wrapper does that)
 - Creating empty typed files
 - Carding school-Outlook-only contacts that this dump does not name

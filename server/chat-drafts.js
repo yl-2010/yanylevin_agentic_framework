@@ -10,10 +10,10 @@ import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/p
 import { basename, extname, join } from "node:path";
 import express from "express";
 import { withCloudRetry } from "./cloud-storage-io.js";
-import { sanitizeSessionId } from "./education-chat-history.js";
-import { userEducationRoot } from "./education-data.js";
+import { sanitizeSessionId } from "./home-chat-history.js";
+import { userHomeRoot } from "./home-data.js";
 import { canonicalizeEmail } from "./identity.js";
-import { notifyEducationClients } from "./education-events.js";
+import { notifyHomeClients } from "./home-events.js";
 import { normalizeJypeWorkspace } from "./jype.js";
 
 /** OneDrive File Provider returns errno -11 when overlapping reads hit a draft. */
@@ -158,14 +158,14 @@ export function guessDraftMime(mimeType, filename) {
 }
 
 /**
- * Drafts live next to .chat-history: education/<email>/ or the JYPE root.
+ * Drafts live next to .chat-history: home/<email>/ or the JYPE root.
  * JYPE history is shared by the group, but drafts stay per member.
  * @param {string} email
  * @param {unknown} [workspace]
  */
 export function chatDraftsRoot(email, workspace) {
   const ws = normalizeJypeWorkspace(workspace);
-  const root = userEducationRoot(email, { workspace: ws });
+  const root = userHomeRoot(email, { workspace: ws });
   if (!ws) return root;
   const member = canonicalizeEmail(email).replace(/[^a-z0-9@._-]/g, "_");
   return join(root, CHAT_DRAFTS_DIRNAME, "members", member || "unknown");
@@ -566,7 +566,7 @@ export function attachChatDraftRoutes(app, opts) {
 
   const rootFor = (req) => chatDraftsRoot(req.user.email, workspace);
   const notify = (req, draftId) => {
-    notifyEducationClients(req.user.email, "change", {
+    notifyHomeClients(req.user.email, "change", {
       source: "drafts",
       draftId,
       ...(workspace ? { workspace } : {}),
@@ -669,7 +669,7 @@ export async function loadMessageDraft(email, workspace, draftIdRaw) {
     consume: async () => {
       try {
         await deleteDraft(root, id);
-        notifyEducationClients(email, "change", {
+        notifyHomeClients(email, "change", {
           source: "drafts",
           draftId: id,
           ...(ws ? { workspace: ws } : {}),

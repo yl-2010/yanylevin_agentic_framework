@@ -38,7 +38,7 @@ A quiet pin is also home. The floor is 20 minutes. Farther away, the script allo
 
 A life-state sample from the last 30 minutes with place `kirkland-home` also means he is home, even if the phone dot says otherwise.
 
-Receipts go in `education/you@example.com/home/lights.json`. Names and rooms only.
+Receipts go in `home/you@example.com/home/lights.json`. Names and rooms only.
 
 ## Zones
 
@@ -52,13 +52,13 @@ At exactly 72 hours Yan is due again, so Sunny is not offered. At exactly 7 days
 
 One scene per Pacific day. A start today blocks the rest. An open warning, or a denial already recorded today, also blocks the rest of the day.
 
-School in session means a school day on `education/you@example.com/schedule.json` and the Pacific clock is inside the bells, from the first bell through the last. The last bell minute is already out. A warning only goes out when the start 15 minutes later is still inside that window.
+School in session means a school day on `home/you@example.com/schedule.json` and the Pacific clock is inside the bells, from the first bell through the last. The last bell minute is already out. A warning only goes out when the start 15 minutes later is still inside that window.
 
 Never trigger `Vacuum Yan's Rooms`.
 
 ## Vacuum state
 
-`education/you@example.com/home/vacuum.json`
+`home/you@example.com/home/vacuum.json`
 
 `zones.yan.lastStartedAt`, `zones.sunny.lastStartedAt`, and `zones.master.lastStartedAt` are the per-zone starts. A file that only has a top-level `lastStartedAt` for `Vacuum Yan` is Yan's clock. The top-level `lastStartedAt` after a new start is whichever zone just ran.
 
@@ -72,7 +72,7 @@ Read the vacuum file. Then:
 
 - Apple Calendar for the next several hours: `node server/calendar-cli.js events --from <now ISO> --to <now plus 6 hours ISO>`
 - Life state: `node server/life-state.js now` and `node server/life-state.js recent 6`
-- On a school day, today's classes in `education/you@example.com/schedule.json`
+- On a school day, today's classes in `home/you@example.com/schedule.json`
 
 The phone pin gates `Vacuum Yan` only. A pin at the house, a missing pin, or a pin that is not clearly away means his rooms wait. It does not block Sunny or the master rooms. Those get the warning either way.
 

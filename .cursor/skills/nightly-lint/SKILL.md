@@ -20,11 +20,11 @@ duplicated, and the cursors moved. You fix structure, not content.
 - Scope: files touched tonight (git status shows them) plus anything the
   earlier phases flagged in their replies.
 - The runner regenerates `people/index.md`, `people/graph.md`, and the
-  education mirror after you finish; never edit those by hand. If
+  home mirror after you finish; never edit those by hand. If
   `node server/brain-graph.js --check` reports problems, fix the underlying
   entity files: frontmatter that does not parse, dangling edge targets. If
   the root cause is serializer or graph tooling, fix the `server/brain*.js`
-  file. The runner commits `server/` with tonight's education tree. Do not
+  file. The runner commits `server/` with tonight's home tree. Do not
   leave that edit uncommitted.
 - Run `node server/brain-glossary.js --check`. If the index is stale, run
   `node server/brain-glossary.js --write-index`. If a glossary file breaks

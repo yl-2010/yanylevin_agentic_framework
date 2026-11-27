@@ -32,12 +32,12 @@ import {
   locationHistoryDir,
   readLocationHistoryState,
 } from "./phone-location.js";
-import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { YAN_HOME_DIR } from "./onedrive-projects.js";
 
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = "/tmp/yanylevin-location-brain.lock";
-const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
+const META_PATH = join(YAN_HOME_DIR, "daily-briefing", "meta.json");
 const LOCK_STALE_MS = 90 * 60 * 1000;
 const SYNTHESIS_WAIT_MS = 90 * 60 * 1000;
 const WAIT_POLL_MS = 5000;

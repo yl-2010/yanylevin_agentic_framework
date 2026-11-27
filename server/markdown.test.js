@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { render } = require("../education/markdown.js");
+const { render } = require("../home/markdown.js");
 
 describe("YLMarkdown.render", () => {
   it("escapes raw HTML", () => {
@@ -21,9 +21,9 @@ describe("YLMarkdown.render", () => {
     assert.match(html, /rel="noopener noreferrer"/);
   });
 
-  it("keeps /education links in-app without a new tab", () => {
-    const html = render(`[todo](/education/todo/essay?class=am-lit)`);
-    assert.match(html, /href="\/education\/todo\/essay\?class=am-lit"/);
+  it("keeps /home links in-app without a new tab", () => {
+    const html = render(`[todo](/home/todo/essay?class=am-lit)`);
+    assert.match(html, /href="\/home\/todo\/essay\?class=am-lit"/);
     assert.doesNotMatch(html, /target="_blank"/);
   });
 

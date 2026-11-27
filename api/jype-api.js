@@ -88,7 +88,7 @@ function readJsonBody(req) {
  * @param {import('http').ServerResponse} res
  * @param {{ method: string, path: string, body?: object|null, timeoutMs?: number, sse?: boolean, binary?: boolean }} opts
  */
-async function forwardEducation(req, res, opts) {
+async function forwardHome(req, res, opts) {
   res.setHeader("Cache-Control", "no-store");
 
   const secret = getAuthSecret();
@@ -243,7 +243,7 @@ module.exports = async function handler(req, res) {
 
     const celebrationSign = /^celebration\/([^/]+)\/sign$/.exec(route);
     if (celebrationSign && method === "POST") {
-      await forwardEducation(req, res, {
+      await forwardHome(req, res, {
         method: "POST",
         path: `/api/jype/celebration/${encodeURIComponent(celebrationSign[1])}/sign`,
         body: {},
@@ -258,7 +258,7 @@ module.exports = async function handler(req, res) {
         res.status(405).json({ ok: false, error: "method not allowed" });
         return;
       }
-      await forwardEducation(req, res, {
+      await forwardHome(req, res, {
         method: "GET",
         path: "/api/jype/data",
         timeoutMs: 30_000,
@@ -272,7 +272,7 @@ module.exports = async function handler(req, res) {
         res.status(405).json({ ok: false, error: "method not allowed" });
         return;
       }
-      await forwardEducation(req, res, {
+      await forwardHome(req, res, {
         method: "GET",
         path: "/api/jype/events",
         timeoutMs: 290_000,
@@ -294,7 +294,7 @@ module.exports = async function handler(req, res) {
         if (val != null && String(val).trim() !== "") q.set(key, String(val));
       }
       const qs = q.toString();
-      await forwardEducation(req, res, {
+      await forwardHome(req, res, {
         method: "GET",
         path: `/api/jype/file${qs ? `?${qs}` : ""}`,
         timeoutMs: 120_000,
@@ -310,7 +310,7 @@ module.exports = async function handler(req, res) {
         res.status(405).json({ ok: false, error: "method not allowed" });
         return;
       }
-      await forwardEducation(req, res, {
+      await forwardHome(req, res, {
         method: "POST",
         path: `/api/jype/project/${encodeURIComponent(projectOpened[1])}/opened`,
         body: {},
@@ -337,7 +337,7 @@ module.exports = async function handler(req, res) {
       const qs = classId
         ? `?classId=${encodeURIComponent(classId)}`
         : "";
-      await forwardEducation(req, res, {
+      await forwardHome(req, res, {
         method: "PATCH",
         path: `/api/jype/todo/${encodeURIComponent(id)}/done${qs}`,
         body: {
@@ -362,7 +362,7 @@ module.exports = async function handler(req, res) {
         if (val != null && String(val).trim() !== "") q.set(key, String(val));
       }
       const qs = q.toString();
-      await forwardEducation(req, res, {
+      await forwardHome(req, res, {
         method: "GET",
         path: `/api/jype/agent/file${qs ? `?${qs}` : ""}`,
         timeoutMs: 120_000,
@@ -377,7 +377,7 @@ module.exports = async function handler(req, res) {
         res.status(405).json({ ok: false, error: "method not allowed" });
         return;
       }
-      await forwardEducation(req, res, {
+      await forwardHome(req, res, {
         method: "POST",
         path: "/api/jype/agent/start",
         body: {},
@@ -408,7 +408,7 @@ module.exports = async function handler(req, res) {
         forwardBody.interrupt = true;
       }
       // Agent run is async on Mac; this only stages + returns 202.
-      await forwardEducation(req, res, {
+      await forwardHome(req, res, {
         method: "POST",
         path: "/api/jype/agent/message",
         body: forwardBody,
@@ -424,7 +424,7 @@ module.exports = async function handler(req, res) {
         return;
       }
       const body = await readJsonBody(req);
-      await forwardEducation(req, res, {
+      await forwardHome(req, res, {
         method: "POST",
         path: "/api/jype/agent/interrupt-queued",
         body: {
@@ -446,7 +446,7 @@ module.exports = async function handler(req, res) {
       const qs = sessionId
         ? `?sessionId=${encodeURIComponent(sessionId)}`
         : "";
-      await forwardEducation(req, res, {
+      await forwardHome(req, res, {
         method: "GET",
         path: `/api/jype/agent/state${qs}`,
         timeoutMs: 15_000,
@@ -460,7 +460,7 @@ module.exports = async function handler(req, res) {
         res.status(405).json({ ok: false, error: "method not allowed" });
         return;
       }
-      await forwardEducation(req, res, {
+      await forwardHome(req, res, {
         method: "GET",
         path: "/api/jype/agent/active",
         timeoutMs: 15_000,
@@ -474,7 +474,7 @@ module.exports = async function handler(req, res) {
         res.status(405).json({ ok: false, error: "method not allowed" });
         return;
       }
-      await forwardEducation(req, res, {
+      await forwardHome(req, res, {
         method: "GET",
         path: "/api/jype/agent/running",
         timeoutMs: 15_000,
@@ -488,7 +488,7 @@ module.exports = async function handler(req, res) {
         res.status(405).json({ ok: false, error: "method not allowed" });
         return;
       }
-      await forwardEducation(req, res, {
+      await forwardHome(req, res, {
         method: "GET",
         path: "/api/jype/agent/chats",
         timeoutMs: 30_000,
@@ -503,7 +503,7 @@ module.exports = async function handler(req, res) {
         return;
       }
       const body = await readJsonBody(req);
-      await forwardEducation(req, res, {
+      await forwardHome(req, res, {
         method: "POST",
         path: "/api/jype/agent/resume",
         body: { sessionId: body?.sessionId },
@@ -519,7 +519,7 @@ module.exports = async function handler(req, res) {
         return;
       }
       const body = await readJsonBody(req);
-      await forwardEducation(req, res, {
+      await forwardHome(req, res, {
         method: "POST",
         path: "/api/jype/agent/read",
         body: { sessionId: body?.sessionId },
@@ -535,7 +535,7 @@ module.exports = async function handler(req, res) {
         return;
       }
       const body = await readJsonBody(req);
-      await forwardEducation(req, res, {
+      await forwardHome(req, res, {
         method: "POST",
         path: "/api/jype/agent/stop",
         body: { sessionId: body?.sessionId },

@@ -162,7 +162,7 @@ final class ChatDraftStore: ObservableObject {
     private var cancelledUploads: Set<UUID> = []
 
     private var prefix: String {
-        workspace == "jype" ? "api/jype/agent" : "api/education/agent"
+        workspace == "jype" ? "api/jype/agent" : "api/home/agent"
     }
 
     func draft(id: String?) -> ChatDraft? {

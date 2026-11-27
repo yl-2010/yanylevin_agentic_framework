@@ -181,7 +181,7 @@ final class LiveActivityCoordinator {
         let gen = agentSyncGeneration
         do {
             let res: RunningAgentsResponse = try await APIClient.shared.request(
-                "api/education/agent/running",
+                "api/home/agent/running",
                 bearer: token
             )
             guard gen == agentSyncGeneration else { return }

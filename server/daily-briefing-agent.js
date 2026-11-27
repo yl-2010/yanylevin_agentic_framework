@@ -18,7 +18,7 @@ import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { gitAddCommitPush } from "./git-publish.js";
-import { scheduleNowParts, scheduleTodayKey } from "./education-data.js";
+import { scheduleNowParts, scheduleTodayKey } from "./home-data.js";
 import { zonedLocalToUtc } from "./local-clock.js";
 
 export { zonedLocalToUtc };
@@ -61,9 +61,9 @@ import { SERVER_LOG_PATH } from "./service-logs.js";
 export { SERVER_LOG_PATH };
 /** Global unslop skill. Phase 3 reads it; never inline into prompts. */
 export const UNSLOP_SKILL_PATH = join(homedir(), ".cursor/skills/unslop/SKILL.md");
-import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { YAN_HOME_DIR } from "./onedrive-projects.js";
 
-export const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
+export const META_PATH = join(YAN_HOME_DIR, "daily-briefing", "meta.json");
 export const BRIEFING_REPO_ROOT = REPO_ROOT;
 
 /**
@@ -109,7 +109,7 @@ export function agentRecapDraftPath(dateKey) {
 export const BRIEFING_NEWS_MODEL_SPEC = {
   id:
     process.env.CURSOR_PERSONAL_ATTACHMENT_MODEL ||
-    process.env.CURSOR_EDUCATION_ATTACHMENT_MODEL ||
+    process.env.CURSOR_HOME_ATTACHMENT_MODEL ||
     "grok-4.7",
   params: [
     { id: "context", value: "256k" },
@@ -250,7 +250,7 @@ export function briefingFolderId(dateKey) {
 
 export function briefingTodoPath(dateKey) {
   return join(
-    YAN_EDUCATION_DIR,
+    YAN_HOME_DIR,
     "todos",
     briefingFolderId(dateKey),
     "todo.json"
@@ -409,11 +409,11 @@ async function tailServerLogLines(dateKey, maxLines = 200) {
 /**
  * @param {string} dateKey
  */
-async function recentEducationCommits(dateKey) {
+async function recentHomeCommits(dateKey) {
   try {
     const { stdout } = await execFileAsync(
       "git",
-      ["log", "--oneline", "-25", "--grep", dateKey, "--", "education/"],
+      ["log", "--oneline", "-25", "--grep", dateKey, "--", "home/"],
       { cwd: REPO_ROOT, maxBuffer: 256 * 1024 }
     );
     return String(stdout || "")
@@ -444,14 +444,14 @@ export async function prefetchNightlyStatus(dateKey, timezone, outPath = NIGHTLY
 
   const brainStatePath = join(
     REPO_ROOT,
-    "education",
+    "home",
     BRIEFING_EMAIL,
     "brain",
     "state.json"
   );
   const locationStatePath = join(
     REPO_ROOT,
-    "education",
+    "home",
     BRIEFING_EMAIL,
     "location",
     "state.json"
@@ -463,7 +463,7 @@ export async function prefetchNightlyStatus(dateKey, timezone, outPath = NIGHTLY
   const journalKey = addDaysToDateKey(dateKey, -1);
   const journalPath = join(
     REPO_ROOT,
-    "education",
+    "home",
     BRIEFING_EMAIL,
     "brain",
     "journal",
@@ -587,7 +587,7 @@ export async function prefetchNightlyStatus(dateKey, timezone, outPath = NIGHTLY
     brainNotes: brainState?.notes || {},
     brainCursors: brainState?.cursors || {},
     serverLogTail: await tailServerLogLines(dateKey),
-    gitCommits: await recentEducationCommits(dateKey),
+    gitCommits: await recentHomeCommits(dateKey),
     lifeState: await assessLifeStateHeartbeat(),
     healthShortcut: await assessHealthShortcutHeartbeat(),
   };
@@ -699,7 +699,7 @@ export function buildUnslopPrompt({ dateKey, timezone, force, dueTime }) {
     `Read and apply the unslop skill (${UNSLOP_SKILL_PATH}). Do not inline the whole skill.`,
     `Read ${draft} and ${recap}. Unslop news capsule titles and bodies plus the agent recap body. Do not remove an URGENT bullet. Phase 2 kept it because the failure is still open.`,
     `If ${draft} is missing, do not copy yesterday's todo news. Stop and say the news draft is missing.`,
-    `Write ${YAN_EDUCATION_DIR}/todos/${dateKey}-daily-briefing/todo.json:`,
+    `Write ${YAN_HOME_DIR}/todos/${dateKey}-daily-briefing/todo.json:`,
     `Title like "August 12th Daily Briefing". kind dailyBriefing. dueDate ${dateKey}, dueTime ${dueTime}. showInDates false. done false. createdAt is now, not a copy of yesterday.`,
     "capsules: agent-recap first (from agent recap draft, keep noVote true), then ~10 news capsules. Do not add an AP Study capsule. Code inserts that after the recap. Top-level citations from news draft only, alphabetical by name.",
     "Capsule thumbs are 3-way: up, down, null (neutral). Agent recap has noVote and no citations.",
@@ -869,8 +869,8 @@ async function runDailyBriefingOnce({ force = false, dateKey: dateKeyOpt, runner
     );
 
     await gitAddCommitPush({
-      paths: [YAN_EDUCATION_DIR],
-      message: `education: ${dateKey} daily briefing`,
+      paths: [YAN_HOME_DIR],
+      message: `home: ${dateKey} daily briefing`,
     });
 
     const exists = await briefingExists(dateKey);

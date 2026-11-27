@@ -1,6 +1,6 @@
 import Foundation
 
-/// Natural due/event phrasing matching `/education` `formatNaturalWhen`.
+/// Natural due/event phrasing matching `/home` `formatNaturalWhen`.
 enum NaturalWhen {
     private static let weekdaysShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
     private static let weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
@@ -57,7 +57,7 @@ enum NaturalWhen {
     }
 
     /// Class-detail subtitle: “11:10–11:40 today”, “11:10–11:40 on Sept 2nd”, …
-    /// Port of `formatNextClassWhen` in education/app.js.
+    /// Port of `formatNextClassWhen` in home/app.js.
     static func formatNextClassWhen(
         dateKey: String?,
         start: String?,

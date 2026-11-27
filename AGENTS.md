@@ -4,7 +4,7 @@ How this repo operates. `SOUL.md` is persona. Do not put operator life facts in 
 
 ## Git
 
-Work on `main`. Do not commit `server/.env`, tokens, Health dumps, chat history, or `education/*/brain/people/`.
+Work on `main`. Do not commit `server/.env`, tokens, Health dumps, chat history, or `home/*/brain/people/`.
 
 ## Open-source origin
 
@@ -23,7 +23,7 @@ Plist names in `deploy/launchagents/` are templates. Rename the label to match w
 
 ## Operator identity
 
-`OWNER_EMAIL` in `server/.env` is the one allowlisted account. Education and fitness data live under `education/<that email>/` and `fitness/<that email>/`.
+`OWNER_EMAIL` in `server/.env` is the one allowlisted account. Home and fitness data live under `home/<that email>/` and `fitness/<that email>/`.
 
 ## Unslop
 

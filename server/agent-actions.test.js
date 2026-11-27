@@ -103,12 +103,12 @@ describe("agent action log", () => {
         false
       );
       assert.equal(isFolderChange("Sent mail to Alex"), false);
-      assert.equal(isDashboardAction("education-date", "nightly-actions", "Added Fall orientation"), false);
+      assert.equal(isDashboardAction("home-date", "nightly-actions", "Added Fall orientation"), false);
       assert.equal(
-        isDashboardAction("education-date", "nightly-actions", "Updated fall parent-teacher conferences"),
+        isDashboardAction("home-date", "nightly-actions", "Updated fall parent-teacher conferences"),
         false
       );
-      assert.equal(isDashboardAction("education-todo", "nightly-actions", "Added Register for AP tests"), false);
+      assert.equal(isDashboardAction("home-todo", "nightly-actions", "Added Register for AP tests"), false);
       const dropped = await appendAgentAction(
         {
           agent: "jype",
@@ -182,7 +182,7 @@ describe("agent action log", () => {
         `${JSON.stringify({
           at: "2026-10-23T10:06:59.279Z",
           agent: "nightly-actions",
-          kind: "education-date",
+          kind: "home-date",
           summary: "Updated fall parent-teacher conferences",
         })}\n`,
         "utf8"
@@ -191,7 +191,7 @@ describe("agent action log", () => {
         {
           at: "2026-10-24T10:00:00.000Z",
           agent: "nightly-actions",
-          kind: "education-date",
+          kind: "home-date",
           summary: "Added Fall orientation",
         },
         { path }

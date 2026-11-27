@@ -16,7 +16,7 @@ description: >-
 
 A public static site for one accomplishment. Study guides use `.cursor/skills/yanylevin-webpage-create/SKILL.md`. This skill leaves that chrome behind.
 
-Yan and the JYPE agent write the public folder. Alex's personal agent stays inside `education/you@example.com/`.
+Yan and the JYPE agent write the public folder. Alex's personal agent stays inside `home/you@example.com/`.
 
 ## Size
 
@@ -32,7 +32,7 @@ Invent the world from the thing being celebrated. A Spanish escrito is a differe
 
 Leave these off every page:
 
-- `/education/styles.css`, `/jype/styles.css`, `liquid-glass.js`, `theme-orb.js`, `yl-home-link.js`
+- `/home/styles.css`, `/jype/styles.css`, `liquid-glass.js`, `theme-orb.js`, `yl-home-link.js`
 - Karla, the YL squircle, the theme orb, the logged-in bottom dock, the chat circle, lake teal, the JYPE red wash, `.sheet` glass cards
 - Dashboard, electives, privacy, and estore chrome
 - `/favicon.svg`. Use a data-URI icon in the page's own colors
@@ -52,7 +52,7 @@ Copy is specific. Names, the assignment, what actually happened. Apply unslop. `
 openssl rand -hex 12
 ```
 
-That is the folder name, 24 hex characters, at the repo root. `<hex>/index.html` and `<hex>/<page>/index.html`. A readable slug like `/spanish-ma-done/` will get opened early. So will a path under `/jype/`, a class folder, or `education/`.
+That is the folder name, 24 hex characters, at the repo root. `<hex>/index.html` and `<hex>/<page>/index.html`. A readable slug like `/spanish-ma-done/` will get opened early. So will a path under `/jype/`, a class folder, or `home/`.
 
 Add a trailing-slash redirect in `vercel.json` for the root, and for a hub path if you add one:
 
@@ -76,7 +76,7 @@ Schedule a future agent only when you can name one clock time from a record.
 
 Confident:
 
-- The assessment todo has `dueDate` and `dueTime`, and you have checked whether that time is the start or the end. In-class work often stores the period start. The Spanish 4 escrito todo is due 2026-10-13 at 08:30 because period D starts then. Open `.cursor/skills/class-schedule/SKILL.md` and that person's `education/<email>/schedule.json`, including `dayOverrides`. The send is 5 minutes before the period ends.
+- The assessment todo has `dueDate` and `dueTime`, and you have checked whether that time is the start or the end. In-class work often stores the period start. The Spanish 4 escrito todo is due 2026-10-13 at 08:30 because period D starts then. Open `.cursor/skills/class-schedule/SKILL.md` and that person's `home/<email>/schedule.json`, including `dayOverrides`. The send is 5 minutes before the period ends.
 - A calendar event with a real end, or a bell you resolved for a named class on a named date. Same 5-minute buffer.
 - A timed exam whose end you calculated from a known duration. Send 5 minutes before that end.
 

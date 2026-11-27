@@ -1,4 +1,4 @@
-/* /fitness view-only — extends education theme tokens */
+/* /fitness view-only — extends home theme tokens */
 
 .fit-body {
   min-height: 100dvh;
@@ -134,7 +134,7 @@
   margin-left: 0;
 }
 
-.fit-machine-filters .edu-filter.is-on {
+.fit-machine-filters .home-filter.is-on {
   box-shadow:
     0 2px var(--lg-outer-shadow-blur) var(--lg-outer-shadow),
     0 0 0 1.5px color-mix(in srgb, var(--fit-filter-color, var(--accent)) 70%, transparent);
@@ -142,7 +142,7 @@
   color: #fff;
 }
 
-.fit-machine-filters .edu-filter:not(.is-on) {
+.fit-machine-filters .home-filter:not(.is-on) {
   box-shadow:
     0 2px var(--lg-outer-shadow-blur) var(--lg-outer-shadow),
     0 0 0 1.5px color-mix(in srgb, var(--fit-filter-color, var(--accent)) 35%, transparent);

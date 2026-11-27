@@ -12,7 +12,7 @@ import { mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { briefingNow, resolveBriefingTimezone } from "./daily-briefing-agent.js";
-import { isSchoolDayParts, scheduleNowParts } from "./education-data.js";
+import { isSchoolDayParts, scheduleNowParts } from "./home-data.js";
 import {
   createLaterAuthRetry,
   promptWithAuthRetry,
@@ -24,11 +24,11 @@ import { readCurrentLifeState } from "./life-state.js";
 import { haversineMeters, homeBooleanKind, KNOWN_PLACES } from "./life-state-snapshot.js";
 import { readPhoneLocation, YAN_EMAIL } from "./phone-location.js";
 import { appendAgentAction, lightsActionSummary } from "./agent-actions.js";
-import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { YAN_HOME_DIR } from "./onedrive-projects.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = "/tmp/yanylevin-home-agent.lock";
-const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
+const META_PATH = join(YAN_HOME_DIR, "daily-briefing", "meta.json");
 const TZ = "America/Los_Angeles";
 
 export const HOME_AGENT_INTERVAL_MS = 60 * 60 * 1000;
@@ -102,9 +102,9 @@ const laterAuthRetry = createLaterAuthRetry({
  */
 export function vacuumStatePath(root = REPO_ROOT) {
   if (!root || resolve(root) === resolve(REPO_ROOT)) {
-    return join(YAN_EDUCATION_DIR, "home", "vacuum.json");
+    return join(YAN_HOME_DIR, "home", "vacuum.json");
   }
-  return join(root, "education", YAN_EMAIL, "home", "vacuum.json");
+  return join(root, "home", YAN_EMAIL, "home", "vacuum.json");
 }
 
 /**
@@ -112,9 +112,9 @@ export function vacuumStatePath(root = REPO_ROOT) {
  */
 export function lightsStatePath(root = REPO_ROOT) {
   if (!root || resolve(root) === resolve(REPO_ROOT)) {
-    return join(YAN_EDUCATION_DIR, "home", "lights.json");
+    return join(YAN_HOME_DIR, "home", "lights.json");
   }
-  return join(root, "education", YAN_EMAIL, "home", "lights.json");
+  return join(root, "home", YAN_EMAIL, "home", "lights.json");
 }
 
 /**
@@ -922,7 +922,7 @@ async function readMeta() {
 async function readSchoolSchedule() {
   try {
     const raw = await readFile(
-      join(YAN_EDUCATION_DIR, "schedule.json"),
+      join(YAN_HOME_DIR, "schedule.json"),
       "utf8"
     );
     const schedule = JSON.parse(raw);

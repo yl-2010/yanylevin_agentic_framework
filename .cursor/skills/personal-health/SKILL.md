@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 # Apple Health — Yan only
 
-**Gate:** signed-in / default user is `you@example.com`. If the user is Alex, skip this whole skill. Never read `education/you@example.com/health/` for Alex.
+**Gate:** signed-in / default user is `you@example.com`. If the user is Alex, skip this whole skill. Never read `home/you@example.com/health/` for Alex.
 
 An iPhone Shortcut posts a daily dump to the Mac. Composer at 01:00 writes prose takeaways. You read those files. You do not talk to HealthKit or the phone.
 
@@ -19,9 +19,9 @@ Clock times in the markdown are **America/Los_Angeles** (Seattle), except workou
 
 Do not dump the whole tree into every turn. Start here:
 
-- `education/you@example.com/health/takeaways.md` — nightly prose, newest day on top
-- `education/you@example.com/health/workouts.md` — every Apple Workout session Node has merged
-- `education/you@example.com/health/history-patterns.md` — standing patterns from the full archive, when it exists
+- `home/you@example.com/health/takeaways.md` — nightly prose, newest day on top
+- `home/you@example.com/health/workouts.md` — every Apple Workout session Node has merged
+- `home/you@example.com/health/history-patterns.md` — standing patterns from the full archive, when it exists
 - `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/health.md` — standing body facts (sleep band, training era, recovery tells), when it exists
 
 Open `raw/*.json` only when the markdown is missing a day or the question needs a number that is not in the takeaways (exact HRV, a specific sleep stage). `log-YYYY-MM.jsonl` is an ingest index, not a chart.

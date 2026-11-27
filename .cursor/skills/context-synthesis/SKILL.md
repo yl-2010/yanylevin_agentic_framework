@@ -95,7 +95,7 @@ Duolingo day-counts) into identity pages. Agent behavior stays in `SOUL.md` and
 ## Location write-back
 
 If a new inference changes **which place or trip mode** a stay was, rewrite the
-matching lines in `education/you@example.com/location/places.md` and
+matching lines in `home/you@example.com/location/places.md` and
 `trips.md`. Street-only, "residence", and generic `car` are unfinished when
 you now know the house, gym, library, or robotaxi. Keep arrive/leave/dwell
 and the markdown shape from `.cursor/skills/location-enrichment/SKILL.md`

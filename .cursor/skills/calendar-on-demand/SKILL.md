@@ -1,7 +1,7 @@
 ---
 name: calendar-on-demand
 description: >-
-  Realtime Apple Calendar and education-todo writer. One Composer run when
+  Realtime Apple Calendar and home-todo writer. One Composer run when
   Jev flags a new iMessage, Mail, school Outlook, or Teams message as a
   calendar event or a specific task the message assigns to Yan. Composer
   picks one. A text from either parent is calendar or nothing, and that run
@@ -35,7 +35,7 @@ Skip these even when they name a day:
 
 - College spam. Recruitment and marketing from colleges, Scoir blasts, apply-now mail, and info sessions he did not register for. A date in the email is not an event.
 - The weekly EPS college-visit list. School sends one about once a week. Do not add each visit. Only a visit Yan said he signed up for, or a form receipt for that visit. The announcement is not a signup.
-- Education todos, homework, Canvas, due dates, and other dashboard items. Those stay on the education dashboard. The calendar is events.
+- Home todos, homework, Canvas, due dates, and other dashboard items. Those stay on the home dashboard. The calendar is events.
 - The EPS bell schedule, and "we should hang out" with no day.
 - EPS Ventures unless there is a signup confirmation.
 - A task he has to do, with no event he is attending. That is a todo, below, unless the text is from a parent.
@@ -62,7 +62,7 @@ Skip these, even when they sound useful:
 - A suggestion, a nudge, "let me know if you want", "you should look at", or "we should".
 - A question that is not asked of him.
 - A task for someone else.
-- Homework, Canvas, and due dates that already live on the education dashboard. Canvas sync already makes those todos.
+- Homework, Canvas, and due dates that already live on the home dashboard. Canvas sync already makes those todos.
 - College spam, and the weekly EPS college-visit list, unless he signed up.
 - A survey, poll, or form a student sent to his school email. Stats projects, classmate blasts, and Student News. A form a teacher or the school assigned him is not this. Canvas already files those.
 
@@ -100,14 +100,14 @@ List the day with `node server/calendar-cli.js events`.
 
 - Similar title already at that start: stop, or `update` if this message changed the time, place, or link.
 - Similar title on that day at a different time, and the message is a move: `update --id` the live event.
-- The old event is only in `education/you@example.com/calendar/deleted-events.jsonl` (or a `deleted.md` calendar row) and the new time, place, or link differs: `create` the new one.
+- The old event is only in `home/you@example.com/calendar/deleted-events.jsonl` (or a `deleted.md` calendar row) and the new time, place, or link differs: `create` the new one.
 - Create prints `skipped: deleted-identical`: stop. That is the same title, start, end, location, and link Yan already deleted. Do not pass `--force` unless Yan explicitly asked for that exact event back.
 
 `--force` bypasses the refuse. Chat uses it only when Yan asked.
 
 ## Action log
 
-On calendar `create`, `update`, and `delete`, add `--via calendar-on-demand`. List and get stay without it. The flag tells the CLI this is a Jev job, so a title that names Jev is refused. These writes do not get a card on the dashboard Actions rail. Yan already sees the change on the calendar or on the education todo list.
+On calendar `create`, `update`, and `delete`, add `--via calendar-on-demand`. List and get stay without it. The flag tells the CLI this is a Jev job, so a title that names Jev is refused. These writes do not get a card on the dashboard Actions rail. Yan already sees the change on the calendar or on the home todo list.
 
 ## Calendar fields
 

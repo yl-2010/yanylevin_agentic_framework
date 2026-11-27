@@ -1,5 +1,5 @@
 /**
- * Match Class Notebook pages to existing education todos.
+ * Match Class Notebook pages to existing home todos.
  * Personal section group is Yan's copy. Content Library is the teacher page.
  * Canvas nightly runs this for todos that already exist. Teachers often
  * publish the page days after the Canvas row.

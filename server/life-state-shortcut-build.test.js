@@ -44,7 +44,7 @@ describe("Yan life-state Shortcuts", () => {
       assert.equal(download.WFWorkflowActionParameters.WFHTTPMethod, "POST");
       assert.equal(download.WFWorkflowActionParameters.WFURL, URL_PLACEHOLDER);
     }
-    assert.equal(DEFAULT_URL.endsWith("/api/education/life-state-intent"), true);
+    assert.equal(DEFAULT_URL.endsWith("/api/home/life-state-intent"), true);
   });
 
   it("ships one-shot unplug, driving focus, and tesla shortcuts", () => {

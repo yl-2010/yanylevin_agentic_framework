@@ -22,14 +22,14 @@ import { extractClientSignals } from "./client-signals.js";
 import { mintVisitorToken } from "./mint.js";
 import { finalizeChatTheme } from "./chat-theme.js";
 import {
-  isEducationUser,
-  readEducationTree,
+  isHomeUser,
+  readHomeTree,
   setTodoDone,
   setCapsuleVote,
   markProjectOpened,
   resolveContextFile,
   sendContextFile,
-} from "./education-data.js";
+} from "./home-data.js";
 import {
   readCelebrationState,
   toggleCelebrationSign,
@@ -52,13 +52,13 @@ import { startCanvasSyncScheduler, applyLiveCanvasOverlay, seedLiveCanvasTodoDon
 import { canonicalizeEmail, isFullAccessEmail, isJypeAccessEmail } from "./identity.js";
 import { ingestTokenOk, ingestUsageBatch, usageIndex, usageReport } from "./usage-log.js";
 import {
-  revealOpenEducationObject,
+  revealOpenHomeObject,
   syncOnedriveObjectVisibility,
-} from "./education-onedrive-visibility.js";
+} from "./home-onedrive-visibility.js";
 import {
   onOnedriveSnapshotWrote,
   startOnedriveSnapshotLoop,
-} from "./education-onedrive-snapshot.js";
+} from "./home-onedrive-snapshot.js";
 import { startHealthTakeawaysScheduler } from "./health-takeaways-agent.js";
 import { startLocationBrainScheduler } from "./location-brain-agent.js";
 import { startHealthBrainScheduler } from "./health-brain-agent.js";
@@ -66,7 +66,7 @@ import { startFactCheckScheduler } from "./fact-check-agent.js";
 import { startLifeStateScheduler } from "./life-state-agent.js";
 import { lightsStatePath, startHomeAgentScheduler, vacuumStatePath } from "./home-agent.js";
 import { readAgentActions } from "./agent-actions.js";
-import { attachEducationEvents } from "./education-events.js";
+import { attachHomeEvents } from "./home-events.js";
 import {
   startAgent,
   messageAgent,
@@ -157,6 +157,18 @@ function rateLimitOk(ip, limit = 30, windowMs = 60_000) {
 }
 
 const app = express();
+// Installed iOS and cached pages still call /api/education.
+app.use((req, _res, next) => {
+  const url = req.url || "";
+  if (
+    url === "/api/education" ||
+    url.startsWith("/api/education/") ||
+    url.startsWith("/api/education?")
+  ) {
+    req.url = "/api/home" + url.slice("/api/education".length);
+  }
+  next();
+});
 app.set("trust proxy", 1);
 
 app.use(
@@ -170,7 +182,7 @@ app.use(
     credentials: true,
   })
 );
-/** 100mb: education attachments are JSON+base64 (~4/3 wire size); 64MB raw ≈ 86MB on the wire. */
+/** 100mb: home attachments are JSON+base64 (~4/3 wire size); 64MB raw ≈ 86MB on the wire. */
 app.use(express.json({ limit: "100mb" }));
 
 app.get("/health", async (_req, res) => {
@@ -380,7 +392,7 @@ app.post("/api/login-log", requireAuth, async (req, res) => {
  * Quiz answers for the signed-in Google account.
  * Email is the JWT. The body cannot name a different account.
  */
-app.post("/api/education/quiz-attempt", requireAuth, async (req, res) => {
+app.post("/api/home/quiz-attempt", requireAuth, async (req, res) => {
   try {
     const doc = await saveQuizAttempt(req.user?.email, req.body || {});
     res.setHeader("Cache-Control", "no-store");
@@ -393,7 +405,7 @@ app.post("/api/education/quiz-attempt", requireAuth, async (req, res) => {
     });
   } catch (err) {
     const status = err.status || 500;
-    if (status >= 500) console.error("[/api/education/quiz-attempt POST]", err);
+    if (status >= 500) console.error("[/api/home/quiz-attempt POST]", err);
     res.status(status).json({
       ok: false,
       error: err.message || "quiz save failed",
@@ -401,7 +413,7 @@ app.post("/api/education/quiz-attempt", requireAuth, async (req, res) => {
   }
 });
 
-app.get("/api/education/quiz-attempt", requireAuth, async (req, res) => {
+app.get("/api/home/quiz-attempt", requireAuth, async (req, res) => {
   try {
     const quiz = String(req.query?.quiz || "");
     const doc = await readQuizAttempt(req.user?.email, quiz);
@@ -409,7 +421,7 @@ app.get("/api/education/quiz-attempt", requireAuth, async (req, res) => {
     res.json({ ok: true, attempt: doc });
   } catch (err) {
     const status = err.status || 500;
-    if (status >= 500) console.error("[/api/education/quiz-attempt GET]", err);
+    if (status >= 500) console.error("[/api/home/quiz-attempt GET]", err);
     res.status(status).json({
       ok: false,
       error: err.message || "quiz read failed",
@@ -436,7 +448,7 @@ app.post("/api/account-delete", requireAuth, async (req, res) => {
       email: result.email,
       recorded: result.recorded,
       message:
-        "Deletion request recorded. Client session should be cleared. Contact you@example.com for education-folder removal.",
+        "Deletion request recorded. Client session should be cleared. Contact you@example.com for home-folder removal.",
     });
   } catch (err) {
     console.error("[/api/account-delete]", err);
@@ -448,8 +460,9 @@ app.post("/api/account-delete", requireAuth, async (req, res) => {
 });
 
 /**
- * Full brain snapshot for the gated /brain/ concepts (Yan only, never Alex).
- * Built on the box, stored at .backend/brain-site/brain.json. Never a static file on Vercel.
+ * Full brain snapshot for the gated /brain/ site (Yan only, never Alex).
+ * Rebuilt live on the Mac Studio by scripts/brain-data/refresh.mjs (LaunchAgent com.yanylevin.brain-data) into
+ * BRAIN_SITE_DIR (~/Library/Application Support/yanylevin/brain-site). Read per request. Never a static file on Vercel.
  */
 app.get("/api/brain", requireAuth, createBrainSnapshotHandler());
 
@@ -461,6 +474,16 @@ app.get(
   "/api/brain-text",
   requireAuth,
   createBrainSnapshotHandler({ file: "brain-text.json" }),
+);
+
+/**
+ * Tiny version stamp of the live brain snapshot (version, newest dates, counts). /brain/ polls it to pick up new
+ * data without a hard refresh. Same gate and folder as /api/brain.
+ */
+app.get(
+  "/api/brain-meta",
+  requireAuth,
+  createBrainSnapshotHandler({ file: "brain-meta.json" }),
 );
 
 /**
@@ -659,12 +682,12 @@ app.get("/api/login-log", requireAuth, async (req, res) => {
 });
 
 /**
- * Education academic OS — gated to the operator.
+ * Home academic OS — gated to the operator.
  * Separate from /api/chat (LM Studio). Local Cursor SDK only.
  */
-function requireEducationUser(req, res, next) {
+function requireHomeUser(req, res, next) {
   requireAuth(req, res, () => {
-    if (!isEducationUser(req.user?.email)) {
+    if (!isHomeUser(req.user?.email)) {
       res.status(403).json({ ok: false, error: "forbidden" });
       return;
     }
@@ -734,7 +757,7 @@ function requireYanLocationWriter(req, res, next) {
     next();
     return;
   }
-  requireEducationUser(req, res, () => {
+  requireHomeUser(req, res, () => {
     if (!isYanLocationUser(req.user?.email)) {
       res.status(403).json({ ok: false, error: "forbidden" });
       return;
@@ -744,7 +767,7 @@ function requireYanLocationWriter(req, res, next) {
   });
 }
 
-app.post("/api/education/location", requireYanLocationWriter, async (req, res) => {
+app.post("/api/home/location", requireYanLocationWriter, async (req, res) => {
   try {
     const saved = await writePhoneLocation(req.body, {
       source: req.locationSource,
@@ -757,7 +780,7 @@ app.post("/api/education/location", requireYanLocationWriter, async (req, res) =
       receivedAt: saved.receivedAt,
     });
   } catch (err) {
-    console.error("[/api/education/location]", err);
+    console.error("[/api/home/location]", err);
     res.status(err.status || 500).json({
       ok: false,
       error: err.message || "location write failed",
@@ -773,7 +796,7 @@ function requireYanIntentWriter(req, res, next) {
     next();
     return;
   }
-  requireEducationUser(req, res, () => {
+  requireHomeUser(req, res, () => {
     if (!isYanLocationUser(req.user?.email)) {
       res.status(403).json({ ok: false, error: "forbidden" });
       return;
@@ -784,7 +807,7 @@ function requireYanIntentWriter(req, res, next) {
 }
 
 /** Phone Shortcuts: dock, unplug, Driving Focus, Tesla Bluetooth. */
-app.post("/api/education/life-state-intent", requireYanIntentWriter, async (req, res) => {
+app.post("/api/home/life-state-intent", requireYanIntentWriter, async (req, res) => {
   try {
     const saved = await writeLifeStateIntent(req.body);
     res.setHeader("Cache-Control", "no-store");
@@ -796,7 +819,7 @@ app.post("/api/education/life-state-intent", requireYanIntentWriter, async (req,
       at: saved.at,
     });
   } catch (err) {
-    console.error("[/api/education/life-state-intent]", err);
+    console.error("[/api/home/life-state-intent]", err);
     res.status(err.status || 500).json({
       ok: false,
       error: err.message || "intent write failed",
@@ -811,7 +834,7 @@ function requireYanHealthWriter(req, res, next) {
     next();
     return;
   }
-  requireEducationUser(req, res, () => {
+  requireHomeUser(req, res, () => {
     if (!isYanLocationUser(req.user?.email)) {
       res.status(403).json({ ok: false, error: "forbidden" });
       return;
@@ -821,7 +844,7 @@ function requireYanHealthWriter(req, res, next) {
   });
 }
 
-app.post("/api/education/health", requireYanHealthWriter, async (req, res) => {
+app.post("/api/home/health", requireYanHealthWriter, async (req, res) => {
   try {
     const saved = await writeHealthDump(req.body, {
       source: req.healthSource,
@@ -829,7 +852,7 @@ app.post("/api/education/health", requireYanHealthWriter, async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     res.json({ ok: true, received: "yes", ...saved });
   } catch (err) {
-    console.error("[/api/education/health]", err);
+    console.error("[/api/home/health]", err);
     res.status(err.status || 500).json({
       ok: false,
       error: err.message || "health write failed",
@@ -837,9 +860,9 @@ app.post("/api/education/health", requireYanHealthWriter, async (req, res) => {
   }
 });
 
-const educationTreeCache = new Map();
-const educationTreeInflight = new Map();
-const EDUCATION_TREE_CACHE_MS = 20_000;
+const homeTreeCache = new Map();
+const homeTreeInflight = new Map();
+const HOME_TREE_CACHE_MS = 20_000;
 let onedriveVisibilityJob = null;
 let onedriveVisibilityFinishedAt = 0;
 const ONEDRIVE_VISIBILITY_GAP_MS = 3 * 60_000;
@@ -856,31 +879,31 @@ function scheduleOnedriveVisibility(email) {
     });
 }
 
-async function educationDataTree(email) {
+async function homeDataTree(email) {
   const key = canonicalizeEmail(email);
-  const hit = educationTreeCache.get(key);
-  if (hit && Date.now() - hit.at < EDUCATION_TREE_CACHE_MS) return hit.tree;
-  const pending = educationTreeInflight.get(key);
+  const hit = homeTreeCache.get(key);
+  if (hit && Date.now() - hit.at < HOME_TREE_CACHE_MS) return hit.tree;
+  const pending = homeTreeInflight.get(key);
   if (pending) return pending;
-  const job = readEducationTree(email)
+  const job = readHomeTree(email)
     .then((tree) => {
-      educationTreeCache.set(key, { at: Date.now(), tree });
+      homeTreeCache.set(key, { at: Date.now(), tree });
       return tree;
     })
     .finally(() => {
-      educationTreeInflight.delete(key);
+      homeTreeInflight.delete(key);
     });
-  educationTreeInflight.set(key, job);
+  homeTreeInflight.set(key, job);
   return job;
 }
 
-app.get("/api/education/data", requireEducationUser, async (req, res) => {
+app.get("/api/home/data", requireHomeUser, async (req, res) => {
   try {
     // Finder reveal writes OneDrive. Do not make the page wait on it.
-    revealOpenEducationObject(req.user.email, req.query || {}).catch((err) => {
+    revealOpenHomeObject(req.user.email, req.query || {}).catch((err) => {
       console.error("[onedrive-reveal]", err);
     });
-    const tree = await educationDataTree(req.user.email);
+    const tree = await homeDataTree(req.user.email);
     // Finder hide/show walks the same CloudStorage files. Not on every poll.
     scheduleOnedriveVisibility(req.user.email);
     const live = /^(1|true|yes)$/i.test(String(req.query?.live || ""));
@@ -890,15 +913,15 @@ app.get("/api/education/data", requireEducationUser, async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     res.json({ ok: true, ...tree });
   } catch (err) {
-    console.error("[/api/education/data]", err);
+    console.error("[/api/home/data]", err);
     res.status(err.status || 500).json({
       ok: false,
-      error: err.message || "education data failed",
+      error: err.message || "home data failed",
     });
   }
 });
 
-app.get("/api/education/file", requireEducationUser, async (req, res) => {
+app.get("/api/home/file", requireHomeUser, async (req, res) => {
   try {
     const file = await resolveContextFile(req.user.email, {
       scope: req.query?.scope,
@@ -912,7 +935,7 @@ app.get("/api/education/file", requireEducationUser, async (req, res) => {
     });
     await sendContextFile(res, file);
   } catch (err) {
-    console.error("[/api/education/file]", err);
+    console.error("[/api/home/file]", err);
     if (!res.headersSent) {
       res.status(err.status || 500).json({
         ok: false,
@@ -923,8 +946,8 @@ app.get("/api/education/file", requireEducationUser, async (req, res) => {
 });
 
 app.patch(
-  "/api/education/todo/:id/done",
-  requireEducationUser,
+  "/api/home/todo/:id/done",
+  requireHomeUser,
   async (req, res) => {
     try {
       const done = Boolean(req.body?.done);
@@ -960,7 +983,7 @@ app.patch(
         todo: props,
       });
     } catch (err) {
-      console.error("[/api/education/todo/done]", err);
+      console.error("[/api/home/todo/done]", err);
       res.status(err.status || 500).json({
         ok: false,
         error: err.message || "todo update failed",
@@ -970,15 +993,15 @@ app.patch(
 );
 
 app.post(
-  "/api/education/project/:id/opened",
-  requireEducationUser,
+  "/api/home/project/:id/opened",
+  requireHomeUser,
   async (req, res) => {
     try {
       const result = await markProjectOpened(req.user.email, req.params.id);
       res.setHeader("Cache-Control", "no-store");
       res.json({ ok: true, ...result });
     } catch (err) {
-      console.error("[/api/education/project/opened]", err);
+      console.error("[/api/home/project/opened]", err);
       res.status(err.status || 500).json({
         ok: false,
         error: err.message || "project open failed",
@@ -988,8 +1011,8 @@ app.post(
 );
 
 app.patch(
-  "/api/education/todo/:id/capsule/:capsuleId/vote",
-  requireEducationUser,
+  "/api/home/todo/:id/capsule/:capsuleId/vote",
+  requireHomeUser,
   async (req, res) => {
     try {
       const classId =
@@ -1025,7 +1048,7 @@ app.patch(
         todo: props,
       });
     } catch (err) {
-      console.error("[/api/education/todo/capsule/vote]", err);
+      console.error("[/api/home/todo/capsule/vote]", err);
       res.status(err.status || 500).json({
         ok: false,
         error: err.message || "capsule vote failed",
@@ -1034,11 +1057,11 @@ app.patch(
   }
 );
 
-app.get("/api/education/events", requireEducationUser, (req, res) => {
+app.get("/api/home/events", requireHomeUser, (req, res) => {
   try {
-    attachEducationEvents(req, res, req.user.email);
+    attachHomeEvents(req, res, req.user.email);
   } catch (err) {
-    console.error("[/api/education/events]", err);
+    console.error("[/api/home/events]", err);
     if (!res.headersSent) {
       res.status(err.status || 500).json({
         ok: false,
@@ -1048,13 +1071,13 @@ app.get("/api/education/events", requireEducationUser, (req, res) => {
   }
 });
 
-app.post("/api/education/agent/start", requireEducationUser, async (req, res) => {
+app.post("/api/home/agent/start", requireHomeUser, async (req, res) => {
   try {
     const result = await startAgent(req.user.email);
     res.setHeader("Cache-Control", "no-store");
     res.json({ ok: true, ...result });
   } catch (err) {
-    console.error("[/api/education/agent/start]", err);
+    console.error("[/api/home/agent/start]", err);
     res.status(err.status || 500).json({
       ok: false,
       error: err.message || "agent start failed",
@@ -1063,8 +1086,8 @@ app.post("/api/education/agent/start", requireEducationUser, async (req, res) =>
 });
 
 app.post(
-  "/api/education/agent/message",
-  requireEducationUser,
+  "/api/home/agent/message",
+  requireHomeUser,
   async (req, res) => {
     try {
       const result = await postAgentMessage(req);
@@ -1072,7 +1095,7 @@ app.post(
       // Async run — returns immediately with status:running; clients poll /state.
       res.status(202).json(result);
     } catch (err) {
-      console.error("[/api/education/agent/message]", err);
+      console.error("[/api/home/agent/message]", err);
       res.status(err.status || 500).json({
         ok: false,
         error: err.message || "agent message failed",
@@ -1082,8 +1105,8 @@ app.post(
 );
 
 app.post(
-  "/api/education/agent/interrupt-queued",
-  requireEducationUser,
+  "/api/home/agent/interrupt-queued",
+  requireHomeUser,
   async (req, res) => {
     try {
       const result = await promoteQueuedTurn(
@@ -1094,7 +1117,7 @@ app.post(
       res.setHeader("Cache-Control", "no-store");
       res.status(202).json(result);
     } catch (err) {
-      console.error("[/api/education/agent/interrupt-queued]", err);
+      console.error("[/api/home/agent/interrupt-queued]", err);
       res.status(err.status || 500).json({
         ok: false,
         error: err.message || "agent interrupt failed",
@@ -1103,13 +1126,13 @@ app.post(
   }
 );
 
-app.get("/api/education/agent/state", requireEducationUser, async (req, res) => {
+app.get("/api/home/agent/state", requireHomeUser, async (req, res) => {
   try {
     const result = await getAgentState(req.query?.sessionId, req.user.email);
     res.setHeader("Cache-Control", "no-store");
     res.json(result);
   } catch (err) {
-    console.error("[/api/education/agent/state]", err);
+    console.error("[/api/home/agent/state]", err);
     res.status(err.status || 500).json({
       ok: false,
       error: err.message || "agent state failed",
@@ -1117,13 +1140,13 @@ app.get("/api/education/agent/state", requireEducationUser, async (req, res) => 
   }
 });
 
-app.get("/api/education/agent/active", requireEducationUser, async (req, res) => {
+app.get("/api/home/agent/active", requireHomeUser, async (req, res) => {
   try {
     const result = await getActiveAgent(req.user.email);
     res.setHeader("Cache-Control", "no-store");
     res.json(result);
   } catch (err) {
-    console.error("[/api/education/agent/active]", err);
+    console.error("[/api/home/agent/active]", err);
     res.status(err.status || 500).json({
       ok: false,
       error: err.message || "agent active failed",
@@ -1131,13 +1154,13 @@ app.get("/api/education/agent/active", requireEducationUser, async (req, res) =>
   }
 });
 
-app.get("/api/education/agent/running", requireEducationUser, async (req, res) => {
+app.get("/api/home/agent/running", requireHomeUser, async (req, res) => {
   try {
     const result = await getRunningAgents(req.user.email);
     res.setHeader("Cache-Control", "no-store");
     res.json(result);
   } catch (err) {
-    console.error("[/api/education/agent/running]", err);
+    console.error("[/api/home/agent/running]", err);
     res.status(err.status || 500).json({
       ok: false,
       error: err.message || "agent running failed",
@@ -1145,13 +1168,13 @@ app.get("/api/education/agent/running", requireEducationUser, async (req, res) =
   }
 });
 
-app.get("/api/education/agent/chats", requireEducationUser, async (req, res) => {
+app.get("/api/home/agent/chats", requireHomeUser, async (req, res) => {
   try {
     const result = await listAgentChatsWithDrafts(req.user.email);
     res.setHeader("Cache-Control", "no-store");
     res.json(result);
   } catch (err) {
-    console.error("[/api/education/agent/chats]", err);
+    console.error("[/api/home/agent/chats]", err);
     res.status(err.status || 500).json({
       ok: false,
       error: err.message || "agent chats failed",
@@ -1159,13 +1182,13 @@ app.get("/api/education/agent/chats", requireEducationUser, async (req, res) => 
   }
 });
 
-app.post("/api/education/agent/resume", requireEducationUser, async (req, res) => {
+app.post("/api/home/agent/resume", requireHomeUser, async (req, res) => {
   try {
     const result = await resumeAgent(req.body?.sessionId, req.user.email);
     res.setHeader("Cache-Control", "no-store");
     res.json({ ok: true, ...result });
   } catch (err) {
-    console.error("[/api/education/agent/resume]", err);
+    console.error("[/api/home/agent/resume]", err);
     res.status(err.status || 500).json({
       ok: false,
       error: err.message || "agent resume failed",
@@ -1173,13 +1196,13 @@ app.post("/api/education/agent/resume", requireEducationUser, async (req, res) =
   }
 });
 
-app.post("/api/education/agent/read", requireEducationUser, async (req, res) => {
+app.post("/api/home/agent/read", requireHomeUser, async (req, res) => {
   try {
     const result = await markAgentChatRead(req.body?.sessionId, req.user.email);
     res.setHeader("Cache-Control", "no-store");
     res.json(result);
   } catch (err) {
-    console.error("[/api/education/agent/read]", err);
+    console.error("[/api/home/agent/read]", err);
     res.status(err.status || 500).json({
       ok: false,
       error: err.message || "agent read failed",
@@ -1187,13 +1210,13 @@ app.post("/api/education/agent/read", requireEducationUser, async (req, res) => 
   }
 });
 
-app.post("/api/education/agent/stop", requireEducationUser, async (req, res) => {
+app.post("/api/home/agent/stop", requireHomeUser, async (req, res) => {
   try {
     const result = await stopAgent(req.body?.sessionId, req.user.email);
     res.setHeader("Cache-Control", "no-store");
     res.json(result);
   } catch (err) {
-    console.error("[/api/education/agent/stop]", err);
+    console.error("[/api/home/agent/stop]", err);
     res.status(err.status || 500).json({
       ok: false,
       error: err.message || "agent stop failed",
@@ -1202,11 +1225,11 @@ app.post("/api/education/agent/stop", requireEducationUser, async (req, res) => 
 });
 
 attachChatDraftRoutes(app, {
-  prefix: "/api/education/agent",
-  guard: requireEducationUser,
+  prefix: "/api/home/agent",
+  guard: requireHomeUser,
 });
 
-app.get("/api/education/agent/file", requireEducationUser, async (req, res) => {
+app.get("/api/home/agent/file", requireHomeUser, async (req, res) => {
   try {
     const file = await resolveChatUploadFile(
       req.user.email,
@@ -1216,7 +1239,7 @@ app.get("/api/education/agent/file", requireEducationUser, async (req, res) => {
     );
     await sendContextFile(res, file);
   } catch (err) {
-    console.error("[/api/education/agent/file]", err);
+    console.error("[/api/home/agent/file]", err);
     if (!res.headersSent) {
       res.status(err.status || 500).json({
         ok: false,
@@ -1228,7 +1251,7 @@ app.get("/api/education/agent/file", requireEducationUser, async (req, res) => {
 
 app.get("/api/jype/data", requireJypeUser, async (req, res) => {
   try {
-    const tree = await readEducationTree(req.user.email, JYPE_WS);
+    const tree = await readHomeTree(req.user.email, JYPE_WS);
     res.setHeader("Cache-Control", "no-store");
     res.json({ ok: true, ...tree, workspace: "jype" });
   } catch (err) {
@@ -1393,7 +1416,7 @@ app.patch(
 
 app.get("/api/jype/events", requireJypeUser, (req, res) => {
   try {
-    attachEducationEvents(req, res, req.user.email, JYPE_WS);
+    attachHomeEvents(req, res, req.user.email, JYPE_WS);
   } catch (err) {
     console.error("[/api/jype/events]", err);
     if (!res.headersSent) {
@@ -1722,7 +1745,7 @@ app.use((_req, res) => {
     startSchoolMailCalendarScheduler();
     startTeamsChannelCalendarScheduler();
     onOnedriveSnapshotWrote((email) => {
-      educationTreeCache.delete(canonicalizeEmail(email));
+      homeTreeCache.delete(canonicalizeEmail(email));
     });
     startOnedriveSnapshotLoop(YAN_EMAIL);
   }

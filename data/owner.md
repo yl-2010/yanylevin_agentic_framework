@@ -8,4 +8,4 @@ This repo is the open-source personal-agent framework. The signed-in operator us
 
 ## Setup
 
-Set `OWNER_EMAIL` in `server/.env`. Rename `education/you@example.com` to match. Do not put private mail, GPS, Health, or other people's data here.
+Set `OWNER_EMAIL` in `server/.env`. Rename `home/you@example.com` to match. Do not put private mail, GPS, Health, or other people's data here.

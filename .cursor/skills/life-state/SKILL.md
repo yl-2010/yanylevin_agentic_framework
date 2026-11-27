@@ -10,14 +10,14 @@ disable-model-invocation: true
 
 # Life state — Yan only
 
-**Gate:** signed-in / default user is `you@example.com`. If the user is Alex, skip this whole skill. Never read `education/you@example.com/life-state/` for Alex. Do not dump Home, location, or this log into a group chat.
+**Gate:** signed-in / default user is `you@example.com`. If the user is Alex, skip this whole skill. Never read `home/you@example.com/life-state/` for Alex. Do not dump Home, location, or this log into a group chat.
 
 Local only. Never spawn a cloud agent.
 
 ## Files
 
 ```
-education/you@example.com/life-state/
+home/you@example.com/life-state/
   schema.md
   heuristics.md
   current.json

@@ -245,13 +245,13 @@
   }
 
   function overviewFilterHtml(machines) {
-    return `<div class="edu-filters fit-machine-filters" role="group" aria-label="Machine filters">${machines
+    return `<div class="home-filters fit-machine-filters" role="group" aria-label="Machine filters">${machines
       .map((m, i) => {
         const on = overviewVisible.has(m.id);
         const color = machineColor(m, i);
         const abbr = machineAbbrev(m.name);
         return `<label
-          class="edu-filter circle${on ? " is-on" : ""}"
+          class="home-filter circle${on ? " is-on" : ""}"
           data-liquid-glass="circle"
           data-filter-id="lg-fit-filter-${esc(m.id)}"
           title="${esc(m.name)}"
@@ -593,7 +593,7 @@
       });
     });
 
-    appEl.querySelectorAll(".edu-filter").forEach((chip) => {
+    appEl.querySelectorAll(".home-filter").forEach((chip) => {
       chip.addEventListener("click", (ev) => {
         ev.preventDefault();
         const input = chip.querySelector("input[data-machine-filter]");

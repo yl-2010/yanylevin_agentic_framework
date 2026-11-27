@@ -12,18 +12,18 @@ description: >-
 Alex, skip this whole skill.
 
 Chat is the normal Personal Agent. Objects live in the personal debate
-project, not `education/projects/jype/`.
+project, not `home/projects/jype/`.
 
 Debate's page color is `debate` in `brand/palette.mjs`. Debate chat always
 uses the agent color. Never set `--chat-*` in `debate/styles.css`.
 
 Do **not** dump full old case text into git. Patterns live in
-`education/you@example.com/projects/debate/CONTEXT.md`. Re-read that
+`home/you@example.com/projects/debate/CONTEXT.md`. Re-read that
 file when Yan asks how he writes cases, or before updating it.
 
 ## Workflow
 
-1. Read `education/you@example.com/projects/debate/CONTEXT.md` for his
+1. Read `home/you@example.com/projects/debate/CONTEXT.md` for his
    style (logical chains, how he uses sources, value/criterion habits).
 2. If a case page is open, note case id + Aff vs Neg.
 3. Brainstorm in HIS shape first. Do not dump generic PF/LD templates or
@@ -34,16 +34,16 @@ file when Yan asks how he writes cases, or before updating it.
 5. Write the speech into `case.json` `aff` / `neg` using the layout in
    the file section below. Do not invent a second layout. A case with no
    body stays title-only. Todos under a case live at
-   `education/you@example.com/projects/debate/cases/<id>/todos/<todoId>/todo.json`
-   and still show on /debate home and /education home. Do not put a todo
+   `home/you@example.com/projects/debate/cases/<id>/todos/<todoId>/todo.json`
+   and still show on /debate home and /home home. Do not put a todo
    list on the case page.
 6. Objects live in the personal debate project, not
-   `education/projects/jype/`. Chat is the normal Personal Agent.
+   `home/projects/jype/`. Chat is the normal Personal Agent.
 
 ## File layout
 
 ```
-education/you@example.com/projects/debate/
+home/you@example.com/projects/debate/
   project.json
   CONTEXT.md                    # agent notes, hidden from UI by default
   cases/<caseId>/

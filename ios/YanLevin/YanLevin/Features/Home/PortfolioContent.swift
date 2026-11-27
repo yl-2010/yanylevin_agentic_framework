@@ -60,7 +60,7 @@ struct PortfolioContent {
     }
 
     static let headline = "A personal agent that lives on your Mac."
-    static let lede = "(PLACEHOLDER) Yan Levin. Open-source framework: Cursor agent, file-tree brain, education and fitness dashboards. Fork and rename before you sign this app."
+    static let lede = "(PLACEHOLDER) Yan Levin. Open-source framework: Cursor agent, file-tree brain, home and fitness dashboards. Fork and rename before you sign this app."
     static let about = "This Home tab is the reference iOS shell. Replace this copy with your own. Set OWNER_EMAIL on the Mac API. Do not ship someone else's grades, bio, or photo."
 
     static let stats: [Stat] = [
@@ -71,7 +71,7 @@ struct PortfolioContent {
     ]
 
     static let timeline: [TimelineItem] = [
-        .init(year: "Now", title: "Fork this repo", body: "Copy server/.env.example, set OWNER_EMAIL, rename education/you@example.com."),
+        .init(year: "Now", title: "Fork this repo", body: "Copy server/.env.example, set OWNER_EMAIL, rename home/you@example.com."),
         .init(year: "Next", title: "Rename the iOS target", body: "Change bundle ID, team, App Group, and display name before signing."),
     ]
 

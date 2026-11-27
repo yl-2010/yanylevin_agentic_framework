@@ -14,7 +14,7 @@ module.exports = async function handler(req, res) {
 
     if (req.method === "GET") {
       res.statusCode = 302;
-      res.setHeader("Location", "/education/");
+      res.setHeader("Location", "/home/");
       res.end();
       return;
     }

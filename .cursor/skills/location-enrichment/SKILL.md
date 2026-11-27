@@ -19,7 +19,7 @@ Places and trips are **two equal passes**. A good `places.md` does not finish th
 
 ## Files
 
-All under `education/you@example.com/location/` unless noted:
+All under `home/you@example.com/location/` unless noted:
 
 | File | Role |
 |------|------|
@@ -28,9 +28,9 @@ All under `education/you@example.com/location/` unless noted:
 | `state.json` | Compose cursor plus your `enrichment` object. |
 | `log-YYYY-MM.jsonl` | Raw GPS. Only if a stay has no usable name. |
 
-Personal Agent transcripts (required source): `education/you@example.com/.chat-history/`. See `.cursor/skills/past-chats/SKILL.md`.
+Personal Agent transcripts (required source): `home/you@example.com/.chat-history/`. See `.cursor/skills/past-chats/SKILL.md`.
 
-Live last-known fix: `education/you@example.com/.location.json` (do not treat as history).
+Live last-known fix: `home/you@example.com/.location.json` (do not treat as history).
 
 ## What "enriched" means
 
@@ -63,7 +63,7 @@ Look as far as you need. Yan only. Do not dump full threads into the markdown.
 - **iMessage:** `node server/imessage-read.js search "…"` / `thread "Name"` (see `.cursor/skills/personal-imessage/SKILL.md`)
 - **Mail.app:** ride receipts, reservations, tickets. Required for every `car` trip. Details below.
 - **Contacts:** resolve names from numbers (`.cursor/skills/personal-contacts/SKILL.md`)
-- **Chat history (required):** Grep and Read `education/you@example.com/.chat-history/` for stay addresses, business/building names, and trip modes. Same rank as Calendar and iMessage. Do not skip because mail or GPS already named something. Do not paste transcripts or indoor activity into `places.md` / `trips.md`. `.cursor/skills/past-chats/SKILL.md`
+- **Chat history (required):** Grep and Read `home/you@example.com/.chat-history/` for stay addresses, business/building names, and trip modes. Same rank as Calendar and iMessage. Do not skip because mail or GPS already named something. Do not paste transcripts or indoor activity into `places.md` / `trips.md`. `.cursor/skills/past-chats/SKILL.md`
 - **Life state (required):** `/tmp/yanylevin-context-life-state.json` or `node server/life-state.js day <date>`. Use it to name the place (home vs still at EPS, gym vs street). Do **not** copy kinds, rooms, apps, class periods, or gym sets into `places.md`. Fan-only is not a shower. `.cursor/skills/life-state/SKILL.md`
 - **Web search:** street address → business/building. Prefer a real name over leaving the street number.
 

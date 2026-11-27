@@ -34,7 +34,7 @@ These tokens are filled in when the grade posts. A text with none of them goes o
 
 - `{score}` and `{points}`
 - `{percent}`
-- `{grade}` the same label as the education page, such as `8/10`, `92%`, or `exc`
+- `{grade}` the same label as the home page, such as `8/10`, `92%`, or `exc`
 - `{assignment}` and `{course}`
 
 Do not write the `// Sent by Yan's Personal Agent` footer. The send adds it.

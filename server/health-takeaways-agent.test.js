@@ -37,7 +37,7 @@ describe("health takeaways prompt", () => {
       force: false,
     });
     assert.match(prompt, /health-takeaways skill/);
-    assert.match(prompt, /education\/health\//);
+    assert.match(prompt, /home\/health\//);
     assert.match(prompt, /workouts\.md/);
     assert.match(prompt, /takeaways\.md/);
     assert.match(prompt, /history-patterns\.md/);

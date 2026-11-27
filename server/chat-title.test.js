@@ -8,7 +8,7 @@ import {
   titleSeedFromUserMessage,
   TITLE_PROMPT,
 } from "./chat-title.js";
-import { fallbackChatTitle } from "./education-chat-history.js";
+import { fallbackChatTitle } from "./home-chat-history.js";
 
 describe("titleFromAgentReply", () => {
   it("keeps a short title", () => {

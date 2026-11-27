@@ -465,7 +465,7 @@ struct TodoWidget: Widget {
             TodoWidgetView(entry: entry)
         }
         .configurationDisplayName("Todos")
-        .description("Upcoming education todos. Tap a title to open it, or the circle to check it off.")
+        .description("Upcoming home todos. Tap a title to open it, or the circle to check it off.")
         // systemExtraLarge is iPad-only (twice as wide as large); iPhone never offers it.
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge])
     }

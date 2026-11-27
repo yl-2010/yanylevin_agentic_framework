@@ -17,7 +17,7 @@ import {
   chatTitleRefreshGitPaths,
 } from "./chat-title-refresh-agent.js";
 import { TITLE_PROMPT } from "./chat-title.js";
-import { formatChatHistoryMarkdown } from "./education-chat-history.js";
+import { formatChatHistoryMarkdown } from "./home-chat-history.js";
 
 const META = {
   timezone: "America/Chicago",
@@ -47,7 +47,7 @@ describe("chat title refresh prompt", () => {
       timezone: "America/Chicago",
       chats: [
         {
-          path: "education/you@example.com/.chat-history/aaaa1111-bbbb-4ccc-8ddd-eeeeffff0001.md",
+          path: "home/you@example.com/.chat-history/aaaa1111-bbbb-4ccc-8ddd-eeeeffff0001.md",
           email: "you@example.com",
           updated: "2026-08-17T20:00:00.000Z",
           title: "Nearby Places to Eat",
@@ -83,7 +83,7 @@ describe("chat title refresh prompt", () => {
       kind: "jype",
       chats: [
         {
-          path: "education/projects/jype/.chat-history/aaaa1111-bbbb-4ccc-8ddd-eeeeffff0001.md",
+          path: "home/projects/jype/.chat-history/aaaa1111-bbbb-4ccc-8ddd-eeeeffff0001.md",
           email: "you@example.com",
           starter: "Alex",
           updated: "2026-08-17T20:00:00.000Z",
@@ -168,7 +168,7 @@ describe("chunkArray", () => {
 });
 
 describe("chat title refresh emails", () => {
-  it("covers both education users", () => {
+  it("covers both home users", () => {
     assert.ok(CHAT_TITLE_REFRESH_EMAILS.includes("you@example.com"));
     assert.ok(CHAT_TITLE_REFRESH_EMAILS.includes("you@example.com"));
   });
@@ -187,17 +187,17 @@ describe("chatTitleRefreshGitPaths", () => {
     const dir = await mkdtemp(join(tmpdir(), "chat-title-git-paths-"));
     try {
       await mkdir(
-        join(dir, "education/you@example.com/.chat-history"),
+        join(dir, "home/you@example.com/.chat-history"),
         { recursive: true }
       );
       const paths = await chatTitleRefreshGitPaths(dir);
-      assert.ok(paths.includes("education/you@example.com/.chat-history"));
+      assert.ok(paths.includes("home/you@example.com/.chat-history"));
       assert.ok(
-        !paths.includes("education/you@example.com/.chat-history")
+        !paths.includes("home/you@example.com/.chat-history")
       );
       assert.ok(
         paths.includes(
-          "education/you@example.com/daily-briefing/chat-title-refresh-state.json"
+          "home/you@example.com/daily-briefing/chat-title-refresh-state.json"
         )
       );
     } finally {
@@ -210,7 +210,7 @@ describe("formatChatHistoryMarkdown still stores titles", () => {
   it("keeps a short title line", async () => {
     const dir = await mkdtemp(join(tmpdir(), "chat-title-refresh-"));
     try {
-      await mkdir(join(dir, "education/you@example.com/.chat-history"), {
+      await mkdir(join(dir, "home/you@example.com/.chat-history"), {
         recursive: true,
       });
       const md = formatChatHistoryMarkdown({

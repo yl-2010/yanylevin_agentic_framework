@@ -35,11 +35,11 @@ import {
 } from "./life-state.js";
 import { nextLocalHmAt } from "./location-history-agent.js";
 import { YAN_EMAIL } from "./phone-location.js";
-import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { YAN_HOME_DIR } from "./onedrive-projects.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = "/tmp/yanylevin-life-state-cleanup.lock";
-const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
+const META_PATH = join(YAN_HOME_DIR, "daily-briefing", "meta.json");
 const LOCK_STALE_MS = 90 * 60 * 1000;
 const TICK_WAIT_MS = 8 * 60 * 1000;
 const TICK_POLL_MS = 2000;
@@ -345,7 +345,7 @@ async function runLifeStateCleanupOnce({
     laterAuthRetry.clear();
     await gitAddCommitPush({
       paths: [LIFE_STATE_REL],
-      message: `education: ${dateKey} life-state cleanup`,
+      message: `home: ${dateKey} life-state cleanup`,
     });
 
     return {

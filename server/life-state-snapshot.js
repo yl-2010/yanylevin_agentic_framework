@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runCalendar } from "./calendar-cli.js";
 import { briefingNow, resolveBriefingTimezone } from "./daily-briefing-agent.js";
-import { resolveNowScheduleContext } from "./education-data.js";
+import { resolveNowScheduleContext } from "./home-data.js";
 import { runHome } from "./home-cli.js";
 import { recentMessages } from "./imessage-read.js";
 import { readLifeStateRaw, readRecentLifeStateSignals, slimLifeStateStore } from "./life-state-intent.js";
@@ -25,9 +25,9 @@ import {
   YAN_EMAIL,
 } from "./phone-location.js";
 import { recentSessions } from "./screentime-read.js";
-import { FITNESS_DIR as FITNESS_ROOT, YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { FITNESS_DIR as FITNESS_ROOT, YAN_HOME_DIR } from "./onedrive-projects.js";
 
-const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
+const META_PATH = join(YAN_HOME_DIR, "daily-briefing", "meta.json");
 const FITNESS_DIR = join(FITNESS_ROOT, YAN_EMAIL, "machines");
 
 export const KNOWN_PLACES = [

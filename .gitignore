@@ -23,8 +23,8 @@ ios/shortcuts/**/workflow.filled.json
 ios/shortcuts/**/workflow.filled.plist
 ios/shortcuts/**/workflow.filled.shortcut
 ios/shortcuts/**/workflow.json
-education/**/.chat-drafts/
-education/**/quiz-attempts/
+home/**/.chat-drafts/
+home/**/quiz-attempts/
 data/usage/
 data/future-agents/
 data/study/
@@ -43,14 +43,14 @@ brain/**/_shots/
 brain/check-report.json
 
 # Operator data that must never be committed from a fork
-education/*/health/
-education/*/.chat-history/
-education/*/.location.json
-education/*/.location-history/
-education/*/.canvas/
-education/*/brain/people/
-education/*/brain/journal/
-education/*/brain/threads/
+home/*/health/
+home/*/.chat-history/
+home/*/.location.json
+home/*/.location-history/
+home/*/.canvas/
+home/*/brain/people/
+home/*/brain/journal/
+home/*/brain/threads/
 data/chat-log.md
 data/login-log.md
 data/agent-actions.jsonl

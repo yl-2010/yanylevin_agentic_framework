@@ -1,5 +1,5 @@
 /**
- * Canvas score labels for the education tree.
+ * Canvas score labels for the home tree.
  * Overlay only. Does not write todo.json / class.json.
  */
 
@@ -289,7 +289,7 @@ function paintCourseScore(target, course, snapshot) {
 }
 
 /**
- * Attach live Canvas labels onto an education tree. Mutates `tree`.
+ * Attach live Canvas labels onto an home tree. Mutates `tree`.
  * When `opts.term` and `opts.termsByClass` are set, a year-long class (and a
  * class in that term) takes its grade and canvasLink from that term's course
  * only. Todo scores still come from each assignment, including older terms.
@@ -418,7 +418,7 @@ export function attachCanvasOverlay(tree, snapshot, courseMap = null, opts = nul
   return tree;
 }
 
-function eachEducationTodo(tree, fn) {
+function eachHomeTodo(tree, fn) {
   if (!tree || typeof tree !== "object") return;
   for (const cls of tree.classes || []) {
     for (const t of cls?.todos || []) fn(t);
@@ -470,7 +470,7 @@ export function attachCanvasComments(tree, comments) {
     });
   }
 
-  eachEducationTodo(tree, (todo) => {
+  eachHomeTodo(tree, (todo) => {
     if (!todo || typeof todo !== "object") return;
     const assignmentId = todoCanvasAssignmentId(todo);
     if (assignmentId == null) return;

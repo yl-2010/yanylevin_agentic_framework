@@ -31,7 +31,7 @@
 // After the merge, background washes (bloomA/B/C, and bg/glow when the brand
 // has them) are derived from each brand's accent so no leftover hue can linger
 // when the theme changes.
-// `npm run brand` copies the merged colors into education/styles.css, the personal sites
+// `npm run brand` copies the merged colors into home/styles.css, the personal sites
 // that keep their own token block (2026-27-electives, prasham-schedule-options), the iOS
 // theme (ios/YanLevin/YanLevin/Design/BrandPalette.generated.swift), and the object-html
 // skill. Never hand-edit those generated blocks.

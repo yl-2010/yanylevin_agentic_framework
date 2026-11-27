@@ -1,5 +1,5 @@
 /**
- * Move Yan's education class trees into OneDrive (except _example-dummy).
+ * Move Yan's home class trees into OneDrive (except _example-dummy).
  *
  *   node server/migrate-classes-to-onedrive.js
  *   node server/migrate-classes-to-onedrive.js --dry-run
@@ -12,7 +12,7 @@ import {
   classObjectDir,
   gradeDirFromMeta,
   hiddenOnedriveFolderName,
-} from "./education-onedrive.js";
+} from "./home-onedrive.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const EMAIL = "you@example.com";
@@ -55,7 +55,7 @@ function folderForClass(classId, props) {
 
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
-  const root = join(ROOT, "education", EMAIL);
+  const root = join(ROOT, "home", EMAIL);
   const meta = JSON.parse(await readFile(join(root, "meta.json"), "utf8"));
   const gradeDir = gradeDirFromMeta(meta);
   if (!gradeDir) throw new Error("onedriveRoot/gradeFolder missing");

@@ -47,7 +47,7 @@ enum EducationScheduleHelper {
     static let schoolDayEndBufferMinutes = 15
     static let defaultLastBellEndMinutes = 15 * 60
 
-    /// Port of `meetingHighlightStartMin` in server/education-data.js.
+    /// Port of `meetingHighlightStartMin` in server/home-data.js.
     static func highlightStartMin(
         for dayClass: DayClass,
         in classes: [DayClass],
@@ -129,7 +129,7 @@ enum EducationScheduleHelper {
         return dueMin >= start && dueMin < end
     }
 
-    /// Port of `classSections` in education/app.js.
+    /// Port of `classSections` in home/app.js.
     static func classSections(
         schedule: EducationSchedule?,
         classes: [EducationClass],
@@ -214,7 +214,7 @@ enum EducationScheduleHelper {
     }
 
     /// Next class that has not ended yet (today or a future school day).
-    /// Port of `nextClassOccurrence` in education/app.js.
+    /// Port of `nextClassOccurrence` in home/app.js.
     static func nextClassOccurrence(
         cls: EducationClass,
         schedule: EducationSchedule?,
@@ -776,7 +776,7 @@ enum EducationTodoHelpers {
     }
 }
 
-/// Matches website `/education` type filters (`MA` · `QA` · `HW` · `CW` · `none`).
+/// Matches website `/home` type filters (`MA` · `QA` · `HW` · `CW` · `none`).
 enum EducationTodoFilter {
     static let orderedTags = ["MA", "QA", "HW", "CW", "none"]
     static var allTags: Set<String> { Set(orderedTags) }

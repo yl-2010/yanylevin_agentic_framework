@@ -38,12 +38,12 @@ describe("study access", () => {
   it("sends /study back to the study page", () => {
     assert.equal(sanitizeReturnPath("/study"), "/study/");
     assert.equal(sanitizeReturnPath("/study/"), "/study/");
-    assert.equal(sanitizeReturnPath("/elsewhere"), "/education/");
+    assert.equal(sanitizeReturnPath("/elsewhere"), "/home/");
     assert.equal(
       sanitizeReturnPath("/us-history/constitution-order"),
       "/us-history/constitution-order/"
     );
-    assert.equal(sanitizeReturnPath("//evil.com/us-history/x"), "/education/");
+    assert.equal(sanitizeReturnPath("//evil.com/us-history/x"), "/home/");
   });
 
 });

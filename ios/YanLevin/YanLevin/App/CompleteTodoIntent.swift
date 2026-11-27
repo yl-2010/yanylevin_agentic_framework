@@ -7,7 +7,7 @@ import WidgetKit
 /// iOS drops widget button intents that only exist in the extension.
 struct CompleteTodoIntent: AppIntent {
     static var title: LocalizedStringResource = "Complete Todo"
-    static var description = IntentDescription("Marks an education todo done or not done.")
+    static var description = IntentDescription("Marks a home todo done or not done.")
     static var isDiscoverable = false
     static var openAppWhenRun = false
     @available(iOS 26.0, *)
@@ -53,7 +53,7 @@ struct CompleteTodoIntent: AppIntent {
             query.append(URLQueryItem(name: "projectId", value: projectId))
         }
         let _: TodoDoneResponse = try await APIClient.shared.request(
-            "api/education/todo/\(todoId)/done",
+            "api/home/todo/\(todoId)/done",
             method: "PATCH",
             body: TodoDoneBody(done: done, classId: classId, projectId: projectId),
             bearer: token,
@@ -61,7 +61,7 @@ struct CompleteTodoIntent: AppIntent {
         )
         do {
             let (data, http) = try await APIClient.shared.requestRaw(
-                "api/education/data",
+                "api/home/data",
                 bearer: token
             )
             if (200..<300).contains(http.statusCode) {

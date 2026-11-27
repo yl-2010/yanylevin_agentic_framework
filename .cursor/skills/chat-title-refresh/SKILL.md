@@ -10,11 +10,11 @@ disable-model-invocation: true
 
 # Chat title refresh (Personal Agent)
 
-**Gate:** local Cursor agent only. Never spawn a cloud agent. Only rewrite `title:` lines in listed `education/<email>/.chat-history/<sessionId>.md` files. Do not edit messages, widgets, or other users' folders that were not listed. JYPE chats are a different skill: `.cursor/skills/jype-chat-title-refresh/SKILL.md`. You will not be given those files.
+**Gate:** local Cursor agent only. Never spawn a cloud agent. Only rewrite `title:` lines in listed `home/<email>/.chat-history/<sessionId>.md` files. Do not edit messages, widgets, or other users' folders that were not listed. JYPE chats are a different skill: `.cursor/skills/jype-chat-title-refresh/SKILL.md`. You will not be given those files.
 
 Model: **composer-2.5** (fast=false).
 
-You run **after** the 01:00 nightly agents. Default slot is **01:30** (`chatTitleRefreshLocalTime` in `education/you@example.com/daily-briefing/meta.json`). Life-state cleanup is the other 01:30 job. Context synthesis is later (02:30). Daily briefing is 06:00.
+You run **after** the 01:00 nightly agents. Default slot is **01:30** (`chatTitleRefreshLocalTime` in `home/you@example.com/daily-briefing/meta.json`). Life-state cleanup is the other 01:30 job. Context synthesis is later (02:30). Daily briefing is 06:00.
 
 The live first-message title agent is a different, faster pass. You see the **whole** thread and overwrite that first guess.
 

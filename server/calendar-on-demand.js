@@ -12,8 +12,8 @@ import { fileURLToPath } from "node:url";
 import { AGENT_SENT_FOOTER } from "./imessage-mention.js";
 import { loadCalendarTombstones } from "./calendar-memory.js";
 import { addLocalDays, zonedParts } from "./calendar-cli.js";
-import { objectDirId, resolveBookkeepingFile } from "./education-onedrive.js";
-import { listTopLevelProjects, PERSONAL_PROJECTS, YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { objectDirId, resolveBookkeepingFile } from "./home-onedrive.js";
+import { listTopLevelProjects, PERSONAL_PROJECTS, YAN_HOME_DIR } from "./onedrive-projects.js";
 import { parseFrontmatter, BRAIN_ROOT } from "./brain-lib.js";
 import { phoneDigits } from "./local-clock.js";
 import { choice, noul, systemOne, typesafeConfig } from "./typesafe.js";
@@ -91,7 +91,7 @@ let parentHandleCache = { at: 0, set: null };
 /** @type {Map<string, { at: number, map: Map<string, string> }>} */
 const handleNameCache = new Map();
 
-const USER_TODOS_DIR = join(YAN_EDUCATION_DIR, "todos");
+const USER_TODOS_DIR = join(YAN_HOME_DIR, "todos");
 const COLLEGE_PREP_TODOS_DIR = join(PERSONAL_PROJECTS, "College Prep", "todos");
 
 /** @type {Map<string, { key: string, messages: object[], timer: ReturnType<typeof setTimeout>|null, run: Function|null }>} */
@@ -254,7 +254,7 @@ async function messageIsParentText(message, deps = {}) {
 
 /**
  * @agent / @agentg already starts a personal-agent turn. This watcher must
- * not also file that job as Yan's education todo.
+ * not also file that job as Yan's home todo.
  * @param {unknown} text
  */
 export function isAgentInstruction(text) {
@@ -517,7 +517,7 @@ export async function projectTodoTargets(opts = {}) {
  */
 export async function loadActionTodoIndex(roots = {}) {
   const userTodosDir = roots.userTodosDir || USER_TODOS_DIR;
-  const deletedDir = roots.deletedDir || YAN_EDUCATION_DIR;
+  const deletedDir = roots.deletedDir || YAN_HOME_DIR;
   const scoped =
     roots.userTodosDir != null || roots.collegeTodosDir != null || roots.projectDirs != null;
   /** @type {{ id: string, name: string, todosDir: string }[]} */
@@ -709,7 +709,7 @@ export function buildOnDemandPrompt(pack) {
   }));
   const deletedTodos = String(pack.deletedTodos || "").trim();
   const calendarLine =
-    "Calendar. Add an event he is actually showing up for. A named day helps. Look up the weekday on the list below. This Saturday is the first Saturday. Next Saturday is the second. Do not count days yourself. TBD venue is fine when the plan is real. Look up the real start and end before you create. Pass --all-day only when the event has no clock (no school, a birthday, a holiday, a date-range delivery). A game, dinner, practice, appointment, or gym session gets that window, not the whole day. If you cannot find the time, create nothing for it. Do not move an existing event to another calendar. That resends invites, including a move on the same account. Pick the calendar only when you create. New events pick iCloud unless you are inviting someone, then Exchange. Skip college spam, including recruitment mail, Scoir, apply-now, and info sessions he did not register for. Skip the weekly EPS college-visit list unless Yan said he signed up for that visit. Skip education todos, homework, Canvas, due dates, and other dashboard items. Those stay on the education dashboard. The calendar is events. Also skip the EPS bell schedule, and EPS Ventures unless there is a signup confirmation.";
+    "Calendar. Add an event he is actually showing up for. A named day helps. Look up the weekday on the list below. This Saturday is the first Saturday. Next Saturday is the second. Do not count days yourself. TBD venue is fine when the plan is real. Look up the real start and end before you create. Pass --all-day only when the event has no clock (no school, a birthday, a holiday, a date-range delivery). A game, dinner, practice, appointment, or gym session gets that window, not the whole day. If you cannot find the time, create nothing for it. Do not move an existing event to another calendar. That resends invites, including a move on the same account. Pick the calendar only when you create. New events pick iCloud unless you are inviting someone, then Exchange. Skip college spam, including recruitment mail, Scoir, apply-now, and info sessions he did not register for. Skip the weekly EPS college-visit list unless Yan said he signed up for that visit. Skip home todos, homework, Canvas, due dates, and other dashboard items. Those stay on the home dashboard. The calendar is events. Also skip the EPS bell schedule, and EPS Ventures unless there is a signup confirmation.";
   /** @type {string[]} */
   const parts = [
     "Follow .cursor/skills/calendar-on-demand/SKILL.md and .cursor/skills/personal-calendar/SKILL.md.",
@@ -736,7 +736,7 @@ export function buildOnDemandPrompt(pack) {
     }
     parts.push(
       calendarLine,
-      `Todo. Only a specific task the message assigns to him. In a message, someone has to give him the task. In email, the mail has to give him a direct task, such as fill out a form a teacher or the school assigned him, reply to a direct question asked of him, or send an email about something the mail says he has to email about. The action is named in the text. If you cannot point at that sentence, create no todo. Skip FYI, thanks, newsletters, passcodes, suggestions, nudges, let-me-know-if-you-want, questions not asked of him, tasks for someone else, homework, Canvas, and due dates that already live on the education dashboard. Those stay education todos. Skip a call to @agent or @agentg, even if it only shows up in the thread. That message is already the agent's job, from Yan or from anyone else. Do not write a todo for it. Making a site or a page counts, including a get well site and a chem site. Do not invent a reply just because someone wrote. Skip college spam and the weekly EPS college-visit list unless he signed up. Skip a survey, poll, or form a student sent to his school email, including a stats project, a classmate blast, and Student News. A form a teacher or the school assigned him is not that skip. Set dueDate as YYYY-MM-DD and dueTime as HH:MM from the message. A deadline clock wins. A named part of the day wins when there is no clock: morning 08:30, after school or by Friday with no clock 15:30, tonight 20:00. ASAP or today with no clock is today at 15:30 when the message is still in the school day, otherwise tomorrow at 08:30. Before a named event means due before that start. Do not leave dueDate or dueTime blank. Do not use midnight. If the message is clearly about a project, write the todo in that project's todos folder. A debate task goes on Debate. College application tasks go in ${COLLEGE_PREP_TODOS_DIR}/<slug>/todo.json. Write a user-level todo at ${USER_TODOS_DIR}/<slug>/todo.json only when it matches no project. Do not invent a project. Fields are name, description, dueDate, dueTime, done false, createdAt now as ISO, showInDates false. Description is short markdown: who asked, what he has to do, and the link if the message has one. No school tag. No date.json. Do not also add that task to Apple Calendar. If an open todo below has a similar name, update that folder, including a new deadline. Do not mint (2). If it looks like a deleted todo row, skip it.`
+      `Todo. Only a specific task the message assigns to him. In a message, someone has to give him the task. In email, the mail has to give him a direct task, such as fill out a form a teacher or the school assigned him, reply to a direct question asked of him, or send an email about something the mail says he has to email about. The action is named in the text. If you cannot point at that sentence, create no todo. Skip FYI, thanks, newsletters, passcodes, suggestions, nudges, let-me-know-if-you-want, questions not asked of him, tasks for someone else, homework, Canvas, and due dates that already live on the home dashboard. Those stay home todos. Skip a call to @agent or @agentg, even if it only shows up in the thread. That message is already the agent's job, from Yan or from anyone else. Do not write a todo for it. Making a site or a page counts, including a get well site and a chem site. Do not invent a reply just because someone wrote. Skip college spam and the weekly EPS college-visit list unless he signed up. Skip a survey, poll, or form a student sent to his school email, including a stats project, a classmate blast, and Student News. A form a teacher or the school assigned him is not that skip. Set dueDate as YYYY-MM-DD and dueTime as HH:MM from the message. A deadline clock wins. A named part of the day wins when there is no clock: morning 08:30, after school or by Friday with no clock 15:30, tonight 20:00. ASAP or today with no clock is today at 15:30 when the message is still in the school day, otherwise tomorrow at 08:30. Before a named event means due before that start. Do not leave dueDate or dueTime blank. Do not use midnight. If the message is clearly about a project, write the todo in that project's todos folder. A debate task goes on Debate. College application tasks go in ${COLLEGE_PREP_TODOS_DIR}/<slug>/todo.json. Write a user-level todo at ${USER_TODOS_DIR}/<slug>/todo.json only when it matches no project. Do not invent a project. Fields are name, description, dueDate, dueTime, done false, createdAt now as ISO, showInDates false. Description is short markdown: who asked, what he has to do, and the link if the message has one. No school tag. No date.json. Do not also add that task to Apple Calendar. If an open todo below has a similar name, update that folder, including a new deadline. Do not mint (2). If it looks like a deleted todo row, skip it.`
     );
     const projectLines = (Array.isArray(pack.projects) ? pack.projects : [])
       .filter((row) => row && row.id && row.todosDir)

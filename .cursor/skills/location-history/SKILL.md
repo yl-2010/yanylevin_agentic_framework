@@ -17,7 +17,7 @@ Model: **composer-2.5** (fast=false). Also the every-4h compose when new GPS has
 
 ## Files
 
-All under `education/you@example.com/location/`:
+All under `home/you@example.com/location/`:
 
 | File | Role |
 |------|------|
@@ -26,7 +26,7 @@ All under `education/you@example.com/location/`:
 | `places.md` | Date-grouped stays. Newest day on top. |
 | `trips.md` | Date-grouped paths. Newest day on top. |
 
-Live last-known fix (do not use as history): `education/you@example.com/.location.json`.
+Live last-known fix (do not use as history): `home/you@example.com/.location.json`.
 
 ## Life state (required context)
 

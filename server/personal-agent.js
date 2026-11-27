@@ -1,6 +1,6 @@
 /**
  * Cursor SDK local agent sessions for the Personal Agent
- * (iOS Chat tab / /education chat). Local-only — never cloud runtime.
+ * (iOS Chat tab / /home chat). Local-only — never cloud runtime.
  */
 
 import { randomUUID } from "node:crypto";
@@ -9,8 +9,8 @@ import { copyFile, mkdir, writeFile, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, basename, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { isEducationUser, resolveNowScheduleContext } from "./education-data.js";
-import { notifyEducationClients } from "./education-events.js";
+import { isHomeUser, resolveNowScheduleContext } from "./home-data.js";
+import { notifyHomeClients } from "./home-events.js";
 import { canonicalizeEmail, isJypeAccessEmail, isFullAccessEmail, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
 import { logSdkResult, personFromEmail } from "./usage-log.js";
 import {
@@ -24,9 +24,9 @@ import {
   normalizeJypeWorkspace,
   originIsJypeThread,
 } from "./jype.js";
-import { educationDataDir, JYPE_DIR } from "./onedrive-projects.js";
+import { homeDataDir, JYPE_DIR } from "./onedrive-projects.js";
 import { gitAddCommitPush } from "./git-publish.js";
-import { encodeEducationRouteId } from "./education-route-id.js";
+import { encodeHomeRouteId } from "./home-route-id.js";
 import { enqueueBrainExtraction } from "./brain-extraction.js";
 import { parseLocationPayload } from "./phone-location.js";
 import { formatCalendarLiveLines } from "./calendar-cli.js";
@@ -45,7 +45,7 @@ import {
   splitChatMessageFiles,
   safeChatFileName,
   EPHEMERAL_HIDE_MS,
-} from "./education-chat-history.js";
+} from "./home-chat-history.js";
 import { enqueueChatTitle, isStubChatTitle } from "./chat-title.js";
 import {
   armFutureAgentTimer,
@@ -159,8 +159,8 @@ const PA_ERROR_REPLY =
  *   replayUiTranscript?: boolean,
  *   activeRun?: any,
  *   interrupting?: boolean,
- *   pendingNavigate?: Omit<EducationNavigate, 'id'>|null,
- *   navigate?: EducationNavigate|null,
+ *   pendingNavigate?: Omit<HomeNavigate, 'id'>|null,
+ *   navigate?: HomeNavigate|null,
  *   imessageOrigin?: object|null,
  *   imessageDeliverFinal?: boolean,
  *   teamsOrigin?: object|null,
@@ -179,7 +179,7 @@ const PA_ERROR_REPLY =
 const ephemeralHideTimers = new Map();
 
 /**
- * One-shot education SPA / iOS stack target. Not stored in chat history.
+ * One-shot home SPA / iOS stack target. Not stored in chat history.
  * @typedef {{
  *   id: string,
  *   view: 'home'|'class'|'project'|'todo'|'date'|'capsule'|'case',
@@ -190,7 +190,7 @@ const ephemeralHideTimers = new Map();
  *   capsuleId?: string,
  *   caseId?: string,
  *   caseSide?: string,
- * }} EducationNavigate
+ * }} HomeNavigate
  */
 
 /** @typedef {{ name: string, mimeType?: string, data?: string, sourcePath?: string, bytes?: number }} AttachmentInput */
@@ -239,7 +239,7 @@ function canUseAgent(email, workspace) {
   if (normalizeJypeWorkspace(workspace) === "jype") {
     return isJypeAccessEmail(normalized);
   }
-  return isEducationUser(normalized);
+  return isHomeUser(normalized);
 }
 
 function canAccessSession(session, email) {
@@ -251,7 +251,7 @@ function canAccessSession(session, email) {
 
 function notifyAgentClients(session, email, data) {
   const ws = sessionWorkspace(session);
-  notifyEducationClients(email || session?.email, "change", {
+  notifyHomeClients(email || session?.email, "change", {
     ...data,
     ...(ws ? { workspace: ws } : {}),
   });
@@ -325,14 +325,14 @@ function personalModelSpec(envId, fallbackId) {
 
 /** Text-only Personal Agent. Default grok-4.7 high, Fast off. */
 export const DEFAULT_MODEL_SPEC = personalModelSpec(
-  process.env.CURSOR_PERSONAL_MODEL || process.env.CURSOR_EDUCATION_MODEL,
+  process.env.CURSOR_PERSONAL_MODEL || process.env.CURSOR_HOME_MODEL,
   "grok-4.7"
 );
 
 /** Attachment / image Personal Agent. grok-4.7 high, Fast off, independent of text-only. */
 export const ATTACHMENT_MODEL_SPEC = personalModelSpec(
   process.env.CURSOR_PERSONAL_ATTACHMENT_MODEL ||
-    process.env.CURSOR_EDUCATION_ATTACHMENT_MODEL,
+    process.env.CURSOR_HOME_ATTACHMENT_MODEL,
   "grok-4.7"
 );
 
@@ -734,7 +734,7 @@ function setSessionWorkingLabel(session, sid, label) {
   const next = label || null;
   if (session.workingLabel === next) return;
   session.workingLabel = next;
-  notifyEducationClients(session.email, "change", {
+  notifyHomeClients(session.email, "change", {
     source: "agent",
     sessionId: sid,
     status: session.status || "running",
@@ -749,17 +749,17 @@ function mintNavigateId() {
 }
 
 /**
- * Sanitize an education page target from the agent tool (or tests).
+ * Sanitize an home page target from the agent tool (or tests).
  * @param {unknown} raw
- * @returns {Omit<EducationNavigate, 'id'> & { id?: string } | null}
+ * @returns {Omit<HomeNavigate, 'id'> & { id?: string } | null}
  */
-export function normalizeEducationNavigate(raw) {
+export function normalizeHomeNavigate(raw) {
   if (!raw || typeof raw !== "object") return null;
   const src = /** @type {Record<string, unknown>} */ (raw);
   const view = String(src.view || "")
     .trim()
     .toLowerCase();
-  if (!EDUCATION_VIEWS.has(view)) return null;
+  if (!HOME_VIEWS.has(view)) return null;
   const str = (key, max = 120) => {
     if (src[key] == null) return "";
     return String(src[key]).trim().slice(0, max);
@@ -778,8 +778,8 @@ export function normalizeEducationNavigate(raw) {
   if (view === "date" && !dateId) return null;
   if (view === "capsule" && (!todoId || !capsuleId)) return null;
   if (view === "case" && !caseId) return null;
-  /** @type {Omit<EducationNavigate, 'id'> & { id?: string }} */
-  const out = { view: /** @type {EducationNavigate['view']} */ (view) };
+  /** @type {Omit<HomeNavigate, 'id'> & { id?: string }} */
+  const out = { view: /** @type {HomeNavigate['view']} */ (view) };
   if (classId) out.classId = classId;
   if (projectId) out.projectId = projectId;
   if (todoId) out.todoId = todoId;
@@ -797,8 +797,8 @@ export function normalizeEducationNavigate(raw) {
  * @param {unknown} raw
  * @returns {string|null}
  */
-export function educationNavigateHref(raw) {
-  const n = normalizeEducationNavigate(raw);
+export function homeNavigateHref(raw) {
+  const n = normalizeHomeNavigate(raw);
   if (!n) return null;
   const q = n.projectId
     ? `?project=${encodeURIComponent(n.projectId)}`
@@ -807,22 +807,22 @@ export function educationNavigateHref(raw) {
       : "";
   switch (n.view) {
     case "home":
-      return "/education/";
+      return "/home/";
     case "class":
-      return `/education/class/${encodeEducationRouteId(n.classId || "")}`;
+      return `/home/class/${encodeHomeRouteId(n.classId || "")}`;
     case "project":
-      return `/education/project/${encodeEducationRouteId(n.projectId || "")}`;
+      return `/home/project/${encodeHomeRouteId(n.projectId || "")}`;
     case "todo":
-      return `/education/todo/${encodeEducationRouteId(n.todoId || "")}${q}`;
+      return `/home/todo/${encodeHomeRouteId(n.todoId || "")}${q}`;
     case "date":
-      return `/education/date/${encodeEducationRouteId(n.dateId || "")}${q}`;
+      return `/home/date/${encodeHomeRouteId(n.dateId || "")}${q}`;
     case "capsule":
-      return `/education/todo/${encodeEducationRouteId(n.todoId || "")}/capsule/${encodeEducationRouteId(
+      return `/home/todo/${encodeHomeRouteId(n.todoId || "")}/capsule/${encodeHomeRouteId(
         n.capsuleId || ""
       )}${q}`;
     case "case": {
       const side = n.caseSide === "neg" ? "neg" : "aff";
-      return `/debate/case/${encodeEducationRouteId(n.caseId || "")}/${side}`;
+      return `/debate/case/${encodeHomeRouteId(n.caseId || "")}/${side}`;
     }
     default:
       return null;
@@ -831,7 +831,7 @@ export function educationNavigateHref(raw) {
 
 /**
  * @param {Session} session
- * @returns {EducationNavigate|null}
+ * @returns {HomeNavigate|null}
  */
 function sessionNavigatePayload(session) {
   return session?.navigate || null;
@@ -842,10 +842,10 @@ function sessionNavigatePayload(session) {
  * Does not jump clients yet.
  * @param {Session|null|undefined} session
  * @param {unknown} raw
- * @returns {Omit<EducationNavigate, 'id'>|null}
+ * @returns {Omit<HomeNavigate, 'id'>|null}
  */
-export function queueEducationNavigate(session, raw) {
-  const nav = normalizeEducationNavigate(raw);
+export function queueHomeNavigate(session, raw) {
+  const nav = normalizeHomeNavigate(raw);
   if (!session || !nav) return null;
   const { id: _ignored, ...rest } = nav;
   session.pendingNavigate = rest;
@@ -855,11 +855,11 @@ export function queueEducationNavigate(session, raw) {
 /**
  * Mint the one-shot jump for a finished turn. No-op if nothing was queued.
  * @param {Session|null|undefined} session
- * @returns {EducationNavigate|null}
+ * @returns {HomeNavigate|null}
  */
-export function publishQueuedEducationNavigate(session) {
+export function publishQueuedHomeNavigate(session) {
   if (!session?.pendingNavigate) return null;
-  /** @type {EducationNavigate} */
+  /** @type {HomeNavigate} */
   const next = { ...session.pendingNavigate, id: mintNavigateId() };
   session.pendingNavigate = null;
   session.navigate = next;
@@ -872,7 +872,7 @@ export function publishQueuedEducationNavigate(session) {
  * @param {Record<string, unknown>} extra
  */
 function notifyTurnFinished(session, sid, extra) {
-  const navigate = publishQueuedEducationNavigate(session);
+  const navigate = publishQueuedHomeNavigate(session);
   /** @type {Record<string, unknown>} */
   const payload = {
     source: "agent",
@@ -880,7 +880,7 @@ function notifyTurnFinished(session, sid, extra) {
     ...extra,
   };
   if (navigate) payload.navigate = navigate;
-  notifyEducationClients(session.email, "change", payload);
+  notifyHomeClients(session.email, "change", payload);
   scheduleEphemeralHideNotify(sid, session, extra?.status);
 }
 
@@ -906,7 +906,7 @@ function armEphemeralListRefresh(email, sid, delayMs = EPHEMERAL_HIDE_MS) {
     ephemeralHideTimers.delete(sid);
     const live = sessions.get(sid);
     if (live?.ephemeralPinned) return;
-    notifyEducationClients(email, "change", {
+    notifyHomeClients(email, "change", {
       source: "agent",
       sessionId: sid,
       status: live?.status || "idle",
@@ -969,7 +969,7 @@ async function backfillInheritedScheduledHides() {
     }
   }
   for (const email of touched) {
-    notifyEducationClients(email, "change", { source: "agent", status: "idle" });
+    notifyHomeClients(email, "change", { source: "agent", status: "idle" });
   }
   return rows;
 }
@@ -1002,11 +1002,11 @@ async function rearmInheritedEphemeralHides(rows) {
  * @param {string} sid
  * @param {Session} session
  */
-function openEducationPageTool(sid, session) {
+function openHomePageTool(sid, session) {
   return {
-    open_education_page: {
+    open_home_page: {
       description:
-        "Queue an education dashboard page to open once this turn finishes (website in place, iOS Education tab without leaving Chat). The jump happens when your final reply lands, not when you call this tool. Last call in the turn wins. Call when the user asks about one todo, class, project, date, capsule, or debate case, says show/take me there, or you just created that object. Skip if Live context is already that page, for lists of many items, or for mail/news/fitness. Call after the folder exists. Express/web/iOS only; not Cursor Desktop.",
+        "Queue an home dashboard page to open once this turn finishes (website in place, iOS Home tab without leaving Chat). The jump happens when your final reply lands, not when you call this tool. Last call in the turn wins. Call when the user asks about one todo, class, project, date, capsule, or debate case, says show/take me there, or you just created that object. Skip if Live context is already that page, for lists of many items, or for mail/news/fitness. Call after the folder exists. Express/web/iOS only; not Cursor Desktop.",
       inputSchema: {
         type: "object",
         properties: {
@@ -1032,7 +1032,7 @@ function openEducationPageTool(sid, session) {
         if (!sessions.has(sid) || sessions.get(sid) !== session) {
           return "session gone";
         }
-        const queued = queueEducationNavigate(session, input);
+        const queued = queueHomeNavigate(session, input);
         if (!queued) return "invalid target";
         return `queued ${queued.view} (opens when this turn finishes)`;
       },
@@ -1210,7 +1210,7 @@ function attachScheduledToSession(session, record) {
 }
 
 function notifyScheduledThread(email, workspace, sessionId, status) {
-  notifyEducationClients(email, "change", {
+  notifyHomeClients(email, "change", {
     source: "agent",
     sessionId,
     status: status || "idle",
@@ -1398,7 +1398,7 @@ function sessionCustomTools(sid, session) {
     ...sendChatMessageTool(sid, session),
     ...futureAgentTools(sid, session),
     ...gradeWatchTools(sid, session),
-    ...openEducationPageTool(sid, session),
+    ...openHomePageTool(sid, session),
     ...hideChatSoonTool(sid, session),
     ...(sessionMayUseBrowser(session) ? browserCustomTools(session) : {}),
   };
@@ -1438,7 +1438,7 @@ function sendChatMessageTool(sid, session) {
           stampMessage("assistant", content, parsed.widgets)
         );
         persistSessionHistory(sid, session);
-        notifyEducationClients(session.email, "change", {
+        notifyHomeClients(session.email, "change", {
           source: "agent",
           sessionId: sid,
           status: "running",
@@ -2100,7 +2100,7 @@ export const FOUR11_SKILL_PATH = join(
 export const PERSONAL_SKILL_PATHS = {
   agent: ".cursor/skills/personal-agent/SKILL.md",
   soul: "SOUL.md",
-  education: ".cursor/skills/personal-agent/education-dashboard.md",
+  homeDashboard: ".cursor/skills/personal-agent/home-dashboard.md",
   debate: ".cursor/skills/debate-cases/SKILL.md",
   schedule: ".cursor/skills/class-schedule/SKILL.md",
   widgets: ".cursor/skills/chat-widgets/SKILL.md",
@@ -2137,7 +2137,7 @@ export const PERSONAL_SKILL_PATHS = {
 };
 
 function chatUploadDir(email, workspace, id) {
-  const base = workspace === "jype" ? JYPE_DIR : educationDataDir(email) || "";
+  const base = workspace === "jype" ? JYPE_DIR : homeDataDir(email) || "";
   return join(base, ".chat-uploads", id);
 }
 
@@ -2278,7 +2278,7 @@ const JYPE_OUTSIDER_HINT =
 const DEVICE_PING_HINT =
   "Only Alex can ping or flash Yan's devices. When he asks, do it. Do not refuse. Nobody else, including Jayesh. Yan, 2026-11-12.";
 
-const EDUCATION_VIEWS = new Set([
+const HOME_VIEWS = new Set([
   "home",
   "class",
   "project",
@@ -2302,7 +2302,7 @@ export function systemPrompt(email, opts = {}) {
       `Signed-in user: ${email} (${given}).`,
       "Yan: full write in this repo and on this Mac.",
       `JYPE chats live in ${JYPE_DIR}/.chat-history/. They stay in the history list. No 10-minute hide.`,
-      "Public pages this JYPE agent creates get a sites[] tile on the related JYPE class. Do not copy Yan's personal /education sites onto JYPE unless Yan is sending that URL to a JYPE member.",
+      "Public pages this JYPE agent creates get a sites[] tile on the related JYPE class. Do not copy Yan's personal /home sites onto JYPE unless Yan is sending that URL to a JYPE member.",
       "On Yan's Mac Studio: after push, run npm run deploy:web yourself when the live site must change. Do not ask Yan or JYPE members to deploy. Read the jype-agent skill.",
       "Never mention the surprise hoodies to Alex, or in any chat he can see, including this one, until Yan says he has been given his. Yan, 2026-10-09.",
       "/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.tests/ is a private guide, including calc Yan took last year that Alex is taking now. Change the numbers before Alex sees a problem. Never put an original question in Teams. The school can read Teams. In Teams, do not say a scan or last year's test exists. Yan, 2026-10-15.",
@@ -2318,7 +2318,7 @@ export function systemPrompt(email, opts = {}) {
       `Always Read and apply the unslop skill (${UNSLOP_SKILL_PATH}) on every turn.`,
       `Always Read ${PERSONAL_SKILL_PATHS.soul} for persona and judgment.`,
       `- JYPE agent (deploy, ship URLs): ${PERSONAL_SKILL_PATHS.jypeAgent}`,
-      `- JYPE dashboard (classes, todos, dates, projects): ${PERSONAL_SKILL_PATHS.education}`,
+      `- JYPE dashboard (classes, todos, dates, projects): ${PERSONAL_SKILL_PATHS.homeDashboard}`,
       `- Static HTML on a JYPE object: ${PERSONAL_SKILL_PATHS.objectHtml || ".cursor/skills/object-html/SKILL.md"}`,
       `- Public yanylevin.com page: ${PERSONAL_SKILL_PATHS.webpage || ".cursor/skills/yanylevin-webpage-create/SKILL.md"}`,
       `- EPS student IDs / school photos: ${FOUR11_SKILL_PATH}`,
@@ -2338,11 +2338,11 @@ export function systemPrompt(email, opts = {}) {
     ].join("\n");
   }
   return [
-    "You are the Personal Agent for yanylevin.com (iOS Chat tab person icon / /education chat) and Cursor Desktop on this Mac.",
-    "The /education website is still the school dashboard. You are a personal agent that can manage that dashboard when asked, plus mail, news, location, and anything else the user asks.",
+    "You are the Personal Agent for yanylevin.com (iOS Chat tab person icon / /home chat) and Cursor Desktop on this Mac.",
+    "The /home website is still the school dashboard. You are a personal agent that can manage that dashboard when asked, plus mail, news, location, and anything else the user asks.",
     `Signed-in user email: ${email}`,
-    "Yan: full write in this repo and on this Mac. Do not refuse repo-wide or Mac-wide work. Class files go on OneDrive (education-dashboard skill). Personal data is /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education. An existing Word, Excel, or PowerPoint file is edited in that app with Cursor computer use. Do not rewrite its bytes.",
-    "Code in this repo must be committed and pushed to origin/main before the turn ends. Commit only files from this turn. education-sync only covers tmp/. User data is on OneDrive. Never commit server/.env.",
+    "Yan: full write in this repo and on this Mac. Do not refuse repo-wide or Mac-wide work. Class files go on OneDrive (home-dashboard skill). Personal data is /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.education. An existing Word, Excel, or PowerPoint file is edited in that app with Cursor computer use. Do not rewrite its bytes.",
+    "Code in this repo must be committed and pushed to origin/main before the turn ends. Commit only files from this turn. home-sync only covers tmp/. User data is on OneDrive. Never commit server/.env.",
     "Never spawn a Cursor cloud agent. Never edit main-site chatbot.js / /api/chat / LM Studio unless Yan explicitly asks.",
     FUTURE_AGENT_HINT,
     THIRD_PARTY_MODEL_HINT,
@@ -2361,7 +2361,7 @@ export function systemPrompt(email, opts = {}) {
     `When Yan states a fact or correction about a person or entity, write it the same turn per ${PERSONAL_SKILL_PATHS.people}: dated timeline entry or frontmatter field on that entity. Do not also copy the person fact onto identity.md. Identity people lines are name, role, and a people/slug pointer. Facts about Yan himself go to /Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/identity.md (map) or identity-school.md / identity-accounts.md / identity-logistics.md or threads/. Rewrite a standing line. Do not wait for the nightly job.`,
     "Do not preload other skills. Read only the file this turn needs:",
     `- Identity / permissions / reply style: ${PERSONAL_SKILL_PATHS.agent}`,
-    `- Education dashboard (classes, todos, dates, projects, school attachments): ${PERSONAL_SKILL_PATHS.education}`,
+    `- Home dashboard (classes, todos, dates, projects, school attachments): ${PERSONAL_SKILL_PATHS.homeDashboard}`,
     `- Debate / case building: ${PERSONAL_SKILL_PATHS.debate}`,
     `- Class schedule: ${PERSONAL_SKILL_PATHS.schedule}`,
     `- EPS student IDs / school photos: ${FOUR11_SKILL_PATH}`,
@@ -2396,14 +2396,14 @@ export function systemPrompt(email, opts = {}) {
     `- Celebration site: ${PERSONAL_SKILL_PATHS.celebration}`,
     `- Memories / brain: ${PERSONAL_SKILL_PATHS.brain}`,
     "",
-    "Live context below is authoritative for clock, class-now, and the open screen. Trust it. Named-people lookup still opens brain/people/. Other education/<email>/ files only when the question needs that data.",
+    "Live context below is authoritative for clock, class-now, and the open screen. Trust it. Named-people lookup still opens brain/people/. Other home/<email>/ files only when the question needs that data.",
     "",
     "Reply: short. School mutations 1-3 lines. Markdown OK in the text bubble; never HTML tags or markdown images. Never em dashes. No thinking aloud. Do not tell the user to refresh. Read the widgets skill before emitting any widget fence. Never put Sent by Yan's Personal Agent in app or website bubbles; that footer is only for iMessage, email, and Teams.",
     "Math on the website and in the iOS app is a display block, with a blank line before and after. Put $$ on its own line, then LaTeX, then $$ on its own line. Stack equations one per line in that block. Use \\(x\\) or $x^2$ only for a symbol inside a sentence. Never backticks for math. iMessage and Teams cannot render KaTeX, so those replies stay plain words.",
     "Send to a person with no channel named: iMessage, then Teams, then email. Named channel wins. In a Teams chat, tell Name stays in that chat unless they say iMessage. iMessage cannot attach a file. Messages accepts the send and the file never arrives. A file for iMessage or Teams goes out as a yanylevin.com link. Put it in the repo, use a non-guessable folder when it should not be easy to find, commit, push, npm run deploy:web, confirm the URL is 200, then send the link. Email the file with Mail.app only when they asked for email. A request to send the file is the link. Attach it in Messages or Teams with computer use only when they specifically ask for the file to go through that app. A message with images has no pixels. Open that chat in the Teams app and look. School Outlook still cannot send.",
     "Long work: send_chat_message first with a short status. Send more mid-run when new info, a change, or a useful update appears. Then a final Done. Quick answers: one reply only (that is the end of turn). On an iMessage or Teams @agent or @agentg first turn, that first status is also posted to the chat before you start the work.",
-    "To show one education page on web/iOS, call open_education_page (education-dashboard skill). The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Skip if already on that page. Not on Cursor Desktop.",
-    "A one-field edit on an existing education object, and nothing else in this thread, call hide_chat_soon yourself at the end. Due date, due time, rename, check off, tag, or hide it from the home list. Skip it for a new object, a page, a file, research, mail, a multi-step job, a thread that already has a real back-and-forth, a future agent scheduled this turn, or an iMessage or Teams thread. Do not mention the hide. Pass sessionId only when asked to hide a different thread in 10 minutes.",
+    "To show one home page on web/iOS, call open_home_page (home-dashboard skill). The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Skip if already on that page. Not on Cursor Desktop.",
+    "A one-field edit on an existing home object, and nothing else in this thread, call hide_chat_soon yourself at the end. Due date, due time, rename, check off, tag, or hide it from the home list. Skip it for a new object, a page, a file, research, mail, a multi-step job, a thread that already has a real back-and-forth, a future agent scheduled this turn, or an iMessage or Teams thread. Do not mention the hide. Pass sessionId only when asked to hide a different thread in 10 minutes.",
     "No period when the reply is one word, one phrase, or one sentence.",
   ].join("\n");
 }
@@ -2546,7 +2546,7 @@ export function liveContextSections(nowContext, uiContext, appendix = "") {
     lines.push(`- client: ${client}`);
     if (uiContext.path) lines.push(`- path: ${uiContext.path}`);
     if (view === "home") {
-      lines.push("- Viewing Education home (TODO / Classes / Dates / Projects panels).");
+      lines.push("- Viewing Home home (TODO / Classes / Dates / Projects panels).");
     } else if (view === "class") {
       lines.push(
         `- Viewing expanded CLASS: ${uiContext.className || uiContext.classId || "?"}` +
@@ -2630,7 +2630,7 @@ export function liveContextSections(nowContext, uiContext, appendix = "") {
       if (uiContext.dateId) lines.push(`- dateId: ${uiContext.dateId}`);
     } else if (view === "usage" || view === "dashboard") {
       lines.push(
-        `- Called from the ${view} site. Same Personal Agent and the same chat history as education. This turn was started from ${view}.`
+        `- Called from the ${view} site. Same Personal Agent and the same chat history as home. This turn was started from ${view}.`
       );
       lines.push(
         view === "usage"
@@ -2676,9 +2676,9 @@ export function liveContextSections(nowContext, uiContext, appendix = "") {
       lines.push(`- view: ${view}`);
     }
     if (uiContext.title && !view) lines.push(`- title: ${uiContext.title}`);
-    if (EDUCATION_VIEWS.has(view)) {
+    if (HOME_VIEWS.has(view)) {
       lines.push(
-        `- Before creating or editing dashboard objects, Read ${PERSONAL_SKILL_PATHS.education}.`
+        `- Before creating or editing dashboard objects, Read ${PERSONAL_SKILL_PATHS.homeDashboard}.`
       );
       lines.push(
         `- Class schedule: Read ${PERSONAL_SKILL_PATHS.schedule} if you need it.`
@@ -3410,7 +3410,7 @@ export async function markAgentChatRead(sessionId, email, opts = {}) {
     sessionId: sid,
     workspace,
   });
-  notifyEducationClients(normalized, "change", {
+  notifyHomeClients(normalized, "change", {
     source: "agent",
     sessionId: sid,
     status: "read",
@@ -3461,7 +3461,7 @@ export async function resumeAgent(sessionId, email, opts = {}) {
       sessionId: sid,
       workspace: workspace || sessionWorkspace(live),
     });
-    notifyEducationClients(normalized, "change", {
+    notifyHomeClients(normalized, "change", {
       source: "agent",
       sessionId: sid,
       status: live.status || "idle",
@@ -3551,7 +3551,7 @@ export async function resumeAgent(sessionId, email, opts = {}) {
   if (!loaded.title || isStubChatTitle(loaded.title, firstUser)) {
     enqueueChatTitle({ email: normalized, sessionId: sid, workspace });
   }
-  notifyEducationClients(normalized, "change", {
+  notifyHomeClients(normalized, "change", {
     source: "agent",
     sessionId: sid,
     status: "idle",
@@ -3824,8 +3824,8 @@ async function executeAgentTurn(sid, session, opts) {
         : null,
     };
     gitAddCommitPush({
-      paths: [`education/${normalized}`],
-      message: `education: agent update for ${normalized}`,
+      paths: [`home/${normalized}`],
+      message: `home: agent update for ${normalized}`,
     }).catch((err) => console.error("[personal-agent] git publish", err));
 
     if (finishedStatus === "idle") {
@@ -4103,8 +4103,8 @@ export async function messageAgent(
       );
     }
     promptParts.push(
-      `When storing long-term dashboard context, Read ${PERSONAL_SKILL_PATHS.education} then copy identical bytes into the matching object folder.`,
-      `Yan class files: that class's OneDrive todo/date folder (meta.json onedriveRoot + gradeFolder + onedriveFolder). Do not write class files under education/${normalized}/ except .chat-uploads. A new Word, Excel, or PowerPoint file can be stored. If that Office file already exists, edit it in the app with Cursor computer use. Do not run server/computer-use.js. Do not store over it. Turn in / submit / upload to Canvas: identify the assignment (Live context first), name the file from the Canvas assignment title (or the todo name if there is no Canvas title; do not use the header printed on the sheet), store, then node --env-file=server/.env server/canvas-files.js submit --canvas-id <id> --file <path>. Save / put this in / handle the file: same store path (node --env-file=server/.env server/canvas-files.js store --src <path> --class <id> --todo "<Finder folder>"), do not submit. Ask only if the assignment is unclear.`
+      `When storing long-term dashboard context, Read ${PERSONAL_SKILL_PATHS.homeDashboard} then copy identical bytes into the matching object folder.`,
+      `Yan class files: that class's OneDrive todo/date folder (meta.json onedriveRoot + gradeFolder + onedriveFolder). Do not write class files under home/${normalized}/ except .chat-uploads. A new Word, Excel, or PowerPoint file can be stored. If that Office file already exists, edit it in the app with Cursor computer use. Do not run server/computer-use.js. Do not store over it. Turn in / submit / upload to Canvas: identify the assignment (Live context first), name the file from the Canvas assignment title (or the todo name if there is no Canvas title; do not use the header printed on the sheet), store, then node --env-file=server/.env server/canvas-files.js submit --canvas-id <id> --file <path>. Save / put this in / handle the file: same store path (node --env-file=server/.env server/canvas-files.js store --src <path> --class <id> --todo "<Finder folder>"), do not submit. Ask only if the assignment is unclear.`
     );
   }
 
@@ -4165,7 +4165,7 @@ export async function messageAgent(
     turnOpts.queueId = randomUUID();
     session.turnQueue.push(turnOpts);
     persistSessionHistory(sid, session);
-    notifyEducationClients(normalized, "change", {
+    notifyHomeClients(normalized, "change", {
       source: "agent",
       sessionId: sid,
       status: "running",
@@ -4180,7 +4180,7 @@ export async function messageAgent(
     // change; a /chats refresh right after send must already list it.
     await persistSessionHistory(sid, session);
     session.workingLabel = WORKING_LABEL_DEFAULT;
-    notifyEducationClients(normalized, "change", {
+    notifyHomeClients(normalized, "change", {
       source: "agent",
       sessionId: sid,
       status: "running",
@@ -4542,7 +4542,7 @@ export async function stopAgent(sessionId, email, opts = {}) {
     if (activeByEmail.get(key) === sid) {
       activeByEmail.delete(key);
     }
-    notifyEducationClients(normalized, "change", {
+    notifyHomeClients(normalized, "change", {
       source: "agent",
       sessionId: sid || null,
       status: "stopped",
@@ -4556,7 +4556,7 @@ export async function stopAgent(sessionId, email, opts = {}) {
     throw err;
   }
   await disposeSession(sid);
-  notifyEducationClients(normalized, "change", {
+  notifyHomeClients(normalized, "change", {
     source: "agent",
     sessionId: sid,
     status: "stopped",

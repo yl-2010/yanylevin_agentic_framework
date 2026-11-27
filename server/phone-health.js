@@ -1,6 +1,6 @@
 /**
  * Apple Health dump from Yan's iPhone Shortcut.
- * POST /api/education/health → education/<email>/health/
+ * POST /api/home/health → home/<email>/health/
  * (raw JSON, monthly JSONL, workouts.md, state.json).
  */
 
@@ -16,10 +16,10 @@ import {
 import { join } from "node:path";
 import { gitAddCommitPush } from "./git-publish.js";
 import { canonicalizeEmail, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
-import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { YAN_HOME_DIR } from "./onedrive-projects.js";
 
 export const HEALTH_DIRNAME = "health";
-export const HEALTH_REL = join(YAN_EDUCATION_DIR, HEALTH_DIRNAME);
+export const HEALTH_REL = join(YAN_HOME_DIR, HEALTH_DIRNAME);
 /** Standing Health display zone. History is Seattle life, not the travel briefing clock. */
 export const HEALTH_TIMEZONE = "America/Los_Angeles";
 /** Austin trip: workouts after this local date (exclusive) through HEALTH_AUSTIN_UNTIL_DATE. */

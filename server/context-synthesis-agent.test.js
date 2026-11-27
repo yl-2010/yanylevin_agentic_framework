@@ -109,7 +109,7 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /biased to include/);
     assert.match(prompt, /College spam stays out/);
     assert.match(prompt, /weekly EPS college-visit list stays out/);
-    assert.match(prompt, /education todos/);
+    assert.match(prompt, /home todos/);
     assert.match(prompt, /Big dates/);
     assert.match(prompt, /biased to omit/);
     assert.match(prompt, /update <path>/);
@@ -187,7 +187,7 @@ describe("nightly phase prompts", () => {
       dateKey: "2026-08-16",
       timezone: "America/Chicago",
       existingIndex:
-        'Existing education dates\n- 2026-08-27 14:00 "Advisory conference" user-level dates/advisory-conference',
+        'Existing home dates\n- 2026-08-27 14:00 "Advisory conference" user-level dates/advisory-conference',
     });
     assert.match(prompt, /Advisory conference/);
     assert.match(prompt, /dates\/advisory-conference/);
@@ -197,7 +197,7 @@ describe("nightly phase prompts", () => {
 
   it("triage and actions carry a deleted.md block from the index", () => {
     const existingIndex = [
-      "Existing education dates",
+      "Existing home dates",
       '- 2026-08-27 14:00 "Advisory conference" user-level dates/advisory-conference',
       "Manually deleted objects (deleted.md). If a proposed date, todo, or calendar event looks like one of these, SKIP creating it. Judgement, not exact date/time. Do not write update <gone-path>. Next year's occurrence is allowed.",
       "- deleted 2026-08-25 15:04 | date | First day of school (11th grade) | on 2026-09-02 08:15 | user-level | was dates/first-day-eps-2026-27",
@@ -225,12 +225,12 @@ describe("nightly phase prompts", () => {
     assert.match(actions, /student sent to his school email never becomes a todo/);
   });
 
-  it("actions is biased to add calendar plans and skip ordinary education dates", () => {
+  it("actions is biased to add calendar plans and skip ordinary home dates", () => {
     const prompt = buildActionsPrompt({
       dateKey: "2026-08-16",
       timezone: "America/Chicago",
       existingIndex:
-        'Existing education dates\n- 2026-08-27 14:00 "Advisory conference" user-level dates/advisory-conference',
+        'Existing home dates\n- 2026-08-27 14:00 "Advisory conference" user-level dates/advisory-conference',
     });
     assert.match(prompt, /nightly-actions skill/);
     assert.match(prompt, /Calendar plans \(or Locked-in calendar\)/);
@@ -240,7 +240,7 @@ describe("nightly phase prompts", () => {
     assert.match(prompt, /@agent or @agentg never becomes a todo/);
     assert.match(prompt, /Skip college spam/);
     assert.match(prompt, /weekly EPS college-visit list/);
-    assert.match(prompt, /education todos/);
+    assert.match(prompt, /home todos/);
     assert.match(prompt, /biased to skip/);
     assert.match(prompt, /Do not need a Yan add-this quote/);
     assert.match(prompt, /TBD venue/);
@@ -451,7 +451,7 @@ describe("context synthesis chats prefetch", () => {
   it("dumps past-day Personal Agent and Cursor Desktop chats", async () => {
     const dir = await mkdtemp(join(tmpdir(), "context-chats-"));
     const sid = "11111111-1111-1111-1111-111111111111";
-    const chatDir = join(dir, "education/you@example.com/.chat-history");
+    const chatDir = join(dir, "home/you@example.com/.chat-history");
     const convoId = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
     const transcriptsDir = join(dir, "transcripts");
     const outPath = join(dir, "chats.json");

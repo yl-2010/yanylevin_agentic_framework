@@ -1,7 +1,7 @@
 import SwiftUI
 import WebKit
 
-/// Site markdown + KaTeX 0.16.22, same files as /education.
+/// Site markdown + KaTeX 0.16.22, same files as /home.
 struct YLWebMarkdownText: View {
     let source: String
     let fg: Color
@@ -112,8 +112,11 @@ private struct YLWebMarkdownView: UIViewRepresentable {
             if url.scheme == "http" || url.scheme == "https" || url.scheme == "mailto" {
                 return url
             }
-            let path = url.path
-            if path.hasPrefix("/education") {
+            var path = url.path
+            if path == "/education" || path.hasPrefix("/education/") {
+                path = "/home" + path.dropFirst("/education".count)
+            }
+            if path.hasPrefix("/home") {
                 var parts = URLComponents(string: "https://yanylevin.com")
                 parts?.path = path
                 parts?.query = url.query

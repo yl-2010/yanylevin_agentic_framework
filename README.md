@@ -2,13 +2,13 @@
 
 Single-operator personal agent that runs on your Mac.
 
-Yan Levin in this repo is a **placeholder** for the person who built the reference implementation. Live site: [yanylevin.com](https://yanylevin.com). Fork it, set `OWNER_EMAIL`, and put your own facts in `education/you@example.com/` (rename the folder to match your email).
+Yan Levin in this repo is a **placeholder** for the person who built the reference implementation. Live site: [yanylevin.com](https://yanylevin.com). Fork it, set `OWNER_EMAIL`, and put your own facts in `home/you@example.com/` (rename the folder to match your email).
 
 ## What you get
 
 - Express API on `:3004` (Cursor SDK Personal Agent + optional local gpt-oss visitor chatbot)
-- `/education`, `/fitness`, `/dashboard` static UIs
-- File-tree brain (`education/<email>/brain/`) plus nightly jobs
+- `/home`, `/fitness`, `/dashboard` static UIs
+- File-tree brain (`home/<email>/brain/`) plus nightly jobs
 - Optional Apple Mail, Messages, Calendar, Contacts, Screen Time, Health, location
 - Optional Canvas LMS sync
 - iOS SwiftUI app as a reference (rename before you sign it)
@@ -19,7 +19,7 @@ Mac-first. Messages, Mail, and TCC do not pretend to be Linux-portable.
 
 1. Copy `server/.env.example` to `server/.env`.
 2. Set `OWNER_EMAIL` (and optional `OWNER_EMAIL_ALIASES`).
-3. Rename `education/you@example.com` and `fitness/you@example.com` to those addresses if they differ.
+3. Rename `home/you@example.com` and `fitness/you@example.com` to those addresses if they differ.
 4. Set `CURSOR_API_KEY`. Optional: `AUTH_SECRET`, Google OAuth client, LM Studio on `127.0.0.1:1234`.
 5. `npm install --prefix server` then `npm run server` from the repo root.
 6. Preview the site with `python3 -m http.server 8080`.

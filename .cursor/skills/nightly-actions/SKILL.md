@@ -2,7 +2,7 @@
 name: nightly-actions
 description: >-
   Phase 4 of Yan's nightly pipeline: execute directed actions, plus standing
-  writes of Apple Calendar plans (add freely) and rare education dates
+  writes of Apple Calendar plans (add freely) and rare home dates
   (skip unless big). Grok 4.7 high. Yan only.
 disable-model-invocation: true
 ---
@@ -15,7 +15,7 @@ disable-model-invocation: true
 
 The nightly pipeline can act, not only remember. Execute Directives from Yan
 and Suggested actions. Also put dated plans on Apple Calendar (default add)
-and rare big dates on the education dashboard, even when Yan never said
+and rare big dates on the home dashboard, even when Yan never said
 "add this."
 
 ## Contract
@@ -27,11 +27,11 @@ and rare big dates on the education dashboard, even when Yan never said
 - Re-verify every item against its evidence before executing. Triage can be
   wrong; you are the second check. For Calendar, triage is often too shy:
   still create a real plan it left off the list. Do not create college spam,
-  the weekly EPS visit list, or a dashboard todo that triage left off. For education dates, triage
+  the weekly EPS visit list, or a dashboard todo that triage left off. For home dates, triage
   is often too eager: skip unless it clears the high bar below.
-- Allowed action classes: iMessage/Mail sends, education todo/date/project
+- Allowed action classes: iMessage/Mail sends, home todo/date/project
   writes, Apple Calendar writes, repo/file work on this Mac.
-- Do not write `education/you@example.com/life-state/` samples. That log
+- Do not write `home/you@example.com/life-state/` samples. That log
   is a context source for the night, not a write target.
 - Report every action taken (and every skip) in your reply; phase 5 and the
   journal rely on it.
@@ -73,7 +73,7 @@ Skip these even when they name a day. For this list, unsure means skip:
 
 - College spam. Recruitment and marketing from colleges, Scoir, apply-now, and info sessions he did not register for. A date in the mail is not a plan.
 - The weekly EPS college-visit list. Do not add each campus visit. Only a visit Yan said he signed up for, or a form receipt for that visit. The announcement is not a signup.
-- Education todos, homework, Canvas assignments, due dates, and other dashboard items. Those stay on the education dashboard. The calendar is events.
+- Home todos, homework, Canvas assignments, due dates, and other dashboard items. Those stay on the home dashboard. The calendar is events.
 - The EPS bell schedule
 - "we should hang out" with no day named
 - A similar title already on that local day (duplicate check below). A realtime calendar agent may already have filed it. Leave it.
@@ -101,7 +101,7 @@ the Zoom registration href for that date from Calla's Mail.app `source` (plain
 `content` drops the link). Do not write location `virtual` when a URL exists.
 A linkless virtual event is not done.
 
-## Big dates on the education dashboard (standing)
+## Big dates on the home dashboard (standing)
 
 Bias is **skip**. The Dates panel is not a second calendar. When you are unsure, do not
 write a `date.json`. Hangouts, dentist, picture day, picnic, spirit week,
@@ -110,7 +110,7 @@ Apple Calendar. If triage listed one of those under Big dates, skip it and
 say why.
 
 Write `date.json` only for rare, high-stakes items, per
-`.cursor/skills/personal-agent/education-dashboard.md`. A school-year
+`.cursor/skills/personal-agent/home-dashboard.md`. A school-year
 milestone can still go on both Calendar and Dates. A picnic goes on Calendar
 only.
 
@@ -135,14 +135,14 @@ the same day are one event. Last year's first day is not this year's
 (different `date`). Same parent + date + clock time also matches when the
 names share a real word (advisor, picnic), not dentist vs conference at
 14:00. Class-specific field trips go under that class. Everything else is
-user-level `education/you@example.com/dates/<slug>/`.
+user-level `home/you@example.com/dates/<slug>/`.
 
 The same prompt includes `deleted.md`. If a big date or calendar plan looks
 like something Yan already deleted, **skip**. Judgement, not exact date/time.
 Do not write `update` for a path that is gone. Next year's occurrence is
 allowed.
 
-Write `description` as markdown per education-dashboard (bold lead-ins,
+Write `description` as markdown per home-dashboard (bold lead-ins,
 bullets, links, blank lines). Never one run-on paragraph. Shape to copy:
 `dates/fall-orientation-day-1/date.json`.
 
@@ -150,7 +150,7 @@ Do not git commit; the Node wrapper does that.
 
 ## Other actions
 
-- **Education todos/projects**: per the education-dashboard file. If an
+- **Home todos/projects**: per the home-dashboard file. If an
   open todo already has the same parent + dueDate + similar name, **update
   it**. Do not invent ` (2)` unless Yan asked for a second copy. Marking a
   todo done requires evidence Yan actually did it or said to mark it. If a
@@ -173,14 +173,14 @@ Do not git commit; the Node wrapper does that.
 
 ## Action log
 
-The dashboard Actions rail is for side effects Yan would not already see. Mail sends, lights, and the vacuum belong there. Education dates, todos, and projects do not. They already show on the education dashboard, including ones this job added. Do not append an `education-date`, `education-todo`, or `education-project` action. Calendar writes do not. The event is already on the calendar, including ones this job added. Do not pass `--via` on calendar commands, and do not append a `calendar` action. Filing a message into Colleges or Security does not either. That is a folder change. Do not append a card for it. A Teams or iMessage send does not. The message is already in that chat. Do not pass `--via` on those sends, and do not append a `teams` or `imessage` action. Reads stay untagged.
+The dashboard Actions rail is for side effects Yan would not already see. Mail sends, lights, and the vacuum belong there. Home dates, todos, and projects do not. They already show on the home dashboard, including ones this job added. Do not append an `home-date`, `home-todo`, or `home-project` action. Calendar writes do not. The event is already on the calendar, including ones this job added. Do not pass `--via` on calendar commands, and do not append a `calendar` action. Filing a message into Colleges or Security does not either. That is a folder change. Do not append a card for it. A Teams or iMessage send does not. The message is already in that chat. Do not pass `--via` on those sends, and do not append a `teams` or `imessage` action. Reads stay untagged.
 
 - After a Mail.app send, run `node server/agent-actions.js append --agent nightly-actions --kind mail --summary "Sent mail to Name"`.
 
 ## Anti-patterns
 
-- Acting on inference for sends, todos, or education dates. "He probably
-  wants X" is a journal note, not an education date. Calendar is the
+- Acting on inference for sends, todos, or home dates. "He probably
+  wants X" is a journal note, not an home date. Calendar is the
   exception: a named day for a real plan is enough, even if the plan is tentative.
   College spam, the weekly EPS visit list, and todos are not that exception.
   `timezoneAfter` and Airbnb checkout are not a flight confirmation. A travel
@@ -200,5 +200,5 @@ The dashboard Actions rail is for side effects Yan would not already see. Mail s
 
 Every directive is executed, skipped-with-reason, or deferred-with-reason.
 Sends still need a quoted Yan directive. Calendar creates need a named day
-and a duplicate check, not a confirmation. Education dates need the high bar
+and a duplicate check, not a confirmation. Home dates need the high bar
 above and a duplicate check.

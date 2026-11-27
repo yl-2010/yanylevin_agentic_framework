@@ -10,7 +10,7 @@ import { execFile, spawn } from "node:child_process";
 import { openSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { notifyEducationClients } from "./education-events.js";
+import { notifyHomeClients } from "./home-events.js";
 import {
   AGENT_WORKER_LABEL,
   AGENT_WORKER_METHODS,
@@ -112,13 +112,13 @@ export function drainSseBuffer(buffer, onBlock) {
 /**
  * Re-broadcast worker agent status to this process's SSE clients. Reconnects
  * forever, so it re-attaches after either side restarts.
- * @param {{ fetchImpl?: typeof fetch, baseUrl?: string, notify?: typeof notifyEducationClients, retryMs?: number }} [opts]
+ * @param {{ fetchImpl?: typeof fetch, baseUrl?: string, notify?: typeof notifyHomeClients, retryMs?: number }} [opts]
  * @returns {{ close: () => void, connected: () => boolean }}
  */
 export function startAgentWorkerBridge(opts = {}) {
   const fetchImpl = opts.fetchImpl || fetch;
   const base = opts.baseUrl || agentWorkerBaseUrl();
-  const notify = opts.notify || notifyEducationClients;
+  const notify = opts.notify || notifyHomeClients;
   const retryMs = opts.retryMs ?? 1000;
   let closed = false;
   let isConnected = false;

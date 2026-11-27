@@ -1,20 +1,20 @@
 /**
  * Last-known iPhone location for Yan's Personal Agent (web + iOS + Cursor).
- * Written by the iOS app (or an iPhone Shortcut) via POST /api/education/location.
+ * Written by the iOS app (or an iPhone Shortcut) via POST /api/home/location.
  * iPhone Always: significant-change, visits, and a 5-minute `periodic` heartbeat.
- * Stored as education/<email>/.location.json plus
- * education/<email>/location/ (append-only JSONL + composed stays/trips).
+ * Stored as home/<email>/.location.json plus
+ * home/<email>/location/ (append-only JSONL + composed stays/trips).
  */
 
 import { timingSafeEqual } from "node:crypto";
 import { appendFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { canonicalizeEmail, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
-import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { YAN_HOME_DIR } from "./onedrive-projects.js";
 
 export const LOCATION_HISTORY_DIRNAME = "location";
-export const LOCATION_REL = join(YAN_EDUCATION_DIR, ".location.json");
-export const LOCATION_HISTORY_REL = join(YAN_EDUCATION_DIR, LOCATION_HISTORY_DIRNAME);
+export const LOCATION_REL = join(YAN_HOME_DIR, ".location.json");
+export const LOCATION_HISTORY_REL = join(YAN_HOME_DIR, LOCATION_HISTORY_DIRNAME);
 export const HISTORY_DEDUPE_MS = 60_000;
 
 /**

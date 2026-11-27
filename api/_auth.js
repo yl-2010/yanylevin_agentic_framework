@@ -1,5 +1,5 @@
 /**
- * Shared Google OAuth / education session helpers for Vercel serverless.
+ * Shared Google OAuth / home session helpers for Vercel serverless.
  */
 
 const crypto = require("crypto");
@@ -23,24 +23,24 @@ const JYPE_ACCESS_EMAILS = new Set();
 const STUDY_ONLY_EMAILS = new Set();
 const EMAIL_ALIASES = loadOwnerAliases();
 
-const SESSION_COOKIE = "yl_education_session";
+const SESSION_COOKIE = "yl_home_session";
 const STATE_COOKIE = "yl_oauth_state";
 const RETURN_COOKIE = "yl_oauth_return";
 /** When set, Google OAuth callback redirects into the iOS app with a mobile JWT. */
 const MOBILE_COOKIE = "yl_oauth_mobile";
 const MOBILE_APP_CALLBACK = "personalagent://oauth";
-const SESSION_ISSUER = "yanylevin-education";
-const SESSION_AUDIENCE = "yanylevin-education";
+const SESSION_ISSUER = "yanylevin-home";
+const SESSION_AUDIENCE = "yanylevin-home";
 /** Mobile / iOS Bearer JWTs (same claims, distinct iss). */
 const MOBILE_SESSION_ISSUER = "yanylevin-ios";
-const MOBILE_SESSION_AUDIENCE = "yanylevin-education";
+const MOBILE_SESSION_AUDIENCE = "yanylevin-home";
 const SESSION_TTL_SEC = 60 * 60 * 24 * 14; // 14 days
 const STATE_TTL_SEC = 600;
 
 /** Allowed post-OAuth landing paths (gated sites + silent main-site unlock). */
 const ALLOWED_RETURN_PATHS = new Set([
   "/",
-  "/education/",
+  "/home/",
   "/fitness/",
   "/dashboard/",
   "/jype/",
@@ -145,7 +145,7 @@ function redirectUri(req) {
  * @param {string|null|undefined} raw
  * @param {string} [fallback]
  */
-function sanitizeReturnPath(raw, fallback = "/education/") {
+function sanitizeReturnPath(raw, fallback = "/home/") {
   const value = String(raw || "").trim();
   if (!value) return fallback;
   let path = value.split("?")[0].split("#")[0];

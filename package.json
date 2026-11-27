@@ -2,7 +2,7 @@
   "name": "yanylevin_agentic_framework",
   "private": false,
   "version": "1.0.0",
-  "description": "Single-operator personal agent framework (Mac Express + Cursor + education/fitness UI)",
+  "description": "Single-operator personal agent framework (Mac Express + Cursor + home/fitness UI)",
   "scripts": {
     "server": "npm run start --prefix server",
     "server:dev": "npm run dev --prefix server",

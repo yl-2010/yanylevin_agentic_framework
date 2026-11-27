@@ -19,7 +19,7 @@
     <title>Dashboard</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" media="(prefers-color-scheme: light)" />
     <link rel="icon" href="/favicon-dark.svg" type="image/svg+xml" media="(prefers-color-scheme: dark)" />
-    <link rel="stylesheet" href="/education/styles.css?v=pill-radius" />
+    <link rel="stylesheet" href="/home/styles.css?v=pill-radius" />
     <link rel="stylesheet" href="/dashboard/styles.css?v=dock1" />
   </head>
   <body>
@@ -146,12 +146,12 @@
         </section>
       </main>
 
-      <div id="edu-chat" class="yan-chat" data-state="closed">
+      <div id="home-chat" class="yan-chat" data-state="closed">
         <div class="yan-chat-column yan-chat-column--history">
           <div
             class="yan-chat-panel"
             data-liquid-glass="rounded"
-            data-filter-id="lg-edu-chat-panel"
+            data-filter-id="lg-home-chat-panel"
             hidden
             aria-hidden="true"
             role="region"
@@ -161,8 +161,8 @@
               type="button"
               class="yan-chat-close yan-chat-close--panel circle"
               data-liquid-glass="circle"
-              data-filter-id="lg-edu-chat-x-panel"
-              data-edu-chat-close-all
+              data-filter-id="lg-home-chat-x-panel"
+              data-home-chat-close-all
               aria-label="Close chat"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true" style="transform: rotate(45deg)"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
@@ -173,22 +173,22 @@
           <div
             class="yan-chat-pill corner circle c-br"
             data-liquid-glass="circle"
-            data-filter-id="lg-edu-chat-pill"
+            data-filter-id="lg-home-chat-pill"
           >
             <button
               type="button"
               class="yan-chat-launcher"
               aria-label="Personal assistant"
               aria-expanded="false"
-              aria-controls="edu-chat-input"
+              aria-controls="home-chat-input"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
             </button>
 
             <form class="yan-chat-form" action="#" autocomplete="off">
-              <label class="visually-hidden" for="edu-chat-input">Ask your personal agent</label>
+              <label class="visually-hidden" for="home-chat-input">Ask your personal agent</label>
               <textarea
-                id="edu-chat-input"
+                id="home-chat-input"
                 class="yan-chat-input"
                 name="q"
                 rows="1"
@@ -204,7 +204,7 @@
                 type="submit"
                 class="yan-chat-send circle"
                 data-liquid-glass="circle"
-                data-filter-id="lg-edu-chat-send"
+                data-filter-id="lg-home-chat-send"
                 aria-label="Send"
               >
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -222,7 +222,7 @@
           <div
             class="yan-chat-panel"
             data-liquid-glass="rounded"
-            data-filter-id="lg-edu-chat-panel-thread"
+            data-filter-id="lg-home-chat-panel-thread"
             hidden
             aria-hidden="true"
             role="region"
@@ -232,8 +232,8 @@
               type="button"
               class="yan-chat-close yan-chat-close--panel circle"
               data-liquid-glass="circle"
-              data-filter-id="lg-edu-chat-x-panel-thread"
-              data-edu-chat-close-thread
+              data-filter-id="lg-home-chat-x-panel-thread"
+              data-home-chat-close-thread
               aria-label="Close this chat"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true" style="transform: rotate(45deg)"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
@@ -244,12 +244,12 @@
           <div
             class="yan-chat-pill corner circle c-br"
             data-liquid-glass="circle"
-            data-filter-id="lg-edu-chat-pill-thread"
+            data-filter-id="lg-home-chat-pill-thread"
           >
             <form class="yan-chat-form" action="#" autocomplete="off">
-              <label class="visually-hidden" for="edu-chat-thread-input">Continue this chat</label>
+              <label class="visually-hidden" for="home-chat-thread-input">Continue this chat</label>
               <textarea
-                id="edu-chat-thread-input"
+                id="home-chat-thread-input"
                 class="yan-chat-input"
                 name="q"
                 rows="1"
@@ -265,7 +265,7 @@
                 type="submit"
                 class="yan-chat-send circle"
                 data-liquid-glass="circle"
-                data-filter-id="lg-edu-chat-send-thread"
+                data-filter-id="lg-home-chat-send-thread"
                 aria-label="Send. Hold send or Enter one second while working to interrupt."
               >
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -299,10 +299,10 @@
     <script src="/theme-orb.js?v=dock-brain2"></script>
     <script src="/yl-home-link.js?v=3"></script>
     <script src="/js/mac-api.js?v=sse-watchdog"></script>
-    <script src="/education/markdown.js?v=katex-2"></script>
+    <script src="/home/markdown.js?v=katex-2"></script>
     <script src="/dashboard/app.js?v=pagectx1"></script>
     <script src="/js/chat-send-flight.js?v=frac-width"></script>
     <script type="module" src="/js/chat-orb.js?v=2"></script>
-    <script src="/education/chatbot.js?v=orb-after-send"></script>
+    <script src="/home/chatbot.js?v=orb-after-send"></script>
 </body>
 </html>

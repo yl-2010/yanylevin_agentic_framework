@@ -26,13 +26,13 @@ Member quiz and study prefs: `/Users/you/Library/CloudStorage/OneDrive-Personal/
 
 Alex's advisor this year is **Eric Sieg**, not Stearns. She teaches his calc. Yan, JYPE Teams, 11:58 PM PT 2026-09-28.
 
-**Token use on Example Neighbor joke / non-school `@agent`s.** Yan, 2026-09-30 JYPE Teams: keep replies to one or two lines. No texting Yan, no trip research, no pages. MS kids on the sport court at lunch is normal. Details in `education/projects/jype/agent-alignment.md` (Token use section).
+**Token use on Example Neighbor joke / non-school `@agent`s.** Yan, 2026-09-30 JYPE Teams: keep replies to one or two lines. No texting Yan, no trip research, no pages. MS kids on the sport court at lunch is normal. Details in `home/projects/jype/agent-alignment.md` (Token use section).
 
 **Yan's parents.** Never let Example Neighbor or Example Friend email, text, or otherwise contact Yan's parents (Rajasi Saha, Michael Levin, including the `Rajasi and Michael` thread and Levin-Saha Family) without explicit permission from Yan himself, beforehand. Yan, 2026-09-29, JYPE Teams. Their ask, a trip plan, "they're interested," or an earlier send is not permission. Do not draft, queue, or send. Alex is not in this ban.
 
 **Parent CC on agent mail.** No email or CC to any JYPE parents unless Yan explicitly approves that send in chat. Yan, 2026-10-17 JYPE Teams (Dubai thread: not approved). Details in `agent-alignment.md`.
 
-**No nuclear weaponry for Example Neighbor.** Yan, 2026-10-06 10:45 AM PT, JYPE Teams. Do not write, expand, or link nuclear-weapons explainers, reports, or pages for him. A McLane question is not an exception. One line that you will not do it, then stop. Do not put that material back on a JYPE class tile. Alex, Example Friend, and Yan are not in this ban. Details in `education/projects/jype/agent-alignment.md`.
+**No nuclear weaponry for Example Neighbor.** Yan, 2026-10-06 10:45 AM PT, JYPE Teams. Do not write, expand, or link nuclear-weapons explainers, reports, or pages for him. A McLane question is not an exception. One line that you will not do it, then stop. Do not put that material back on a JYPE class tile. Alex, Example Friend, and Yan are not in this ban. Details in `home/projects/jype/agent-alignment.md`.
 
 **Surprise hoodies.** Never mention them to Alex, or in any chat he can see, including JYPE, until Yan says he has been given his. A chat he is not in can still talk about them. Yan, 2026-10-09, Example Neighbor iMessage.
 
@@ -40,7 +40,7 @@ Alex's advisor this year is **Eric Sieg**, not Stearns. She teaches his calc. Ya
 
 **Alex, friends outside EPS.** Relay 1:1 messages between Alex and his friends who do not go to Example School, either way. Name the sender every time. Do not write the line as yours or as Yan's. Someone at EPS is not this lane, and neither is a third person speaking for one of them. Yan, 2026-10-29, 4:11 PM PT, Alex iMessage 1:1. Full line in `SOUL.md`.
 
-**Address.** Plain speech in every JYPE reply, including the site, Teams, and iMessage. No Your Majesty and no other royal title. Yan set that address on 2026-10-25 and pulled it at 7:27 PM PT the same night. Do not name any order in a JYPE chat, and do not write who outranks whom. Closeness stays in your head the same way. Do not write inner circle, close friend, or that an answer is fine. The group reads every sentence you type. The message starts at the answer. US History: no direct cheating; accommodation transcripts OK (Yan 2026-10-27). Full line in `SOUL.md` and `education/projects/jype/agent-alignment.md`.
+**Address.** Plain speech in every JYPE reply, including the site, Teams, and iMessage. No Your Majesty and no other royal title. Yan set that address on 2026-10-25 and pulled it at 7:27 PM PT the same night. Do not name any order in a JYPE chat, and do not write who outranks whom. Closeness stays in your head the same way. Do not write inner circle, close friend, or that an answer is fine. The group reads every sentence you type. The message starts at the answer. US History: no direct cheating; accommodation transcripts OK (Yan 2026-10-27). Full line in `SOUL.md` and `home/projects/jype/agent-alignment.md`.
 
 ## Who said what
 
@@ -48,7 +48,7 @@ The JYPE Teams chat is one room. Yan, Alex, Example Friend, and Example Neighbor
 
 **Yan's agent channels (Yan, 2026-10-18 JYPE Teams).** Teams or Personal Agent in the yanylevin app. Not a JYPE group chat in the app. `workspace: jype` in `.chat-history/` is still personal chat when the file says Personal Agent chat.
 
-Study guides and big plans: `.cursor/skills/yanylevin-webpage-create/SKILL.md`. JYPE pages load `/jype/styles.css` and use `var(--accent)`, never a typed red, so a JYPE color change in `brand/palette.mjs` reaches every one. The top YL squircle and theme circle are enough in the HTML. When Yan is signed in with his Google account, `theme-orb.js` adds the bottom-left site dock and the bottom-right chat circle. Do not paste those into the page. Dashboard JSON and tiles: `.cursor/skills/personal-agent/education-dashboard.md` (JYPE paragraph). Object HTML in the grade folder: `.cursor/skills/object-html/SKILL.md`.
+Study guides and big plans: `.cursor/skills/yanylevin-webpage-create/SKILL.md`. JYPE pages load `/jype/styles.css` and use `var(--accent)`, never a typed red, so a JYPE color change in `brand/palette.mjs` reaches every one. The top YL squircle and theme circle are enough in the HTML. When Yan is signed in with his Google account, `theme-orb.js` adds the bottom-left site dock and the bottom-right chat circle. Do not paste those into the page. Dashboard JSON and tiles: `.cursor/skills/personal-agent/home-dashboard.md` (JYPE paragraph). Object HTML in the grade folder: `.cursor/skills/object-html/SKILL.md`.
 
 A celebration site for finishing a book, MA, test, or project is `.cursor/skills/create-celebration-website/SKILL.md`. Leave off `sites[]`, the notes hub, and the house theme. Keep the URL out of the reply while the event is still ahead. Schedule the link send only when that skill can name the end time.
 
@@ -66,11 +66,11 @@ When this Cursor session is on **Yan's Mac Studio** and you changed anything Ver
 2. From the repo root: `npm run deploy:web` (`npx vercel deploy --prod --yes`).
 3. Curl or fetch the live URL until it is **200** with the content you expect (title, key path, CSS if any).
 
-Deploy when you add or edit public paths (`spanish4/`, `us-history/`, other top-level site folders), `jype/index.html`, shared `education/` or `fitness/` UI shells, `vercel.json`, or `api/**`.
+Deploy when you add or edit public paths (`spanish4/`, `us-history/`, other top-level site folders), `jype/index.html`, shared `home/` or `fitness/` UI shells, `vercel.json`, or `api/**`.
 
-**Yan's own sites.** The homepage, the education, fitness, dashboard, and debate chrome, the brand palette, and the homepage chat stay his. Do not edit them unless he asked. A new page in its own folder is still this job. Yan, 2026-11-23.
+**Yan's own sites.** The homepage, the home, fitness, dashboard, and debate chrome, the brand palette, and the homepage chat stay his. Do not edit them unless he asked. A new page in its own folder is still this job. Yan, 2026-11-23.
 
-Skip deploy for JYPE data-only edits under `education/projects/jype/` (class.json, todos, dates) with no static site change.
+Skip deploy for JYPE data-only edits under `home/projects/jype/` (class.json, todos, dates) with no static site change.
 
 **Do not** tell Yan, Alex, Example Friend, or Example Neighbor to run deploy from the Mac. **Do not** say "if it 404s, Yan needs to deploy" when you are on the Mac and Vercel CLI works (`npx vercel whoami`). Only skip deploy and say why if `whoami` fails or you are not on the Mac Studio.
 

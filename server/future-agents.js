@@ -16,14 +16,14 @@ import http from "node:http";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { isEducationUser } from "./education-data.js";
+import { isHomeUser } from "./home-data.js";
 import { personFromEmail } from "./usage-log.js";
 import {
   patchChatHistoryScheduled,
   patchChatHistoryVisibility,
   persistChatHistory,
   withScheduledTitlePrefix,
-} from "./education-chat-history.js";
+} from "./home-chat-history.js";
 import { canonicalizeEmail, isJypeAccessEmail } from "./identity.js";
 import { LOCAL_SOCK } from "./local-ipc.js";
 import { WHATSAPP_AGENT_ENABLED } from "./whatsapp-mention.js";
@@ -430,7 +430,7 @@ export function publicFutureAgentEntry(record) {
     workspaceLabel: jype ? "JYPE" : "Personal",
     prompt: prompt.length > 180 ? `${prompt.slice(0, 177).trim()}...` : prompt,
     title: record.title,
-    href: `${jype ? "/jype/" : "/education/"}?chat=${encodeURIComponent(record.sessionId)}`,
+    href: `${jype ? "/jype/" : "/home/"}?chat=${encodeURIComponent(record.sessionId)}`,
   };
 }
 
@@ -455,7 +455,7 @@ export async function scheduleFutureAgent(input) {
   if (!email) throw httpError("email required", 400);
   if (workspace === "jype") {
     if (!isJypeAccessEmail(email)) throw httpError("forbidden", 403);
-  } else if (!isEducationUser(email)) {
+  } else if (!isHomeUser(email)) {
     throw httpError("forbidden", 403);
   }
   const prompt = String(input?.prompt || "").trim();

@@ -1,6 +1,6 @@
 /**
  * Personal Agent markdown → safe HTML.
- * No raw HTML passthrough. Used by /education chat + object descriptions.
+ * No raw HTML passthrough. Used by /home chat + object descriptions.
  */
 (function (root, factory) {
   const api = factory();
@@ -140,12 +140,15 @@
     s = s.replace(/\[([^\]]+)\]\(((?:[^()\s]|\([^)]*\))+)(?:\s+"[^"]*")?\)/g, (_, label, url) => {
       const href = safeUrl(url);
       if (!href) return label;
-      const internal = href.startsWith("/education");
+      const linked = href.startsWith("/education/") || href === "/education"
+        ? "/home" + href.slice("/education".length)
+        : href;
+      const internal = linked.startsWith("/home");
       const extra = internal
         ? ""
         : ' target="_blank" rel="noopener noreferrer"';
       return hold(
-        `<a href="${escapeHtml(href)}"${extra}>${renderInline(label, ctx)}</a>`
+        `<a href="${escapeHtml(linked)}"${extra}>${renderInline(label, ctx)}</a>`
       );
     });
 

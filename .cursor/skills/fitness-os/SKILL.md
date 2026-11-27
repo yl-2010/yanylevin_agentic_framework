@@ -17,7 +17,7 @@ Two entry points share this skill: **iOS Gym text input** (Cursor SDK local agen
 - App/agent sessions inject the signed-in email — write only under `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.fitness/<that-email>/`
 - In Cursor Desktop on Yan's Mac, default to `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.fitness/you@example.com/` unless the user names Alex
 - Never touch the other user’s folder
-- Never edit education data, main-site chatbot wiring, or LM Studio config
+- Never edit home data, main-site chatbot wiring, or LM Studio config
 
 ## File schema
 

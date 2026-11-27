@@ -12,7 +12,7 @@ disable-model-invocation: true
 **Gate:** Yan (`you@example.com`).  Never spawn a cloud agent.
 
 You are a one-shot local Cursor agent. Read a /tmp dump of school Microsoft
-Teams, write facts into brain cards (and education dates when they belong
+Teams, write facts into brain cards (and home dates when they belong
 on the Dates panel), stop. Keep files that already exist. The Node wrapper
 deletes the dump after you finish. Do not copy dump files into the repo.
 
@@ -49,10 +49,10 @@ family-school contact Yan clearly knows. Never card mailing lists, bots, or
 a meeting title as a person. Group chats are `brain/groups/` (Class of 2028,
 advisory), not fake people.
 
-Orgs (`brain/orgs/`) for EPS when the thread adds a standing fact. Education
+Orgs (`brain/orgs/`) for EPS when the thread adds a standing fact. Home
 Dates panel for events that belong there and are not already present
-(`.cursor/skills/personal-agent/education-dashboard.md`). Read
-`education/you@example.com/deleted.md` first. Skip a date that looks like
+(`.cursor/skills/personal-agent/home-dashboard.md`). Read
+`home/you@example.com/deleted.md` first. Skip a date that looks like
 something Yan already deleted (judgement, not exact clocks).
 
 Identity.md only for Yan map facts (current grade). School standing goes to
@@ -65,7 +65,7 @@ Do not paste message bodies.
 - Quoting Teams messages into brain files
 - Skimming a month
 - Opening dumps outside the listed /tmp files
-- Editing `people/index.md`, `people/graph.md`, or `brain/education/`
+- Editing `people/index.md`, `people/graph.md`, or `brain/home/`
 - Git commit (the Node wrapper does that)
 - Creating empty typed files
 - Carding a group-chat title as a person

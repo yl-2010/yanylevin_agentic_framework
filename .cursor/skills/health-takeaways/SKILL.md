@@ -19,7 +19,7 @@ Model: **composer-2.5** (fast=false).
 
 ## Files
 
-All under `education/you@example.com/health/`:
+All under `home/you@example.com/health/`:
 
 | File | Role |
 |------|------|

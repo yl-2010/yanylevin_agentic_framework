@@ -18,10 +18,10 @@ Model: **composer-2.5** (fast=false).
 
 | File | Role |
 |------|------|
-| `education/you@example.com/location/places.md` | Named stays. Read. Newest day on top. |
-| `education/you@example.com/location/trips.md` | Only if a stay name is ambiguous. |
+| `home/you@example.com/location/places.md` | Named stays. Read. Newest day on top. |
+| `home/you@example.com/location/trips.md` | Only if a stay name is ambiguous. |
 | `/tmp/yanylevin-context-life-state.json` | Yesterday's 5-minute kinds. Confirm he was at that place (`at_gym`, `in_class`). Stay fact is the visit, not rooms/apps. Do not write this tree. Do not edit `places.md`. |
-| `education/you@example.com/location/state.json` | Compose/enrichment cursors plus your `brainPlaces` object. |
+| `home/you@example.com/location/state.json` | Compose/enrichment cursors plus your `brainPlaces` object. |
 | `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/schema.md` | Frontmatter and timeline contract. Required. |
 | `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/places/<slug>.md` | Your only write target. |
 

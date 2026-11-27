@@ -21,9 +21,9 @@ import {
   chatHistoryTouchMs,
   listChatHistoryFiles,
   reapplyChatTitleStarters,
-} from "./education-chat-history.js";
+} from "./home-chat-history.js";
 import { normalizeJypeWorkspace } from "./jype.js";
-import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { YAN_HOME_DIR } from "./onedrive-projects.js";
 import { gitAddCommitPush } from "./git-publish.js";
 import { FULL_ACCESS_EMAILS, OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
 import {
@@ -36,10 +36,10 @@ import { nextLocalHmAt } from "./location-history-agent.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = "/tmp/yanylevin-chat-title-refresh.lock";
-const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
-const STATE_REL = `education/${YAN_EMAIL}/daily-briefing/chat-title-refresh-state.json`;
+const META_PATH = join(YAN_HOME_DIR, "daily-briefing", "meta.json");
+const STATE_REL = `home/${YAN_EMAIL}/daily-briefing/chat-title-refresh-state.json`;
 const STATE_ABS = join(
-  YAN_EDUCATION_DIR,
+  YAN_HOME_DIR,
   "daily-briefing",
   "chat-title-refresh-state.json"
 );
@@ -496,8 +496,8 @@ async function runChatTitleRefreshOnce({
     await gitAddCommitPush({
       paths,
       message: backfill
-        ? `education: ${dateKey} chat title backfill`
-        : `education: ${dateKey} chat title refresh`,
+        ? `home: ${dateKey} chat title backfill`
+        : `home: ${dateKey} chat title refresh`,
     });
 
     return {

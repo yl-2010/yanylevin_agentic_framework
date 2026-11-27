@@ -110,7 +110,7 @@ struct EducationContextFile: Decodable, Identifiable, Hashable {
     let webViewUrl: String?
 
     var id: String {
-        "\(source ?? "education")|\(kind ?? "file")|\(path ?? name)"
+        "\(source ?? "home")|\(kind ?? "file")|\(path ?? name)"
     }
 
     var displayName: String { name }

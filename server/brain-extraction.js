@@ -30,7 +30,7 @@ export function buildExtractionPrompt({ userText, assistantText }) {
   const clip = (s) => String(s || "").slice(0, MAX_TEXT);
   return [
     "You are the post-turn brain extraction pass for Yan (you@example.com). Yan only.",
-    "Local only. Never spawn a Cursor cloud agent.  No sends, no education or calendar writes.",
+    "Local only. Never spawn a Cursor cloud agent.  No sends, no home or calendar writes.",
     `Follow the entity contract in ${BRAIN_REL}/schema.md and the write rules in .cursor/skills/personal-people/SKILL.md.`,
     "Below is one Personal Agent chat turn. Decide whether Yan stated durable facts or corrections the brain should hold.",
     "Allowed writes ONLY:",
@@ -39,7 +39,7 @@ export function buildExtractionPrompt({ userText, assistantText }) {
     `- edit or add a short standing line in ${BRAIN_REL}/identity.md or identity-school.md / identity-accounts.md / identity-logistics.md, or a ${BRAIN_REL}/threads/ page, for facts about Yan himself. Rewrite the line. Do not append into a mega-bullet. Dated events go to the matching org or thread.`,
     "Person spelling, emails, nicknames, phones, birthdays, deaths, and jobs never go on identity.md as prose. Those stay on the person card. Identity people lines are name, role, and a people/slug pointer. You may still edit identity.md for Yan facts.",
     `- slang or abbreviations that are not a person nickname: node server/brain-glossary.js "<term>" first. If it is missing and the meaning is clear, node server/brain-glossary.js add --term "..." --gloss "...". Duplicate means do nothing. Do not hand-edit glossary files.`,
-    "Never write prose sections, never create new entity cards, never hand-edit generated files (people/index.md, people/graph.md, glossary/index.md, brain/education/**), never touch journal/ or patterns.md. brain-glossary.js add is allowed and it rewrites the glossary index.",
+    "Never write prose sections, never create new entity cards, never hand-edit generated files (people/index.md, people/graph.md, glossary/index.md, brain/home/**), never touch journal/ or patterns.md. brain-glossary.js add is allowed and it rewrites the glossary index.",
     "First pull the entity card (node server/brain-entity-card.js <slug>) or the glossary entry and check the fact is not already there; the in-chat agent may have written it this turn. Duplicate means do nothing.",
     "Questions, chit-chat, coding requests, and agent instructions are not brain facts. When in doubt, do nothing.",
     "",
@@ -80,7 +80,7 @@ export function enqueueBrainExtraction({ email, sessionId, userText, assistantTe
       );
       await gitAddCommitPush({
         paths: [BRAIN_REL],
-        message: "education: chat-turn brain extraction",
+        message: "home: chat-turn brain extraction",
       }).catch(() => {});
     })
     .catch((err) => {

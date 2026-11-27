@@ -10,7 +10,7 @@ description: >-
 
 # Daily News
 
-Yan-only (`education/you@example.com/`). Local Cursor agents, never cloud.
+Yan-only (`home/you@example.com/`). Local Cursor agents, never cloud.
 
 ## Pipeline (Express 6:00 job)
 
@@ -39,7 +39,7 @@ Output files, schema, and timing are the same as the Cursor run. Exit 2 means a 
 ## Files
 
 ```
-education/you@example.com/
+home/you@example.com/
   daily-briefing/
     meta.json          # timezone, 06:00 compile, 07:00 due
     profile.md         # standing context

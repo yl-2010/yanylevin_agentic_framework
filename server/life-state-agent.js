@@ -16,11 +16,11 @@ import {
   writeLifeStateSchedulerState,
 } from "./life-state.js";
 import { buildLifeStateSnapshot } from "./life-state-snapshot.js";
-import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { YAN_HOME_DIR } from "./onedrive-projects.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = "/tmp/yanylevin-life-state.lock";
-const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
+const META_PATH = join(YAN_HOME_DIR, "daily-briefing", "meta.json");
 const SKILL_PATH = join(REPO_ROOT, ".cursor/skills/life-state/SKILL.md");
 export const LIFE_STATE_INTERVAL_MS = 5 * 60 * 1000;
 const LOCK_STALE_MS = 8 * 60 * 1000;

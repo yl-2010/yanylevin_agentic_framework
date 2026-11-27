@@ -89,7 +89,7 @@ struct ChatView: View {
     @State private var pendingSendFlights: [ChatSendFlightPending] = []
     @State private var sendFlight: ChatSendFlightState?
     @State private var sendFlightGeneration = 0
-    /// Bumped to cancel/restart SSE + polling (same as Education tab).
+    /// Bumped to cancel/restart SSE + polling (same as Home tab).
     @State private var liveSessionID = 0
     /// Long-press Copy pill target — message stays put (no context-menu lift).
     @State private var copyMenuMessageID: UUID?
@@ -618,7 +618,7 @@ struct ChatView: View {
         scrollChatToEnd(proxy: proxy)
     }
 
-    /// Same as Education tab: tear down SSE/polling, reload agent+tree, restart live path.
+    /// Same as Home tab: tear down SSE/polling, reload agent+tree, restart live path.
     private func reloadAndRestartLiveSession() async {
         guard let token = auth.session?.token else { return }
         liveSessionID += 1

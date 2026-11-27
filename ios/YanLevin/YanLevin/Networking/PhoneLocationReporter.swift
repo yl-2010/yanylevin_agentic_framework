@@ -313,7 +313,7 @@ final class PhoneLocationReporter: NSObject, CLLocationManagerDelegate, @uncheck
         defer { posting = false }
         do {
             _ = try await APIClient.shared.requestRaw(
-                "api/education/location",
+                "api/home/location",
                 method: "POST",
                 body: fix,
                 bearer: token

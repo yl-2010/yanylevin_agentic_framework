@@ -21,7 +21,7 @@ const CAL_DB = join(
 const APPLE_EPOCH_MS = 978307200 * 1000;
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const CAL_DIR = join(ROOT, "education", "you@example.com", "calendar");
+const CAL_DIR = join(ROOT, "home", "you@example.com", "calendar");
 export const DECISIONS_PATH = join(CAL_DIR, "sort-decisions.jsonl");
 export const PLAN_PATH = join(CAL_DIR, "sort-plan.json");
 

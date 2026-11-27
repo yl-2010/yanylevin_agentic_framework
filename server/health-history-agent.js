@@ -24,10 +24,10 @@ import {
 } from "./health-history-digest.js";
 import { HEALTH_TAKEAWAYS_MODEL_SPEC } from "./health-takeaways-agent.js";
 import { HEALTH_REL, HEALTH_TIMEZONE, YAN_EMAIL, healthDir } from "./phone-health.js";
-import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { YAN_HOME_DIR } from "./onedrive-projects.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
+const META_PATH = join(YAN_HOME_DIR, "daily-briefing", "meta.json");
 
 function modelSelection(spec) {
   return {

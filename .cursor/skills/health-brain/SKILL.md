@@ -19,12 +19,12 @@ Model: **composer-2.5** (fast=false).
 
 | File | Role |
 |------|------|
-| `education/you@example.com/health/takeaways.md` | Nightly prose. Read. |
-| `education/you@example.com/health/history-patterns.md` | Archive essay. Read. First run distills this. |
-| `education/you@example.com/health/workouts.md` | Skim for mix, not every line. |
+| `home/you@example.com/health/takeaways.md` | Nightly prose. Read. |
+| `home/you@example.com/health/history-patterns.md` | Archive essay. Read. First run distills this. |
+| `home/you@example.com/health/workouts.md` | Skim for mix, not every line. |
 | `/tmp/yanylevin-context-life-state.json` | Rooms, gym, computer. Sleep dumps through the 2026-09-26 10:49 AM PT ingest are actual overnight. Later Health-app sleep is inflated until Yan says otherwise. Do not copy 5-minute samples onto health.md. |
-| `education/you@example.com/health/raw/apple-export-*.json` | Do not open. Too large. |
-| `education/you@example.com/health/state.json` | Ingest/takeaways cursors plus your `brainHealth` object. Home timezone is America/Los_Angeles; Austin trip workouts after 2026-08-12 through 2026-08-26 use America/Chicago. |
+| `home/you@example.com/health/raw/apple-export-*.json` | Do not open. Too large. |
+| `home/you@example.com/health/state.json` | Ingest/takeaways cursors plus your `brainHealth` object. Home timezone is America/Los_Angeles; Austin trip workouts after 2026-08-12 through 2026-08-26 use America/Chicago. |
 | `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/schema.md` | Memory-page contract. Required. |
 | `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/health.md` | Your only write target. |
 

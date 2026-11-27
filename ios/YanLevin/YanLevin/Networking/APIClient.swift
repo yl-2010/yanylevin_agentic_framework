@@ -9,7 +9,7 @@ enum APIConfig {
         return URL(string: "https://yanylevin.com")!
     }
 
-    /// Mac Express via Cloudflare Tunnel (education/fitness data + SSE + agent).
+    /// Mac Express via Cloudflare Tunnel (home/fitness data + SSE + agent).
     static var apiBaseURL: URL {
         if let raw = Bundle.main.object(forInfoDictionaryKey: "YanApiBaseURL") as? String,
            let url = URL(string: raw) {
@@ -23,10 +23,10 @@ enum APIConfig {
     static let githubURL = URL(string: "https://github.com/yl-2010")!
     static let mailURL = URL(string: "mailto:you@example.com")!
 
-    /// Auth stays on Vercel; education/fitness hit the Mac API directly.
+    /// Auth stays on Vercel; home/fitness hit the Mac API directly.
     static func usesMacAPI(_ path: String) -> Bool {
         let p = path.hasPrefix("/") ? String(path.dropFirst()) : path
-        return p.hasPrefix("api/education/") || p.hasPrefix("api/fitness/") || p.hasPrefix("api/jype/")
+        return p.hasPrefix("api/home/") || p.hasPrefix("api/fitness/") || p.hasPrefix("api/jype/")
     }
 }
 

@@ -22,8 +22,8 @@ import {
 } from "./canvas-sync.js";
 import { canvasAssignmentIdFromLink, canvasCourseIdFromLink } from "./canvas-grades.js";
 import { fetchAssignmentComments } from "./canvas-context.js";
-import { listClassEntriesForRoot } from "./education-data.js";
-import { objectDirId, resolveBookkeepingFile } from "./education-onedrive.js";
+import { listClassEntriesForRoot } from "./home-data.js";
+import { objectDirId, resolveBookkeepingFile } from "./home-onedrive.js";
 import { listTopLevelProjects } from "./onedrive-projects.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -79,10 +79,10 @@ const MIME_BY_EXT = {
   ".mp4": "video/mp4",
 };
 
-import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { YAN_HOME_DIR } from "./onedrive-projects.js";
 
 function yanRoot() {
-  return YAN_EDUCATION_DIR;
+  return YAN_HOME_DIR;
 }
 
 async function readJsonFile(path) {

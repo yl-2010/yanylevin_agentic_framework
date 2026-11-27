@@ -39,13 +39,13 @@ describe("markdownToTeamsHtml", () => {
     );
   });
 
-  it("renders links and autolinks, rewriting /education paths", () => {
+  it("renders links and autolinks, rewriting /home paths", () => {
     const html = markdownToTeamsHtml(
-      "[todo](/education/todo/essay) and https://example.com."
+      "[todo](/home/todo/essay) and https://example.com."
     );
     assert.match(
       html,
-      /href="https:\/\/yanylevin.com\/education\/todo\/essay"/
+      /href="https:\/\/yanylevin.com\/home\/todo\/essay"/
     );
     assert.match(html, /href="https:\/\/example.com"/);
   });

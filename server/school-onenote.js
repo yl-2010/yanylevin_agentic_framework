@@ -10,7 +10,7 @@ import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promi
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { listClassEntriesForRoot } from "./education-data.js";
+import { listClassEntriesForRoot } from "./home-data.js";
 import {
   CLASS_NOTEBOOKS,
   CONTENT_LIBRARY_GROUP,
@@ -1009,10 +1009,10 @@ async function withToken(parsed, root, fn) {
   }
 }
 
-const YAN_EDUCATION_ROOT = join(
+const YAN_HOME_ROOT = join(
   dirname(fileURLToPath(import.meta.url)),
   "..",
-  "education",
+  "home",
   "you@example.com"
 );
 
@@ -1064,7 +1064,7 @@ export async function linkClassTodos(opts = {}) {
  * @param {{ dryRun?: boolean }} opts
  */
 async function linkClassTodosWithToken(token, opts) {
-  const classes = await listClassEntriesForRoot(YAN_EDUCATION_ROOT);
+  const classes = await listClassEntriesForRoot(YAN_HOME_ROOT);
   const notebooks = await listNotebooks(token);
   /** @type {object[]} */
   const updates = [];

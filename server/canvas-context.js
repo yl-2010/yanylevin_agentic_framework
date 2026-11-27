@@ -1,8 +1,8 @@
 /**
  * Canvas pages, modules, course files, and submission comments.
- * Dumps under education/<yan>/.canvas/ feed the agent.
- * Teacher comments also overlay onto education todos (web and iOS).
- * Pages, modules, and course files stay off the education UI.
+ * Dumps under home/<yan>/.canvas/ feed the agent.
+ * Teacher comments also overlay onto home todos (web and iOS).
+ * Pages, modules, and course files stay off the home UI.
  * Full (nightly / --fetch-only) snapshot pulls these. Hourly light does not.
  */
 
@@ -230,7 +230,7 @@ export function formatPagesMarkdown(pages) {
   const lines = [
     "# Canvas pages",
     "",
-    "Agent context only. Do not put these on the education UI.",
+    "Agent context only. Do not put these on the home UI.",
     "",
   ];
   const list = Array.isArray(pages) ? pages : [];
@@ -259,7 +259,7 @@ export function formatModulesMarkdown(modules) {
   const lines = [
     "# Canvas modules",
     "",
-    "Agent context only. Do not put these on the education UI.",
+    "Agent context only. Do not put these on the home UI.",
     "",
   ];
   const list = Array.isArray(modules) ? modules : [];
@@ -293,7 +293,7 @@ export function formatCourseFilesMarkdown(files) {
   const lines = [
     "# Canvas course files",
     "",
-    "Agent context only. Names and folders, not education tiles. Do not copy into OneDrive for the UI.",
+    "Agent context only. Names and folders, not home tiles. Do not copy into OneDrive for the UI.",
     "",
   ];
   const list = Array.isArray(files) ? files : [];

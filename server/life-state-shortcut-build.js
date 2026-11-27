@@ -17,7 +17,7 @@ const execFileAsync = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const TOKEN_PLACEHOLDER = "__LOCATION_INGEST_TOKEN__";
 export const URL_PLACEHOLDER = "__LIFE_STATE_INTENT_URL__";
-export const DEFAULT_URL = "https://api.yanylevin.com/api/education/life-state-intent";
+export const DEFAULT_URL = "https://api.yanylevin.com/api/home/life-state-intent";
 const ICLOUD_DIR = join(
   homedir(),
   "Library/Mobile Documents/com~apple~CloudDocs/YanLifeState"

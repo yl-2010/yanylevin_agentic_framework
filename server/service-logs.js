@@ -13,7 +13,7 @@ export const SERVICE_LOG_FILES = {
   server: "personal-agent-server.log",
   agentWorker: "personal-agent-worker.log",
   cursorUsage: "personal-agent-cursor-usage.log",
-  educationSync: "personal-agent-education-sync.log",
+  homeSync: "personal-agent-home-sync.log",
   lmstudioGptOss: "personal-agent-lmstudio-gpt-oss.log",
   cloudflared: "cloudflared-personal-agent.log",
   computerUse: "personal-agent-computer-use.log",
@@ -28,7 +28,7 @@ export const SERVICE_LOGS = Object.fromEntries(
 export const SERVER_LOG_PATH = SERVICE_LOGS.server;
 export const AGENT_WORKER_LOG_PATH = SERVICE_LOGS.agentWorker;
 export const CURSOR_USAGE_LOG_PATH = SERVICE_LOGS.cursorUsage;
-export const EDUCATION_SYNC_LOG_PATH = SERVICE_LOGS.educationSync;
+export const HOME_SYNC_LOG_PATH = SERVICE_LOGS.homeSync;
 export const LMSTUDIO_GPT_OSS_LOG_PATH = SERVICE_LOGS.lmstudioGptOss;
 export const CLOUDFLARED_LOG_PATH = SERVICE_LOGS.cloudflared;
 export const COMPUTER_USE_LOG_PATH = SERVICE_LOGS.computerUse;

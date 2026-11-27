@@ -29,11 +29,11 @@ import {
   readHealthState,
   writeHealthState,
 } from "./phone-health.js";
-import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { YAN_HOME_DIR } from "./onedrive-projects.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = "/tmp/yanylevin-health-takeaways.lock";
-const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
+const META_PATH = join(YAN_HOME_DIR, "daily-briefing", "meta.json");
 const LOCK_STALE_MS = 45 * 60 * 1000;
 
 export const HEALTH_TAKEAWAYS_MODEL_SPEC = {

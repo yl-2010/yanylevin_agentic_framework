@@ -246,7 +246,7 @@ struct ScheduleWidget: Widget {
             ScheduleWidgetView(entry: entry)
         }
         .configurationDisplayName("Schedule")
-        .description("Upcoming classes from Education. Requires a signed-in full-access account.")
+        .description("Upcoming classes from Home. Requires a signed-in full-access account.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }

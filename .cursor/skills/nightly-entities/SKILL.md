@@ -27,7 +27,7 @@ for people; you are where person facts land.
   entity). Never rewrite untouched people. Never glob `people/`.
 - Writes go under `brain/people/<slug>/`, `brain/groups/`, `brain/orgs/`,
   `brain/places/`. Never edit generated files (`people/index.md`,
-  `people/graph.md`, `brain/education/**`); the runner regenerates them.
+  `people/graph.md`, `brain/home/**`); the runner regenerates them.
 - Timeline entries are append-only: add `- YYYY-MM-DD | fact [source]` at the
   bottom. Check the entry is not already there (a chat-time write or an
   aborted earlier run may have added it). Never edit or delete existing

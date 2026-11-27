@@ -3,7 +3,7 @@ import AppIntents
 /// Opens the app to an education class page (Live Activity banner).
 struct OpenClassIntent: AppIntent {
     static var title: LocalizedStringResource = "Open Class"
-    static var description = IntentDescription("Opens an education class.")
+    static var description = IntentDescription("Opens a home class.")
     static var isDiscoverable = false
     static var openAppWhenRun = true
 

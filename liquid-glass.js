@@ -13,7 +13,7 @@
  * Cheap frost (opt-in, html[data-lg-cheap="1"]):
  *   No refraction, no specular maps, no pointer-follow glow. Flat frost on
  *   cards. A short blur only on the corner orbs. Used for Alex on
- *   /education and for every account on /jype. Absent flag keeps this file's
+ *   /home and for every account on /jype. Absent flag keeps this file's
  *   normal desktop path.
  */
 (() => {
@@ -351,9 +351,9 @@
   function isStaticContentBox(el) {
     if (el.classList.contains("chapter-chip")) return false;
     return (
-      el.classList.contains("edu-panel") ||
-      el.classList.contains("edu-file-tile") ||
-      el.classList.contains("edu-case-side") ||
+      el.classList.contains("home-panel") ||
+      el.classList.contains("home-file-tile") ||
+      el.classList.contains("home-case-side") ||
       el.classList.contains("dash-login") ||
       el.classList.contains("dash-entry") ||
       el.classList.contains("dash-agent") ||
@@ -366,7 +366,7 @@
   }
 
   const STATIC_BOX_SEL =
-    ".edu-panel.lg-static, .edu-file-tile.lg-static, .edu-case-side.lg-static, .dash-login.lg-static, .dash-entry.lg-static, .dash-agent.lg-static, .yan-chat-widget.lg-static, .yan-chat-map-ios.lg-static, .yan-chat-bubble.lg-static, .sheet.lg-static, .glass-pill.lg-static";
+    ".home-panel.lg-static, .home-file-tile.lg-static, .home-case-side.lg-static, .dash-login.lg-static, .dash-entry.lg-static, .dash-agent.lg-static, .yan-chat-widget.lg-static, .yan-chat-map-ios.lg-static, .yan-chat-bubble.lg-static, .sheet.lg-static, .glass-pill.lg-static";
 
   const STATIC_BOX_MAG_SCALE = 0.6;
 
@@ -1517,9 +1517,9 @@ void main() {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
       }
-      html.lg-cheap .edu-panel,
+      html.lg-cheap .home-panel,
       html.lg-cheap .sheet,
-      html.lg-cheap .edu-file-tile,
+      html.lg-cheap .home-file-tile,
       html.lg-cheap .yan-chat-panel,
       html.lg-cheap .yan-chat-bubble {
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12) !important;
@@ -1909,7 +1909,7 @@ void main() {
       .querySelectorAll(".stat-tile")
       .forEach((el) => bindMagnetic(el, 0.28));
     document
-      .querySelectorAll(".edu-vote, .edu-filter")
+      .querySelectorAll(".home-vote, .home-filter")
       .forEach((el) => bindMagnetic(el, 0.28));
     document.querySelectorAll(".yan-chat-pill").forEach((el) => {
       bindMagnetic(el, 0.18);

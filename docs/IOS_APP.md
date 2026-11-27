@@ -1,6 +1,6 @@
 # Yan Levin iOS app
 
-Native SwiftUI companion to [yanylevin.com](https://yanylevin.com). Universal for **iPhone and iPad** (`TARGETED_DEVICE_FAMILY: 1,2`) with adaptive layouts: wide canvas on iPad and landscape (2-column Home cards / Education matching the website; Timeline stays single-column).
+Native SwiftUI companion to [yanylevin.com](https://yanylevin.com). Universal for **iPhone and iPad** (`TARGETED_DEVICE_FAMILY: 1,2`) with adaptive layouts: wide canvas on iPad and landscape (2-column Home cards / Home matching the website; Timeline stays single-column).
 
 ## Requirements
 
@@ -27,9 +27,9 @@ open YanLevin.xcodeproj
 | Audience | Tabs |
 |----------|------|
 | Guests | Home (portfolio), Chat (visitor → Mac gpt-oss), Account |
-| Full access (`you@example.com` / `you@icloud.com`, `you@example.com` / `you@icloud.com`) | Opens on **Chat** (tab order is Account → Fitness → Education; Chat is the prominent slot on iPhone). Education (classes/todos) and Fitness are extra tabs. Chat defaults to Personal Agent, with a top-right circle toggle (person ↔ YL) for public chat. Guests still open on Home. While the Personal Agent is working, tap Send to queue (max 8). Hold Send for 1 second, then release, to interrupt the live turn and send immediately. Hold a queued bubble for that same 1 second, then release, to interrupt with it. Same hold on `/education` web chat. |
+| Full access (`you@example.com` / `you@icloud.com`, `you@example.com` / `you@icloud.com`) | Opens on **Chat** (tab order is Account → Fitness → Home; Chat is the prominent slot on iPhone). Home (classes/todos) and Fitness are extra tabs. Chat defaults to Personal Agent, with a top-right circle toggle (person ↔ YL) for public chat. Guests still open on Home. While the Personal Agent is working, tap Send to queue (max 8). Hold Send for 1 second, then release, to interrupt the live turn and send immediately. Hold a queued bubble for that same 1 second, then release, to interrupt with it. Same hold on `/home` web chat. |
 
-Yan’s **iPhone** session may send location to the Mac API (`POST /api/education/location`) so the Personal Agent (web and iPad included) knows where the phone is. Chat maps on iPhone and iPad still use on-device GPS for the blue dot and expanded map. The **iPad app does not upload location**, does not run the 5-minute heartbeat, and does not send a device bundle; agent context uses the iPhone feed on the Mac. The Mac rejects an `idiom: "pad"` post so iPad cannot overwrite the iPhone pin. Each iPhone post overwrites that fix and appends a private history log. Location ingest is Yan-only. Allow **Always** in iPhone Settings if you want updates while the phone is in the pocket: significant-change (~500m), visits, and a raw 5-minute heartbeat with battery, charging, network, and audio route (no extra agents). The 5-minute timer only posts while the app process is running. Sitting still does not wake it. iOS wakes it again on a significant move (~500m) or a visit. After a swipe-kill, heartbeats pause until the app is opened again; significant-change and visits can still relaunch on a move. Agents should treat that sitting-still silence as expected, not as a GPS failure.
+Yan’s **iPhone** session may send location to the Mac API (`POST /api/home/location`) so the Personal Agent (web and iPad included) knows where the phone is. Chat maps on iPhone and iPad still use on-device GPS for the blue dot and expanded map. The **iPad app does not upload location**, does not run the 5-minute heartbeat, and does not send a device bundle; agent context uses the iPhone feed on the Mac. The Mac rejects an `idiom: "pad"` post so iPad cannot overwrite the iPhone pin. Each iPhone post overwrites that fix and appends a private history log. Location ingest is Yan-only. Allow **Always** in iPhone Settings if you want updates while the phone is in the pocket: significant-change (~500m), visits, and a raw 5-minute heartbeat with battery, charging, network, and audio route (no extra agents). The 5-minute timer only posts while the app process is running. Sitting still does not wake it. iOS wakes it again on a significant move (~500m) or a visit. After a swipe-kill, heartbeats pause until the app is opened again; significant-change and visits can still relaunch on a move. Agents should treat that sitting-still silence as expected, not as a GPS failure.
 
 ### Fitness
 
@@ -44,7 +44,7 @@ Apple/iCloud emails alias onto the same Gmail-backed account folders — Google 
 
 ### Live Activities (iPhone and iPad)
 
-Lock Screen on both; Dynamic Island on iPhone; status bar on iPad. Full-access only. Started from the app (foreground, education SSE, or iPhone location heartbeat). Class minutes (`12 min`) are system-drawn, so they keep counting with the app asleep. No ActivityKit push yet.
+Lock Screen on both; Dynamic Island on iPhone; status bar on iPad. Full-access only. Started from the app (foreground, home SSE, or iPhone location heartbeat). Class minutes (`12 min`) are system-drawn, so they keep counting with the app asleep. No ActivityKit push yet.
 
 | Activity | When | Tap |
 |----------|------|-----|
@@ -53,13 +53,13 @@ Lock Screen on both; Dynamic Island on iPhone; status bar on iPad. Full-access o
 
 Enable Live Activities for Yan Levin in iPhone Settings if they do not appear.
 
-### Education widgets (full-access only)
+### Home widgets (full-access only)
 
 Home Screen widgets require a signed-in allowlisted account (session mirrored via App Group `group.com.example.personalagent`):
 
 | Widget | Sizes | Behavior |
 |--------|-------|----------|
-| **Schedule** | 2×2, 2×4, 4×4 | Upcoming classes. Small/medium show 4; large shows up to 8 split by the same day groups as `/education`. |
+| **Schedule** | 2×2, 2×4, 4×4 | Upcoming classes. Small/medium show 4; large shows up to 8 split by the same day groups as `/home`. |
 | **Todos** | 2×2, 2×4, 4×4; iPad also 8×4 | Upcoming open todos (5 / 5 / 7; iPad extra-large: 14 in two columns), with the same due-date hairlines as the in-app / site TODO list. Small and medium are title-only (no due/class lines). Large keeps due + class. Widget settings: CW/HW/QA/MA/untagged filters plus optional class filter. Tap the circle to complete; tap the title to open that todo in the app. |
 
 Enable App Groups for both the app and `com.example.personalagent.widgets` in the Apple Developer portal (**paid Apple Developer Program required** for a physical device). Without that, widgets cannot read your login session. The Simulator often still creates the App Group from the entitlements file alone.
@@ -79,7 +79,7 @@ The control uses the YL app mark. After installing an update, remove the old cir
 
 ## App Store Review notes (paste into Connect)
 
-> Chat and the Personal Agent require Yan’s Mac Studio API (`api.yanylevin.com`) with LM Studio and the local Cursor personal agent online. If those services are down, the app shows an offline message. Sign-in: Google and Sign in with Apple. Full Education access is limited to allowlisted accounts; demo account: contact developer. Privacy Policy: https://yanylevin.com/privacy/
+> Chat and the Personal Agent require Yan’s Mac Studio API (`api.yanylevin.com`) with LM Studio and the local Cursor personal agent online. If those services are down, the app shows an offline message. Sign-in: Google and Sign in with Apple. Full Home access is limited to allowlisted accounts; demo account: contact developer. Privacy Policy: https://yanylevin.com/privacy/
 
 ## TestFlight
 

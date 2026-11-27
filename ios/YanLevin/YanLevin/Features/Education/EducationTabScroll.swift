@@ -1,7 +1,7 @@
 import SwiftUI
 
 extension View {
-    /// Track scroll offset for Education tab re-taps: scroll to top if needed,
+    /// Track scroll offset for Home tab re-taps: scroll to top if needed,
     /// otherwise the store pops. Only the visible page writes `visiblePageIsAtTop`.
     func educationTabReselectScroll(isActive: Bool) -> some View {
         modifier(EducationTabScrollModifier(isActive: isActive))

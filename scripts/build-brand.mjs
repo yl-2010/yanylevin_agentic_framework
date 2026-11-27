@@ -19,7 +19,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CHECK = process.argv.includes("--check");
 
 const CSS_TARGETS = [
-  { file: "education/styles.css", brands: ["personal", "agent", "jype", "debate"] },
+  { file: "home/styles.css", brands: ["personal", "agent", "jype", "debate"] },
   { file: "2026-27-electives/styles.css", brands: ["personal"] },
   { file: "prasham-schedule-options/styles.css", brands: ["personal"] },
 ];

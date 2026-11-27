@@ -4,7 +4,7 @@ import AppIntents
 /// the circle uses `CompleteTodoIntent` and does not open the app.
 struct OpenTodoIntent: AppIntent {
     static var title: LocalizedStringResource = "Open Todo"
-    static var description = IntentDescription("Opens an education todo.")
+    static var description = IntentDescription("Opens a home todo.")
     static var isDiscoverable = false
     static var openAppWhenRun = true
 

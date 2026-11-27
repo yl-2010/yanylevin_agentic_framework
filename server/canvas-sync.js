@@ -11,7 +11,7 @@
  * Hourly/nightly agents still do not POST submissions.
  * Full fetch also dumps comments, pages, modules, and course files into
  * .canvas/ for the agent. Teacher comments also overlay onto todo pages.
- * Pages, modules, and course files stay off the education UI.
+ * Pages, modules, and course files stay off the home UI.
  */
 
 import { mkdir, open, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
@@ -29,11 +29,11 @@ import {
   effectiveTrimesterForVisibility,
   listClassEntriesForRoot,
   scheduleTodayKey,
-} from "./education-data.js";
-import { scheduleOnedriveSnapshotRefresh } from "./education-onedrive-snapshot.js";
-import { formatDeletedBlock, loadDeletedMarkdown } from "./education-match.js";
+} from "./home-data.js";
+import { scheduleOnedriveSnapshotRefresh } from "./home-onedrive-snapshot.js";
+import { formatDeletedBlock, loadDeletedMarkdown } from "./home-match.js";
 import { gitAddCommitPush } from "./git-publish.js";
-import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { YAN_HOME_DIR } from "./onedrive-projects.js";
 import {
   attachCanvasComments,
   attachCanvasOverlay,
@@ -49,14 +49,14 @@ import {
 } from "./cursor-sdk-auth.js";
 import { OWNER_EMAIL as YAN_EMAIL } from "./identity.js";
 
-export const CANVAS_REL = join(YAN_EDUCATION_DIR, ".canvas");
+export const CANVAS_REL = join(YAN_HOME_DIR, ".canvas");
 export function canvasSyncHm(meta) {
   return nightlyAgentsHm(meta);
 }
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_BASE = "https://canvas.instructure.com";
-const META_PATH = join(YAN_EDUCATION_DIR, "daily-briefing", "meta.json");
+const META_PATH = join(YAN_HOME_DIR, "daily-briefing", "meta.json");
 const LOCK_PATH = "/tmp/yanylevin-canvas-sync.lock";
 export const CANVAS_LOCK_STALE_MS = 90 * 60 * 1000;
 export const CANVAS_LOCK_RETRY_MS = 3 * 60 * 1000;
@@ -796,7 +796,7 @@ export function filterCanvasSnapshotToDashboard(snapshot, classNames) {
 }
 
 async function listDashboardClassNames() {
-  const root = YAN_EDUCATION_DIR;
+  const root = YAN_HOME_DIR;
   /** @type {string[]} */
   const names = [];
   for (const entry of await listClassEntriesForRoot(root)) {
@@ -1479,7 +1479,7 @@ export function formatCanvasAssignmentsMarkdown(snapshot, opts = {}) {
     `Updated: ${snapshot.updatedAt || now.toISOString()}`,
     `Timezone: ${snapshot.timezone || ""}`,
     "",
-    "Agent maps these rows onto existing education dashboard classes (personal-canvas skill).",
+    "Agent maps these rows onto existing home dashboard classes (personal-canvas skill).",
     "Only dashboard / junior-year classes are stored. Never copy done/completed from Canvas.",
     "",
   ];
@@ -1949,12 +1949,12 @@ export function buildCanvasSyncPrompt({
       ? hourlyBlock.trim()
       : "";
   return [
-    `Follow ${SKILL_PATH}. Sync Canvas into Yan's education dashboard.`,
+    `Follow ${SKILL_PATH}. Sync Canvas into Yan's home dashboard.`,
     "Yan only (you@example.com). Local only. Never spawn a Cursor cloud agent.",
     `Today's date key: ${dateKey} (timezone ${timezone}).`,
     `Snapshot: ${CANVAS_REL}/snapshot.json (also assignments.md). Optional map: ${CANVAS_REL}/course-map.json.`,
     `Agent context dumps: ${CANVAS_REL}/comments.md, comments-new.md, pages.md, modules.md, files.md (and the matching .json). Teacher comments show on the todo page from the live overlay. Pages, modules, and course files stay off the UI.`,
-    "Read comments-new.md. Fold new teacher comments into that class or todo .CONTEXT.md on OneDrive (Finder-hidden, and hidden from the education UI). Skip a comment already in .CONTEXT.md. Do not copy comments into .todo.json description. Do not create dashboard tiles from pages, modules, or course files. Use those dumps when writing todo descriptions or class .CONTEXT.md if they explain the work.",
+    "Read comments-new.md. Fold new teacher comments into that class or todo .CONTEXT.md on OneDrive (Finder-hidden, and hidden from the home UI). Skip a comment already in .CONTEXT.md. Do not copy comments into .todo.json description. Do not create dashboard tiles from pages, modules, or course files. Use those dumps when writing todo descriptions or class .CONTEXT.md if they explain the work.",
     `New-assignment log: ${CANVAS_REL}/last-hourly-sync.json. Read it. Fix mistakes the daytime Composer pass made when it created a new todo (wrong tags, HW: prefixes left on names, Adv Calc HW dues pulled back to Canvas time, Data Science number/stat visual due pulled back to 2026-11-18, American Lit Venn due pulled back to 2026-10-20, yoga CW hiddenFromHome, missing canvasId, duplicate todos, course-map drift). Day 12 problem set (canvasId 40440347) stays 2026-10-27 09:55. Yan set that to the start of Tuesday calc. Do not shift it to the previous period C. Review problems from MA 2 (canvasId 40440348) stays 2026-10-29 12:25. Yan put that back on the original Thursday. Do not shift it to the previous period C. SP1 presentation problem (canvasId 40468349) stays HW, due 2026-11-04 12:25. Yan said it was homework. Do not retag it MA because the title says presentation. Do not shift it to the previous period C. Independent Research Project Preliminary Data Collection and Analysis (canvasId 40476875) stays HW. Yan said it was homework on 2026-11-05. Do not retag it MA because the title says project. STUDY GUIDE: MA Oral Final: Stereotypes Project 2026 (canvasId 40481133) stays HW, due 2026-11-13 08:30. It is the study guide for the oral, not the oral. Do not retag it MA because the title says final or project. Due and title updates on todos that already exist are applied in code each hour. Review those too.`,
     "Yan is a 2026-27 junior. Those academic dashboard classes are often missing from Canvas until school publishes them. That is expected.",
     "FIRST: map snapshot courses to Yan's class folders (OneDrive `.education` under the grade folder, skip free-period shells and fixtures). The snapshot already dropped non-dashboard enrollments. If ZERO dashboard classes appear in Canvas, STOP immediately. Do not invent Class of 2028, EPS Library, Iceland EBC, Graphic Design, or prior-year shells. Do not create todos. One short note is enough.",
@@ -1964,7 +1964,7 @@ export function buildCanvasSyncPrompt({
     "Pull major syllabus / calendar-event dates onto .date.json with canvasLink. OneDrive class bookkeeping is Finder-hidden: .todo.json, .date.json, .CONTEXT.md. Do not write a plain todo.json next to .todo.json.",
     "Do not create a date when that canvasId is already a class todo. MAs already show in Dates. Physics MA #2 (canvasId 40291676) and the Motion Research Symposium (canvasId 40291677) are todos only. The symposium stays due 2026-11-20 10:30 even though Canvas has no due.",
     "NEVER write done or completedAt from Canvas. New todos start done false. Updates leave those keys untouched. Page-load overlay paints completion in the API; you still must not persist it. Preserve finderHidden when it is already set.",
-    "Do not POST to Canvas. Do not delete education todos just because Canvas dropped a row.",
+    "Do not POST to Canvas. Do not delete home todos just because Canvas dropped a row.",
     "Leave canvasFiles on .todo.json alone. Express downloads teacher attachments into the OneDrive todo folder after you finish. Spanish 4 pasted decoration images (image-<uuid>, image.png) are not downloaded.",
     "Do not recreate a todo or date that looks like a manually deleted.md row. Judgement, not exact due clocks. canvasId is a strong hint.",
     `After the Canvas writes, link OneNote pages yourself. Tag does not matter (CW, HW, QA, MA, or none). If Yan would open the page for that todo, link it. Follow .cursor/skills/personal-onenote/SKILL.md for how to open notebooks, sign in, and read pages. A signed-out status means run login, then list sections and pages. Leave existing OneNote sites alone only if login itself fails. Two passes. Do not run link-todos. Seen page ids are ${CANVAS_REL}/onenote-seen.json, shape { "pages": { "<pageId>": { "title": "", "notebook": "" } } }. That file is a memory of pages already considered. If it is missing, nothing has been considered. Pass 1 is not empty. Also look at todos created or due on or after 2026-10-08 that still have no OneNote site. After you write the file, later nights use the normal two passes. Pass 1: a page id not in that file is new. For each new page, check every todo in that class, any due date. Pass 2: every todo created tonight, and every todo with dueDate from today through 14 days out in this timezone, done or not, any tag. For each of those, check the class notebook for applicable pages, including pages already in onenote-seen.json. A page in Yan's notebook is a site named with the assignment name, oneNote personal. A Content Library page is a site named Content Library: plus the page title, oneNote content-library. Copy url (https webUrl), clientUrl (onenote:), and pageId. The same page may go on every todo it applies to. Do not cap how many OneNote sites a todo has. Set main true on exactly one OneNote site, the page Yan would open first, and clear main on the others. A title close to the todo name is a hint, and so is the level 0 page when later pages are indented under it. One OneNote site means that site is main. Do not remove an existing OneNote site because this pass did not mention it. Skip a pageId already on that todo. Keep sites that are not OneNote. Do not put OneNote URLs in description. A path in the description is not the link. A Canvas description that names a Content Library page means that page applies. After both passes, rewrite onenote-seen.json from the pages you listed.`,
@@ -2423,7 +2423,7 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
       laterAuthRetry.clear();
       await gitAddCommitPush({
         paths: [CANVAS_REL],
-        message: `education: ${dateKey} canvas snapshot (junior courses not published)`,
+        message: `home: ${dateKey} canvas snapshot (junior courses not published)`,
       });
       return {
         ok: true,
@@ -2444,7 +2444,7 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
     );
 
     const deletedBlock = formatDeletedBlock(
-      await loadDeletedMarkdown(YAN_EDUCATION_DIR)
+      await loadDeletedMarkdown(YAN_HOME_DIR)
     );
     const lastHourly = await readLastHourlySync(dir);
     const hourlyBlock = lastHourly
@@ -2502,8 +2502,8 @@ async function runCanvasSyncOnce({ force = false, fetchOnly = false } = {}) {
       (fetched.snapshot?.assignments || []).map((row) => row.id)
     );
     await gitAddCommitPush({
-      paths: [YAN_EDUCATION_DIR],
-      message: `education: ${dateKey} canvas sync`,
+      paths: [YAN_HOME_DIR],
+      message: `home: ${dateKey} canvas sync`,
     });
 
     return {
@@ -2613,7 +2613,7 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
       hourlyLaterAuthRetry.clear();
       await gitAddCommitPush({
         paths: canvasPaths,
-        message: `education: ${hourKey} canvas watch seed`,
+        message: `home: ${hourKey} canvas watch seed`,
       });
       return {
         ok: true,
@@ -2699,8 +2699,8 @@ async function runCanvasHourlySyncOnce({ force = false } = {}) {
     await gitAddCommitPush({
       paths: canvasPaths,
       message: createdRows.length
-        ? `education: ${hourKey} canvas assignment`
-        : `education: ${hourKey} canvas watch`,
+        ? `home: ${hourKey} canvas assignment`
+        : `home: ${hourKey} canvas watch`,
     });
     return {
       ok: true,

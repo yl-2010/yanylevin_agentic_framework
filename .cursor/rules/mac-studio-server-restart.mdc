@@ -7,7 +7,7 @@ alwaysApply: true
 
 Restarting the live Express API is **the agent’s job** when this Cursor instance is on **Yan’s Mac Studio** and the change set affects that process. Do not skip it or leave it for the user. Follow [`AGENTS.md`](../../AGENTS.md).
 
-Restarting the API is safe for running agents. Personal Agent turns live in a separate process, the agent worker (`com.personalagent.agent-worker`, `server/agent-worker.js`, 127.0.0.1:3005). The API proxies `/api/education/agent/*` and `/api/jype/agent/*` to it and re-attaches to the worker's status stream when it comes back, so loading dots and `/agent/running` pick up where they left off.
+Restarting the API is safe for running agents. Personal Agent turns live in a separate process, the agent worker (`com.personalagent.agent-worker`, `server/agent-worker.js`, 127.0.0.1:3005). The API proxies `/api/home/agent/*` and `/api/jype/agent/*` to it and re-attaches to the worker's status stream when it comes back, so loading dots and `/agent/running` pick up where they left off.
 
 ## Gate (must pass)
 
@@ -23,7 +23,7 @@ Skip restart on MacBook, Cursor Cloud, or any other host.
 
 Restart the API when edits affect the running Node process, e.g. `server/**`, `server/package.json`, or `deploy/launchagents/com.personalagent.server.plist` / root `npm run server` plumbing. Do not wait for agents to go idle first.
 
-Skip for static HTML/CSS/JS, iOS, Vercel-only, docs-only, or education/fitness data-folder sync.
+Skip for static HTML/CSS/JS, iOS, Vercel-only, docs-only, or home/fitness data-folder sync.
 
 ## Restart command
 

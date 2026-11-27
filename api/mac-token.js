@@ -1,7 +1,7 @@
 /**
  * Same-origin Mac API JWT mint (Hobby-safe: one function for visitor + user).
  * - GET /api/mac-token           → visitor JWT (chatbot)
- * - GET /api/mac-user-token      → rewrite → ?kind=user (education/fitness session)
+ * - GET /api/mac-user-token      → rewrite → ?kind=user (home/fitness session)
  */
 
 const { mintHs256Jwt } = require("./_jwt");

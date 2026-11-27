@@ -8,10 +8,10 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withCloudRetry } from "./cloud-storage-io.js";
 import { YAN_EMAIL, readPhoneLocation } from "./phone-location.js";
-import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { YAN_HOME_DIR } from "./onedrive-projects.js";
 
 export const LIFE_STATE_DIRNAME = "life-state";
-export const LIFE_STATE_REL = join(YAN_EDUCATION_DIR, LIFE_STATE_DIRNAME);
+export const LIFE_STATE_REL = join(YAN_HOME_DIR, LIFE_STATE_DIRNAME);
 export const LIFE_STATE_SNAPSHOT_PATH = "/tmp/yanylevin-life-state-snapshot.json";
 export const LIFE_STATE_GUESS_PATH = "/tmp/yanylevin-life-state-guess.json";
 export const LIFE_STATE_CONTEXT_PATH = "/tmp/yanylevin-context-life-state.json";

@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  backupShouldCopy,
   listTopLevelProjects,
   normalizeTier,
   stableProjectId,
@@ -45,5 +46,34 @@ describe("onedrive project tiers", () => {
     );
     const all = await listTopLevelProjects({ includeBackend: true, roots: [root] });
     assert.equal(all.find((row) => row.id === "tests")?.tier, "backend");
+  });
+});
+
+describe("onedrive backup filter", () => {
+  it("copies class json and skips a worksheet pdf", () => {
+    assert.equal(
+      backupShouldCopy("C. Advanced Calc/.HW Sep 16 problem set/.todo.json", "grade"),
+      true
+    );
+    assert.equal(
+      backupShouldCopy("H. Physics/.education/class.json", "grade"),
+      true
+    );
+    assert.equal(
+      backupShouldCopy("C. Advanced Calc/.HW Sep 16 problem set/problem set.pdf", "grade"),
+      false
+    );
+  });
+
+  it("copies project json and chat history, and skips audio", () => {
+    assert.equal(backupShouldCopy("project.json", "project"), true);
+    assert.equal(backupShouldCopy(".chat-history/2026-11-27/note.txt", "project"), true);
+    assert.equal(backupShouldCopy("sites/song.wav", "project"), false);
+    assert.equal(backupShouldCopy("essay.docx", "project"), false);
+  });
+
+  it("copies a person card in a full tree and skips Finder junk", () => {
+    assert.equal(backupShouldCopy("brain/people/ada/person.md", "full"), true);
+    assert.equal(backupShouldCopy(".DS_Store", "full"), false);
   });
 });

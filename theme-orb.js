@@ -3,7 +3,7 @@
  * Draggable (snaps home near top-right); click toggles light/dark theme.
  * Theme is session-only.
  *
- * On education, dashboard, usage, debate, and brain, a logged-in L of glass squares
+ * On home, dashboard, usage, debate, and brain, a logged-in L of glass squares
  * sits in the bottom-left (usage, brain, dashboard). The same three buttons show on
  * every site, including the one you are already on. Drag the circle into the
  * empty cell and it becomes a square that still toggles the theme. Drag it
@@ -109,8 +109,8 @@
   function appDockPage() {
     const path = location.pathname.replace(/\/+$/, "") || "/";
     return (
-      path === "/education" ||
-      path.startsWith("/education/") ||
+      path === "/home" ||
+      path.startsWith("/home/") ||
       path === "/dashboard" ||
       path.startsWith("/dashboard/") ||
       path === "/usage" ||
@@ -391,10 +391,10 @@
   }
 
   function ensureChatWorkspace() {
-    if (window.YL_EDU) return;
+    if (window.YL_HOME) return;
     const path = location.pathname;
     if (path === "/jype" || path.startsWith("/jype/")) {
-      window.YL_EDU = {
+      window.YL_HOME = {
         basePath: "/jype",
         apiPrefix: "/api/jype",
         workspace: "jype",
@@ -405,21 +405,21 @@
 
   function chatMarkup(label) {
     return `
-    <div id="edu-chat" class="yan-chat" data-state="closed">
+    <div id="home-chat" class="yan-chat" data-state="closed">
       <div class="yan-chat-column yan-chat-column--history">
         <div class="yan-chat-panel" data-liquid-glass="rounded" data-filter-id="lg-owner-chat-panel" hidden aria-hidden="true" role="region" aria-label="Chat history">
-          <button type="button" class="yan-chat-close yan-chat-close--panel circle" data-liquid-glass="circle" data-filter-id="lg-owner-chat-x-panel" data-edu-chat-close-all aria-label="Close chat">
+          <button type="button" class="yan-chat-close yan-chat-close--panel circle" data-liquid-glass="circle" data-filter-id="lg-owner-chat-x-panel" data-home-chat-close-all aria-label="Close chat">
             <svg viewBox="0 0 24 24" aria-hidden="true" style="transform: rotate(45deg)"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
           </button>
           <div class="yan-chat-history"></div>
         </div>
         <div class="yan-chat-pill corner circle c-br" data-liquid-glass="circle" data-filter-id="lg-owner-chat-pill">
-          <button type="button" class="yan-chat-launcher" aria-label="${label}" aria-expanded="false" aria-controls="edu-chat-input">
+          <button type="button" class="yan-chat-launcher" aria-label="${label}" aria-expanded="false" aria-controls="home-chat-input">
             <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
           </button>
           <form class="yan-chat-form" action="#" autocomplete="off">
-            <label class="visually-hidden" for="edu-chat-input">Ask your agent</label>
-            <textarea id="edu-chat-input" class="yan-chat-input" name="q" rows="1" maxlength="32000" tabindex="-1" autocomplete="off" wrap="soft" aria-multiline="true"></textarea>
+            <label class="visually-hidden" for="home-chat-input">Ask your agent</label>
+            <textarea id="home-chat-input" class="yan-chat-input" name="q" rows="1" maxlength="32000" tabindex="-1" autocomplete="off" wrap="soft" aria-multiline="true"></textarea>
             <button type="submit" class="yan-chat-send circle" data-liquid-glass="circle" data-filter-id="lg-owner-chat-send" aria-label="Send">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><g stroke="currentColor" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18.2V6.4"/><path d="M6.9 11.3L12 6.2L17.1 11.3"/></g></svg>
             </button>
@@ -428,15 +428,15 @@
       </div>
       <div class="yan-chat-column yan-chat-column--thread" hidden>
         <div class="yan-chat-panel" data-liquid-glass="rounded" data-filter-id="lg-owner-chat-panel-thread" hidden aria-hidden="true" role="region" aria-label="${label}">
-          <button type="button" class="yan-chat-close yan-chat-close--panel circle" data-liquid-glass="circle" data-filter-id="lg-owner-chat-x-thread" data-edu-chat-close-thread aria-label="Close this chat">
+          <button type="button" class="yan-chat-close yan-chat-close--panel circle" data-liquid-glass="circle" data-filter-id="lg-owner-chat-x-thread" data-home-chat-close-thread aria-label="Close this chat">
             <svg viewBox="0 0 24 24" aria-hidden="true" style="transform: rotate(45deg)"><g fill="currentColor"><rect x="10.35" y="4.5" width="3.3" height="15" rx="1.65"/><rect x="4.5" y="10.35" width="15" height="3.3" rx="1.65"/></g></svg>
           </button>
           <div class="yan-chat-messages" aria-live="polite"></div>
         </div>
         <div class="yan-chat-pill corner circle c-br" data-liquid-glass="circle" data-filter-id="lg-owner-chat-pill-thread">
           <form class="yan-chat-form" action="#" autocomplete="off">
-            <label class="visually-hidden" for="edu-chat-thread-input">Continue this chat</label>
-            <textarea id="edu-chat-thread-input" class="yan-chat-input" name="q" rows="1" maxlength="32000" tabindex="-1" autocomplete="off" wrap="soft" aria-multiline="true"></textarea>
+            <label class="visually-hidden" for="home-chat-thread-input">Continue this chat</label>
+            <textarea id="home-chat-thread-input" class="yan-chat-input" name="q" rows="1" maxlength="32000" tabindex="-1" autocomplete="off" wrap="soft" aria-multiline="true"></textarea>
             <button type="submit" class="yan-chat-send circle" data-liquid-glass="circle" data-filter-id="lg-owner-chat-send-thread" aria-label="Send">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><g stroke="currentColor" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18.2V6.4"/><path d="M6.9 11.3L12 6.2L17.1 11.3"/></g></svg>
             </button>
@@ -462,9 +462,9 @@
       ["/js/mac-api.js", ""],
       ["/js/chat-send-flight.js?v=1", ""],
       ["https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js", ""],
-      ["/education/markdown.js?v=katex-2", ""],
+      ["/home/markdown.js?v=katex-2", ""],
       ["/js/chat-orb.js?v=2", "module"],
-      ["/education/chatbot.js?v=orb-after-send", ""],
+      ["/home/chatbot.js?v=orb-after-send", ""],
     ];
     if (!document.querySelector("link[href*='katex.min.css']")) {
       const link = document.createElement("link");
@@ -482,7 +482,7 @@
   function installOwnerCorners() {
     if (!document.querySelector("a.c-tl")) return;
     const needsDock = !document.getElementById("app-dock");
-    const needsChat = !document.getElementById("edu-chat");
+    const needsChat = !document.getElementById("home-chat");
     if (!needsDock && !needsChat) return;
 
     fetch("/api/auth/session", {
@@ -508,7 +508,7 @@
           added = true;
         }
 
-        if (!document.getElementById("edu-chat")) {
+        if (!document.getElementById("home-chat")) {
           ensureChatWorkspace();
           const holder = document.createElement("div");
           holder.innerHTML = chatMarkup(chatLabel());

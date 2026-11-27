@@ -158,7 +158,7 @@ function systemPrompt(email, machineId, machineName) {
     `Signed-in user email: ${email}`,
     `Only create/update files under ${FITNESS_DIR}/${email}/`,
     "Never touch another user's email folder.",
-    "Never edit main-site chatbot code, education folders, or LM Studio wiring.",
+    "Never edit main-site chatbot code, home folders, or LM Studio wiring.",
     "Never spawn a Cursor cloud agent.",
     "Prefer the fitness-os skill instructions when present.",
     "",

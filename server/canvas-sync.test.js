@@ -149,7 +149,7 @@ describe("formatCanvasAssignmentsMarkdown", () => {
     assert.match(md, /American Literature/);
     assert.match(md, /canvasId 2/);
     assert.match(md, /Never copy done/);
-    assert.doesNotMatch(md, /Do not auto-create education todos/);
+    assert.doesNotMatch(md, /Do not auto-create home todos/);
   });
 
   it("notes dropped enrollments that are not dashboard classes", () => {

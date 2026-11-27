@@ -32,7 +32,7 @@ enum RootTab: Hashable {
 /// - Lock-screen Chat control / `yanylevin://chat` → always Chat tab + fresh
 ///   thread, warm or cold, via the `chatHandoffStartNew` handoff below
 ///   (backed by the App Group pending flag when the intent runs out of process).
-/// - Todo widget title tap / `yanylevin://todo` → Education tab, that todo's
+/// - Todo widget title tap / `yanylevin://todo` → Home tab, that todo's
 ///   expanded view (circle tap checks the item without opening the app).
 @MainActor
 final class AppNavigationStore: ObservableObject {
@@ -241,7 +241,7 @@ struct RootTabView: View {
     private var educationTabTitle: String {
         if educationFocus.isJype { return "JYPE" }
         if educationFocus.isDebate { return "Debate" }
-        return "Education"
+        return "Home"
     }
 
     var body: some View {
@@ -302,7 +302,7 @@ struct RootTabView: View {
                 Tab("Fitness", systemImage: "dumbbell.fill", value: RootTab.fitness) {
                     GymView()
                 }
-                Tab(educationTabTitle, systemImage: "graduationcap.fill", value: RootTab.education) {
+                Tab(educationTabTitle, systemImage: "house.fill", value: RootTab.education) {
                     EducationView()
                 }
             } else {
@@ -345,7 +345,7 @@ struct RootTabView: View {
                 Tab("Fitness", systemImage: "dumbbell.fill", value: RootTab.fitness) {
                     GymView()
                 }
-                Tab(educationTabTitle, systemImage: "graduationcap.fill", value: RootTab.education) {
+                Tab(educationTabTitle, systemImage: "house.fill", value: RootTab.education) {
                     EducationView()
                 }
             } else {
@@ -413,8 +413,8 @@ private struct LiquidTabBarModifier: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {
             // Chat is the prominent tab, so minimizing it duplicates the chat
-            // icon on both circles. Education is the only tab where collapse
-            // looks right (cap on the left, chat on the right).
+            // icon on both circles. Home is the only tab where collapse
+            // looks right (house on the left, chat on the right).
             content
                 .tabBarMinimizeBehavior(selectedTab == .education ? .onScrollDown : .never)
         } else {

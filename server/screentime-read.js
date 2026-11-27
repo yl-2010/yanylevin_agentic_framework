@@ -57,7 +57,7 @@ const APP_CATALOG = {
   "com.burbn.barcelona": { name: "Threads", category: "social" },
   "com.burbn.instagram": { name: "Instagram", category: "social" },
   "com.chromanoir.Zeit": { name: "Zeit", category: "other" },
-  "com.duolingo.DuolingoMobile": { name: "Duolingo", category: "education" },
+  "com.duolingo.DuolingoMobile": { name: "Duolingo", category: "home" },
   "com.google.chrome": { name: "Chrome", category: "browser" },
   "com.google.ios.youtube": { name: "YouTube", category: "video" },
   "com.openai.chat": { name: "ChatGPT", category: "productivity" },

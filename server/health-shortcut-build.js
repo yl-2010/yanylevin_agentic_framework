@@ -19,7 +19,7 @@ const SOURCE_DIR = join(ROOT, "ios", "shortcuts", "yan-health-sync");
 const SOURCE_PLIST = join(SOURCE_DIR, "workflow.plist");
 const TOKEN_PLACEHOLDER = "__HEALTH_INGEST_TOKEN__";
 const URL_PLACEHOLDER = "__HEALTH_INGEST_URL__";
-const DEFAULT_URL = "https://api.yanylevin.com/api/education/health";
+const DEFAULT_URL = "https://api.yanylevin.com/api/home/health";
 const ICLOUD_DIR = join(
   homedir(),
   "Library/Mobile Documents/com~apple~CloudDocs/YanHealth"
@@ -558,7 +558,7 @@ export async function ensureHealthIngestToken() {
   const existing = match ? String(match[1] || "").trim().replace(/^["']|["']$/g, "") : "";
   if (existing) return existing;
   const token = randomBytes(32).toString("hex");
-  const line = `\n# iPhone Shortcut POST /api/education/health\nHEALTH_INGEST_TOKEN=${token}\n`;
+  const line = `\n# iPhone Shortcut POST /api/home/health\nHEALTH_INGEST_TOKEN=${token}\n`;
   await writeFile(env.path, `${env.text.trimEnd()}${line}`, "utf8");
   return token;
 }

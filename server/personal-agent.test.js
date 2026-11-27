@@ -46,10 +46,10 @@ import {
   systemPrompt,
   formatVisibleTranscript,
   teamsVoicePrompt,
-  normalizeEducationNavigate,
-  educationNavigateHref,
-  queueEducationNavigate,
-  publishQueuedEducationNavigate,
+  normalizeHomeNavigate,
+  homeNavigateHref,
+  queueHomeNavigate,
+  publishQueuedHomeNavigate,
   deliverIMessageFinalReply,
   deliverIMessageProgressReply,
   deliverTeamsFinalReply,
@@ -65,7 +65,7 @@ import {
   liveContextSections,
   getAgentState,
 } from "./personal-agent.js";
-import { persistChatHistory } from "./education-chat-history.js";
+import { persistChatHistory } from "./home-chat-history.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const YAN = "you@example.com";
@@ -199,7 +199,7 @@ describe("Personal Agent models", () => {
 describe("Personal Agent system prompt", () => {
   it("stays slim and points at on-demand files instead of dumping recipes", () => {
     const prompt = systemPrompt(YAN);
-    assert.ok(prompt.length < 10090, `prompt length ${prompt.length}`);
+    assert.ok(prompt.length < 10085, `prompt length ${prompt.length}`);
     assert.match(prompt, /Personal Agent/);
     assert.match(prompt, /schedule_future_agent/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.futureAgents));
@@ -223,14 +223,14 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /Send more mid-run/);
     assert.match(prompt, /posted to the chat before you start the work/);
     assert.doesNotMatch(prompt, /once, first/);
-    assert.match(prompt, /open_education_page/);
+    assert.match(prompt, /open_home_page/);
     assert.match(prompt, /hide_chat_soon/);
     assert.match(prompt, /Do not mention the hide/);
     assert.match(prompt, /No period when the reply is one word/);
     assert.match(prompt, /Math on the website and in the iOS app is a display block/);
     assert.match(prompt, /Never backticks for math/);
     assert.match(prompt, /Never put Sent by Yan's Personal Agent in app or website bubbles/);
-    assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.education));
+    assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.homeDashboard));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.schedule));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.widgets));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.browser));
@@ -256,7 +256,7 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /images has no pixels/);
     assert.match(prompt, /existing Word, Excel, or PowerPoint/);
     assert.match(prompt, /School Outlook still cannot send/);
-    assert.ok(prompt.length < 10090, `prompt length ${prompt.length}`);
+    assert.ok(prompt.length < 10085, `prompt length ${prompt.length}`);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.chats));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.location));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.lifeState));
@@ -282,7 +282,7 @@ describe("Personal Agent system prompt", () => {
     assert.doesNotMatch(prompt, /Sunny = Adi Levin/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.news));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.brain));
-    assert.doesNotMatch(prompt, /education-os/);
+    assert.doesNotMatch(prompt, /home-os/);
     assert.doesNotMatch(prompt, /```widget/);
     assert.doesNotMatch(prompt, /osascript/);
     assert.doesNotMatch(prompt, /showInDates/);
@@ -297,7 +297,7 @@ describe("Personal Agent system prompt", () => {
   it("tells the JYPE agent not to copy Yan's personal class sites", () => {
     const prompt = systemPrompt(YAN, { workspace: "jype" });
     assert.match(prompt, /JYPE agent/);
-    assert.match(prompt, /Do not copy Yan's personal \/education sites onto JYPE/);
+    assert.match(prompt, /Do not copy Yan's personal \/home sites onto JYPE/);
     assert.match(prompt, /npm run deploy:web yourself/);
     assert.match(prompt, /Never mention the surprise hoodies to Alex/);
     assert.match(prompt, /Third-party models \(Opus, Fable, Sonnet\) are allowed only when this message is from Yan/);
@@ -344,8 +344,8 @@ describe("Personal Agent live context", () => {
         localTime: "17:47",
         timezone: "America/Los_Angeles",
         isSchoolDay: false,
-        schedulePdf: "education/2026-27 Weekly Class Schedule.pdf",
-        scheduleJson: "education/you@example.com/schedule.json",
+        schedulePdf: "home/2026-27 Weekly Class Schedule.pdf",
+        scheduleJson: "home/you@example.com/schedule.json",
       },
       null
     );
@@ -431,10 +431,10 @@ describe("Personal Agent live context", () => {
       screen: "Range: Last 7 days\nFilters: person Yan",
     });
     assert.match(usage, /Called from the usage site/);
-    assert.match(usage, /same chat history as education/);
+    assert.match(usage, /same chat history as home/);
     assert.match(usage, /Range: Last 7 days/);
     assert.match(usage, /Filters: person Yan/);
-    assert.doesNotMatch(usage, /education-dashboard skill/);
+    assert.doesNotMatch(usage, /home-dashboard skill/);
 
     const dash = formatLiveContextBlock(null, {
       client: "web",
@@ -459,7 +459,7 @@ describe("Personal Agent live context", () => {
     });
     assert.match(hub, /Viewing the Brain hub/);
     assert.match(hub, /Card: none/);
-    assert.doesNotMatch(hub, /education-dashboard skill/);
+    assert.doesNotMatch(hub, /home-dashboard skill/);
 
     const card = formatLiveContextBlock(null, {
       client: "web",
@@ -493,7 +493,7 @@ describe("Personal Agent live context", () => {
     assert.match(focused, /Card: none/);
     assert.match(card, /Debate partner/);
     assert.match(card, /relationship: close friend/);
-    assert.doesNotMatch(card, /education-dashboard skill/);
+    assert.doesNotMatch(card, /home-dashboard skill/);
   });
 
   it("keeps usage screen text and drops unknown fields", () => {
@@ -548,7 +548,7 @@ describe("Personal Agent live context", () => {
 });
 
 describe("Personal Agent skill files", () => {
-  it("keeps education dashboard context and recipes on disk", async () => {
+  it("keeps home dashboard context and recipes on disk", async () => {
     for (const rel of Object.values(PERSONAL_SKILL_PATHS)) {
       const text = await readFile(rel.startsWith("/") ? rel : join(REPO_ROOT, rel), "utf8");
       assert.ok(text.length > 80, rel);
@@ -560,12 +560,12 @@ describe("Personal Agent skill files", () => {
     assert.match(four11, /thefixphotogroup\.zenfolio\.com\/f409629586/);
     assert.match(four11, /eq=\{STUDENT_ID\}/);
     const dashboard = await readFile(
-      join(REPO_ROOT, PERSONAL_SKILL_PATHS.education),
+      join(REPO_ROOT, PERSONAL_SKILL_PATHS.homeDashboard),
       "utf8"
     );
     assert.match(dashboard, /Todo identity/);
     assert.match(dashboard, /Date identity/);
-    assert.match(dashboard, /open_education_page/);
+    assert.match(dashboard, /open_home_page/);
     assert.match(dashboard, /Description formatting/);
     assert.match(dashboard, /always write markdown/);
     assert.match(dashboard, /similar name/);
@@ -594,7 +594,7 @@ describe("Personal Agent skill files", () => {
       "utf8"
     );
     assert.match(location, /\.location\.json/);
-    assert.match(location, /education\/you@example.com\/location\//);
+    assert.match(location, /home\/you@example.com\/location\//);
     assert.match(location, /places\.md/);
     assert.match(location, /trips\.md/);
     assert.match(location, /brain\/places/);
@@ -708,7 +708,7 @@ describe("Personal Agent skill files", () => {
 
     const calendar = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.calendar), "utf8");
     assert.match(calendar, /yl-calendar/);
-    assert.match(calendar, /education todos/);
+    assert.match(calendar, /home todos/);
     assert.match(calendar, /Meeting links \(required\)/);
     assert.match(calendar, /--url/);
     assert.match(calendar, /zoom\.us\/webinar\/register/);
@@ -784,7 +784,7 @@ describe("Personal Agent skill files", () => {
     assert.match(people, /\[GPS\]/);
 
     const agent = await readFile(join(REPO_ROOT, PERSONAL_SKILL_PATHS.agent), "utf8");
-    assert.match(agent, /education-sync already commits/);
+    assert.match(agent, /home-sync already commits/);
     assert.match(agent, /git push origin main/);
     assert.match(agent, /send_chat_message/);
     assert.match(agent, /Send more intermediate bubbles/);
@@ -792,7 +792,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /@agent` \/ `@agentg`/);
     assert.doesNotMatch(agent, /once, first/);
     assert.doesNotMatch(agent, /One status bubble is enough/);
-    assert.match(agent, /open_education_page/);
+    assert.match(agent, /open_home_page/);
     assert.match(agent, /iMessage @agent/);
     assert.match(agent, /Teams @agent/);
     assert.match(agent, /Each row from `school-teams\.js thread` has its own `speaker`/);
@@ -935,11 +935,11 @@ describe("Personal Agent skill files", () => {
     assert.match(actions, /Bias is \*\*add\*\*/);
     assert.match(actions, /Missing venue does not skip it/);
     assert.match(actions, /location TBD/);
-    assert.match(actions, /Big dates on the education dashboard/);
+    assert.match(actions, /Big dates on the home dashboard/);
     assert.match(actions, /Bias is \*\*skip\*\*/);
     assert.match(actions, /similar name/);
     assert.match(actions, /update that folder/);
-    assert.match(actions, /description.*markdown|markdown per education-dashboard/i);
+    assert.match(actions, /description.*markdown|markdown per home-dashboard/i);
     assert.match(actions, /OneNote/);
     assert.match(actions, /personal-onenote/);
     assert.match(actions, /Meeting links are required/);
@@ -1394,93 +1394,93 @@ describe("teams voice digest", () => {
   });
 });
 
-describe("open_education_page navigate payload", () => {
+describe("open_home_page navigate payload", () => {
   it("validates views and required ids", () => {
-    assert.equal(normalizeEducationNavigate(null), null);
-    assert.equal(normalizeEducationNavigate({ view: "fitness" }), null);
-    assert.equal(normalizeEducationNavigate({ view: "class" }), null);
-    assert.equal(normalizeEducationNavigate({ view: "todo" }), null);
-    assert.equal(normalizeEducationNavigate({ view: "capsule", todoId: "brief" }), null);
-    assert.equal(normalizeEducationNavigate({ view: "home" })?.view, "home");
+    assert.equal(normalizeHomeNavigate(null), null);
+    assert.equal(normalizeHomeNavigate({ view: "fitness" }), null);
+    assert.equal(normalizeHomeNavigate({ view: "class" }), null);
+    assert.equal(normalizeHomeNavigate({ view: "todo" }), null);
+    assert.equal(normalizeHomeNavigate({ view: "capsule", todoId: "brief" }), null);
+    assert.equal(normalizeHomeNavigate({ view: "home" })?.view, "home");
     assert.equal(
-      normalizeEducationNavigate({ view: "class", classId: "am-lit" })?.classId,
+      normalizeHomeNavigate({ view: "class", classId: "am-lit" })?.classId,
       "am-lit"
     );
-    const todo = normalizeEducationNavigate({
+    const todo = normalizeHomeNavigate({
       view: "todo",
       todoId: "hw-personal-infographic",
       classId: "data-science-1",
     });
     assert.equal(
-      normalizeEducationNavigate({
+      normalizeHomeNavigate({
         view: "case",
         caseId: "us-ought-to-deborder",
         caseSide: "neg",
       })?.caseSide,
       "neg"
     );
-    assert.equal(normalizeEducationNavigate({ view: "case" }), null);
+    assert.equal(normalizeHomeNavigate({ view: "case" }), null);
   });
 
   it("builds website hrefs", () => {
-    assert.equal(educationNavigateHref({ view: "home" }), "/education/");
+    assert.equal(homeNavigateHref({ view: "home" }), "/home/");
     assert.equal(
-      educationNavigateHref({ view: "class", classId: "am-lit" }),
-      "/education/class/am-lit"
+      homeNavigateHref({ view: "class", classId: "am-lit" }),
+      "/home/class/am-lit"
     );
     assert.equal(
-      educationNavigateHref({
+      homeNavigateHref({
         view: "todo",
         todoId: "hw-personal-infographic",
         classId: "data-science-1",
       }),
-      "/education/todo/hw-personal-infographic?class=data-science-1"
+      "/home/todo/hw-personal-infographic?class=data-science-1"
     );
     assert.equal(
-      educationNavigateHref({
+      homeNavigateHref({
         view: "todo",
         todoId: "make-public-repo",
         projectId: "yanylevin",
       }),
-      "/education/todo/make-public-repo?project=yanylevin"
+      "/home/todo/make-public-repo?project=yanylevin"
     );
     assert.equal(
-      educationNavigateHref({
+      homeNavigateHref({
         view: "capsule",
         todoId: "2026-09-01-daily-briefing",
         capsuleId: "cap-1",
       }),
-      "/education/todo/2026-09-01-daily-briefing/capsule/cap-1"
+      "/home/todo/2026-09-01-daily-briefing/capsule/cap-1"
     );
     assert.equal(
-      educationNavigateHref({
+      homeNavigateHref({
         view: "date",
         dateId: "fall-orientation-day-1",
       }),
-      "/education/date/fall-orientation-day-1"
+      "/home/date/fall-orientation-day-1"
     );
-    const spanishHref = educationNavigateHref({
+    const spanishHref = homeNavigateHref({
       view: "todo",
       todoId: "QA Sep 24 #1 ESCRITO AUDITIVO Otoño 2026",
       classId: "spanish-4",
     });
     assert.equal(spanishHref.includes("#"), false);
-    assert.match(spanishHref, /^\/education\/todo\/QA\*20Sep\*2024\*20\*231/);
+    assert.match(spanishHref, /^\/home\/todo\/QA\*20Sep\*2024\*20\*231/);
     assert.match(spanishHref, /\?class=spanish-4$/);
     assert.equal(
-      educationNavigateHref({
+      homeNavigateHref({
         view: "case",
         caseId: "us-ought-to-deborder",
         caseSide: "aff",
       }),
       "/debate/case/us-ought-to-deborder/aff"
     );
-    assert.equal(educationNavigateHref({ view: "nope" }), null);
+    assert.equal(homeNavigateHref({ view: "nope" }), null);
   });
 
   it("queues a jump and publishes it once", () => {
     const session = {};
-    const queued = queueEducationNavigate(session, {
+    const queued = queueHomeNavigate(session, {
       view: "todo",
       todoId: "hw",
       classId: "spanish-4",
@@ -1488,21 +1488,21 @@ describe("open_education_page navigate payload", () => {
     assert.equal(queued?.todoId, "hw");
     assert.equal("id" in (queued || {}), false);
     assert.equal(session.navigate, undefined);
-    const first = publishQueuedEducationNavigate(session);
+    const first = publishQueuedHomeNavigate(session);
     assert.ok(first?.id);
     assert.equal(first?.view, "todo");
     assert.equal(first?.todoId, "hw");
     assert.equal(session.pendingNavigate, null);
     assert.equal(session.navigate?.id, first?.id);
-    assert.equal(publishQueuedEducationNavigate(session), null);
+    assert.equal(publishQueuedHomeNavigate(session), null);
     assert.equal(session.navigate?.id, first?.id);
   });
 
   it("keeps the last queued page when the tool is called twice", () => {
     const session = {};
-    queueEducationNavigate(session, { view: "home" });
-    queueEducationNavigate(session, { view: "class", classId: "am-lit" });
-    const pub = publishQueuedEducationNavigate(session);
+    queueHomeNavigate(session, { view: "home" });
+    queueHomeNavigate(session, { view: "class", classId: "am-lit" });
+    const pub = publishQueuedHomeNavigate(session);
     assert.equal(pub?.view, "class");
     assert.equal(pub?.classId, "am-lit");
   });
@@ -1773,7 +1773,7 @@ describe("composeTurnPrompt", () => {
 describe("getAgentState after the in-memory session is gone", () => {
   it("loads the transcript from disk instead of 404", async () => {
     const root = await mkdtemp(join(tmpdir(), "pa-state-"));
-    const sid = "edu-diskstate1";
+    const sid = "home-diskstate1";
     try {
       await persistChatHistory({
         root,

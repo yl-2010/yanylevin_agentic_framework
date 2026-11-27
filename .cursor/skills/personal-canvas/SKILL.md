@@ -1,7 +1,7 @@
 ---
 name: personal-canvas
 description: >-
-  Sync Yan's EPS Canvas into the education dashboard (assignments, syllabus
+  Sync Yan's EPS Canvas into the home dashboard (assignments, syllabus
   dates, canvasLink), submit file/text/URL when Yan asks, pull teacher
   attachments into OneDrive todos. Nightly also dumps comments, pages,
   modules, and course files for agent context. Teacher comments also show
@@ -15,22 +15,22 @@ disable-model-invocation: true
 
 EPS Canvas is `https://canvas.instructure.com`. A student API token lives in `server/.env` (`CANVAS_ACCESS_TOKEN`). Never print or commit the token.
 
-This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how dashboard classes line up with Canvas courses, then write education todos/dates. Nightly model: **composer-2.5** (fast=false). Express polls Canvas about every 30 seconds and creates a new todo in code. That poll does not start a model. A new assignment then starts **composer-2.5** (fast=false) and reads `.cursor/skills/personal-canvas/new-assignment.md` only, to attach OneNote pages and files for that assignment.
+This is an **agent sync**, not a hardcoded mapper. Read the snapshot, decide how dashboard classes line up with Canvas courses, then write home todos/dates. Nightly model: **composer-2.5** (fast=false). Express polls Canvas about every 30 seconds and creates a new todo in code. That poll does not start a model. A new assignment then starts **composer-2.5** (fast=false) and reads `.cursor/skills/personal-canvas/new-assignment.md` only, to attach OneNote pages and files for that assignment.
 
 ## When to run
 
-- **Page open (Express, not you):** `/api/education/data?live=1` fetches submissions, planner complete, and grades for mapped courses and overlays `done` + `canvasWork` in the API. That does **not** write `todo.json`. You still never persist completion.
+- **Page open (Express, not you):** `/api/home/data?live=1` fetches submissions, planner complete, and grades for mapped courses and overlays `done` + `canvasWork` in the API. That does **not** write `todo.json`. You still never persist completion.
 - **Checkoff (Express, not you):** Yan checking off a Canvas-linked todo writes a planner override (`marked_complete`) so Canvas To-Do matches. Local-only todos stay local. You still never POST planner overrides.
 - **Submit (you, only when Yan says submit / turn in / upload this to Canvas):** identify the assignment, rename+store the chat file on OneDrive if he attached one, then `canvas-files.js submit` (file, `--text` / `--text-file`, or `--url`). Save / put this in / handle the file never submits. Ask only if the assignment is actually unclear.
 - **Watch (about every 30 seconds):** Express fetches mapped courses, except the 01:00 nightly window (00:50 to 01:20). No model on a quiet poll. It writes the snapshot only when an assignment was added or its title, due, link, or teacher files changed. Due and title updates on todos that already exist happen in code. A missing `seen-assignment-ids.json` is filled from the current snapshot and does not start Composer. A quiet poll does not commit.
 - **New assignment:** The same poll creates the todo immediately, downloads teacher files, then starts Composer. The prompt lists only those new assignments. The todo already exists. Do not create a second one.
-- **Nightly:** Express runs the full fetch + this skill at **01:00** (`nightlyAgentsLocalTime` in `education/you@example.com/daily-briefing/meta.json`). Same slot as location compose/enrichment. Context synthesis is later (02:30). Daily briefing is 06:00. **Re-read todos the daytime watch created and fix mistakes.** Also review due and title updates the watch applied in code. Fold new teacher comments into class/todo `CONTEXT.md`. Run both OneNote passes across the class. Then Express pulls teacher files. On success the nightly run marks the snapshot assignment ids seen, so the watch does not create them again.
+- **Nightly:** Express runs the full fetch + this skill at **01:00** (`nightlyAgentsLocalTime` in `home/you@example.com/daily-briefing/meta.json`). Same slot as location compose/enrichment. Context synthesis is later (02:30). Daily briefing is 06:00. **Re-read todos the daytime watch created and fix mistakes.** Also review due and title updates the watch applied in code. Fold new teacher comments into class/todo `CONTEXT.md`. Run both OneNote passes across the class. Then Express pulls teacher files. On success the nightly run marks the snapshot assignment ids seen, so the watch does not create them again.
 - **Manual (Personal Agent):** Yan says sync / pull / update Canvas. First fetch, then apply this skill **in this turn** (full nightly rules, including class map). Do not spawn a nested Cursor agent. After writes, Express pull still runs on the next hourly/fetch; you may also `canvas-files.js pull`.
 
 ```bash
 node --env-file=server/.env server/canvas-sync.js --fetch-only
 node --env-file=server/.env server/canvas-files.js submit --canvas-id 40335975
-node --env-file=server/.env server/canvas-files.js submit --canvas-id 40335975 --file education/you@example.com/.chat-uploads/<session>/scan.pdf
+node --env-file=server/.env server/canvas-files.js submit --canvas-id 40335975 --file home/you@example.com/.chat-uploads/<session>/scan.pdf
 node --env-file=server/.env server/canvas-files.js submit --canvas-id 40073386 --text "here is the paragraph"
 node --env-file=server/.env server/canvas-files.js submit --canvas-id 40073386 --text-file /tmp/body.txt
 node --env-file=server/.env server/canvas-files.js submit --canvas-id 40073386 --url https://example.com/doc
@@ -46,7 +46,7 @@ If `.canvas/snapshot.json` is missing and the fetch CLI fails, say Canvas is not
 ## Files
 
 ```
-education/you@example.com/.canvas/
+home/you@example.com/.canvas/
   snapshot.json         # only dashboard / junior-year classes (assignments, events, syllabi)
   assignments.md        # readable index of that same subset
   comments.json / comments.md / comments-new.md
@@ -69,9 +69,9 @@ OneDrive <gradeFolder>/<onedriveFolder>/.education/
 <Finder date folder>/date.json + that date's files
 ```
 
-Yan class trees live on OneDrive (see education-dashboard.md). Do not write `education/you@example.com/classes/<id>/` except `_example-dummy`.
+Yan class trees live on OneDrive (see home-dashboard.md). Do not write `home/you@example.com/classes/<id>/` except `_example-dummy`.
 
-Dashboard schema: `.cursor/skills/personal-agent/education-dashboard.md`.
+Dashboard schema: `.cursor/skills/personal-agent/home-dashboard.md`.
 
 ## New assignment pass (Composer)
 
@@ -102,7 +102,7 @@ When at least one class maps, sync **only** those mapped classes, plus the `proj
 For every snapshot assignment whose `courseId` maps to a class:
 
 - Match an existing todo in that class by `canvasId`, then `canvasLink`, then same **name + parent + dueDate**.
-- Create if none, unless it looks like a row in `education/you@example.com/deleted.md`. Judgement, not exact due clocks. `canvasId` is a strong hint; similar name + class in the same year is enough. Skip those. OneDrive folder name: `HW Sep 15 Title` (tag, due as `Mon D`, JSON name, spaces not kebab), unique in that class folder. Set `createdAt` now. `done: false` on create only. Express visibility sync will rename if the due date or title later changes.
+- Create if none, unless it looks like a row in `home/you@example.com/deleted.md`. Judgement, not exact due clocks. `canvasId` is a strong hint; similar name + class in the same year is enough. Skip those. OneDrive folder name: `HW Sep 15 Title` (tag, due as `Mon D`, JSON name, spaces not kebab), unique in that class folder. Set `createdAt` now. `done: false` on create only. Express visibility sync will rename if the due date or title later changes.
 - **Update** name, `dueDate`, `dueTime`, `tag`, `description`, `canvasLink`, `canvasId` when Canvas changed.
 - Prefer snapshot `dueDate` / `dueTime` (already in the briefing timezone). Undated Canvas rows may omit due fields.
 - **Advanced Calculus HW (Yan, 2026-09-10):** For `advanced-calculus` todos with `tag: "HW"`, do **not** use the Canvas due as the dashboard due. Canvas is typically two period-C meetings after the start day. Set `dueDate` / `dueTime` to the **previous** period-C meeting before Canvas due, at that day's C start from `schedule.json` (`bells` / `dayOverrides`). Match by `canvasId` first so a shifted due still updates the same todo. Do not pull those dues back to Canvas on later syncs. Leave MA / QA / CW on Canvas times. If Canvas due is not on a C meeting, leave Canvas times.
@@ -141,7 +141,7 @@ Read each mapped course `syllabus` plus snapshot `events[]`. Create/update **imp
 
 ## Comments, pages, modules, course files
 
-Full fetch (nightly, `--fetch-only`, manual sync) writes those dumps. The :00 watch does not. Pages, modules, and course files stay off `/education` and iOS. Teacher comments are the exception. The live overlay paints them on the todo page, on the same 10 second Canvas pull as grades. Home starts its 24 or 48 hour window when the student can see the comment. That is the submission `posted_at` when the teacher releases it after writing it. The card still shows the write time. Do not copy comments into `todo.json` `description`. Do not download course-file dumps into OneDrive class folders (assignment attachments still use `canvas-files.js pull`).
+Full fetch (nightly, `--fetch-only`, manual sync) writes those dumps. The :00 watch does not. Pages, modules, and course files stay off `/home` and iOS. Teacher comments are the exception. The live overlay paints them on the todo page, on the same 10 second Canvas pull as grades. Home starts its 24 or 48 hour window when the student can see the comment. That is the submission `posted_at` when the teacher releases it after writing it. The card still shows the write time. Do not copy comments into `todo.json` `description`. Do not download course-file dumps into OneDrive class folders (assignment attachments still use `canvas-files.js pull`).
 
 **Comments.** The todo page shows teacher comments (not Yan's own). Comments attach by assignment, so a year-long class shows fall and winter notes together the same way it shows both terms' todos. The live pull asks every mapped course. Read `comments.md` anytime Yan asks what a teacher said, or `canvas-files.js comments --canvas-id <id>` for a live pull. Nightly / manual: read `comments-new.md`. Fold new teacher comments into that class or todo OneDrive `CONTEXT.md` (hidden from tiles). Skip if that comment is already there. Skip Yan's own comments unless they matter. One short dated line per comment is enough (`2026-09-18 Seeley on Average Speed Write-up: …`).
 
@@ -172,7 +172,7 @@ No chat file and no text/URL: submit the student file already in that OneDrive f
 
 **Save / put this in / handle / store** (and any file request that does not say submit / turn in / upload to Canvas): identify the todo the same way, rename if needed, store on OneDrive. Stop. Do not call `submit`. If the destination is an existing Word, Excel, or PowerPoint file, do not store over it. Edit that file in the Office app with computer use and save from the app. A new Office file can be stored.
 
-Homework goes on the todo that already exists. A new todo is rare. A scan of an MA or QA he already took goes on that earlier assessment todo, named like the Canvas title with MA or QA kept, and a copy goes in `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.tests/<class>/`. Do not make a new todo due today to hold the scan. Full rules are in the education-dashboard skill, Chat attachments.
+Homework goes on the todo that already exists. A new todo is rare. A scan of an MA or QA he already took goes on that earlier assessment todo, named like the Canvas title with MA or QA kept, and a copy goes in `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.tests/<class>/`. Do not make a new todo due today to hold the scan. Full rules are in the home-dashboard skill, Chat attachments.
 
 ```bash
 node --env-file=server/.env server/canvas-files.js store --src <path> --canvas-id <id>
@@ -192,14 +192,14 @@ Junk Canvas names get renamed when they land. `image-` plus a uuid, `image-` plu
 
 ## Never
 
-- **Never** set or clear `done` or `completedAt` in todo.json from Canvas. Yan checks work off in yanylevin. Express overlays Canvas submitted/graded/planner-complete as `done` on `/api/education/data` without writing those keys. Express may POST/PUT Canvas planner overrides when Yan checks a Canvas-linked todo. An agent update must leave `done` / `completedAt` exactly as they are.
+- **Never** set or clear `done` or `completedAt` in todo.json from Canvas. Yan checks work off in yanylevin. Express overlays Canvas submitted/graded/planner-complete as `done` on `/api/home/data` without writing those keys. Express may POST/PUT Canvas planner overrides when Yan checks a Canvas-linked todo. An agent update must leave `done` / `completedAt` exactly as they are.
 - **Never** POST/PUT/DELETE to Canvas from hourly/nightly sync. Checkoff write-back is Express only. Submit is Personal Agent only, when Yan asked, via `canvas-files.js submit`.
-- **Never** delete an education todo/date because it disappeared from Canvas.
+- **Never** delete an home todo/date because it disappeared from Canvas.
 - **Never** recreate a todo/date Yan already deleted (`deleted.md`). Judgement, not exact clocks.
 - **Never** touch fixtures (`"fixture": true` or ids starting `_example-`).
 - **Never** put Canvas rows on a project unless `course-map.json` says `project:<id>` for that course. User-level todos stay off Canvas. Other courses stay on class folders only.
 - **Never** mix this with Fitness OS gym logs.
-- **Never** put Canvas comments, pages, modules, or course-file dumps on the education UI.
+- **Never** put Canvas comments, pages, modules, or course-file dumps on the home UI.
 
 ## OneNote links
 
@@ -207,7 +207,7 @@ Tag does not matter. CW, HW, QA, MA, or no tag. If Yan would open that Class Not
 
 How to open notebooks, sign in, and read pages is [personal-onenote](../personal-onenote/SKILL.md). Follow that. A signed-out `status` means run `login`, then list sections and pages. Leave existing OneNote sites alone only if login itself fails. Do not run `link-todos`. That command scores titles in code and misses real pages.
 
-Seen page ids live in `education/you@example.com/.canvas/onenote-seen.json`:
+Seen page ids live in `home/you@example.com/.canvas/onenote-seen.json`:
 
 ```json
 { "pages": { "<pageId>": { "title": "Day 1 problem set", "notebook": "Advanced Calculus 26-27" } } }
@@ -255,4 +255,4 @@ Read `last-hourly-sync.json`. The watch creates new todos in code and starts Com
 
 ## After writes
 
-Education file watcher refreshes `/education`. Prefer committing `education/you@example.com/` when the nightly runner did not already. Manual chat: 1–3 short lines (`Synced Canvas into Lit, Physics, and Spanish`).
+Home file watcher refreshes `/home`. Prefer committing `home/you@example.com/` when the nightly runner did not already. Manual chat: 1–3 short lines (`Synced Canvas into Lit, Physics, and Spanish`).

@@ -11,7 +11,7 @@ disable-model-invocation: true
 
 **Gate:** Yan (`you@example.com`) only.  Never spawn a cloud agent. Local only.
 
-You run at **01:30** (`lifeStateCleanupLocalTime` in `education/you@example.com/daily-briefing/meta.json`), after the 01:00 location compose. Chat title refresh is the other 01:30 job. Context synthesis is 02:30 and will read the cleaned log.
+You run at **01:30** (`lifeStateCleanupLocalTime` in `home/you@example.com/daily-briefing/meta.json`), after the 01:00 location compose. Chat title refresh is the other 01:30 job. Context synthesis is 02:30 and will read the cleaned log.
 
 Model: **composer-2.5** (fast=false).
 
@@ -20,7 +20,7 @@ The 5-minute Composer tick guesses from a snapshot. It flickers. One sleeping sa
 ## Files
 
 ```
-education/you@example.com/life-state/
+home/you@example.com/life-state/
   schema.md
   heuristics.md
   log-YYYY-MM.jsonl
@@ -64,7 +64,7 @@ Read the matching skill, then query. Cursor shells often cannot open `knowledgeC
 | iMessage | `.cursor/skills/personal-imessage/SKILL.md` — same socket, `fromMe` / `who` / `atLocal`. Never treat `handle` as speaker in a 1:1. Do not copy message bodies into samples. |
 | School Teams | `.cursor/skills/personal-school-teams/SKILL.md` — `node server/school-teams.js` chats he sent in yesterday's window |
 | Calendar | `.cursor/skills/personal-calendar/SKILL.md` — `node server/calendar-cli.js events --from … --to …` |
-| Location | `education/you@example.com/location/places.md` and `trips.md` (01:00 compose already ran). GPS JSONL only if a stay is unclear. |
+| Location | `home/you@example.com/location/places.md` and `trips.md` (01:00 compose already ran). GPS JSONL only if a stay is unclear. |
 | Schedule | `.cursor/skills/class-schedule/SKILL.md` — `schedule.json` for in_class / free / lunch |
 | Gym | `.cursor/skills/fitness-os/SKILL.md` — yesterday's machine entries |
 | Chat history | `.cursor/skills/past-chats/SKILL.md` if he told the agent where he was |

@@ -1,6 +1,6 @@
 /**
  * Vercel proxy for /api/fitness/* → Mac Express (api.yanylevin.com).
- * Mirrors education-api.js; Hobby-plan single function via vercel rewrite.
+ * Mirrors home-api.js; Hobby-plan single function via vercel rewrite.
  */
 
 const { mintHs256Jwt } = require("./_jwt");

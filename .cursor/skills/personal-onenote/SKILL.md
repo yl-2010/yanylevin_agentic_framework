@@ -13,7 +13,7 @@ disable-model-invocation: true
 
 **Gate:** Yan only on a personal chat. A JYPE group question that names a
 class page or section may open that class Content Library section.
-Alex's personal `/education` chat skips this skill. Leave other
+Alex's personal `/home` chat skips this skill. Leave other
 students' private sections alone. Do not open Yan's private section unless
 Yan asked.
 
@@ -194,4 +194,4 @@ under `_Content Library`, `_Collaboration Space`, and Yan's name.
 `sections` flattens those groups.
 
 This is not school OneDrive. Grade-folder Word/PPT files stay on the
-education-dashboard OneDrive path.
+home-dashboard OneDrive path.

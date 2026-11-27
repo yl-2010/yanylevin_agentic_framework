@@ -23,11 +23,11 @@ Every claim overnight agents wrote tonight should match the source. Fix what is 
 
 Verify:
 
-- Git-visible writes from tonight's jobs under `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/` (`identity.md`, `identity-school.md`, `identity-accounts.md`, `identity-logistics.md`, `patterns.md`, `health.md`, `threads/`, tonight's journal `journal/<dateKey minus 1 day>.md`, entity cards phase 2 touched), `location/places.md` + `trips.md`, `health/takeaways.md`, education `date.json` / `todo.json` if phase 4 or Canvas wrote them.
+- Git-visible writes from tonight's jobs under `/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/` (`identity.md`, `identity-school.md`, `identity-accounts.md`, `identity-logistics.md`, `patterns.md`, `health.md`, `threads/`, tonight's journal `journal/<dateKey minus 1 day>.md`, entity cards phase 2 touched), `location/places.md` + `trips.md`, `health/takeaways.md`, home `date.json` / `todo.json` if phase 4 or Canvas wrote them.
 - `[iMessage]` / `[mail]` timeline lines dated today or yesterday, even if a chat-time write put them there earlier. Standing and identity lines that restate those facts.
 - `brain/state.json` `notes` when they restate facts.
 
-Skip: generated `people/index.md`, `people/graph.md`, `brain/education/**`, chat titles, raw GPS/health JSON, news capsules, the briefing todo (it does not exist yet).
+Skip: generated `people/index.md`, `people/graph.md`, `brain/home/**`, chat titles, raw GPS/health JSON, news capsules, the briefing todo (it does not exist yet).
 
 Life-state: `/tmp/yanylevin-context-life-state.json` or
 `node server/life-state.js day <journalKey>`. The 01:30 cleanup already
@@ -110,7 +110,7 @@ Keep `lastSynthesisAt`, `lastSynthesisDateKey`, `timezone`, and `cursors`. Set `
 - Treating `timezoneAfter` or checkout as the flight date
 - Treating "no new mail since cursor" as "this booking is not in mail"
 - Editing last week's journal
-- Touching generated index/graph/education mirror
+- Touching generated index/graph/home mirror
 - Git commit (the Node wrapper does that)
 - Pasting full texts or secrets into cards
 

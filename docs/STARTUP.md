@@ -21,7 +21,7 @@ curl -sS https://api.yanylevin.com/health
 |-------|------|
 | `com.personalagent.server` | Yan Levin Express `:3004` (`node --env-file=.env index.js`) |
 | `com.personalagent.cloudflared` | Tunnel → `api.yanylevin.com` |
-| `com.personalagent.education-sync` | Auto push/pull education + fitness folders, JYPE workspace, `tmp/`; optional OneDrive relaunch |
+| `com.personalagent.home-sync` | Auto push/pull home + fitness folders, JYPE workspace, `tmp/`; optional OneDrive relaunch |
 | `com.yanylevin.cursor-usage` | Read this Mac's Cursor chats and post them to `/api/usage/ingest`. Studio also pulls the billing feed. Person is Yan unless `data/usage/machine.json` says otherwise |
 | `com.yanylevin.lmstudio-gpt-oss` | Open LM Studio at login and load `openai/gpt-oss-20b`. It stays loaded |
 | `com.personalagent.agent-worker` | Personal Agent worker on `:3005` (`server/agent-worker.js`) |
@@ -44,9 +44,9 @@ bash $HOME/yanylevin_agentic_framework/deploy/launchagents/install-lmstudio-gpt-
 
 Logs: `~/Library/Logs/personal-agent/personal-agent-lmstudio-gpt-oss.log`. This agent only loads gpt-oss. Orpheus stays unloaded until another local API voice asks for it.
 
-### Education / data folder sync (Mac Studio + MacBook)
+### Home / data folder sync (Mac Studio + MacBook)
 
-Keeps `tmp/` in sync with `origin/main`. Education, JYPE, fitness, and the chat and login logs live on OneDrive.
+Keeps `tmp/` in sync with `origin/main`. Home, JYPE, fitness, and the chat and login logs live on OneDrive.
 
 Behavior:
 
@@ -57,10 +57,10 @@ Behavior:
 Install / reload on each Mac (repo path `$HOME/yanylevin_agentic_framework`, Homebrew node):
 
 ```bash
-bash $HOME/yanylevin_agentic_framework/deploy/launchagents/install-education-sync.sh
+bash $HOME/yanylevin_agentic_framework/deploy/launchagents/install-home-sync.sh
 ```
 
-Logs: `~/Library/Logs/personal-agent/personal-agent-education-sync.log`. Those user-data commits never deploy the site. Git auto-deploy is off. Agents run `npm run deploy:web` for homepage, `/education` `/fitness` `/dashboard` UI, and `api/`, not for `education/<email>/` or `education/projects/jype/` sync.
+Logs: `~/Library/Logs/personal-agent/personal-agent-home-sync.log`. Those user-data commits never deploy the site. Git auto-deploy is off. Agents run `npm run deploy:web` for homepage, `/home` `/fitness` `/dashboard` UI, and `api/`, not for `home/<email>/` or `home/projects/jype/` sync.
 
 ### Cursor usage collector (Mac Studio + MacBook)
 

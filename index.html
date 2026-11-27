@@ -18,7 +18,7 @@
     <title>(PLACEHOLDER) Yan Levin · personal agent framework</title>
     <meta
       name="description"
-      content="Open-source personal agent framework. Mac-local Cursor agent, education/fitness dashboards, Apple integrations. Yan Levin is a placeholder name for the reference implementation."
+      content="Open-source personal agent framework. Mac-local Cursor agent, home/fitness dashboards, Apple integrations. Yan Levin is a placeholder name for the reference implementation."
     />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" media="(prefers-color-scheme: light)" />
     <link rel="icon" href="favicon-dark.svg" type="image/svg+xml" media="(prefers-color-scheme: dark)" />
@@ -1156,7 +1156,7 @@
         <h2>What this is</h2>
         <div class="about-row">
           <div class="about-col">
-            <p>A Mac-hosted personal agent. Express on localhost, Cursor SDK for the signed-in operator, optional local gpt-oss for visitors. Education, fitness, and dashboard UIs read a per-email folder tree. Apple integrations talk to the OS over a local Unix socket, not the public internet.</p>
+            <p>A Mac-hosted personal agent. Express on localhost, Cursor SDK for the signed-in operator, optional local gpt-oss for visitors. Home, fitness, and dashboard UIs read a per-email folder tree. Apple integrations talk to the OS over a local Unix socket, not the public internet.</p>
             <p>Yan Levin in this repo is a placeholder for the person who built the reference implementation. Fork it, set OWNER_EMAIL, rename the iOS target before you sign it.</p>
           </div>
         </div>
@@ -1166,7 +1166,7 @@
         <h2>Run it</h2>
         <div class="rows">
           <div class="row"><h3>Mac Express API</h3><p class="when">port 3004</p><p>Copy server/.env.example, set OWNER_EMAIL and CURSOR_API_KEY, then npm run server. Optional: LM Studio on :1234 for the public chatbot.</p></div>
-          <div class="row"><h3>Dashboards</h3><p class="when">/education /fitness /dashboard</p><p>Static UI on Vercel or python3 -m http.server. Google OAuth is optional on localhost.</p></div>
+          <div class="row"><h3>Dashboards</h3><p class="when">/home /fitness /dashboard</p><p>Static UI on Vercel or python3 -m http.server. Google OAuth is optional on localhost.</p></div>
           <div class="row"><h3>iOS</h3><p class="when">SwiftUI</p><p>Ship as a reference. Change the bundle ID, team, and display name before signing. See docs/IOS_APP.md.</p></div>
         </div>
       </section>
@@ -1184,8 +1184,8 @@
             class="app-tile"
             data-liquid-glass="rounded"
             data-filter-id="lg-app-edu"
-            href="/education/"
-          ><span>Education</span></a>
+            href="/home/"
+          ><span>Home</span></a>
           <a
             class="app-tile"
             data-liquid-glass="rounded"

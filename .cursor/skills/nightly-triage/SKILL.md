@@ -20,7 +20,7 @@ only phase that reads every source. You write nothing to the brain.
 ## Contract
 
 - Output exactly one file: `/tmp/yanylevin-context-notable.md`.
-- No writes anywhere else. No sends. No education/calendar changes. No news.
+- No writes anywhere else. No sends. No home/calendar changes. No news.
 - Every later phase relies on your digest being complete: a fact you drop is
   a fact the whole night drops. When unsure, include it.
 - Missing source (dump `ok=false`) is a gap to note in the digest, not empty
@@ -65,7 +65,7 @@ only phase that reads every source. You write nothing to the brain.
 - **Chats**: `/tmp/yanylevin-context-chats.json`, then Read every listed
   Personal Agent file; Cursor Desktop user prompts are context for what Yan
   asked or decided. Skip Task subagents. Required even if quiet.
-- **Location**: `education/you@example.com/location/places.md` and
+- **Location**: `home/you@example.com/location/places.md` and
   `trips.md` (the 01:00 jobs already ran). Note stays/trips that are still
   vague (street-only, "residence", generic car) so phase 3 can **name** them.
   Do not ask phase 3 to dump life-state into those lines.
@@ -77,7 +77,7 @@ only phase that reads every source. You write nothing to the brain.
   day. Do not copy rooms/apps/classes into `places.md`.
   CLI: `node server/life-state.js day <yesterday>`. Skill:
   `.cursor/skills/life-state/SKILL.md`.
-- **Health** (required): `education/you@example.com/health/takeaways.md`
+- **Health** (required): `home/you@example.com/health/takeaways.md`
   and `workouts.md` (the 01:00 Composer takeaways job already ran). Workouts,
   sleep, and recovery tells for the day. Dump sleep through the 2026-09-26
   10:49 AM PT ingest is actual. Later Health-app sleep is inflated until Yan
@@ -90,8 +90,8 @@ only phase that reads every source. You write nothing to the brain.
   `/tmp/yanylevin-context-mail-people.json`, school names
   `/tmp/yanylevin-context-school-names.json` (lookup only; never import the
   roster).
-- **Education**: open todos/dates that changed
-  (`.cursor/skills/personal-agent/education-dashboard.md`).
+- **Home**: open todos/dates that changed
+  (`.cursor/skills/personal-agent/home-dashboard.md`).
 - **Briefing memory** (light): `daily-briefing/profile.md`, `preferences.md`
   for new standing facts only.
 
@@ -123,7 +123,7 @@ source + date. Every iMessage fact names who said it.
 Stays/trips still vague, plus the evidence that names them. "None" if none.
 
 ## Suggested actions
-Sends Yan asked for, education todo/project writes, repo work. Each with its
+Sends Yan asked for, home todo/project writes, repo work. Each with its
 evidence quote. Do not put calendar plans or big dates here; they have their
 own sections. "None" if none. An iMessage from Rajasi Saha or Michael Levin
 is not a todo. Do not suggest one. A calendar plan is still fine when Yan is
@@ -141,7 +141,7 @@ A game, dinner, practice, appointment, or gym session is not all-day. If the
 source has no clock, write `time unknown` and where to look (team site, invite,
 earlier event). Do not write all-day as a stand-in. PathIvy webinars: the Zoom
 registration href from Mail.app `source` for that date's row, not the words
-"Registration Link". "None" if none. Homework, Canvas, bells, education todos,
+"Registration Link". "None" if none. Homework, Canvas, bells, home todos,
 and other dashboard items do not belong. The calendar is events.
 College spam does not belong. Recruitment mail, Scoir, apply-now, and info
 sessions Yan did not register for stay out even when they name a day.
@@ -162,7 +162,7 @@ location tbd" belongs here. Put the missing venue on the line. Do not move it
 to Gaps.
 
 ## Big dates
-Rare, high-stakes items for the education Dates panel. Bias is omit.
+Rare, high-stakes items for the home Dates panel. Bias is omit.
 First/last day, orientation, advisor/parent conferences, travel that takes
 Yan out of school, a college visit Yan said he signed up for, graduation-scale milestones. One line per
 date: name, YYYY-MM-DD, optional time, parent (user-level or class id),

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseChatHistoryMeta } from "./education-chat-history.js";
+import { parseChatHistoryMeta } from "./home-chat-history.js";
 import {
   cancelFutureAgent,
   formatPacificScheduleLabel,
@@ -17,7 +17,7 @@ import {
   scheduledThreadShouldInheritHide,
   selectDueFutureAgents,
 } from "./future-agents.js";
-import { listChatHistory, patchChatHistoryEphemeral } from "./education-chat-history.js";
+import { listChatHistory, patchChatHistoryEphemeral } from "./home-chat-history.js";
 
 const YAN = "you@example.com";
 const JEFFERY = "friend@example.com";
@@ -68,14 +68,14 @@ describe("future agent schedule", () => {
       });
       const personalPath = join(
         root,
-        "education",
+        "home",
         YAN,
         ".chat-history",
         `${jype.sessionId}.md`
       );
       const jypePath = join(
         root,
-        "education/projects/jype/.chat-history",
+        "home/projects/jype/.chat-history",
         `${jype.sessionId}.md`
       );
       await assert.rejects(readFile(personalPath, "utf8"));
@@ -99,7 +99,7 @@ describe("future agent schedule", () => {
       });
       assert.equal(personal.history, "personal");
       const own = await readFile(
-        join(root, "education", YAN, ".chat-history", `${personal.sessionId}.md`),
+        join(root, "home", YAN, ".chat-history", `${personal.sessionId}.md`),
         "utf8"
       );
       assert.match(own, /Remind me to mail the form/);
@@ -108,7 +108,7 @@ describe("future agent schedule", () => {
         readFile(
           join(
             root,
-            "education/projects/jype/.chat-history",
+            "home/projects/jype/.chat-history",
             `${personal.sessionId}.md`
           ),
           "utf8"
@@ -167,7 +167,7 @@ describe("future agent schedule", () => {
       });
       const hiddenPath = join(
         root,
-        "education",
+        "home",
         YAN,
         ".chat-history",
         `${hidden.sessionId}.md`
@@ -208,7 +208,7 @@ describe("future agent schedule", () => {
         origin: { kind: "teams", chatId: "19:abc@thread.v2" },
       });
       const jypeText = await readFile(
-        join(root, "education/projects/jype/.chat-history", `${jype.sessionId}.md`),
+        join(root, "home/projects/jype/.chat-history", `${jype.sessionId}.md`),
         "utf8"
       );
       assert.doesNotMatch(jypeText, /^ephemeral:/m);
@@ -232,7 +232,7 @@ describe("future agent schedule", () => {
       });
       const keptPath = join(
         root,
-        "education",
+        "home",
         YAN,
         ".chat-history",
         `${kept.sessionId}.md`

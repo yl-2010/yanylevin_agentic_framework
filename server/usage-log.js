@@ -14,7 +14,7 @@ import { createHash, timingSafeEqual, randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { appendFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { chatTitlesForSessions } from "./education-chat-history.js";
+import { chatTitlesForSessions } from "./home-chat-history.js";
 import { canonicalizeEmail } from "./identity.js";
 
 import { zonedLocalToUtc } from "./local-clock.js";

@@ -50,7 +50,7 @@ import {
   prefetchNightlyStatus,
 } from "./daily-briefing-agent.js";
 import { gitAddCommitPush } from "./git-publish.js";
-import { YAN_EDUCATION_DIR } from "./onedrive-projects.js";
+import { YAN_HOME_DIR } from "./onedrive-projects.js";
 
 export const GROKBOT_OUT_DIR = "/tmp/yanylevin-daily-briefing-grokbot";
 export const PHASES = ["news", "agent-recap", "unslop"];
@@ -65,7 +65,7 @@ export const NEWS_CATEGORIES = new Set([
   "markets",
   "other",
 ]);
-const BRIEFING_DIR = join(YAN_EDUCATION_DIR, "daily-briefing");
+const BRIEFING_DIR = join(YAN_HOME_DIR, "daily-briefing");
 export const TASTE_PATH = join(BRIEFING_DIR, "taste.md");
 const SKILLS = {
   news: join(BRIEFING_REPO_ROOT, ".cursor/skills/daily-news/SKILL.md"),
@@ -714,8 +714,8 @@ export async function finalize(opts = {}) {
   }
   // Same end step as the Cursor pipeline.
   const git = await gitAddCommitPush({
-    paths: [YAN_EDUCATION_DIR],
-    message: `education: ${dateKey} daily briefing`,
+    paths: [YAN_HOME_DIR],
+    message: `home: ${dateKey} daily briefing`,
   }).catch((err) => ({ pushed: false, reason: err instanceof Error ? err.message : String(err) }));
   const exists = await briefingExists(dateKey);
   status.phases.unslop = { ...(status.phases.unslop || {}), state: "done", output: todoPath, doneAt: new Date().toISOString() };
