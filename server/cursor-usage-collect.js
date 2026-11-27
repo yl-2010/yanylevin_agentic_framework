@@ -1,7 +1,8 @@
 /**
  * Reads this Mac's Cursor desktop database and posts prompts to the usage API.
  * On the Studio it also pulls the subscription billing feed. Other Macs also
- * post their agent transcript tags, so their billing does not fall to Alex.
+ * post their agent transcript tags, so a desktop chat is not filed as an
+ * unattributed cloud agent.
  * LaunchAgent com.yanylevin.cursor-usage. Person defaults to Yan.
  */
 

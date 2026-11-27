@@ -1,10 +1,13 @@
 /**
  * Cursor usage clumps. One user prompt is one row.
  * Billing that neither the Studio nor the MacBook can trace (no prompt, no
- * transcript on either machine) is Alex. He no longer runs a collector,
- * so kind is cursor-desktop and repo is Other. Cloud agents Grok Bot started
- * are always Yan (isGrokBotCloudAgent). Files stay on the Mac under
- * data/usage/. Gitignored.
+ * transcript on either machine) was Alex through 2026-11-25 Pacific. He
+ * was signed into Yan's Cursor account and does not run a collector, so those
+ * rows stay cursor-desktop and repo Other. From 2026-11-26 Pacific that
+ * leftover billing is Yan's cloud agents. A tagged run, including Alex's
+ * @agent turns, still keeps the person on the prompt or transcript.
+ * Cloud agents Grok Bot started are always Yan (isGrokBotCloudAgent).
+ * Files stay on the Mac under data/usage/. Gitignored.
  */
 
 import { createHash, timingSafeEqual, randomUUID } from "node:crypto";
@@ -27,6 +30,8 @@ export const USAGE_META_PATH = join(USAGE_DIR, "meta.json");
 const PROMPT_STORE_MAX = 80_000;
 const PROMPT_API_MAX = 8_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** First Pacific day when untraced billing is Yan's cloud agents, not Alex. */
+const UNATTRIBUTED_YAN_FROM = "2026-11-26";
 const CHAT_KINDS = new Set(["jype-agent", "personal-agent", "agent", "cursor-desktop", "teams-agent"]);
 const CHANNEL_KINDS = new Set(["teams-agent", "imessage-agent", "personal-chat", "jype-chat", "whatsapp-agent"]);
 const CHANNEL_LABEL = { Teams: "teams", iMessage: "iMessage" };
@@ -62,11 +67,12 @@ export function isCloudAgentId(id) {
 }
 
 /**
- * A cloud agent Grok Bot started. Those are always Yan's, never Alex's.
+ * A cloud agent Grok Bot started. Those are always Yan's.
  * Runs started through the Cursor API or SDK (Grok Bot's cloud agents) get a
  * name-based v5 uuid. Runs started by hand on cursor.com or in the desktop app
- * get a random v4 uuid and keep the old rules. This server never starts cloud
- * agents. A transcript row with kind grok-bot-cloud-agent marks any other run.
+ * get a random v4 uuid. A v4 run with no transcript follows billingOnlyClump.
+ * This server never starts cloud agents. A transcript row with kind
+ * grok-bot-cloud-agent marks any other run.
  * @param {unknown} id
  * @param {{ kind?: string }|null|undefined} [tag] transcript index entry for the run
  */
@@ -1106,16 +1112,25 @@ function pickParentPrompt(parents, child) {
   return best || parents[0] || null;
 }
 
+/**
+ * @param {string} at
+ */
+function unattributedIsYan(at) {
+  const day = pacificDay(at);
+  return day !== "" && day >= UNATTRIBUTED_YAN_FROM;
+}
+
 function billingOnlyClump(bill) {
   const tokens = tokensFromUsage(bill.tokens);
   const grokBot = isGrokBotModel(bill.model);
+  const yanCloud = !grokBot && unattributedIsYan(bill.at);
   return {
     id: bill.id,
     source: "billing",
     at: bill.at || "",
-    person: grokBot ? "Yan" : "Alex",
+    person: grokBot || yanCloud ? "Yan" : "Alex",
     repo: grokBot ? "Grok Bot" : "Other",
-    kind: grokBot ? "grok-bot" : "cursor-desktop",
+    kind: grokBot ? "grok-bot" : yanCloud ? "cloud-agent" : "cursor-desktop",
     model: bill.model || "",
     modelConfig: null,
     prompt: "",

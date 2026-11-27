@@ -242,6 +242,67 @@ describe("usage clumps", () => {
     assert.equal(grown.changed[0].chargedCents, 540);
   });
 
+  it("gives untraced billing from Nov 26 2026 Pacific to Yan and keeps a tagged Alex agent", () => {
+    const clumps = buildClumps([
+      {
+        id: "sdk:req-today",
+        source: "sdk",
+        at: "2026-11-26T20:00:00.000Z",
+        startedAt: "2026-11-26T19:59:00.000Z",
+        endedAt: "2026-11-26T20:00:00.000Z",
+        person: "Alex",
+        repo: "yanylevin-agents",
+        kind: "teams-agent",
+        model: "grok-4.7-high",
+        prompt: "From Alex on Teams:\n\n@agent what is due",
+        threadId: "chat-today",
+        requestId: "req-today",
+        tokens: tokensFromUsage({ inputTokens: 40, outputTokens: 8 }),
+      },
+      {
+        id: "bill:req-today",
+        source: "billing",
+        at: "2026-11-26T19:59:30.000Z",
+        usageEventId: "req-today",
+        conversationId: "agent-today",
+        model: "grok-4.7-high",
+        tokens: tokensFromUsage({ inputTokens: 40, outputTokens: 8 }),
+        chargedCents: 6,
+      },
+      {
+        id: "bill:cloud-today",
+        source: "billing",
+        at: "2026-11-26T18:00:00.000Z",
+        usageEventId: "cloud-today",
+        conversationId: "bc-abce2d6d-0f22-41a1-8198-572762cf7aae",
+        model: "composer-2.5",
+        tokens: tokensFromUsage({ inputTokens: 80, outputTokens: 10 }),
+        chargedCents: 15,
+      },
+      {
+        id: "bill:eve",
+        source: "billing",
+        at: "2026-11-26T07:30:00.000Z",
+        usageEventId: "eve",
+        conversationId: "still-prasham",
+        model: "composer-2.5",
+        tokens: tokensFromUsage({ inputTokens: 8, outputTokens: 1 }),
+        chargedCents: 2,
+      },
+    ]);
+    const teams = clumps.find((row) => row.kind === "teams-agent");
+    assert.equal(teams.person, "Alex");
+    assert.equal(teams.chargedCents, 6);
+    const cloud = clumps.find((row) => row.threadId === "bc-abce2d6d-0f22-41a1-8198-572762cf7aae");
+    assert.equal(cloud.person, "Yan");
+    assert.equal(cloud.kind, "cloud-agent");
+    assert.equal(cloud.repo, "Other");
+    assert.equal(cloud.chargedCents, 15);
+    const eve = clumps.find((row) => row.threadId === "still-prasham");
+    assert.equal(eve.person, "Alex");
+    assert.equal(eve.kind, "cursor-desktop");
+  });
+
   it("tags a local transcript and attributes off-machine billing to Alex", () => {
     const index = new Map([
       ["agent-1", { person: "Alex", repo: "yanylevin-agents", kind: "jype-agent", prompt: "what is due" }],

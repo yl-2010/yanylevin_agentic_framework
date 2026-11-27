@@ -2,7 +2,8 @@
  * Tags billing rows from Cursor agent transcripts on this Mac.
  * The transcript folder name is the billing conversation id.
  * The MacBook collector posts its own transcript tags to the Studio.
- * Billing that neither Mac can tag is Alex, cursor-desktop (usage-log.js).
+ * Billing neither Mac can tag follows usage-log.js. Through 2026-11-25 Pacific
+ * that is Alex, cursor-desktop. From 2026-11-26 it is Yan, cloud-agent.
  */
 
 import { open, readdir, readFile, stat, writeFile, mkdir } from "node:fs/promises";
