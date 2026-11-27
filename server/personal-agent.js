@@ -2378,6 +2378,15 @@ export function normalizeUiContext(raw) {
   str("title", 200);
   str("site", 24);
   str("screen", 4000);
+  str("brainPage", 40);
+  str("brainPageTitle", 80);
+  str("brainParam", 200);
+  str("cardId", 200);
+  str("cardLabel", 200);
+  str("cardType", 40);
+  str("cardSummary", 2500);
+  str("cardFacts", 2000);
+  if (typeof src.cardExpanded === "boolean") out.cardExpanded = src.cardExpanded;
   if (typeof src.done === "boolean") out.done = src.done;
   if (typeof src.freePeriod === "boolean") out.freePeriod = src.freePeriod;
   const phoneLocation = parseLocationPayload(src.phoneLocation);
@@ -2556,10 +2565,45 @@ export function liveContextSections(nowContext, uiContext, appendix = "") {
       lines.push(
         `- Called from the ${view} site. Same Personal Agent and the same chat history as education. This turn was started from ${view}.`
       );
+      lines.push(
+        view === "usage"
+          ? "- The lines below are this usage page right now: range, filters, and any thread card that is open."
+          : "- The lines below are this dashboard page right now. One page: Actions, Scheduled agents, the agent graph, and the chat log."
+      );
       const screen = String(uiContext.screen || "").trim();
       if (screen) {
         lines.push("- What is on screen:");
         lines.push(screen);
+      }
+    } else if (view === "brain") {
+      const page = String(uiContext.brainPage || "hub");
+      const title = String(uiContext.brainPageTitle || (page === "hub" ? "Hub" : page));
+      if (page === "hub") {
+        lines.push("- Viewing the Brain hub. The category city is on screen.");
+      } else {
+        lines.push(`- Viewing Brain subpage: ${title}.`);
+      }
+      const cardId = String(uiContext.cardId || "").trim();
+      const param = String(uiContext.brainParam || "").trim();
+      if (param && !cardId) lines.push(`- Subpage focus: ${param}`);
+      if (cardId) {
+        const label = uiContext.cardLabel || cardId;
+        const type = uiContext.cardType ? ` (${uiContext.cardType})` : "";
+        const wide = uiContext.cardExpanded ? ", expanded sheet" : "";
+        lines.push(`- Card pulled up: ${label}${type} [id ${cardId}]${wide}.`);
+        if (uiContext.cardSummary) {
+          lines.push("- Card summary (text on the card):");
+          lines.push(String(uiContext.cardSummary));
+        }
+        if (uiContext.cardFacts) {
+          lines.push("- Card fields:");
+          lines.push(String(uiContext.cardFacts));
+        }
+        lines.push(
+          "- This is the card the user has open. Answer about this entity from it. For a person, pull the entity card when you need the full file."
+        );
+      } else {
+        lines.push("- Card: none.");
       }
     } else if (view) {
       lines.push(`- view: ${view}`);

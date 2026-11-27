@@ -440,8 +440,57 @@ describe("Personal Agent live context", () => {
       screen: "Actions:\n- Canvas sync",
     });
     assert.match(dash, /Called from the dashboard site/);
+    assert.match(dash, /One page: Actions/);
     assert.match(dash, /Canvas sync/);
     assert.doesNotMatch(dash, /Before creating or editing dashboard objects/);
+  });
+
+  it("names the brain subpage and the open card", () => {
+    const hub = formatLiveContextBlock(null, {
+      client: "web",
+      path: "/brain/",
+      view: "brain",
+      site: "brain",
+      brainPage: "hub",
+      brainPageTitle: "Hub",
+    });
+    assert.match(hub, /Viewing the Brain hub/);
+    assert.match(hub, /Card: none/);
+    assert.doesNotMatch(hub, /education-dashboard skill/);
+
+    const card = formatLiveContextBlock(null, {
+      client: "web",
+      path: "/brain/#/people/people/alex-rivera",
+      view: "brain",
+      site: "brain",
+      brainPage: "people",
+      brainPageTitle: "People",
+      brainParam: "people/alex-rivera",
+      cardId: "people/alex-rivera",
+      cardLabel: "Alex Rivera",
+      cardType: "person",
+      cardExpanded: true,
+      cardSummary: "Debate partner.",
+      cardFacts: "relationship: close friend",
+    });
+    assert.match(card, /Viewing Brain subpage: People/);
+    assert.doesNotMatch(card, /Subpage focus/);
+    assert.match(card, /Card pulled up: Alex Rivera \(person\) \[id people\/alex-rivera\], expanded sheet/);
+
+    const focused = formatLiveContextBlock(null, {
+      client: "web",
+      path: "/brain/#/places/places/home",
+      view: "brain",
+      brainPage: "places",
+      brainPageTitle: "Places",
+      brainParam: "places/home",
+    });
+    assert.match(focused, /Viewing Brain subpage: Places/);
+    assert.match(focused, /Subpage focus: places\/home/);
+    assert.match(focused, /Card: none/);
+    assert.match(card, /Debate partner/);
+    assert.match(card, /relationship: close friend/);
+    assert.doesNotMatch(card, /education-dashboard skill/);
   });
 
   it("keeps usage screen text and drops unknown fields", () => {
@@ -456,6 +505,26 @@ describe("Personal Agent live context", () => {
     assert.equal(ctx.site, "usage");
     assert.equal(ctx.screen, "Metric: tokens");
     assert.equal(ctx.secret, undefined);
+
+    const brain = normalizeUiContext({
+      client: "web",
+      view: "brain",
+      brainPage: "people",
+      brainPageTitle: "People",
+      brainParam: "people/alex-rivera",
+      cardId: "people/alex-rivera",
+      cardLabel: "Alex Rivera",
+      cardType: "person",
+      cardExpanded: false,
+      cardSummary: "Debate partner.",
+      cardFacts: "relationship: close friend",
+      secret: "nope",
+    });
+    assert.equal(brain.brainPage, "people");
+    assert.equal(brain.cardId, "people/alex-rivera");
+    assert.equal(brain.cardExpanded, false);
+    assert.equal(brain.cardSummary, "Debate partner.");
+    assert.equal(brain.secret, undefined);
   });
 
   it("appends a Yan calendar/canvas appendix when provided", () => {

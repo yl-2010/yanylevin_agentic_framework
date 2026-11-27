@@ -25,7 +25,10 @@
   }
 
   function dashboardScreen() {
-    const lines = ["Dashboard rails currently on screen."];
+    const lines = [
+      "Page: Dashboard. One page, no subpage.",
+      "Sections on screen: Actions, Scheduled agents, Agents graph, Chat log.",
+    ];
     lines.push("Agent graph:");
     for (const band of AGENT_BANDS) {
       const names = band.items
