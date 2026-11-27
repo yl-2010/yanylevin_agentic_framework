@@ -636,6 +636,10 @@ describe("Personal Agent skill files", () => {
       join(REPO_ROOT, PERSONAL_SKILL_PATHS.browser),
       "utf8"
     );
+    assert.match(browser, /Which profile/);
+    assert.match(browser, /tabs open/);
+    assert.match(browser, /--profile/);
+    assert.match(browser, /Personal/);
     assert.match(browser, /Google Chrome/);
     assert.match(browser, /skip static|When to skip/i);
     assert.match(browser, /JYPE/);
@@ -845,6 +849,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /personal-screentime/);
     assert.match(agent, /personal-onenote/);
     assert.match(agent, /personal-browser/);
+    assert.match(agent, /profile whose name matches the task/);
     assert.match(agent, /context-synthesis/);
     assert.match(agent, /location-enrichment/);
     assert.match(agent, /location-brain/);

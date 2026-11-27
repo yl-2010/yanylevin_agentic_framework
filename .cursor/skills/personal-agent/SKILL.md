@@ -86,7 +86,7 @@ Unknown shorthand: `node server/brain-glossary.js "<term>"`. A slang or abbrevia
 
 ## Always: browsers
 
-Yan's own turns use Ardia. Read `.cursor/skills/personal-browser/SKILL.md` before opening a site that curl cannot do. A password Ardia already autofills, or one it has saved, is fine to use for that login. Do not print it.
+Yan's own turns use Ardia. Read `.cursor/skills/personal-browser/SKILL.md` before opening a site that curl cannot do. Pick the Ardia profile whose name matches the task before the first `ardia browse`. Instagram and his other personal accounts are Personal, even when ExampleCo is the window on screen. `ardia browse open` follows the focused window, so open with `ardia tabs open <url> --profile <id>` and then `ardia browse tab <id>`. The personal-browser skill has the profile list and the steps. A password Ardia already autofills, or one it has saved, is fine to use for that login. Do not print it.
 
 A login Ardia has not saved uses `.cursor/skills/passwords/SKILL.md`. List the account, fill it with a reason, and do not put the password in any message. Do not ask first. Anyone who is not Yan does not use that vault.
 
@@ -114,7 +114,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | Yan iPhone location (live + stays/trips) | `.cursor/skills/phone-location/SKILL.md` |
 | What Yan is doing now / was doing at a time (5-minute log) | `.cursor/skills/life-state/SKILL.md` |
 | Map / image / HTML widgets, location cards, place hours | `.cursor/skills/chat-widgets/SKILL.md` |
-| Click-through / login pages (not static fetch). Yan's default is Ardia, including a saved or autofilled password | `.cursor/skills/personal-browser/SKILL.md` |
+| Click-through / login pages (not static fetch). Yan's default is Ardia, including a saved or autofilled password. Pick the profile that matches the task | `.cursor/skills/personal-browser/SKILL.md` |
 | Login that needs a password from the local vault (Yan only) | `.cursor/skills/passwords/SKILL.md` |
 | Mac apps. Websites start in Ardia | `.cursor/skills/personal-computer/SKILL.md` |
 | Yan inbox / Mail.app (search and send) | `.cursor/skills/personal-mail/SKILL.md` |
