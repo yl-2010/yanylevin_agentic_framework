@@ -36,6 +36,7 @@ import {
   listChatHistory,
   loadChatHistory,
   markChatHistoryRead,
+  patchChatHistoryDeferHide,
   patchChatHistoryEphemeral,
   persistChatHistory,
   resolveChatStarter,
@@ -169,6 +170,7 @@ const PA_ERROR_REPLY =
  *   activeTurnId?: string,
  *   guestCaller?: object|null,
  *   ephemeralPinned?: boolean,
+ *   agentDeferHide?: boolean,
  *   channelReplyOwed?: ''|'imessage'|'teams'|'whatsapp',
  * }} Session
  */
@@ -1038,6 +1040,66 @@ function openEducationPageTool(sid, session) {
   };
 }
 
+/**
+ * @param {string} sid
+ * @param {Session} session
+ */
+function hideChatSoonTool(sid, session) {
+  return {
+    hide_chat_soon: {
+      description:
+        "Drop a thread from the iOS and web history list 10 minutes after the reply. Omit sessionId for this thread. It stays listed until then. A later message from the app or the site cancels it. Pass sessionId only when asked to hide a different thread in this history. JYPE chats stay listed. Do not mention this in the reply.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          sessionId: {
+            type: "string",
+            description:
+              "Another thread in this history. Omit to hide this thread 10 minutes after the reply.",
+          },
+        },
+      },
+      async execute({ sessionId } = {}) {
+        if (!sessions.has(sid) || sessions.get(sid) !== session) {
+          return "session gone";
+        }
+        if (sessionWorkspace(session) === "jype") return "jype chats stay listed";
+        const target = sanitizeSessionId(sessionId || "");
+        if (!target || target === sid) {
+          if ((session.turnQueue || []).length > 0) {
+            return "a later message is already waiting";
+          }
+          session.agentDeferHide = true;
+          return "hides 10 minutes after this reply";
+        }
+        const workspace = sessionWorkspace(session);
+        const loaded = await loadChatHistory({
+          email: session.email,
+          sessionId: target,
+          workspace,
+        });
+        if (!loaded) return "thread not found";
+        const patched = await patchChatHistoryDeferHide({
+          email: session.email,
+          sessionId: target,
+          workspace,
+        });
+        if (!patched) return "thread not found";
+        const live = sessions.get(target);
+        if (
+          live &&
+          live.email === session.email &&
+          sessionWorkspace(live) === workspace
+        ) {
+          live.agentDeferHide = true;
+        }
+        armEphemeralListRefresh(session.email, target, EPHEMERAL_HIDE_MS);
+        return "that thread hides in 10 minutes";
+      },
+    },
+  };
+}
+
 function originFromSession(session) {
   const teams = session?.teamsOrigin;
   if (teams && typeof teams === "object") {
@@ -1337,6 +1399,7 @@ function sessionCustomTools(sid, session) {
     ...futureAgentTools(sid, session),
     ...gradeWatchTools(sid, session),
     ...openEducationPageTool(sid, session),
+    ...hideChatSoonTool(sid, session),
     ...(sessionMayUseBrowser(session) ? browserCustomTools(session) : {}),
   };
 }
@@ -1426,6 +1489,7 @@ function persistSessionHistory(sid, session) {
     starter: session.starter || "",
   };
   if (ephemeral != null) opts.ephemeral = ephemeral;
+  if (session.agentDeferHide && ephemeral === true) opts.stampEphemeralClock = true;
   if (session.scheduled) {
     opts.scheduled = true;
     opts.scheduledRunAt = session.scheduledRunAt || "";
@@ -1894,6 +1958,7 @@ export function isUiChatClient(uiContext) {
 export function shouldPersistChatEphemeral(session) {
   if (!session) return null;
   if (sessionWorkspace(session) === "jype") return false;
+  if (session.agentDeferHide) return true;
   if (session.ephemeralPinned) return false;
   if (session.imessageOrigin || session.teamsOrigin || session.whatsappOrigin) return true;
   return null;
@@ -1908,6 +1973,7 @@ export function shouldPersistChatEphemeral(session) {
 export function pinEphemeralChatIfUiClient(session, uiContext, sessionId) {
   if (!session || !isUiChatClient(uiContext)) return false;
   session.ephemeralPinned = true;
+  session.agentDeferHide = false;
   const sid = String(sessionId || "").trim();
   if (sid) clearEphemeralHideTimer(sid);
   return true;
@@ -2337,6 +2403,7 @@ export function systemPrompt(email, opts = {}) {
     "Send to a person with no channel named: iMessage, then Teams, then email. Named channel wins. In a Teams chat, tell Name stays in that chat unless they say iMessage. iMessage cannot attach a file. Messages accepts the send and the file never arrives. A file for iMessage or Teams goes out as a yanylevin.com link. Put it in the repo, use a non-guessable folder when it should not be easy to find, commit, push, npm run deploy:web, confirm the URL is 200, then send the link. Email the file with Mail.app only when they asked for email. A request to send the file is the link. Attach it in Messages or Teams with computer use only when they specifically ask for the file to go through that app. A message with images has no pixels. Open that chat in the Teams app and look. School Outlook still cannot send.",
     "Long work: send_chat_message first with a short status. Send more mid-run when new info, a change, or a useful update appears. Then a final Done. Quick answers: one reply only (that is the end of turn). On an iMessage or Teams @agent or @agentg first turn, that first status is also posted to the chat before you start the work.",
     "To show one education page on web/iOS, call open_education_page (education-dashboard skill). The jump happens once when this turn ends, not when you call the tool. Last call in the turn wins. Skip if already on that page. Not on Cursor Desktop.",
+    "A one-field edit on an existing education object, and nothing else in this thread, call hide_chat_soon yourself at the end. Due date, due time, rename, check off, tag, or hide it from the home list. Skip it for a new object, a page, a file, research, mail, a multi-step job, a thread that already has a real back-and-forth, a future agent scheduled this turn, or an iMessage or Teams thread. Do not mention the hide. Pass sessionId only when asked to hide a different thread in 10 minutes.",
     "No period when the reply is one word, one phrase, or one sentence.",
   ].join("\n");
 }

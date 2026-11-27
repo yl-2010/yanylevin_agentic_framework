@@ -22,6 +22,7 @@ import {
   parseChatHistoryMessages,
   parseChatHistoryMeta,
   splitChatMessageFiles,
+  patchChatHistoryDeferHide,
   patchChatHistoryTitle,
   patchChatHistoryVisibility,
   persistChatHistory,
@@ -830,6 +831,98 @@ describe("persist/list", () => {
         sessionId: SID,
       });
       assert.equal(loaded?.ephemeral, true);
+      const kept = await readFile(join(root, chatHistoryFileRel(EMAIL, SID)), "utf8");
+      assert.doesNotMatch(kept, /^ephemeralAt:/m);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("stamps ephemeralAt for a defer hide and drops both when cleared", async () => {
+    const root = await mkdtemp(join(tmpdir(), "edu-chat-hist-"));
+    try {
+      await persistChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        ephemeral: true,
+        messages: [{ role: "user", content: "move the due date" }],
+      });
+      const abs = join(root, chatHistoryFileRel(EMAIL, SID));
+      const teams = await readFile(abs, "utf8");
+      assert.match(teams, /^ephemeral: true$/m);
+      assert.doesNotMatch(teams, /^ephemeralAt:/m);
+
+      await persistChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        ephemeral: true,
+        stampEphemeralClock: true,
+        messages: [
+          { role: "user", content: "move the due date" },
+          { role: "assistant", content: "done" },
+        ],
+      });
+      const stamped = parseChatHistoryMeta(await readFile(abs, "utf8"));
+      assert.equal(stamped.ephemeral, true);
+      assert.equal(stamped.ephemeralAt, stamped.updated);
+
+      const oldUpdated = "2026-08-15T18:00:00.000Z";
+      let text = await readFile(abs, "utf8");
+      text = text
+        .replace(/^updated: .+$/m, `updated: ${oldUpdated}`)
+        .replace(/^ephemeralAt: .+$/m, "ephemeralAt: 2026-08-15T18:01:00.000Z");
+      await writeFile(abs, text, "utf8");
+      const now = new Date("2026-08-15T18:10:00.000Z");
+      const listed = await listChatHistory({ root, email: EMAIL, now });
+      assert.ok(listed.some((row) => row.sessionId === SID));
+
+      text = (await readFile(abs, "utf8")).replace(
+        /^ephemeralAt: .+$/m,
+        `ephemeralAt: ${oldUpdated}`
+      );
+      await writeFile(abs, text, "utf8");
+      const dropped = await listChatHistory({ root, email: EMAIL, now });
+      assert.equal(
+        dropped.some((row) => row.sessionId === SID),
+        false
+      );
+      const working = await listChatHistory({
+        root,
+        email: EMAIL,
+        now,
+        workingIds: new Set([SID]),
+      });
+      assert.ok(working.some((row) => row.sessionId === SID));
+
+      assert.equal(
+        await patchChatHistoryDeferHide({
+          root,
+          email: EMAIL,
+          sessionId: SID,
+          at: "2026-08-15T18:05:00.000Z",
+        }),
+        true
+      );
+      const afterPatch = parseChatHistoryMeta(await readFile(abs, "utf8"));
+      assert.equal(afterPatch.updated, oldUpdated);
+      assert.equal(afterPatch.ephemeralAt, "2026-08-15T18:05:00.000Z");
+
+      await persistChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        ephemeral: false,
+        messages: [
+          { role: "user", content: "move the due date" },
+          { role: "assistant", content: "done" },
+          { role: "user", content: "also the time" },
+        ],
+      });
+      const cleared = await readFile(abs, "utf8");
+      assert.doesNotMatch(cleared, /^ephemeral:/m);
+      assert.doesNotMatch(cleared, /^ephemeralAt:/m);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -1040,6 +1133,28 @@ describe("titles", () => {
         new Date("2026-08-15T18:10:00.000Z")
       ),
       true
+    );
+    const stamped = {
+      sessionId: SID,
+      ephemeral: true,
+      updated: "2020-01-01T00:00:00.000Z",
+      ephemeralAt: "2026-08-15T18:00:00.000Z",
+    };
+    assert.equal(
+      chatHistoryIsEphemeralHidden(stamped, new Date("2026-08-15T18:09:00.000Z")),
+      false
+    );
+    assert.equal(
+      chatHistoryIsEphemeralHidden(stamped, new Date("2026-08-15T18:10:00.000Z")),
+      true
+    );
+    assert.equal(
+      chatHistoryIsEphemeralHidden(
+        stamped,
+        new Date("2026-08-15T18:10:00.000Z"),
+        new Set([SID])
+      ),
+      false
     );
   });
 });

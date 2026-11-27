@@ -377,9 +377,21 @@ export function sanitizeChatEphemeral(raw) {
 }
 
 /**
- * Hide an @agent thread from the UI list once the reply has sat idle.
- * Working sessions stay listed. Talking from web/iOS clears ephemeral.
- * @param {{ sessionId?: string, ephemeral?: boolean, updated?: string }|null|undefined} row
+ * A parsed ISO time, or "" when the line is missing or junk.
+ * @param {unknown} raw
+ * @returns {string}
+ */
+export function sanitizeChatEphemeralAt(raw) {
+  const s = String(raw || "").trim();
+  if (!s || Number.isNaN(Date.parse(s))) return "";
+  return new Date(s).toISOString();
+}
+
+/**
+ * Hide an ephemeral thread from the UI list once it has sat idle.
+ * ephemeralAt is the hide_chat_soon clock. Teams and iMessage files omit
+ * that line and use updated. Working sessions stay listed.
+ * @param {{ sessionId?: string, ephemeral?: boolean, updated?: string, ephemeralAt?: string }|null|undefined} row
  * @param {Date} [now]
  * @param {Iterable<string>|Set<string>|undefined} workingIds
  */
@@ -389,10 +401,12 @@ export function chatHistoryIsEphemeralHidden(row, now = new Date(), workingIds) 
   const working =
     workingIds instanceof Set ? workingIds : new Set(workingIds || []);
   if (sid && working.has(sid)) return false;
+  const stamped = Date.parse(String(row.ephemeralAt || ""));
   const updated = Date.parse(String(row.updated || ""));
-  if (!Number.isFinite(updated)) return false;
+  const clock = Number.isFinite(stamped) ? stamped : updated;
+  if (!Number.isFinite(clock)) return false;
   const t = now instanceof Date ? now.getTime() : Date.now();
-  return t - updated >= EPHEMERAL_HIDE_MS;
+  return t - clock >= EPHEMERAL_HIDE_MS;
 }
 
 /**
@@ -432,7 +446,11 @@ export function formatChatHistoryMarkdown(opts) {
   const starter = String(opts?.starter || "").trim();
   if (starter) lines.push(`starter: ${starter}`);
   lines.push(`visibility: ${visibility}`);
-  if (ephemeral) lines.push("ephemeral: true");
+  if (ephemeral) {
+    lines.push("ephemeral: true");
+    const ephemeralAt = sanitizeChatEphemeralAt(opts?.ephemeralAt);
+    if (ephemeralAt) lines.push(`ephemeralAt: ${ephemeralAt}`);
+  }
   if (opts?.scheduled) {
     lines.push("scheduled: true");
     const runAt = String(opts.scheduledRunAt || "").trim();
@@ -472,6 +490,7 @@ export function formatChatHistoryMarkdown(opts) {
  *   title: string,
  *   visibility: 'showing'|'hidden',
  *   ephemeral: boolean,
+ *   ephemeralAt: string,
  *   preview: string,
  *   workspace: string,
  *   starter: string,
@@ -507,6 +526,7 @@ export function parseChatHistoryMeta(markdown) {
     title: sanitizeChatTitle(titleMatch ? titleMatch[1] : ""),
     visibility: sanitizeChatVisibility(field("visibility")),
     ephemeral: sanitizeChatEphemeral(field("ephemeral")),
+    ephemeralAt: sanitizeChatEphemeralAt(field("ephemeralAt")),
     workspace: normalizeJypeWorkspace(field("workspace")),
     starter: field("starter"),
     scheduled: field("scheduled") === "true",
@@ -894,6 +914,8 @@ export async function persistChatHistory(opts) {
   let scheduled = opts?.scheduled === true ? true : opts?.scheduled === false ? false : null;
   let scheduledRunAt = String(opts?.scheduledRunAt || "").trim();
   let scheduledStatus = String(opts?.scheduledStatus || "").trim();
+  let keepEphemeralAt = "";
+  const stampEphemeralClock = opts?.stampEphemeralClock === true;
   try {
     const existing = await readFile(abs, "utf8");
     const meta = parseChatHistoryMeta(existing);
@@ -902,6 +924,7 @@ export async function persistChatHistory(opts) {
     if (!title) title = meta.title;
     if (!visibility) visibility = meta.visibility;
     if (ephemeral == null) ephemeral = meta.ephemeral;
+    keepEphemeralAt = meta.ephemeralAt || "";
     if (!starter) starter = meta.starter;
     if (scheduled == null) scheduled = meta.scheduled;
     if (!scheduledRunAt) scheduledRunAt = meta.scheduledRunAt;
@@ -954,6 +977,13 @@ export async function persistChatHistory(opts) {
     });
   }
 
+  let ephemeralAt = "";
+  if (ephemeral) {
+    const requested = sanitizeChatEphemeralAt(opts?.ephemeralAt);
+    if (requested) ephemeralAt = requested;
+    else if (stampEphemeralClock) ephemeralAt = updatedAt;
+    else ephemeralAt = keepEphemeralAt;
+  }
   const markdown = formatChatHistoryMarkdown({
     email,
     sessionId,
@@ -963,6 +993,7 @@ export async function persistChatHistory(opts) {
     title,
     visibility: visibility || "showing",
     ephemeral: Boolean(ephemeral),
+    ephemeralAt,
     workspace: opts?.workspace,
     starter,
     scheduled: Boolean(scheduled),
@@ -1155,6 +1186,46 @@ export async function patchChatHistoryEphemeral(opts) {
     return false;
   }
   if (next === text) return false;
+  await writeFile(abs, next, "utf8");
+  return true;
+}
+
+/**
+ * Hide a thread 10 minutes from now without moving updated.
+ * The row stays put and does not turn unread.
+ * @param {{ email: string, sessionId: string, workspace?: string, root?: string, at?: string }} opts
+ * @returns {Promise<boolean>}
+ */
+export async function patchChatHistoryDeferHide(opts) {
+  const email = canonicalizeEmail(opts?.email);
+  const sessionId = sanitizeSessionId(opts?.sessionId);
+  const rel = chatHistoryFileRel(email, sessionId, opts?.workspace);
+  if (!email || !sessionId || !rel) return false;
+  const abs = absChatFile(email, rel, opts?.workspace, opts?.root);
+  let text;
+  try {
+    text = await readFile(abs, "utf8");
+  } catch (err) {
+    if (err && /** @type {{ code?: string }} */ (err).code === "ENOENT") {
+      return false;
+    }
+    throw err;
+  }
+  const at = isoOrNow(opts?.at);
+  let next = text;
+  if (/^ephemeral:\s+/m.test(next)) {
+    next = next.replace(/^ephemeral:\s+.*$/m, "ephemeral: true");
+  } else if (/^visibility:\s+/m.test(next)) {
+    next = next.replace(/^(visibility:\s+\S+)\s*$/m, "$1\nephemeral: true");
+  } else {
+    return false;
+  }
+  if (/^ephemeralAt:\s+/m.test(next)) {
+    next = next.replace(/^ephemeralAt:\s+.*$/m, `ephemeralAt: ${at}`);
+  } else {
+    next = next.replace(/^(ephemeral:\s+true)\s*$/m, `$1\nephemeralAt: ${at}`);
+  }
+  if (next === text) return true;
   await writeFile(abs, next, "utf8");
   return true;
 }
@@ -1435,6 +1506,7 @@ async function readChatHistoryRows(opts) {
         title: meta.title,
         visibility: meta.visibility,
         ephemeral: meta.ephemeral,
+        ephemeralAt: meta.ephemeralAt || "",
         updated: meta.updated || new Date(file.mtimeMs).toISOString(),
         preview: meta.preview,
         started: meta.started,

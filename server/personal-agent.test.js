@@ -199,7 +199,7 @@ describe("Personal Agent models", () => {
 describe("Personal Agent system prompt", () => {
   it("stays slim and points at on-demand files instead of dumping recipes", () => {
     const prompt = systemPrompt(YAN);
-    assert.ok(prompt.length < 9600, `prompt length ${prompt.length}`);
+    assert.ok(prompt.length < 10090, `prompt length ${prompt.length}`);
     assert.match(prompt, /Personal Agent/);
     assert.match(prompt, /schedule_future_agent/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.futureAgents));
@@ -224,6 +224,8 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /posted to the chat before you start the work/);
     assert.doesNotMatch(prompt, /once, first/);
     assert.match(prompt, /open_education_page/);
+    assert.match(prompt, /hide_chat_soon/);
+    assert.match(prompt, /Do not mention the hide/);
     assert.match(prompt, /No period when the reply is one word/);
     assert.match(prompt, /Math on the website and in the iOS app is a display block/);
     assert.match(prompt, /Never backticks for math/);
@@ -254,7 +256,7 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /images has no pixels/);
     assert.match(prompt, /existing Word, Excel, or PowerPoint/);
     assert.match(prompt, /School Outlook still cannot send/);
-    assert.ok(prompt.length < 9600, `prompt length ${prompt.length}`);
+    assert.ok(prompt.length < 10090, `prompt length ${prompt.length}`);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.chats));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.location));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.lifeState));
@@ -306,6 +308,7 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /Projects\/\.tests\/ is a private guide/);
     assert.match(prompt, /do not say a scan or last year's test exists/);
     assert.match(prompt, /No Your Majesty and no other royal title/);
+    assert.doesNotMatch(prompt, /hide_chat_soon/);
     assert.doesNotMatch(prompt, /as royalty/);
     assert.doesNotMatch(prompt, /Your Majesty is enough/);
     assert.doesNotMatch(prompt, /The royal address still happens/);
@@ -1055,6 +1058,20 @@ describe("ephemeral @agent chats", () => {
     );
     assert.equal(shouldPersistChatEphemeral({}), null);
     assert.equal(shouldPersistChatEphemeral(null), null);
+    assert.equal(
+      shouldPersistChatEphemeral({
+        ephemeralPinned: true,
+        agentDeferHide: true,
+      }),
+      true
+    );
+    assert.equal(
+      shouldPersistChatEphemeral({
+        workspace: "jype",
+        agentDeferHide: true,
+      }),
+      false
+    );
   });
 
   it("pins when the follow-up is from web or iOS, not iMessage or Teams", () => {
@@ -1062,11 +1079,17 @@ describe("ephemeral @agent chats", () => {
     assert.equal(isUiChatClient({ client: "ios" }), true);
     assert.equal(isUiChatClient({ client: "imessage" }), false);
     assert.equal(isUiChatClient({ client: "teams" }), false);
-    const session = { imessageOrigin: { to: "x" }, ephemeralPinned: false };
+    const session = {
+      imessageOrigin: { to: "x" },
+      ephemeralPinned: false,
+      agentDeferHide: true,
+    };
     assert.equal(pinEphemeralChatIfUiClient(session, { client: "imessage" }, "sid"), false);
     assert.equal(session.ephemeralPinned, false);
+    assert.equal(session.agentDeferHide, true);
     assert.equal(pinEphemeralChatIfUiClient(session, { client: "web" }, "sid"), true);
     assert.equal(session.ephemeralPinned, true);
+    assert.equal(session.agentDeferHide, false);
     assert.equal(shouldPersistChatEphemeral(session), false);
   });
 
