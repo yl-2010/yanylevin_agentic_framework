@@ -1,9 +1,7 @@
 // Fall. The site orange stays, including the JYPE and debate chips that follow it.
-// Chat leaves the Halloween gray for a dark forest green on the iPhone 13 Pro
-// Alpine Green hue. Apple's compare page paints that finish as #576856.
-// Light mode is a darker forest of that hue. Dark mode is the same green
-// lifted, so bubbles, the send tint, and the beam still read on a dark page.
-// JYPE stays red. Debate stays slate. Debate chat uses this green.
+// Chat is a dark navy purple in light mode and a light lavender in dark mode,
+// so bubbles, the send tint, and the beam still read on the page.
+// JYPE stays red. Debate stays slate. Debate chat uses this purple.
 
 export default {
   personal: {
@@ -13,9 +11,9 @@ export default {
     ios: { liveActivity: { light: "#a85a22", dark: "#e3a06a" } },
   },
   agent: {
-    accent: { light: "#354d34", dark: "#a7c8a5" },
-    pulse: { light: "#c7dcc6", dark: "#e3f0e2" },
-    ios: { liveActivity: { hsb: [117, 0.3, 0.7] } },
+    accent: { light: "#32245c", dark: "#cbb6f0" },
+    pulse: { light: "#d4cce6", dark: "#ebe4f8" },
+    ios: { liveActivity: { hsb: [262, 0.3, 0.72] } },
   },
   jype: {
     chipTint: { light: "#d9620b", dark: "#f28c38" },
