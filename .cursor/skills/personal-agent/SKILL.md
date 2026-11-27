@@ -88,6 +88,8 @@ Unknown shorthand: `node server/brain-glossary.js "<term>"`. A slang or abbrevia
 
 Yan's own turns use Ardia. Read `.cursor/skills/personal-browser/SKILL.md` before opening a site that curl cannot do. A password Ardia already autofills, or one it has saved, is fine to use for that login. Do not print it.
 
+A login Ardia has not saved uses `.cursor/skills/passwords/SKILL.md`. List the account, fill it with a reason, and do not put the password in any message. Do not ask first. Anyone who is not Yan does not use that vault.
+
 Dedicated Chrome, headless Chrome, and Arc stay available when that skill gives a reason. JYPE and other guests do not get Ardia. Yan, 2026-11-15.
 
 ## Read on demand (do not preload)
@@ -113,6 +115,7 @@ Do **not** dump these into context unless the turn needs them. Read the matching
 | What Yan is doing now / was doing at a time (5-minute log) | `.cursor/skills/life-state/SKILL.md` |
 | Map / image / HTML widgets, location cards, place hours | `.cursor/skills/chat-widgets/SKILL.md` |
 | Click-through / login pages (not static fetch). Yan's default is Ardia, including a saved or autofilled password | `.cursor/skills/personal-browser/SKILL.md` |
+| Login that needs a password from the local vault (Yan only) | `.cursor/skills/passwords/SKILL.md` |
 | Mac apps. Websites start in Ardia | `.cursor/skills/personal-computer/SKILL.md` |
 | Yan inbox / Mail.app (search and send) | `.cursor/skills/personal-mail/SKILL.md` |
 | School Outlook `owner@school.example` | `.cursor/skills/personal-school-mail/SKILL.md` |

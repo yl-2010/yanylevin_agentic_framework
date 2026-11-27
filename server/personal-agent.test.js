@@ -232,6 +232,8 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.schedule));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.widgets));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.browser));
+    assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.passwords));
+    assert.match(prompt, /Never put a password in a reply/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.computer));
     assert.match(prompt, /skip static fetch/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.mail));
@@ -314,11 +316,21 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.schoolOnenote));
     assert.ok(prompt.includes(FOUR11_SKILL_PATH));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.browser));
+    assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.passwords));
     assert.match(prompt, /schedule_future_agent/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.futureAgents));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.celebration));
   });
 
+
+  it("keeps the password vault on Yan's turns", () => {
+    const yan = systemPrompt(YAN);
+    const guest = systemPrompt("friend@example.com", { workspace: "jype" });
+    assert.ok(yan.includes(PERSONAL_SKILL_PATHS.passwords));
+    assert.match(yan, /Do not ask first/);
+    assert.doesNotMatch(guest, /skills\/passwords\/SKILL\.md/);
+    assert.match(guest, /Do not read Yan's passwords/);
+  });
 });
 
 describe("Personal Agent live context", () => {

@@ -34,6 +34,9 @@ data/agent-actions.jsonl
 **/venv/
 **/__pycache__/
 
+# Apple Passwords export. Plaintext. The vault lives in ~/.yanylevin/passwords.
+**/Passwords.csv
+
 # Brain concepts: real private data never goes in git (served via /api/brain).
 brain/data/
 brain/**/_shots/

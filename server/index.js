@@ -90,6 +90,7 @@ import {
   publicFutureAgentEntry,
 } from "./future-agents.js";
 import { listPublicGradeWatches, startGradeWatchScheduler } from "./grade-watch.js";
+import { readPasswordAccess } from "./passwords.js";
 import {
   isFitnessUser,
   readFitnessTree,
@@ -453,6 +454,16 @@ app.post("/api/account-delete", requireAuth, async (req, res) => {
 app.get("/api/brain", requireAuth, createBrainSnapshotHandler());
 
 /**
+ * Untruncated text for the /brain/ detail card (Yan only): full summary/details of every node brain.json clips.
+ * Same gate and folder as /api/brain (.backend/brain-site/brain-text.json).
+ */
+app.get(
+  "/api/brain-text",
+  requireAuth,
+  createBrainSnapshotHandler({ file: "brain-text.json" }),
+);
+
+/**
  * Login audit log for the gated /dashboard (operator only).
  */
 app.get("/api/future-agents", requireAuth, async (req, res) => {
@@ -470,6 +481,24 @@ app.get("/api/future-agents", requireAuth, async (req, res) => {
     res.status(500).json({
       ok: false,
       error: err.message || "future-agents read failed",
+    });
+  }
+});
+
+app.get("/api/password-access", requireAuth, async (req, res) => {
+  try {
+    if (canonicalizeEmail(req.user?.email) !== "you@example.com") {
+      res.status(403).json({ ok: false, error: "forbidden" });
+      return;
+    }
+    const entries = await readPasswordAccess();
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, count: entries.length, entries });
+  } catch (err) {
+    console.error("[/api/password-access]", err);
+    res.status(500).json({
+      ok: false,
+      error: err.message || "password-access read failed",
     });
   }
 });

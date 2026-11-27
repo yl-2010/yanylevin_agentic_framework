@@ -15,7 +15,9 @@ const ALLOWED = new Set([
   "login-log",
   "agent-actions",
   "future-agents",
+  "password-access",
   "brain",
+  "brain-text",
 ]);
 
 /** /brain/ data is Yan-only (the brain tree is never shown to Alex). */
@@ -80,7 +82,9 @@ module.exports = async function handler(req, res) {
       path === "chat-log" ||
       path === "agent-actions" ||
       path === "future-agents" ||
-      path === "brain"
+      path === "password-access" ||
+      path === "brain" ||
+      path === "brain-text"
     ) {
       if (req.method !== "GET") {
         res.setHeader("Allow", "GET");
@@ -118,7 +122,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    if (path === "brain" && String(session.email || "").toLowerCase() !== BRAIN_EMAIL) {
+    if ((path === "brain" || path === "brain-text" || path === "password-access") && String(session.email || "").toLowerCase() !== BRAIN_EMAIL) {
       res.status(403).json({ ok: false, error: "forbidden" });
       return;
     }

@@ -25,8 +25,8 @@
     <style>
       :root {
         /* Color theme from site #1 */
-        --bg-0: #e8edf2;
-        --bg-1: #dde5ec;
+        --bg-0: color-mix(in srgb, var(--accent) 6%, white);
+        --bg-1: color-mix(in srgb, var(--accent) 11%, white);
         --fg: #14181d;
         --muted: #5a6470;
         --accent: #1b7d8a;
@@ -34,10 +34,10 @@
         --panel-bg: rgba(255, 255, 255, 0.5);
         --panel-brd: rgba(255, 255, 255, 0.6);
         --rim: rgba(255, 255, 255, 0.75);
-        --glow: rgba(255, 255, 255, 0.92);
-        --bloom-a: rgba(24, 125, 145, 0.22);
-        --bloom-b: rgba(206, 176, 122, 0.16);
-        --bloom-c: rgba(70, 120, 200, 0.18);
+        --glow: color-mix(in srgb, var(--accent) 8%, white);
+        --bloom-a: color-mix(in srgb, var(--accent) 22%, transparent);
+        --bloom-b: color-mix(in srgb, color-mix(in srgb, var(--accent) 60%, white) 16%, transparent);
+        --bloom-c: color-mix(in srgb, color-mix(in srgb, var(--accent) 72%, black) 18%, transparent);
         --lg-tint-rgb: 255, 255, 255;
         --lg-tint-opacity: 0.06;
         --lg-shadow-blur: 20px;
@@ -76,8 +76,8 @@
       /* Dark tokens: OS preference (unless forced light) or explicit resolved dark */
       @media (prefers-color-scheme: dark) {
         :root:not([data-resolved-theme="light"]) {
-          --bg-0: #0b0e11;
-          --bg-1: #0f141a;
+          --bg-0: color-mix(in srgb, var(--accent) 5%, black);
+          --bg-1: color-mix(in srgb, var(--accent) 9%, black);
           --fg: #e9eef2;
           --muted: #98a2ad;
           --accent: #71c4c2;
@@ -85,10 +85,10 @@
           --panel-bg: rgba(26, 31, 37, 0.45);
           --panel-brd: rgba(255, 255, 255, 0.1);
           --rim: rgba(255, 255, 255, 0.16);
-          --glow: rgba(200, 214, 224, 0.05);
-          --bloom-a: rgba(58, 150, 152, 0.2);
-          --bloom-b: rgba(150, 120, 70, 0.15);
-          --bloom-c: rgba(66, 104, 168, 0.17);
+          --glow: color-mix(in srgb, var(--accent) 8%, transparent);
+          --bloom-a: color-mix(in srgb, var(--accent) 20%, transparent);
+          --bloom-b: color-mix(in srgb, color-mix(in srgb, var(--accent) 65%, black) 15%, transparent);
+          --bloom-c: color-mix(in srgb, color-mix(in srgb, var(--accent) 72%, white) 17%, transparent);
           --lg-tint-rgb: 18, 24, 22;
           --lg-tint-opacity: 0.28;
           --lg-shadow-blur: 22px;
@@ -103,8 +103,8 @@
         }
       }
       html[data-resolved-theme="dark"] {
-        --bg-0: #0b0e11;
-        --bg-1: #0f141a;
+        --bg-0: color-mix(in srgb, var(--accent) 5%, black);
+        --bg-1: color-mix(in srgb, var(--accent) 9%, black);
         --fg: #e9eef2;
         --muted: #98a2ad;
         --accent: #71c4c2;
@@ -112,10 +112,10 @@
         --panel-bg: rgba(26, 31, 37, 0.45);
         --panel-brd: rgba(255, 255, 255, 0.1);
         --rim: rgba(255, 255, 255, 0.16);
-        --glow: rgba(200, 214, 224, 0.05);
-        --bloom-a: rgba(58, 150, 152, 0.2);
-        --bloom-b: rgba(150, 120, 70, 0.15);
-        --bloom-c: rgba(66, 104, 168, 0.17);
+        --glow: color-mix(in srgb, var(--accent) 8%, transparent);
+        --bloom-a: color-mix(in srgb, var(--accent) 20%, transparent);
+        --bloom-b: color-mix(in srgb, color-mix(in srgb, var(--accent) 65%, black) 15%, transparent);
+        --bloom-c: color-mix(in srgb, color-mix(in srgb, var(--accent) 72%, white) 17%, transparent);
         --lg-tint-rgb: 18, 24, 22;
         --lg-tint-opacity: 0.28;
         --lg-shadow-blur: 22px;
@@ -129,8 +129,8 @@
         --pointer-glow-blend: normal;
       }
       html[data-resolved-theme="light"] {
-        --bg-0: #e8edf2;
-        --bg-1: #dde5ec;
+        --bg-0: color-mix(in srgb, var(--accent) 6%, white);
+        --bg-1: color-mix(in srgb, var(--accent) 11%, white);
         --fg: #14181d;
         --muted: #5a6470;
         --accent: #1b7d8a;
@@ -138,10 +138,10 @@
         --panel-bg: rgba(255, 255, 255, 0.5);
         --panel-brd: rgba(255, 255, 255, 0.6);
         --rim: rgba(255, 255, 255, 0.75);
-        --glow: rgba(255, 255, 255, 0.92);
-        --bloom-a: rgba(24, 125, 145, 0.22);
-        --bloom-b: rgba(206, 176, 122, 0.16);
-        --bloom-c: rgba(70, 120, 200, 0.18);
+        --glow: color-mix(in srgb, var(--accent) 8%, white);
+        --bloom-a: color-mix(in srgb, var(--accent) 22%, transparent);
+        --bloom-b: color-mix(in srgb, color-mix(in srgb, var(--accent) 60%, white) 16%, transparent);
+        --bloom-c: color-mix(in srgb, color-mix(in srgb, var(--accent) 72%, black) 18%, transparent);
         --lg-tint-rgb: 255, 255, 255;
         --lg-tint-opacity: 0.06;
         --lg-shadow-blur: 20px;

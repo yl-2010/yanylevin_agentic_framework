@@ -2056,6 +2056,7 @@ export const PERSONAL_SKILL_PATHS = {
   news: ".cursor/skills/daily-news/SKILL.md",
   fitness: ".cursor/skills/fitness-os/SKILL.md",
   browser: ".cursor/skills/personal-browser/SKILL.md",
+  passwords: ".cursor/skills/passwords/SKILL.md",
   computer: ".cursor/skills/personal-computer/SKILL.md",
   brain: "/Users/you/Library/CloudStorage/OneDrive-Personal/Projects/.backend/brain/schema.md",
   synthesis: ".cursor/skills/context-synthesis/SKILL.md",
@@ -2257,6 +2258,7 @@ export function systemPrompt(email, opts = {}) {
       `- EPS student IDs / school photos: ${FOUR11_SKILL_PATH}`,
       `- Click-through / login pages (skip static fetch): ${PERSONAL_SKILL_PATHS.browser}`,
       `- Mac apps, Arc if Chrome fails. Cursor computer use, same model as this turn: ${PERSONAL_SKILL_PATHS.computer}`,
+      `Read ${PERSONAL_SKILL_PATHS.passwords} before a login. Never put a password in a reply, send_chat_message, Teams, iMessage, email, or any other message. Do not ask first.`,
       `- School OneNote class notebooks, when the question names a page or section: ${PERSONAL_SKILL_PATHS.schoolOnenote}`,
       `- Future agents (schedule a later run): ${PERSONAL_SKILL_PATHS.futureAgents}`,
       `- Grade watch (poll a Canvas assignment until the grade posts): ${PERSONAL_SKILL_PATHS.gradeWatch}`,
@@ -2299,6 +2301,7 @@ export function systemPrompt(email, opts = {}) {
       ? `- Click-through / login pages (skip static fetch): ${PERSONAL_SKILL_PATHS.browser}`
       : "",
     `- Mac apps, Arc if Chrome fails. Cursor computer use, same model as this turn: ${PERSONAL_SKILL_PATHS.computer}`,
+    `Read ${PERSONAL_SKILL_PATHS.passwords} before a login. Never put a password in a reply, send_chat_message, Teams, iMessage, email, or any other message. Do not ask first.`,
     `- Yan Mail.app search and send: ${PERSONAL_SKILL_PATHS.mail}`,
     `- School Outlook (owner@school.example) via school-mail.js: ${PERSONAL_SKILL_PATHS.schoolMail}`,
     `- School OneNote (on demand only): ${PERSONAL_SKILL_PATHS.schoolOnenote}`,

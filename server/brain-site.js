@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { canonicalizeEmail } from "./identity.js";
 import { YAN_BACKEND_DIR } from "./onedrive-projects.js";
 
-export function createBrainSnapshotHandler({ snapshotPath = join(YAN_BACKEND_DIR, "brain-site", "brain.json") } = {}) {
+export function createBrainSnapshotHandler({ file = "brain.json", snapshotPath = join(YAN_BACKEND_DIR, "brain-site", file) } = {}) {
   return async function brainSnapshotHandler(req, res) {
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("X-Content-Type-Options", "nosniff");

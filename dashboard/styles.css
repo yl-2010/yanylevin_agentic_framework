@@ -475,6 +475,10 @@ html.lg-chrome .dash-agent.lg-static.lg-refraction::after {
   color: var(--muted);
 }
 
+#password-access-list .dash-action-line {
+  overflow-wrap: anywhere;
+}
+
 a.dash-future-link {
   display: flex;
   flex: 1 1 auto;
