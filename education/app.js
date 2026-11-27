@@ -2782,18 +2782,12 @@
     }
   }
 
-  const EDU_BACK_PATH =
-    "M 18.13 25.56 L 45.69 9.65 Q 59.19 1.85 59.19 17.44 L 59.19 49.26 Q 59.19 64.85 45.69 57.06 L 18.13 41.15 Q 4.63 33.35 18.13 25.56 Z";
-
   function backLinkHtml(href, filterId = "lg-edu-back") {
-    const shadowFilterId = `${filterId}-shadow`;
-    return `<a class="edu-back" href="${escapeHtml(
+    return `<a class="corner circle edu-back" data-liquid-glass="circle" data-filter-id="${escapeHtml(
+      filterId
+    )}" href="${escapeHtml(
       href
-    )}" aria-label="Back"><svg class="edu-back-shadow" viewBox="0 0 63 68" width="63" height="68" aria-hidden="true" focusable="false" draggable="false"><defs><filter id="${escapeHtml(
-      shadowFilterId
-    )}" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="12" result="blur"/><feOffset in="blur" dx="0" dy="6" result="offset"/><feFlood flood-color="currentColor" result="flood"/><feComposite in="flood" in2="offset" operator="in" result="shadow"/></filter></defs><path fill="#000" filter="url(#${escapeHtml(
-      shadowFilterId
-    )})" d="${EDU_BACK_PATH}"/></svg><span class="edu-back-glass" aria-hidden="true"></span></a>`;
+    )}" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>`;
   }
 
   function todoLowerHtml(filesHtml, commentsHtml) {

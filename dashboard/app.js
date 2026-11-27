@@ -12,15 +12,11 @@
   const loginListEl = document.getElementById("login-list");
   const actionsEl = document.getElementById("action-list");
   const futureEl = document.getElementById("future-agent-list");
-  const passwordsEl = document.getElementById("password-access-list");
-  const passwordsSection = document.getElementById("dash-passwords");
   let futureKey = "";
-  let passwordKey = "";
   let futurePoll = null;
   const agentsEl = document.getElementById("dash-agents");
   let userEmail = "";
-  const shown = { actions: [], future: [], chats: [], passwords: [] };
-  const YAN_EMAIL = "you@example.com";
+  const shown = { actions: [], future: [], chats: [] };
 
   function clipLine(value, max) {
     const text = String(value || "").replace(/\s+/g, " ").trim();
@@ -51,13 +47,6 @@
       const when = entry.status === "running" ? "Running" : entry.when || "";
       lines.push(
         `- ${when} ${entry.workspaceLabel || ""}: ${clipLine(entry.prompt || entry.title, 180)}`
-      );
-    }
-    lines.push("Passwords accessed:");
-    if (!shown.passwords.length) lines.push("- none");
-    for (const entry of shown.passwords.slice(0, 12)) {
-      lines.push(
-        `- ${entry.when || ""} ${entry.title || ""} ${entry.username || ""} ${clipLine(entry.reason, 180)}`
       );
     }
     lines.push("Chat log:");
@@ -644,57 +633,6 @@
     queueMicrotask(() => window.reinitLiquidGlass?.());
   }
 
-  function renderPasswordAccess(entry, index) {
-    const id = `lg-password-${index}`;
-    const lines = [entry.username, entry.url, entry.reason].filter(Boolean);
-    return `<li
-      class="dash-entry dash-action"
-      data-liquid-glass="rounded"
-      data-lg-radius="18"
-      data-filter-id="${escapeHtml(id)}"
-      data-key="${escapeHtml(entry.at || String(index))}"
-    >
-      <div class="dash-entry-in">
-        <p class="dash-when">${escapeHtml(shortWhen(entry))}</p>
-        <p class="dash-action-agent">${escapeHtml(entry.title || "")}</p>
-        ${lines
-          .map((line) => `<p class="dash-action-line">${escapeHtml(line)}</p>`)
-          .join("")}
-      </div>
-    </li>`;
-  }
-
-  function renderEmptyPasswords() {
-    return `<li
-      class="dash-entry dash-action is-empty"
-      data-liquid-glass="rounded"
-      data-lg-radius="18"
-      data-filter-id="lg-password-empty"
-    >
-      <div class="dash-entry-in">
-        <p class="dash-action-line">No passwords accessed</p>
-      </div>
-    </li>`;
-  }
-
-  function renderPasswordAccesses(entries, resetScroll) {
-    shown.passwords = Array.isArray(entries) ? entries : [];
-    if (!passwordsEl) return;
-    const key = shown.passwords
-      .map((entry) => `${entry.at || ""}:${entry.reason || ""}`)
-      .join("|");
-    if (key === passwordKey && passwordsEl.childElementCount) return;
-    passwordKey = key;
-    const rows = shown.passwords.length
-      ? shown.passwords.map(renderPasswordAccess)
-      : [renderEmptyPasswords()];
-    const scroll = passwordsEl.scrollLeft;
-    passwordsEl.innerHTML = rows.join("");
-    if (resetScroll) passwordsEl.scrollLeft = 0;
-    else passwordsEl.scrollLeft = scroll;
-    queueMicrotask(() => window.reinitLiquidGlass?.());
-  }
-
   function renderActions(entries) {
     shown.actions = Array.isArray(entries) ? entries : [];
     if (!actionsEl) return;
@@ -780,23 +718,6 @@
     return data;
   }
 
-  async function fetchPasswordAccess() {
-    if (userEmail !== YAN_EMAIL) return { entries: [] };
-    const { res, data } = await fetchJson("/api/dashboard/password-access");
-    if (res.status === 401) {
-      show("login");
-      return null;
-    }
-    if (res.status === 403) {
-      if (passwordsSection) passwordsSection.hidden = true;
-      return { entries: [] };
-    }
-    if (!res.ok || !data.ok) {
-      throw new Error(data.error || `password-access failed (${res.status})`);
-    }
-    return data;
-  }
-
   /** One-shot: ensure current session is in the login log (covers pre-fix cookies). */
   async function ensureLoginRecorded() {
     try {
@@ -820,14 +741,13 @@
 
   async function loadOnce() {
     try {
-      const [chat, logins, actions, future, passwords] = await Promise.all([
+      const [chat, logins, actions, future] = await Promise.all([
         fetchChatLog(),
         fetchLoginLog(),
         fetchAgentActions(),
         fetchFutureAgents(),
-        fetchPasswordAccess(),
       ]);
-      if (!chat || !logins || !actions || !future || !passwords) return;
+      if (!chat || !logins || !actions || !future) return;
       renderChats(Array.isArray(chat.entries) ? chat.entries : []);
       renderLogins(Array.isArray(logins.entries) ? logins.entries : []);
       renderActions(Array.isArray(actions.entries) ? actions.entries : []);
@@ -837,7 +757,6 @@
         true,
         Array.isArray(future.gradeWatches) ? future.gradeWatches : []
       );
-      renderPasswordAccesses(Array.isArray(passwords.entries) ? passwords.entries : [], true);
     } catch (err) {
       console.error("[dashboard]", err);
     }
@@ -857,7 +776,6 @@
       }
       if (data.access === "full") {
         userEmail = String(data.email || "").trim().toLowerCase();
-        if (passwordsSection) passwordsSection.hidden = userEmail !== YAN_EMAIL;
         try {
           renderAgents();
           await ensureLoginRecorded();
@@ -877,14 +795,6 @@
               );
             })
             .catch((err) => console.error("[dashboard] future agents", err));
-          if (userEmail === YAN_EMAIL) {
-            fetchPasswordAccess()
-              .then((data) => {
-                if (!data) return;
-                renderPasswordAccesses(Array.isArray(data.entries) ? data.entries : [], false);
-              })
-              .catch((err) => console.error("[dashboard] passwords", err));
-          }
         }, 30_000);
         return;
       }

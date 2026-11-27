@@ -303,7 +303,62 @@ function requireReason(reason) {
   return text;
 }
 
-async function appendAccess(vault, entry) {
+/**
+ * One line for the dashboard Actions rail. No secret.
+ * @param {{ title?: string, username?: string, reason?: string, kind?: string }} entry
+ */
+export function passwordActionSummary(entry) {
+  const title = String(entry?.title || "").trim() || "account";
+  const username = String(entry?.username || "").trim();
+  const reason = String(entry?.reason || "").replace(/\s+/g, " ").trim();
+  const who = username ? ` for ${username}` : "";
+  const kind = String(entry?.kind || "fill");
+  let verb = `Filled the ${title} password${who}`;
+  if (kind === "otp") verb = `Used a ${title} one-time code${who}`;
+  if (kind === "unlock-dialog") verb = "Typed the Mac login password";
+  return reason ? `${verb}. ${reason}` : verb;
+}
+
+/**
+ * @param {{ at?: string, id?: string, title?: string, kind?: string }} entry
+ */
+export function passwordActionId(entry) {
+  const at = String(entry?.at || "");
+  const id = String(entry?.id || entry?.title || "account");
+  const kind = String(entry?.kind || "fill") || "fill";
+  return `password:${id}:${kind}:${at}`;
+}
+
+/**
+ * @param {ReturnType<typeof resolveVault>} vault
+ * @param {{ actionsPath?: string, logAction?: boolean, agent?: string }} opts
+ * @param {Record<string, string>} row
+ */
+async function logPasswordAction(vault, opts, row) {
+  if (opts.logAction === false) return null;
+  const actionsPath = String(opts.actionsPath || "");
+  const realVault = resolve(vault.dir) === resolve(passwordsDir());
+  if (!actionsPath && !realVault) return null;
+  try {
+    const { appendAgentAction } = await import("./agent-actions.js");
+    const agent = String(opts.agent || "").trim() || "personal-agent";
+    return await appendAgentAction(
+      {
+        at: row.at,
+        agent,
+        kind: "password",
+        summary: passwordActionSummary(row),
+        id: passwordActionId(row),
+      },
+      actionsPath ? { path: actionsPath } : {}
+    );
+  } catch (err) {
+    console.error("[agent-actions]", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+async function appendAccess(vault, entry, opts = {}) {
   await ensureDir(vault.dir);
   const row = {
     at: new Date().toISOString(),
@@ -317,6 +372,8 @@ async function appendAccess(vault, entry) {
   const file = join(vault.dir, "access.jsonl");
   await appendFile(file, JSON.stringify(row) + "\n", { mode: 0o600 });
   await chmod(file, 0o600);
+  await logPasswordAction(vault, opts, row);
+  return row;
 }
 
 async function mustEntry(vault, id) {
@@ -500,7 +557,7 @@ export async function fillAccount(opts = {}) {
   const entry = await mustEntry(vault, opts.id);
   const secret = await getSecret(vault, PASSWORD_SERVICE, entry.id);
   if (!secret) throw new Error("no password stored for that account");
-  await appendAccess(vault, { ...entry, reason, kind: "fill" });
+  await appendAccess(vault, { ...entry, reason, kind: "fill" }, opts);
   const typePassword = opts.typePassword || defaultType;
   try {
     await typePassword({ browser, ref: opts.ref, secret, entry });
@@ -517,7 +574,7 @@ export async function otpAccount(opts = {}) {
   const stored = await getSecret(vault, OTP_SERVICE, entry.id);
   if (!stored) throw new Error("no one-time code stored for that account");
   const code = totpCode(stored, opts.now);
-  await appendAccess(vault, { ...entry, reason, kind: "otp" });
+  await appendAccess(vault, { ...entry, reason, kind: "otp" }, opts);
   if (opts.browser || opts.ref) {
     const browser = String(opts.browser || "").toLowerCase();
     if (browser !== "ardia" && browser !== "chrome") throw new Error("browser must be ardia or chrome");
@@ -564,14 +621,18 @@ export async function unlockDialog(opts = {}) {
   }
   const secret = await getSecret(vault, MAC_SERVICE, MAC_ACCOUNT);
   if (!secret) throw new Error("no Mac login password stored");
-  await appendAccess(vault, {
-    id: "mac-login",
-    title: "Mac login",
-    url: "",
-    username: "",
-    reason,
-    kind: "unlock-dialog",
-  });
+  await appendAccess(
+    vault,
+    {
+      id: "mac-login",
+      title: "Mac login",
+      url: "",
+      username: "",
+      reason,
+      kind: "unlock-dialog",
+    },
+    opts
+  );
   const typePassword = opts.typePassword || typeIntoFrontmost;
   try {
     await typePassword({ secret });
@@ -606,18 +667,54 @@ export async function readPasswordAccess(opts = {}) {
       rows.push({
         at: String(raw.at || ""),
         when: formatPacificTime(raw.at),
+        id: String(raw.id || ""),
         title: String(raw.title || ""),
         url: String(raw.url || ""),
         username: String(raw.username || ""),
         reason: String(raw.reason || ""),
+        kind: String(raw.kind || ""),
       });
     } catch {
       /* skip a broken line */
     }
   }
   rows.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
-  const limit = opts.limit ?? 200;
-  return rows.slice(0, limit);
+  if (opts.limit == null) return rows.slice(0, 200);
+  if (opts.limit <= 0) return rows;
+  return rows.slice(0, opts.limit);
+}
+
+/**
+ * Copy access-log rows into the agent action log. A repeated id is skipped.
+ * @param {{ path?: string, dir?: string, backend?: string, env?: NodeJS.ProcessEnv }} opts
+ */
+export async function seedPasswordActions(opts = {}) {
+  const path = String(opts.path || "");
+  if (!path) return;
+  const rows = await readPasswordAccess({
+    dir: opts.dir,
+    backend: opts.backend,
+    env: opts.env,
+    limit: 0,
+  });
+  if (!rows.length) return;
+  const { appendAgentAction, readActionIds } = await import("./agent-actions.js");
+  const ids = await readActionIds(path);
+  for (const row of rows) {
+    const id = passwordActionId(row);
+    if (ids.has(id)) continue;
+    ids.add(id);
+    await appendAgentAction(
+      {
+        at: row.at,
+        agent: "personal-agent",
+        kind: "password",
+        summary: passwordActionSummary(row),
+        id,
+      },
+      { path }
+    );
+  }
 }
 
 function flag(argv, name) {
@@ -656,6 +753,7 @@ async function main() {
         reason: flag(argv, "--reason"),
         browser: flag(argv, "--browser"),
         ref: flag(argv, "--ref"),
+        agent: flag(argv, "--via"),
       });
       process.stdout.write("filled\n");
       return;
@@ -668,12 +766,16 @@ async function main() {
         reason: flag(argv, "--reason"),
         browser,
         ref,
+        agent: flag(argv, "--via"),
       });
       process.stdout.write(result.filled ? "filled\n" : `${result.code}\n`);
       return;
     }
     if (cmd === "unlock-dialog") {
-      await unlockDialog({ reason: flag(argv, "--reason") });
+      await unlockDialog({
+        reason: flag(argv, "--reason"),
+        agent: flag(argv, "--via"),
+      });
       process.stdout.write("typed\n");
       return;
     }

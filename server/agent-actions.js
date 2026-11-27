@@ -1,6 +1,6 @@
 /**
  * Append-only log of side effects Yan would not already see.
- * Mail sends, lights, and the vacuum belong here.
+ * Mail sends, lights, the vacuum, and password uses belong here.
  * Education dashboard writes do not. Dates, todos, and projects already show on /education.
  * Moving a message into a folder does not.
  * Teams and iMessage sends do not. Those already show in the chat.
@@ -18,6 +18,7 @@ export { AGENT_ACTIONS_PATH };
 
 const AGENT_LABELS = {
   "home-agent": "Home agent",
+  "personal-agent": "Personal agent",
   "calendar-on-demand": "Calendar or todo",
   "nightly-actions": "Nightly actions",
 };
@@ -85,16 +86,40 @@ export function splitVia(args) {
  * @param {string} path
  * @param {string} id
  */
-async function actionIdExists(path, id) {
+/**
+ * @param {string} path
+ */
+export async function readActionIds(path) {
   let text = "";
   try {
     text = await readFile(path, "utf8");
   } catch (err) {
-    if (err && err.code === "ENOENT") return false;
+    if (err && err.code === "ENOENT") return new Set();
     throw err;
   }
-  const needle = `"id":${JSON.stringify(id)}`;
-  return text.split("\n").some((line) => line.includes(needle));
+  /** @type {Set<string>} */
+  const ids = new Set();
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const row = JSON.parse(trimmed);
+      const id = String(row?.id || "").trim();
+      if (id) ids.add(id);
+    } catch {
+      /* skip a torn line */
+    }
+  }
+  return ids;
+}
+
+/**
+ * @param {string} path
+ * @param {string} id
+ */
+async function actionIdExists(path, id) {
+  const ids = await readActionIds(path);
+  return ids.has(id);
 }
 
 /**
@@ -240,6 +265,22 @@ export async function readAgentActions(opts = {}) {
   const path = opts.path || AGENT_ACTIONS_PATH;
   if (opts.seed !== false) {
     await ensureHomeSeeds({ ...opts, path });
+    const seedPasswords =
+      opts.passwords === true ||
+      (opts.passwords !== false && path === AGENT_ACTIONS_PATH);
+    if (seedPasswords) {
+      try {
+        const { seedPasswordActions } = await import("./passwords.js");
+        await seedPasswordActions({
+          path,
+          dir: opts.passwordDir,
+          backend: opts.passwordBackend,
+          env: opts.env,
+        });
+      } catch (err) {
+        console.error("[agent-actions] password seed", err instanceof Error ? err.message : err);
+      }
+    }
   }
   let text = "";
   try {

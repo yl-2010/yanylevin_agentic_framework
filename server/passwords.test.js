@@ -5,13 +5,16 @@ import { join } from "node:path";
 import { spawn } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { readAgentActions } from "./agent-actions.js";
 import {
   fillAccount,
   importCsv,
   listAccounts,
   otpAccount,
+  passwordActionSummary,
   passwordsDir,
   readPasswordAccess,
+  seedPasswordActions,
   setMacPassword,
   totpCode,
   unlockDialog,
@@ -229,6 +232,74 @@ test("unlock-dialog types only when Passwords or a system dialog is in front", a
   assert.equal(log[0].title, "Mac login");
   assert.equal(log[0].reason, "Read the GitHub code in Passwords");
   assert.equal(JSON.stringify(log).includes("studio-secret"), false);
+});
+
+test("password action copy names the account and leaves the secret out", () => {
+  assert.equal(
+    passwordActionSummary({
+      title: "GitHub",
+      username: "yan",
+      reason: "Sign in to GitHub to read the repo",
+      kind: "fill",
+    }),
+    "Filled the GitHub password for yan. Sign in to GitHub to read the repo"
+  );
+  assert.equal(
+    passwordActionSummary({
+      title: "GitHub",
+      username: "yan",
+      reason: "GitHub 2FA",
+      kind: "otp",
+    }),
+    "Used a GitHub one-time code for yan. GitHub 2FA"
+  );
+  assert.equal(
+    passwordActionSummary({
+      title: "Mac login",
+      reason: "Read the GitHub code in Passwords",
+      kind: "unlock-dialog",
+    }),
+    "Typed the Mac login password. Read the GitHub code in Passwords"
+  );
+});
+
+test("a password use is one agent action, including older access rows", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "yl-passwords-action-"));
+  const opts = vaultOpts(dir);
+  const file = await writeCsv(
+    dir,
+    "actions.csv",
+    `${CSV_HEADER}\nGitHub,https://github.com/login,yan,secret-one,,\n`
+  );
+  await importCsv(file, opts);
+  const github = (await listAccounts(opts))[0];
+  const actionsPath = join(dir, "actions.jsonl");
+  await fillAccount({
+    ...opts,
+    id: github.id,
+    reason: "Sign in to GitHub to read the repo",
+    browser: "ardia",
+    ref: "e11",
+    agent: "nightly-actions",
+    actionsPath,
+    typePassword: async () => {},
+  });
+  const { entries } = await readAgentActions({ path: actionsPath, seed: false });
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].agent, "nightly-actions");
+  assert.equal(entries[0].agentName, "Nightly actions");
+  assert.equal(entries[0].kind, "password");
+  assert.equal(entries[0].summary, "Filled the GitHub password for yan. Sign in to GitHub to read the repo");
+  assert.equal(JSON.stringify(entries).includes("secret-one"), false);
+
+  const seeded = join(dir, "seeded.jsonl");
+  await seedPasswordActions({ path: seeded, ...opts });
+  await seedPasswordActions({ path: seeded, ...opts });
+  const again = await readAgentActions({ path: seeded, seed: false });
+  assert.equal(again.entries.length, 1);
+  assert.equal(again.entries[0].agent, "personal-agent");
+  assert.equal(again.entries[0].agentName, "Personal agent");
+  assert.equal(again.entries[0].summary, entries[0].summary);
 });
 
 test("the access reader drops a password field someone stuffed into the log", async () => {

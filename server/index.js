@@ -510,17 +510,21 @@ app.get("/api/agent-actions", requireAuth, async (req, res) => {
       return;
     }
 
-    const { entries, mtimeMs, size } = await readAgentActions({
+    const read = await readAgentActions({
       lightsPath: lightsStatePath(),
       vacuumPath: vacuumStatePath(),
     });
+    const yan = canonicalizeEmail(req.user?.email) === YAN_EMAIL;
+    const entries = yan
+      ? read.entries
+      : read.entries.filter((entry) => entry.kind !== "password");
 
     res.setHeader("Cache-Control", "no-store");
     res.json({
       ok: true,
       count: entries.length,
-      mtimeMs,
-      size,
+      mtimeMs: read.mtimeMs,
+      size: read.size,
       entries,
       briefingRunner: briefingRunner(),
     });

@@ -27,6 +27,8 @@ Choose the one id that matches the site and the username. If two rows match, pic
 
 The reason is one sentence about why this login is happening. It goes on the same command that fills the field. An empty reason does nothing and does not unlock the password.
 
+Each fill, one-time code, and Mac dialog unlock shows up on the dashboard Actions row. The card says Personal agent unless you pass `--via` with another agent id, such as `--via nightly-actions`.
+
 Ardia, on a Yan turn. The ref is the snapshot ref, such as `e11`.
 
 ```bash

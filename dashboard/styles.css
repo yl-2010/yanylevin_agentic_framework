@@ -469,14 +469,11 @@ html.lg-chrome .dash-agent.lg-static.lg-refraction::after {
   font-size: var(--text-body);
   line-height: var(--lh-body);
   font-weight: 400;
+  overflow-wrap: anywhere;
 }
 
 .dash-action.is-empty .dash-action-line {
   color: var(--muted);
-}
-
-#password-access-list .dash-action-line {
-  overflow-wrap: anywhere;
 }
 
 a.dash-future-link {
