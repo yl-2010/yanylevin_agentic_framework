@@ -37,6 +37,9 @@ data/agent-actions.jsonl
 # Apple Passwords export. Plaintext. The vault lives in ~/.yanylevin/passwords.
 **/Passwords.csv
 
+# Grok Bot drops a plan snapshot in the repo root every six hours.
+.tmp-grokbot-usage-*.json
+
 # Brain concepts: real private data never goes in git (served via /api/brain).
 brain/data/
 brain/**/_shots/
