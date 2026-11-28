@@ -30,17 +30,17 @@ export const VOICE_SUMMARY_MAX_TOKENS = 80;
 export const VOICE_TALK_MAX_TOKENS = 120;
 
 export const VOICE_TURN_NOTE =
-  "This request was spoken. The work is the same as a typed turn. The final text is a normal chat answer. If the task is really hard, start the hard subagent. A normal question stays on this turn.";
+  "This request was spoken. You are the tool channel beside the voice. The voice keeps speaking. The work is the same as a typed turn. The final text is a normal chat answer the voice will say. If the task is really hard, start the hard subagent. A normal question stays on this turn.";
 
 /**
- * The local model stays in the call. The first word is its judgment.
- * That word is not spoken. There is no phrase list in this file.
+ * The local model is the voice for the whole call. It keeps speaking.
+ * A line that is exactly `tool` is the side channel, like VoiceChat's tool
+ * output. That line is not spoken. There is no phrase list in this file.
  */
 export const VOICE_CONVERSATION_PROMPT = [
-  "You are the voice on this phone call. You stay in the conversation. Talk in short spoken sentences.",
-  "The first word of each reply is stay or agent. That word is not spoken.",
-  "agent means this turn needs tools or the Personal Agent. That includes mail, files, the calendar, todos, the brain, and anything you have to look up or change. After that word, say one short sentence in your own words, then stop. Do not answer the request.",
-  "stay means you can answer from this conversation. After that word, speak the reply. Do not start the Personal Agent.",
+  "You are the voice on this phone call. Stay in the conversation. Talk in short spoken sentences and keep going.",
+  "If this turn needs tools or the Personal Agent, write a line by itself that is exactly tool. That line is not spoken. It covers mail, files, the calendar, todos, the brain, and anything you have to look up or change. Then keep talking. Do not stop. Do not invent the result. Do not use a stock phrase.",
+  "If you can answer from this conversation, just speak. Do not write that line.",
 ].join(" ");
 
 const SPOKEN_STOP = new Set(
@@ -83,30 +83,74 @@ export function modelSpeech(raw) {
 }
 
 /**
- * The model's first word is the route. It is not spoken.
- * `agent` starts Composer. Anything else, including a reply with no marker, stays on this model.
- * A prefix of the marker stays pending until the word is finished.
- * @param {unknown} speech
- * @param {boolean} [flush]
- * @returns {{ route: "agent"|"stay"|null, speech: string, pending: boolean }}
+ * A line that is exactly `tool`, or the word `tool` before the reply.
+ * Not speech. A trailing prefix of that word stays pending.
+ * @param {string} line
  */
-export function readVoiceRoute(speech, flush = false) {
-  const body = String(speech || "").replace(/^\s+/, "");
-  if (!body) return { route: null, speech: "", pending: !flush };
-  const match = body.match(/^([A-Za-z]+)([\s\S]*)$/);
-  if (!match) return { route: "stay", speech: body, pending: false };
-  const word = match[1].toLowerCase();
-  const after = match[2];
-  const isRoute = word === "agent" || word === "stay";
-  const isPrefix = !isRoute && ("agent".startsWith(word) || "stay".startsWith(word));
-  if ((isPrefix || isRoute) && after === "" && !flush) {
-    return { route: null, speech: "", pending: true };
+function isToolLine(line) {
+  return /^tool[.!?]?$/i.test(String(line || "").trim());
+}
+
+/**
+ * @param {string} line
+ */
+function isToolPrefix(line) {
+  const word = String(line || "").trim();
+  if (!word || !/^[A-Za-z]+$/.test(word)) return false;
+  const lower = word.toLowerCase();
+  return lower !== "tool" && "tool".startsWith(lower);
+}
+
+/**
+ * Spoken text, plus whether the side channel asked for tools.
+ * The voice does not wait on this. A finished sentence is speech even when
+ * a later line is still the word tool. Harmony analysis can carry the same
+ * line. There is no stay-or-agent word.
+ * @param {unknown} raw
+ * @param {boolean} [flush]
+ * @returns {{ tools: boolean, speech: string, pending: boolean }}
+ */
+export function readVoiceSide(raw, flush = false) {
+  const text = String(raw || "");
+  let tools = false;
+  if (text.includes("<|")) {
+    for (const row of extractHarmonyChannels(text)) {
+      if (row.channel === "final") continue;
+      if (isToolLine(row.body)) tools = true;
+    }
   }
-  if (isRoute && (after === "" || /^[\s.!?]/.test(after))) {
-    const spoken = after.replace(/^[.!?]+\s*/, "").replace(/^\s+/, "");
-    return { route: word, speech: spoken, pending: false };
+  let body = modelSpeech(text).replace(/^\s+/, "");
+  if (!body) return { tools, speech: "", pending: !flush };
+  const lead = body.match(/^(tool)([\s\S]*)$/i);
+  if (lead) {
+    const after = lead[2];
+    if (after === "" && !flush) return { tools: false, speech: "", pending: true };
+    if (after === "" || /^[\s.!? ]/.test(after)) {
+      tools = true;
+      body = after.replace(/^[.!?]+\s*/, "").replace(/^\s+/, "");
+    }
   }
-  return { route: "stay", speech: body, pending: false };
+  if (!body) return { tools, speech: "", pending: false };
+  const endsNl = /\n$/.test(body);
+  const parts = body.split("\n");
+  /** @type {string[]} */
+  const spoken = [];
+  let pending = false;
+  for (let i = 0; i < parts.length; i++) {
+    const trimmed = parts[i].trim();
+    if (!trimmed) continue;
+    const open = i === parts.length - 1 && !endsNl && !flush;
+    if (open && (isToolPrefix(trimmed) || isToolLine(trimmed))) {
+      pending = true;
+      continue;
+    }
+    if (isToolLine(trimmed)) {
+      tools = true;
+      continue;
+    }
+    spoken.push(trimmed);
+  }
+  return { tools, speech: spoken.join(" "), pending };
 }
 
 /**
@@ -731,8 +775,7 @@ export function createVoiceBook(deps) {
     async grokFinished({ sessionId, utteranceId, content, dropped }) {
       const call = bySession.get(sessionId);
       if (!call || call.summarized) return;
-      // The voice model is done talking. The spoken answer is the agent's text.
-      stopVoice(call);
+      // The tool result comes back into the same voice. Do not cut it off.
       const turn = call.turns.find((row) => row.utteranceId && row.utteranceId === utteranceId);
       if (dropped) {
         if (turn) {
@@ -754,11 +797,13 @@ export function createVoiceBook(deps) {
         spoken = firstSentences(full, 2);
       }
       call.compressing = false;
+      const aside = String(call.voiceAside?.[utteranceId] || "").trim();
+      const heard = [aside, spoken].filter(Boolean).join(" ");
       call.turns.push({
         role: "assistant",
         text: full,
         full,
-        spoken,
+        spoken: heard,
         at: new Date(now()).toISOString(),
         utteranceId,
       });
@@ -778,7 +823,7 @@ export function createVoiceBook(deps) {
         rest = split.rest;
         if (parts.length >= 2) break;
       }
-      for (const piece of parts) pushSpeak(call, piece, "answer");
+      for (const piece of parts) pushSpeak(call, piece, "voice", utteranceId);
       call.speaking = false;
       call.speakingText = "";
       call.pendingSpeak.delete(utteranceId);
@@ -1033,8 +1078,8 @@ function memoryFromTurns(turns) {
 }
 
 /**
- * One local model for the whole call. It speaks as soon as a sentence exists.
- * Composer starts only when that model says the turn needs tools.
+ * One local model for the whole call. It keeps speaking.
+ * Composer starts only when the side channel asks for tools.
  * @param {any} call
  * @param {string} id
  * @param {string} said
@@ -1065,8 +1110,6 @@ async function runVoiceTurn(call, id, said, interrupt, deps, now, push) {
     { role: "user", content: said },
   ];
   let raw = "";
-  let route = "";
-  let routed = false;
   let sentSpeech = "";
   let pendingBuf = "";
   let spokenCount = 0;
@@ -1075,8 +1118,12 @@ async function runVoiceTurn(call, id, said, interrupt, deps, now, push) {
 
   function startAgent() {
     if (agentStarted || call.voiceFor !== id) return;
+    if (typeof deps.messageAgent !== "function") {
+      call.pendingSpeak.delete(id);
+      return;
+    }
     agentStarted = true;
-    if (typeof deps.messageAgent !== "function") return;
+    call.voiceRoute = "tool";
     void Promise.resolve(
       deps.messageAgent(call.sessionId, call.email, said, id, interrupt)
     ).catch((err) => {
@@ -1094,36 +1141,25 @@ async function runVoiceTurn(call, id, said, interrupt, deps, now, push) {
   }
 
   function drain(flush) {
-    const limit = route === "agent" ? 1 : 4;
-    while (spokenCount < limit) {
+    while (spokenCount < 4) {
       const split = splitSpeakable(pendingBuf, false);
       if (!split) break;
       pendingBuf = split.rest;
       emit(split.piece);
     }
-    if (flush && spokenCount < limit) {
+    if (flush && spokenCount < 4) {
       const tail = splitSpeakable(pendingBuf, true);
       if (tail?.piece) {
         pendingBuf = tail.rest;
         emit(tail.piece);
       }
     }
-    if (route === "agent" && spokenCount >= 1) ac.abort();
   }
 
   function pump(flush) {
     if (call.voiceFor !== id) return;
-    const judged = readVoiceRoute(modelSpeech(raw), flush);
-    if (judged.pending) return;
-    if (!routed) {
-      routed = true;
-      route = judged.route || "stay";
-      call.voiceRoute = route;
-      if (route === "agent") startAgent();
-      else if (interrupt && typeof deps.cancelTurn === "function") {
-        void Promise.resolve(deps.cancelTurn(call.sessionId, call.email)).catch(() => {});
-      }
-    }
+    const judged = readVoiceSide(raw, flush);
+    if (judged.tools) startAgent();
     const full = judged.speech || "";
     const extra = full.startsWith(sentSpeech) ? full.slice(sentSpeech.length) : full;
     if (full.startsWith(sentSpeech)) sentSpeech = full;
@@ -1138,24 +1174,24 @@ async function runVoiceTurn(call, id, said, interrupt, deps, now, push) {
       if (ac.signal.aborted || call.voiceFor !== id) break;
       raw += delta;
       pump(false);
-      if (route === "agent" && spokenCount >= 1) break;
     }
     if (call.voiceFor === id && !ac.signal.aborted) pump(true);
   } catch {
-    /* aborted, or the local model is down. No canned line, and no Composer without a judgment. */
+    /* aborted, or the local model is down. No canned line, and no Composer without a tool line. */
   }
   if (call.voiceFor !== id) return;
-  if (!routed) {
-    route = "stay";
-    call.voiceRoute = "stay";
+  if (!call.voiceRoute) call.voiceRoute = "stay";
+  if (call.voiceRoute === "tool") {
+    if (spokenText) {
+      if (!call.voiceAside) call.voiceAside = {};
+      call.voiceAside[id] = spokenText;
+      rememberVoice(call, "assistant", spokenText);
+    }
+  } else {
+    call.pendingSpeak.delete(id);
     if (interrupt && typeof deps.cancelTurn === "function") {
       void Promise.resolve(deps.cancelTurn(call.sessionId, call.email)).catch(() => {});
     }
-  }
-  if (route === "agent") {
-    if (spokenText) rememberVoice(call, "assistant", spokenText);
-  } else {
-    call.pendingSpeak.delete(id);
     if (spokenText) {
       call.turns.push({
         role: "assistant",

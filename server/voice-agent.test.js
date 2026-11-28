@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseChatHistoryMessages, persistChatHistory } from "./home-chat-history.js";
 import {
+  VOICE_CONVERSATION_PROMPT,
   VOICE_TURN_NOTE,
   VOICE_COOLDOWN_MS,
   VOICE_HEARTBEAT_MS,
@@ -14,7 +15,7 @@ import {
   firstSentences,
   modelSpeech,
   parseSummaryBubbles,
-  readVoiceRoute,
+  readVoiceSide,
   spokenLineAddsNoun,
 } from "./voice-agent.js";
 
@@ -93,33 +94,41 @@ describe("voice turn note", () => {
 });
 
 describe("voice model judgment", () => {
-  it("reads the route word and leaves it out of the speech", () => {
-    assert.deepEqual(readVoiceRoute("sta"), { route: null, speech: "", pending: true });
-    assert.deepEqual(readVoiceRoute("stay"), { route: null, speech: "", pending: true });
-    assert.deepEqual(readVoiceRoute("stay\nHey."), {
-      route: "stay",
-      speech: "Hey.",
-      pending: false,
-    });
-    assert.deepEqual(readVoiceRoute("agent Looking at Friday."), {
-      route: "agent",
+  it("keeps speech and treats a tool line as the side channel", () => {
+    assert.deepEqual(readVoiceSide("to"), { tools: false, speech: "", pending: true });
+    assert.deepEqual(readVoiceSide("tool"), { tools: false, speech: "", pending: true });
+    assert.deepEqual(readVoiceSide("tool\nLooking at Friday."), {
+      tools: true,
       speech: "Looking at Friday.",
       pending: false,
     });
-    assert.deepEqual(readVoiceRoute("Hello there."), {
-      route: "stay",
+    assert.deepEqual(readVoiceSide("Hello there."), {
+      tools: false,
       speech: "Hello there.",
       pending: false,
     });
-    assert.equal(readVoiceRoute("agent", true).route, "agent");
+    assert.equal(readVoiceSide("tool", true).tools, true);
+    assert.equal(readVoiceSide("tool", true).speech, "");
     const harmony =
-      "<|channel|>analysis<|message|>needs tools<|end|><|channel|>final<|message|>stay\nHey.";
-    assert.equal(modelSpeech(harmony).includes("needs tools"), false);
-    assert.equal(readVoiceRoute(modelSpeech(harmony)).route, "stay");
-    assert.match(readVoiceRoute(modelSpeech(harmony)).speech, /Hey/);
+      "<|channel|>analysis<|message|>tool<|end|><|channel|>final<|message|>Looking at Friday. The mail can wait.";
+    assert.equal(modelSpeech(harmony).includes("tool"), false);
+    const side = readVoiceSide(harmony);
+    assert.equal(side.tools, true);
+    assert.match(side.speech, /Looking at Friday/);
+    assert.match(side.speech, /mail can wait/);
+    assert.equal(side.speech.includes("tool"), false);
   });
 
-  it("stays on the voice model unless that model says agent", async () => {
+  it("has no hello list and no canned holding line", () => {
+    assert.equal(/checking/i.test(VOICE_CONVERSATION_PROMPT), false);
+    assert.equal(/one second/i.test(VOICE_CONVERSATION_PROMPT), false);
+    assert.equal(/yeah/i.test(VOICE_CONVERSATION_PROMPT), false);
+    assert.equal(/\bhello\b/i.test(VOICE_CONVERSATION_PROMPT), false);
+    assert.match(VOICE_CONVERSATION_PROMPT, /keep going/);
+    assert.match(VOICE_CONVERSATION_PROMPT, /line by itself that is exactly tool/);
+  });
+
+  it("stays on the voice model unless the side channel asks for tools", async () => {
     /** @type {string[][]} */
     const prompts = [];
     const harness = bookWith({
@@ -127,8 +136,8 @@ describe("voice model judgment", () => {
         async *streamVoice(messages) {
           prompts.push(messages.map((row) => row.content));
           const heard = messages.at(-1).content;
-          if (heard === "thanks") yield "agent\nI'll take a look.\n";
-          else yield "stay\nHey.\n";
+          if (heard === "thanks") yield "I'll take a look.\nThe folder is the one from yesterday.\ntool\n";
+          else yield "Hey.\n";
         },
       },
     });
@@ -154,14 +163,17 @@ describe("voice model judgment", () => {
       text: "thanks",
       clientUtteranceId: "u-agent",
     });
-    assert.equal(thanks.route, "agent");
+    assert.equal(thanks.route, "tool");
     assert.equal(thanks.speak[0].text, "I'll take a look.");
+    assert.equal(thanks.speak[1].text, "The folder is the one from yesterday.");
+    assert.equal(thanks.speak.every((chunk) => chunk.kind === "voice"), true);
     assert.equal(harness.overrides.sends, 1);
     assert.match(prompts[1].join("\n"), /Hey/);
     assert.equal(prompts[1].some((line) => line === "Checking."), false);
+    assert.equal(prompts[1].some((line) => /one second/i.test(line)), false);
   });
 
-  it("speaks the model's sentence before the agent send returns", async () => {
+  it("keeps speaking while the tool channel runs", async () => {
     let releaseSend;
     const sendGate = new Promise((resolve) => {
       releaseSend = resolve;
@@ -176,7 +188,7 @@ describe("voice model judgment", () => {
           return { ok: true };
         },
         async *streamVoice() {
-          yield "agent\nLooking at Friday.\nI filed the college mail.\n";
+          yield "Looking at Friday.\nI filed the college mail.\ntool\n";
         },
       },
     });
@@ -190,17 +202,21 @@ describe("voice model judgment", () => {
     });
     const result = await pending;
     assert.equal(started, true);
-    assert.equal(result.speak.length, 1);
+    assert.equal(result.route, "tool");
+    assert.equal(result.speak.length, 2);
     assert.equal(result.speak[0].text, "Looking at Friday.");
-    assert.equal(result.speak[0].kind, "voice");
+    assert.equal(result.speak[1].text, "I filed the college mail.");
+    assert.equal(result.speak.every((chunk) => chunk.kind === "voice"), true);
     await harness.book.grokFinished({
       sessionId: "voice-sess1",
       utteranceId: "u-hold",
       content: "Calc is due tomorrow.",
     });
     const call = harness.book.bySession.get("voice-sess1");
-    assert.equal(call.speak.filter((chunk) => chunk.kind === "voice").length, 1);
-    assert.ok(call.speak.some((chunk) => chunk.kind === "answer"));
+    assert.equal(call.speak.filter((chunk) => chunk.kind === "voice").length, 3);
+    assert.equal(call.speak.some((chunk) => chunk.kind === "answer"), false);
+    assert.equal(call.speak[0].text, "Looking at Friday.");
+    assert.match(call.speak.at(-1).text, /Calc is due tomorrow/);
     releaseSend();
   });
 
@@ -408,7 +424,7 @@ describe("one device and the summary wait", () => {
       summaryText: JSON.stringify({ bubbles }),
       deps: {
         async *streamVoice() {
-          yield "stay\nSounds good.\n";
+          yield "Sounds good.\n";
         },
         async commitSummary(call, rows) {
           await persistChatHistory({

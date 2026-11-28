@@ -4719,6 +4719,8 @@ export async function messageAgent(
     );
   }
   if (session.voiceMode) {
+    // Side channel. The voice model keeps speaking. This send exists only
+    // because that model wrote a tool line.
     promptParts.push(VOICE_TURN_NOTE, "");
   }
   promptParts.push("User:", text || "(no text — see attachments)");
