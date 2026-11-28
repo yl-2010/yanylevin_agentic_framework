@@ -21,6 +21,13 @@ export const AGENT_WORKER_METHODS = Object.freeze([
   "resolveChatUploadFile",
   "scheduleFutureAgentLive",
   "cancelFutureAgentLive",
+  "startVoiceSession",
+  "voiceUtterance",
+  "voiceState",
+  "voiceAudio",
+  "voiceDormant",
+  "voiceResume",
+  "voiceHeartbeat",
 ]);
 
 export function agentWorkerBaseUrl() {

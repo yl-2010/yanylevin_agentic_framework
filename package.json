@@ -8,6 +8,8 @@
     "server:dev": "npm run dev --prefix server",
     "agent-worker": "npm run agent-worker --prefix server",
     "agent-worker:restart-when-idle": "npm run agent-worker:restart-when-idle --prefix server",
+    "voice-speech": "npm run voice-speech --prefix server",
+    "voice-models:download": "python3 server/download-voice-models.py",
     "deploy:web": "npx vercel deploy --prod --yes",
     "brand": "node scripts/build-brand.mjs",
     "daily-briefing": "npm run daily-briefing --prefix server",

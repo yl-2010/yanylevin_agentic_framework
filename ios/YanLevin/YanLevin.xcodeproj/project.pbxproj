@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		016EA89B8F227C0DDEED8851 /* ChatSendFlight.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA73E841EE806831FD0F0861 /* ChatSendFlight.swift */; };
+		1F6B3D90A4C85E27B7D14A38 /* VoiceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D4A6C28E1F74B30A8C5D9E2 /* VoiceSession.swift */; };
+		4B8E2F17C9A046D3B5E8A172 /* VoiceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7C31A94B0D64F58A2E19C6D /* VoiceView.swift */; };
 		0176F9C055AC87C95524E633 /* ChatWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0293C4406F9D69D94DEF0AF /* ChatWidgets.swift */; };
 		02E4B0AB334E7E786B92BAFF /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D468F5B66C3D9BB130D39AAA /* AuthStore.swift */; };
 		032BFEAC925AFA4D167E6C32 /* WidgetTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = DECFCA8CF45C78AC9199902F /* WidgetTheme.swift */; };
@@ -68,6 +70,7 @@
 		8214A22DEE1542B0EC9F7A0F /* ChatDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCCAA3CC9D5DF782932D5C1B /* ChatDraftStore.swift */; };
 		824D6E2F1C587C1EFEBBF1E5 /* EducationContextFiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23283A3D071E6F63E623FD38 /* EducationContextFiles.swift */; };
 		826F6BD0C6720A6D4550B518 /* GlassChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4533B0C052E08A466A1A195A /* GlassChrome.swift */; };
+		84A1C0E7B2D94F6A91E3C508 /* HomeAccountTitleGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84A1C0E7B2D94F6A91E3C509 /* HomeAccountTitleGesture.swift */; };
 		8855992881D58F17A8FE5242 /* KaTeX_Size1-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = F833CB1445F5C3B9B8CF1568 /* KaTeX_Size1-Regular.woff2 */; };
 		92B5F17CAFBFD2DE8AA97AEB /* YLMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A015C81FA07EC99A09C44AE /* YLMotion.swift */; };
 		93BADEA5A4C4F56FEFFFF5A4 /* APIClient+URL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2723AF7679B0DE1C331A02F3 /* APIClient+URL.swift */; };
@@ -145,6 +148,8 @@
 
 /* Begin PBXFileReference section */
 		03B019B6E0B0488314D38BD9 /* ChatControlWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatControlWidget.swift; sourceTree = "<group>"; };
+		9D4A6C28E1F74B30A8C5D9E2 /* VoiceSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceSession.swift; sourceTree = "<group>"; };
+		E7C31A94B0D64F58A2E19C6D /* VoiceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceView.swift; sourceTree = "<group>"; };
 		04CDAACEDCB8632DFA206E04 /* KaTeX_Main-BoldItalic.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Main-BoldItalic.woff2"; sourceTree = "<group>"; };
 		057315720E940707A886B356 /* YanLevinWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = YanLevinWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		080B5543DFC0877FE81D2D84 /* YLMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YLMark.swift; sourceTree = "<group>"; };
@@ -196,6 +201,7 @@
 		82915689A31137AC9DA6206D /* OpenChatIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenChatIntent.swift; sourceTree = "<group>"; };
 		832A6558D9C48C7524ACB200 /* GymView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GymView.swift; sourceTree = "<group>"; };
 		838DB13614005AD484E1EF7C /* KaTeX_Size4-Regular.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Size4-Regular.woff2"; sourceTree = "<group>"; };
+		84A1C0E7B2D94F6A91E3C509 /* HomeAccountTitleGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeAccountTitleGesture.swift; sourceTree = "<group>"; };
 		8651995A2DE1EC4290CBBDCC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8821DC411CE772F1EBF795CE /* OpenAgentChatIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAgentChatIntent.swift; sourceTree = "<group>"; };
 		88D4BE7A6B3DEE51641D955E /* LICENSE */ = {isa = PBXFileReference; path = LICENSE; sourceTree = "<group>"; };
@@ -259,6 +265,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		8C2E5A71D9B34F06A1E7C4D5 /* Voice */ = {
+			isa = PBXGroup;
+			children = (
+				9D4A6C28E1F74B30A8C5D9E2 /* VoiceSession.swift */,
+				E7C31A94B0D64F58A2E19C6D /* VoiceView.swift */,
+			);
+			path = Voice;
+			sourceTree = "<group>";
+		};
 		133769D51F42958DE1DCF5D0 /* Gym */ = {
 			isa = PBXGroup;
 			children = (
@@ -378,6 +393,7 @@
 				23283A3D071E6F63E623FD38 /* EducationContextFiles.swift */,
 				D52A64A697EC5F95C4A2B684 /* EducationTabScroll.swift */,
 				F0F29B1D9327A0BC8892A063 /* EducationView.swift */,
+				84A1C0E7B2D94F6A91E3C509 /* HomeAccountTitleGesture.swift */,
 			);
 			path = Education;
 			sourceTree = "<group>";
@@ -462,6 +478,7 @@
 				9677241926DC32DAC5B7F9AE /* Education */,
 				133769D51F42958DE1DCF5D0 /* Gym */,
 				DE7722D88202B484853ABED7 /* Home */,
+				8C2E5A71D9B34F06A1E7C4D5 /* Voice */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -657,6 +674,7 @@
 				759BFDA13D21B1C13ED6D8B5 /* FitnessStore.swift in Sources */,
 				826F6BD0C6720A6D4550B518 /* GlassChrome.swift in Sources */,
 				F4D7D1D5846E78005F4C7208 /* GymView.swift in Sources */,
+				84A1C0E7B2D94F6A91E3C508 /* HomeAccountTitleGesture.swift in Sources */,
 				44F57A5672664B02EBD73904 /* HomeView.swift in Sources */,
 				3B957FF9EC905A753653E97F /* KeychainStore.swift in Sources */,
 				3DA5590F09A92039E16CAB9F /* LiveActivityCoordinator.swift in Sources */,
@@ -684,6 +702,8 @@
 				F45C99C5519725B12E0C2130 /* YLTintedOrb.swift in Sources */,
 				45C10542870F5305373A709F /* YLWebMarkdown.swift in Sources */,
 				B6F580E7F659994D82092817 /* YanLevinApp.swift in Sources */,
+				1F6B3D90A4C85E27B7D14A38 /* VoiceSession.swift in Sources */,
+				4B8E2F17C9A046D3B5E8A172 /* VoiceView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

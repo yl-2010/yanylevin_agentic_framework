@@ -40,6 +40,9 @@ data/agent-actions.jsonl
 # Grok Bot drops a plan snapshot in the repo root every six hours.
 .tmp-grokbot-usage-*.json
 
+# Voice weights belong in ~/Library/Application Support/yanylevin/voice-models/.
+voice-models/
+
 # Brain concepts: real private data never goes in git (served via /api/brain).
 brain/data/
 brain/**/_shots/

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.yanylevin.voice-speech</string>
+  <key>WorkingDirectory</key>
+  <string>$HOME/yanylevin_agentic_framework/server</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/you/Library/Application Support/yanylevin/voice-speech-venv/bin/python3</string>
+    <string>$HOME/yanylevin_agentic_framework/server/voice-speech.py</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>HOME</key>
+    <string>/Users/yanlevin</string>
+    <key>VOICE_SPEECH_HOST</key>
+    <string>127.0.0.1</string>
+    <key>VOICE_SPEECH_PORT</key>
+    <string>3016</string>
+    <key>HF_HUB_OFFLINE</key>
+    <string>1</string>
+    <key>TRANSFORMERS_OFFLINE</key>
+    <string>1</string>
+    <key>HF_DATASETS_OFFLINE</key>
+    <string>1</string>
+    <key>HF_HUB_DISABLE_TELEMETRY</key>
+    <string>1</string>
+    <key>PYTHONUNBUFFERED</key>
+    <string>1</string>
+  </dict>
+  <key>MaterializeDatalessFiles</key>
+  <true/>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/you/Library/Logs/personal-agent/yanylevin-voice-speech.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/you/Library/Logs/personal-agent/yanylevin-voice-speech.log</string>
+</dict>
+</plist>

@@ -5,22 +5,29 @@ enum RootTab: Hashable {
     case fitness
     case chat
     case education
-    case account
+    case voice
 
     static func defaultTab(fullAccess: Bool) -> RootTab {
         fullAccess ? .chat : .home
     }
 
     /// iOS 27 TabView crashes if selection points at a tab that is not in the
-    /// current set (Apple 164516837). Signed-in chrome has no Home; guests have
-    /// no Fitness / Education.
+    /// current set (Apple 164516837). Signed-in chrome has no portfolio Home.
+    /// Guests have no Fitness or Education. Voice is in both sets.
     static func clamped(_ tab: RootTab, fullAccess: Bool) -> RootTab {
         if fullAccess {
-            return tab == .home ? .chat : tab
+            switch tab {
+            case .home:
+                return .chat
+            case .fitness, .education, .voice, .chat:
+                return tab
+            }
         }
         switch tab {
-        case .fitness, .education: return .home
-        default: return tab
+        case .fitness, .education:
+            return .home
+        case .home, .voice, .chat:
+            return tab
         }
     }
 }
@@ -46,7 +53,8 @@ final class AppNavigationStore: ObservableObject {
 
     /// Keep `selectedTab` inside the tabs the current auth state actually shows.
     /// Call this in the same turn as `AuthStore.session` changes; `onChange` is
-    /// too late (the TabView has already laid out).
+    /// too late (the TabView has already laid out). Voice stays put. It is a
+    /// legal tab before and after sign-in. Signing out still lands on Home.
     func adoptAccess(fullAccess: Bool) {
         if fullAccess {
             if selectedTab == .home {
@@ -287,30 +295,37 @@ struct RootTabView: View {
     private var tabSelection: Binding<RootTab> {
         Binding(
             get: { RootTab.clamped(nav.selectedTab, fullAccess: auth.hasFullAccess) },
-            set: { nav.selectedTab = $0 }
+            set: { newTab in
+                // Coming back from another tab is a tap on the Home icon.
+                // A re-tap of the selected Home tab goes through TabReselectObserver.
+                if newTab == .education, nav.selectedTab != .education {
+                    educationFocus.homeAccountPresented = false
+                }
+                nav.selectedTab = newTab
+            }
         )
     }
 
-    /// Same tabs as before. Chat is the iOS 27 prominent slot so it sits in
-    /// its own circle on the trailing edge.
+    /// Fitness, Home, Voice, then Chat. Chat is the iOS 27 prominent slot so
+    /// it sits in its own circle on the trailing edge. Home keeps the house icon.
     private var phoneTabView: some View {
         TabView(selection: tabSelection) {
             if auth.hasFullAccess {
-                Tab("Account", systemImage: "person.crop.circle", value: RootTab.account) {
-                    AccountView()
-                }
                 Tab("Fitness", systemImage: "dumbbell.fill", value: RootTab.fitness) {
                     GymView()
                 }
                 Tab(educationTabTitle, systemImage: "house.fill", value: RootTab.education) {
                     EducationView()
                 }
+                Tab("Voice", systemImage: "waveform", value: RootTab.voice) {
+                    VoiceView()
+                }
             } else {
                 Tab("Home", systemImage: "house.fill", value: RootTab.home) {
                     HomeView()
                 }
-                Tab("Account", systemImage: "person.crop.circle", value: RootTab.account) {
-                    AccountView()
+                Tab("Voice", systemImage: "waveform", value: RootTab.voice) {
+                    VoiceView()
                 }
             }
             if #available(iOS 27, *) {
@@ -334,26 +349,26 @@ struct RootTabView: View {
         }
     }
 
-    /// Same tabs as phone, without the prominent Chat circle. iPad uses the
-    /// compact top tab bar; the giant sidebar stays available via the toggle.
+    /// Same order as the phone, without the prominent Chat circle. iPad uses the
+    /// compact top tab bar. The giant sidebar stays available via the toggle.
     private var padTabView: some View {
         TabView(selection: tabSelection) {
             if auth.hasFullAccess {
-                Tab("Account", systemImage: "person.crop.circle", value: RootTab.account) {
-                    AccountView()
-                }
                 Tab("Fitness", systemImage: "dumbbell.fill", value: RootTab.fitness) {
                     GymView()
                 }
                 Tab(educationTabTitle, systemImage: "house.fill", value: RootTab.education) {
                     EducationView()
                 }
+                Tab("Voice", systemImage: "waveform", value: RootTab.voice) {
+                    VoiceView()
+                }
             } else {
                 Tab("Home", systemImage: "house.fill", value: RootTab.home) {
                     HomeView()
                 }
-                Tab("Account", systemImage: "person.crop.circle", value: RootTab.account) {
-                    AccountView()
+                Tab("Voice", systemImage: "waveform", value: RootTab.voice) {
+                    VoiceView()
                 }
             }
             Tab(
@@ -367,14 +382,14 @@ struct RootTabView: View {
         .defaultAdaptableTabBarPlacement(.tabBar)
     }
 
-    /// Full-access sessions open on Chat; tab bar order is Account → Fitness → Education.
+    /// Full-access sessions open on Chat. Tab order is Fitness, Home, Voice, Chat.
     private func applyAuthorizedDefaultIfNeeded() {
         guard auth.hasFullAccess, !didApplyAuthorizedDefault else { return }
         didApplyAuthorizedDefault = true
         nav.consumePendingOpenTodoIfNeeded()
         nav.consumePendingOpenClassIfNeeded()
         nav.consumePendingOpenChatIfNeeded()
-        // Keep Account/Chat if the user is mid sign-in or already browsing
+        // Keep Voice or Chat if the user is mid sign-in or already browsing
         // (lock-screen Chat or a widget todo tap). Only rewrite leftover Home.
         if nav.selectedTab == .home {
             nav.selectedTab = .chat

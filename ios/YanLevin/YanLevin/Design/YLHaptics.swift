@@ -77,6 +77,25 @@ enum YLHaptics {
         playImpact(.soft, intensity: 0.92)
     }
 
+    /// First sound of a voice turn. One soft impact, the same generator as
+    /// `machineSwipeHalfway`. Play when audio actually starts, not when the
+    /// request is sent. Not `startBusyPulse`.
+    static func voiceFirstSound() {
+        playImpact(.soft, intensity: 0.92)
+    }
+
+    /// Spoken answer starts. One medium impact. Same generator as `medium`,
+    /// played as the answer audio begins.
+    static func voiceAnswer() {
+        medium()
+    }
+
+    /// Voice summary landed while this device is in the foreground. One soft
+    /// impact. Skip the call if the app is backgrounded or the device is off.
+    static func voiceSaved() {
+        playImpact(.soft)
+    }
+
     /// Warm the soft generator as a machine-title drag begins.
     static func prepareMachineSwipe() {
         HapticHost.shared.attach()

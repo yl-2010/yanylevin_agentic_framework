@@ -79,6 +79,13 @@ import {
   resumeAgent,
   markAgentChatRead,
   resolveChatUploadFile,
+  startVoiceSession,
+  voiceUtterance,
+  voiceState,
+  voiceAudio,
+  voiceDormant,
+  voiceResume,
+  voiceHeartbeat,
   ensureAgentWorker,
   startAgentWorkerBridge,
   startAgentWorkerWatchdog,
@@ -1081,6 +1088,116 @@ app.post("/api/home/agent/start", requireHomeUser, async (req, res) => {
     res.status(err.status || 500).json({
       ok: false,
       error: err.message || "agent start failed",
+    });
+  }
+});
+
+app.post("/api/home/agent/voice/start", requireHomeUser, async (req, res) => {
+  try {
+    const result = await startVoiceSession(req.user.email, { device: req.body?.device });
+    res.setHeader("Cache-Control", "no-store");
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/home/agent/voice/start]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "voice start failed",
+    });
+  }
+});
+
+app.post("/api/home/agent/voice/utterance", requireHomeUser, async (req, res) => {
+  try {
+    const result = await voiceUtterance(req.user.email, req.body || {});
+    res.setHeader("Cache-Control", "no-store");
+    res.status(202).json(result);
+  } catch (err) {
+    console.error("[/api/home/agent/voice/utterance]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "voice utterance failed",
+    });
+  }
+});
+
+app.get("/api/home/agent/voice/state", requireHomeUser, async (req, res) => {
+  try {
+    const result = await voiceState(req.user.email, {
+      sessionId: req.query?.sessionId,
+      after: req.query?.after,
+    });
+    res.setHeader("Cache-Control", "no-store");
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/home/agent/voice/state]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "voice state failed",
+    });
+  }
+});
+
+app.get("/api/home/agent/voice/audio", requireHomeUser, async (req, res) => {
+  try {
+    const result = await voiceAudio(req.user.email, {
+      sessionId: req.query?.sessionId,
+      chunkId: req.query?.chunkId,
+    });
+    if (!result?.audioBase64) {
+      res.status(404).json({ ok: false, error: "audio not found" });
+      return;
+    }
+    res.setHeader("Content-Type", result.mime || "audio/pcm");
+    if (result.sampleRate) res.setHeader("X-Sample-Rate", String(result.sampleRate));
+    res.setHeader("Cache-Control", "no-store");
+    res.send(Buffer.from(result.audioBase64, "base64"));
+  } catch (err) {
+    console.error("[/api/home/agent/voice/audio]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "voice audio failed",
+    });
+  }
+});
+
+app.post("/api/home/agent/voice/dormant", requireHomeUser, async (req, res) => {
+  try {
+    const result = await voiceDormant(req.user.email, req.body || {});
+    res.setHeader("Cache-Control", "no-store");
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/home/agent/voice/dormant]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "voice dormant failed",
+    });
+  }
+});
+
+app.post("/api/home/agent/voice/resume", requireHomeUser, async (req, res) => {
+  try {
+    const result = await voiceResume(req.user.email, req.body || {});
+    res.setHeader("Cache-Control", "no-store");
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/home/agent/voice/resume]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "voice resume failed",
+    });
+  }
+});
+
+app.post("/api/home/agent/voice/heartbeat", requireHomeUser, async (req, res) => {
+  try {
+    const result = await voiceHeartbeat(req.user.email, req.body || {});
+    res.setHeader("Cache-Control", "no-store");
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/home/agent/voice/heartbeat]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "voice heartbeat failed",
     });
   }
 });

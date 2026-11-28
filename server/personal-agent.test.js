@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,8 +64,15 @@ import {
   composeTurnPrompt,
   liveContextSections,
   getAgentState,
+  getActiveAgent,
+  startAgent,
+  claimsChatFocus,
+  installAgentSessionForTests,
+  discardAgentSessionForTests,
+  persistSessionHistoryForTests,
 } from "./personal-agent.js";
 import { persistChatHistory } from "./home-chat-history.js";
+import { chatHistoryAbsDir } from "./onedrive-projects.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const YAN = "you@example.com";
@@ -194,12 +201,34 @@ describe("Personal Agent models", () => {
       "false"
     );
   });
+
+  it("lets modelLock beat the mention ladder", () => {
+    const composer = guestTurnModelSpec(
+      {
+        modelLock: "composer",
+        imessageDeliverFinal: true,
+        workspace: "jype",
+        guestCaller: null,
+      },
+      false
+    );
+    assert.equal(composer.id, "composer-2.5");
+    const grok = guestTurnModelSpec(
+      {
+        modelLock: "grok",
+        teamsDeliverFinal: true,
+        guestCaller: null,
+      },
+      false
+    );
+    assert.equal(grok.id, "grok-4.7");
+  });
 });
 
 describe("Personal Agent system prompt", () => {
   it("stays slim and points at on-demand files instead of dumping recipes", () => {
     const prompt = systemPrompt(YAN);
-    assert.ok(prompt.length < 10085, `prompt length ${prompt.length}`);
+    assert.ok(prompt.length < 10608, `prompt length ${prompt.length}`);
     assert.match(prompt, /Personal Agent/);
     assert.match(prompt, /schedule_future_agent/);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.futureAgents));
@@ -208,6 +237,7 @@ describe("Personal Agent system prompt", () => {
     assert.ok(prompt.includes(UNSLOP_SKILL_PATH));
     assert.ok(prompt.includes(FOUR11_SKILL_PATH));
     assert.match(prompt, /Always Read and apply the unslop skill/);
+    assert.match(prompt, /message_agent/);
     assert.match(prompt, /Never mention the surprise hoodies to Alex/);
     assert.match(prompt, /Third-party models \(Opus, Fable, Sonnet\) are allowed only when this message is from Yan/);
     assert.match(prompt, /Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor/);
@@ -256,7 +286,7 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /images has no pixels/);
     assert.match(prompt, /existing Word, Excel, or PowerPoint/);
     assert.match(prompt, /School Outlook still cannot send/);
-    assert.ok(prompt.length < 10085, `prompt length ${prompt.length}`);
+    assert.ok(prompt.length < 10608, `prompt length ${prompt.length}`);
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.chats));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.location));
     assert.ok(prompt.includes(PERSONAL_SKILL_PATHS.lifeState));
@@ -299,6 +329,7 @@ describe("Personal Agent system prompt", () => {
     assert.match(prompt, /JYPE agent/);
     assert.match(prompt, /Do not copy Yan's personal \/home sites onto JYPE/);
     assert.match(prompt, /npm run deploy:web yourself/);
+    assert.match(prompt, /message_agent/);
     assert.match(prompt, /Never mention the surprise hoodies to Alex/);
     assert.match(prompt, /Third-party models \(Opus, Fable, Sonnet\) are allowed only when this message is from Yan/);
     assert.match(prompt, /Yan's course percent, letter, and assignment scores do not go to Example Friend, Example Neighbor/);
@@ -1127,6 +1158,34 @@ describe("ephemeral @agent chats", () => {
     assert.equal(jype.ephemeralPinned, true);
     assert.equal(shouldPersistChatEphemeral(jype), false);
   });
+
+  it("hides orchestrator and subagent threads unless they are pinned", () => {
+    assert.equal(
+      shouldPersistChatEphemeral({
+        workspace: "jype",
+        role: "orchestrator",
+        ephemeralPinned: false,
+      }),
+      true
+    );
+    assert.equal(
+      shouldPersistChatEphemeral({
+        workspace: "jype",
+        role: "orchestrator",
+        ephemeralPinned: true,
+      }),
+      false
+    );
+    assert.equal(shouldPersistChatEphemeral({ workspace: "jype" }), false);
+    assert.equal(
+      shouldPersistChatEphemeral({ role: "subagent", ephemeralPinned: true }),
+      false
+    );
+    assert.equal(
+      shouldPersistChatEphemeral({ role: "subagent", ephemeralPinned: false }),
+      true
+    );
+  });
 });
 
 describe("Personal Agent turn mode", () => {
@@ -1378,6 +1437,29 @@ describe("formatVisibleTranscript", () => {
     assert.doesNotMatch(text, /line 0/);
     assert.match(text, /line 4/);
     assert.doesNotMatch(text, /in-flight bubble/);
+  });
+
+  it("names the sender session in the replay and keeps it out of the bubble", () => {
+    const row = stampMessage("user", 'From "Orchestrator: Chat":\n\ncheck the lab', null, {
+      mailFrom: "parent-session-id",
+    });
+    assert.equal(row.mailFrom, "parent-session-id");
+    assert.doesNotMatch(row.content, /parent-session-id/);
+    const snap = snapshotMessages({
+      messages: [row],
+      turnQueue: [
+        { bubble: 'From "Subagent: Chat":\n\ndone', mailFrom: "parent-session-id", queueId: "q-mail" },
+      ],
+    });
+    assert.equal(snap[0].mailFrom, "parent-session-id");
+    assert.equal(snap[1].mailFrom, "parent-session-id");
+    assert.doesNotMatch(snap[0].content, /parent-session-id/);
+    const text = formatVisibleTranscript(
+      { messages: [row, stampMessage("assistant", "ok")] },
+      ""
+    );
+    assert.match(text, /Mail from session parent-session-id\./);
+    assert.match(text, /From "Orchestrator: Chat":/);
   });
 });
 
@@ -1802,6 +1884,71 @@ describe("getAgentState after the in-memory session is gone", () => {
       assert.equal(again.messages.length, 2);
     } finally {
       await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("voice scratch and focus", () => {
+  const fakeAgent = { send() { throw new Error("voice test should not send"); } };
+
+  it("hides scratch rows from getAgentState", async () => {
+    const sid = "voice-scratch-rows";
+    installAgentSessionForTests(sid, {
+      email: YAN,
+      voiceMode: true,
+      status: "idle",
+      messages: [
+        stampMessage("user", "move the calc homework", null, { scratch: true }),
+        stampMessage("assistant", "Moved it to Friday", null, { scratch: true }),
+        stampMessage("user", "typed later", null),
+      ],
+      turnQueue: [{ scratch: true, bubble: "still talking", queueId: "q1" }],
+      uploads: [],
+    });
+    try {
+      const state = await getAgentState(sid, YAN);
+      assert.equal(state.messages.length, 1);
+      assert.equal(state.messages[0].content, "typed later");
+      assert.equal(state.messages.some((m) => m.content.includes("Friday")), false);
+    } finally {
+      discardAgentSessionForTests(sid);
+    }
+  });
+
+  it("does not write a chat file while voiceMode is set", async () => {
+    const sid = "voice-no-history-file";
+    installAgentSessionForTests(sid, {
+      email: YAN,
+      voiceMode: true,
+      status: "idle",
+      messages: [stampMessage("user", "what is due tomorrow", null, { scratch: true })],
+      turnQueue: [],
+      uploads: [],
+    });
+    try {
+      await persistSessionHistoryForTests(sid);
+      const file = join(chatHistoryAbsDir(YAN), `${sid}.md`);
+      await assert.rejects(access(file));
+    } finally {
+      discardAgentSessionForTests(sid);
+    }
+  });
+
+  it("leaves the website active chat alone", async () => {
+    const web = await startAgent(YAN, { agent: fakeAgent });
+    const voice = await startAgent(YAN, {
+      agent: fakeAgent,
+      skipFocus: true,
+      voice: true,
+    });
+    try {
+      assert.equal(getActiveAgent(YAN).sessionId, web.sessionId);
+      assert.notEqual(voice.sessionId, web.sessionId);
+      assert.equal(claimsChatFocus({ voiceMode: true }), false);
+      assert.equal(claimsChatFocus({ voiceMode: false }), true);
+    } finally {
+      discardAgentSessionForTests(voice.sessionId);
+      discardAgentSessionForTests(web.sessionId);
     }
   });
 });

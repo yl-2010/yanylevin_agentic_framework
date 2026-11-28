@@ -86,6 +86,71 @@ export async function chatCompletions({
 }
 
 /**
+ * Stream a short completion. Yields text deltas.
+ * The voice session uses this for the spoken answer, with a small max_tokens.
+ * @param {object} opts
+ * @param {Array<{role: string, content: string}>} opts.messages
+ * @param {number} [opts.temperature]
+ * @param {number} [opts.maxTokens]
+ * @param {AbortSignal} [opts.signal]
+ * @returns {AsyncGenerator<string>}
+ */
+export async function* streamChatCompletions({
+  messages,
+  temperature = 0.3,
+  maxTokens = 80,
+  signal,
+} = {}) {
+  const { baseUrl, model } = getLmStudioConfig();
+  const res = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+      stream: true,
+    }),
+    signal,
+  });
+  if (!res.ok || !res.body) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `LM Studio stream error ${res.status}: ${text.slice(0, 240) || res.statusText}`
+    );
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        const data = trimmed.slice(5).trim();
+        if (!data || data === "[DONE]") continue;
+        let json;
+        try {
+          json = JSON.parse(data);
+        } catch {
+          continue;
+        }
+        const delta = json?.choices?.[0]?.delta?.content;
+        if (typeof delta === "string" && delta) yield delta;
+      }
+    }
+  } finally {
+    reader.releaseLock?.();
+  }
+}
+
+/**
  * Lightweight reachability check for /health.
  * @param {{ baseUrl?: string, model?: string }} [opts]
  */

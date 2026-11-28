@@ -14,6 +14,7 @@ import {
   resolveChatStarter,
   sanitizeChatTitle,
   scheduledTaskFromUserMessage,
+  withRoleTitlePrefix,
   withScheduledTitlePrefix,
 } from "./home-chat-history.js";
 
@@ -39,6 +40,7 @@ export const TITLE_PROMPT = `Reply with only a short chat list title for this fi
 ${CHAT_TITLE_STYLE}
 Do not prefix the title with a person's name or Name:. The server adds that when needed.
 Do not prefix the title with Scheduled:. The server adds that on a future agent thread.
+Do not prefix the title with Orchestrator: or Subagent:. The server adds those.
 If this is a Teams or iMessage @agent ping, title the request, not the From Name on Teams/iMessage wrapper or the @agent mention.
 If the message starts with "Agent scheduled for", title the task under that line, not the date.
 
@@ -75,6 +77,10 @@ function isScheduledThread(loaded, firstUserMessage) {
 }
 
 function storeChatTitle(title, loaded, firstUserMessage, starterOpts) {
+  const role = String(loaded?.role || "").trim().toLowerCase();
+  if (role === "orchestrator" || role === "subagent") {
+    return withRoleTitlePrefix(role, title);
+  }
   if (isScheduledThread(loaded, firstUserMessage)) {
     return withScheduledTitlePrefix(title);
   }

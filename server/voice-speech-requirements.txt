@@ -1,0 +1,8 @@
+# Local packages for server/voice-speech.py on the Mac Studio.
+# The venv lives under Application Support, next to the weights, not in git.
+# These are not a hosted speech API. Runtime sets HF_HUB_OFFLINE=1.
+torch
+nemo_toolkit[asr]>=2.2.0
+kokoro>=0.9.4
+numpy
+huggingface_hub>=0.26

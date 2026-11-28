@@ -87,6 +87,9 @@ final class EducationFocusStore: ObservableObject {
     @Published var path: [EducationRoute] = []
     /// Visible Education page is within a few points of the top.
     @Published var visiblePageIsAtTop = true
+    /// Signed-in Account, opened from the blank space beside the Home title.
+    /// The Home tab stays selected. The Home icon clears this.
+    @Published var homeAccountPresented = false
     @Published var scrollToTopGeneration = 0
     @Published var filePreviewPresented = false
     @Published var filePreviewDismissGeneration = 0
@@ -125,6 +128,10 @@ final class EducationFocusStore: ObservableObject {
     }
 
     func handleTabReselect() {
+        if homeAccountPresented {
+            homeAccountPresented = false
+            return
+        }
         if filePreviewPresented {
             filePreviewDismissGeneration += 1
             return

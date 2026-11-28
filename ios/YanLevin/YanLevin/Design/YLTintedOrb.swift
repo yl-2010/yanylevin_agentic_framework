@@ -2,9 +2,11 @@ import SwiftUI
 import ThinkingOrbsKit
 import UIKit
 
-/// ThinkingOrbsKit `.working` orb painted in the chat tint instead of greys,
-/// using the web engine's `inkColor` ramp (toward black on dark, toward white on light).
+/// ThinkingOrbsKit orb painted in the chat tint instead of greys.
+/// Ink ramps toward black on dark and toward white on light, same as the web engine.
+/// `state` defaults to `.working` so the chat Working bubble stays on that mode.
 struct YLTintedOrb: View {
+    var state: OrbState = .working
     let size: CGFloat
 
     @Environment(\.colorScheme) private var colorScheme
@@ -16,7 +18,7 @@ struct YLTintedOrb: View {
     private static let reducedMotionT: Double = 0.6
 
     var body: some View {
-        let preset = resolvePreset(.working, Self.tuned)
+        let preset = resolvePreset(state, Self.tuned)
         let tint = Self.rgb(YLTheme.chatSend(colorScheme, palette: palette))
         let dark = colorScheme == .dark
         Group {

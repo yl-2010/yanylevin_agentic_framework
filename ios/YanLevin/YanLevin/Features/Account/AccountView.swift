@@ -33,7 +33,7 @@ struct AccountView: View {
                 .adaptiveReadableWidth(AdaptiveLayout.formMaxWidth)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .tabReselectScrollToTop(for: .account)
+            .tabReselectScrollToTop(for: .voice)
             .ylPageBackground()
             .navigationTitle("Account")
             .navigationBarTitleDisplayMode(.large)

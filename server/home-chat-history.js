@@ -31,6 +31,16 @@ export const CHAT_HISTORY_READ_FILENAME = ".read.json";
 export const TITLE_MAX = 40;
 /** History titles for future agents. The prefix sits outside TITLE_MAX. */
 export const SCHEDULED_TITLE_PREFIX = "Scheduled: ";
+/** Orchestrator thread titles. The prefix sits outside TITLE_MAX. */
+export const ORCHESTRATOR_TITLE_PREFIX = "Orchestrator: ";
+/** Subagent thread titles. The prefix sits outside TITLE_MAX. */
+export const SUBAGENT_TITLE_PREFIX = "Subagent: ";
+
+const TITLE_ROLE_PREFIXES = [
+  SCHEDULED_TITLE_PREFIX,
+  ORCHESTRATOR_TITLE_PREFIX,
+  SUBAGENT_TITLE_PREFIX,
+];
 const PREVIEW_MAX = 80;
 const RECENT_LIMIT = 12;
 const LIST_MAX = 500;
@@ -206,14 +216,26 @@ function clampChatTitle(s, max) {
   return s;
 }
 
+/**
+ * Scheduled, Orchestrator, and Subagent sit outside TITLE_MAX.
+ * An empty tail after the prefix is not a title.
+ * @param {string} s
+ * @returns {string|null} null when s has none of those prefixes
+ */
+function sanitizePrefixedChatTitle(s) {
+  for (const prefix of TITLE_ROLE_PREFIXES) {
+    const lead = prefix.trimEnd();
+    if (!s.toLowerCase().startsWith(lead.toLowerCase())) continue;
+    const rest = clampChatTitle(s.slice(lead.length).trim(), TITLE_MAX);
+    return rest ? `${prefix}${rest}` : "";
+  }
+  return null;
+}
+
 export function sanitizeChatTitle(raw) {
   const s = normalizeChatTitle(raw);
-  const lead = `${SCHEDULED_TITLE_PREFIX.toLowerCase()}`;
-  if (s.toLowerCase().startsWith(lead)) {
-    const rest = s.slice(SCHEDULED_TITLE_PREFIX.length).trim();
-    const bare = clampChatTitle(rest, TITLE_MAX);
-    return bare ? `${SCHEDULED_TITLE_PREFIX}${bare}` : "";
-  }
+  const prefixed = sanitizePrefixedChatTitle(s);
+  if (prefixed !== null) return prefixed;
   return clampChatTitle(s, TITLE_MAX);
 }
 
@@ -226,6 +248,42 @@ export function withScheduledTitlePrefix(title) {
   if (s.startsWith(SCHEDULED_TITLE_PREFIX)) return s;
   const bare = clampChatTitle(s, TITLE_MAX) || "Agent";
   return `${SCHEDULED_TITLE_PREFIX}${bare}`;
+}
+
+/**
+ * Drop one leading Scheduled, Orchestrator, or Subagent prefix.
+ * @param {string} title
+ */
+function stripLeadingRoleTitlePrefix(title) {
+  const s = String(title || "").trim();
+  for (const prefix of TITLE_ROLE_PREFIXES) {
+    const lead = prefix.trimEnd();
+    if (!s.toLowerCase().startsWith(lead.toLowerCase())) continue;
+    return s.slice(lead.length).trim();
+  }
+  return s;
+}
+
+/**
+ * Orchestrator: or Subagent: on a thread title.
+ * A subagent role uses Subagent. Every other role uses Orchestrator.
+ * Existing role prefixes are stripped first so they do not stack.
+ * @param {unknown} role
+ * @param {unknown} title
+ */
+export function withRoleTitlePrefix(role, title) {
+  let s = normalizeChatTitle(title);
+  for (let i = 0; i < TITLE_ROLE_PREFIXES.length + 1; i++) {
+    const next = stripLeadingRoleTitlePrefix(s);
+    if (next === s) break;
+    s = next;
+  }
+  const bare = clampChatTitle(s, TITLE_MAX) || "Chat";
+  const prefix =
+    String(role || "").trim().toLowerCase() === "subagent"
+      ? SUBAGENT_TITLE_PREFIX
+      : ORCHESTRATOR_TITLE_PREFIX;
+  return `${prefix}${bare}`;
 }
 
 /**
@@ -342,7 +400,13 @@ export function prefixChatTitle(title, starter) {
 export function applyChatTitleStarter(title, opts = {}) {
   const resolved = resolveChatStarter(opts);
   let t = sanitizeChatTitle(title);
-  if (t.startsWith(SCHEDULED_TITLE_PREFIX)) return t;
+  if (
+    t.startsWith(SCHEDULED_TITLE_PREFIX) ||
+    t.startsWith(ORCHESTRATOR_TITLE_PREFIX) ||
+    t.startsWith(SUBAGENT_TITLE_PREFIX)
+  ) {
+    return t;
+  }
   if (resolved) {
     return prefixChatTitle(stripChatTitlePrefix(t, resolved), resolved);
   }
@@ -388,6 +452,92 @@ export function sanitizeChatEphemeralAt(raw) {
 }
 
 /**
+ * orchestrator or subagent. Anything else is omitted.
+ * @param {unknown} raw
+ * @returns {'orchestrator'|'subagent'|''}
+ */
+function sanitizeChatRole(raw) {
+  const s = String(raw || "").trim().toLowerCase();
+  if (s === "orchestrator" || s === "subagent") return s;
+  return "";
+}
+
+/**
+ * family or open. Anything else is omitted.
+ * @param {unknown} raw
+ * @returns {'family'|'open'|''}
+ */
+function sanitizeMailScope(raw) {
+  const s = String(raw || "").trim().toLowerCase();
+  if (s === "family" || s === "open") return s;
+  return "";
+}
+
+/**
+ * composer or grok. Anything else is omitted.
+ * @param {unknown} raw
+ * @returns {'composer'|'grok'|''}
+ */
+function sanitizeModelLock(raw) {
+  const s = String(raw || "").trim().toLowerCase();
+  if (s === "composer" || s === "grok") return s;
+  return "";
+}
+
+/**
+ * One header token. No spaces.
+ * @param {unknown} raw
+ * @param {number} [max]
+ */
+function sanitizeHeaderToken(raw, max = 200) {
+  const s = String(raw ?? "").trim();
+  if (!s || s.length > max || /\s/.test(s)) return "";
+  return s;
+}
+
+/**
+ * Orchestrator key. Colons stay. The whole remainder of the line is the key.
+ * @param {unknown} raw
+ */
+function sanitizeOrchestratorKey(raw) {
+  const s = String(raw ?? "")
+    .replace(/[\r\n\0]/g, "")
+    .trim();
+  return s;
+}
+
+/**
+ * Session ids, comma-separated, no spaces.
+ * @param {unknown} raw
+ * @returns {string[]}
+ */
+function sanitizeChildren(raw) {
+  const parts = Array.isArray(raw) ? raw : String(raw || "").split(",");
+  /** @type {string[]} */
+  const out = [];
+  for (const part of parts) {
+    const sid = sanitizeSessionId(part);
+    if (!sid || out.includes(sid)) continue;
+    out.push(sid);
+  }
+  return out;
+}
+
+/**
+ * mail-from sits on the line under a User heading. Only a real session id counts.
+ * @param {unknown} raw
+ * @returns {{ mailFrom: string, body: string }}
+ */
+function takeMailFrom(raw) {
+  const text = String(raw || "");
+  const m = text.match(/^mail-from:\s+(\S+)[ \t]*(?:\r?\n)*/);
+  if (!m) return { mailFrom: "", body: text };
+  const mailFrom = sanitizeSessionId(m[1]);
+  if (!mailFrom) return { mailFrom: "", body: text };
+  return { mailFrom, body: text.slice(m[0].length) };
+}
+
+/**
  * Hide an ephemeral thread from the UI list once it has sat idle.
  * ephemeralAt is the hide_chat_soon clock. Teams and iMessage files omit
  * that line and use updated. Working sessions stay listed.
@@ -419,6 +569,13 @@ export function chatHistoryIsEphemeralHidden(row, now = new Date(), workingIds) 
  *   title?: string,
  *   visibility?: string,
  *   ephemeral?: boolean,
+ *   role?: string,
+ *   cursorAgent?: string,
+ *   parentSession?: string,
+ *   mailScope?: string,
+ *   modelLock?: string,
+ *   orchestratorKey?: string,
+ *   children?: string[]|string,
  * }} opts
  */
 export function formatChatHistoryMarkdown(opts) {
@@ -458,12 +615,31 @@ export function formatChatHistoryMarkdown(opts) {
     const status = String(opts.scheduledStatus || "").trim();
     if (status) lines.push(`scheduledStatus: ${status}`);
   }
+  const role = sanitizeChatRole(opts?.role);
+  const cursorAgent = sanitizeHeaderToken(opts?.cursorAgent);
+  const parentSession = sanitizeSessionId(opts?.parentSession);
+  const mailScope = sanitizeMailScope(opts?.mailScope);
+  const modelLock = sanitizeModelLock(opts?.modelLock);
+  const orchestratorKey = sanitizeOrchestratorKey(opts?.orchestratorKey);
+  const children = sanitizeChildren(opts?.children);
+  if (role) lines.push(`role: ${role}`);
+  if (cursorAgent) lines.push(`cursorAgent: ${cursorAgent}`);
+  if (parentSession) lines.push(`parentSession: ${parentSession}`);
+  if (mailScope) lines.push(`mailScope: ${mailScope}`);
+  if (modelLock) lines.push(`modelLock: ${modelLock}`);
+  if (orchestratorKey) lines.push(`orchestratorKey: ${orchestratorKey}`);
+  if (children.length) lines.push(`children: ${children.join(",")}`);
   lines.push("");
   for (const m of messages) {
     if (!m || (m.role !== "user" && m.role !== "assistant")) continue;
     const who = m.role === "assistant" ? "Assistant" : "User";
     const at = m.at ? isoOrNow(m.at) : updatedAt;
     lines.push(`## ${who} — ${at}`);
+    const mailFrom = who === "User" ? sanitizeSessionId(m.mailFrom) : "";
+    if (mailFrom) {
+      lines.push(`mail-from: ${mailFrom}`);
+      lines.push("");
+    }
     lines.push(messageBody(m.content));
     const fileFence = m.role === "user" ? formatChatFilesFence(m.files) : "";
     if (fileFence) {
@@ -497,6 +673,13 @@ export function formatChatHistoryMarkdown(opts) {
  *   scheduled: boolean,
  *   scheduledRunAt: string,
  *   scheduledStatus: string,
+ *   role: ''|'orchestrator'|'subagent',
+ *   cursorAgent: string,
+ *   parentSession: string,
+ *   mailScope: ''|'family'|'open',
+ *   modelLock: ''|'composer'|'grok',
+ *   orchestratorKey: string,
+ *   children: string[],
  * }}
  */
 export function parseChatHistoryMeta(markdown) {
@@ -504,6 +687,11 @@ export function parseChatHistoryMeta(markdown) {
   const field = (key) => {
     const m = text.match(new RegExp(`^${key}:\\s+(\\S+)`, "m"));
     return m ? m[1] : "";
+  };
+  // Rest of the line. Colons in orchestratorKey belong to the key.
+  const rest = (key) => {
+    const m = text.match(new RegExp(`^${key}:\\s+(.+)$`, "m"));
+    return m ? m[1].trim() : "";
   };
   const titleMatch = text.match(/^title:\s+(.+)$/m);
   let preview = "";
@@ -513,7 +701,8 @@ export function parseChatHistoryMeta(markdown) {
     const body = after.split("\n").slice(1).join("\n");
     const nextHeading = body.search(/^## /m);
     const chunk = (nextHeading >= 0 ? body.slice(0, nextHeading) : body).trim();
-    const shown = splitChatMessageFiles(chunk);
+    const mailed = takeMailFrom(chunk);
+    const shown = splitChatMessageFiles(mailed.body.trim());
     preview = (shown.content || shown.files[0]?.name || "")
       .replace(/\s+/g, " ")
       .slice(0, PREVIEW_MAX);
@@ -532,6 +721,13 @@ export function parseChatHistoryMeta(markdown) {
     scheduled: field("scheduled") === "true",
     scheduledRunAt: field("scheduledRunAt"),
     scheduledStatus: field("scheduledStatus"),
+    role: sanitizeChatRole(field("role")),
+    cursorAgent: sanitizeHeaderToken(field("cursorAgent")),
+    parentSession: sanitizeSessionId(field("parentSession")),
+    mailScope: sanitizeMailScope(field("mailScope")),
+    modelLock: sanitizeModelLock(field("modelLock")),
+    orchestratorKey: sanitizeOrchestratorKey(rest("orchestratorKey")),
+    children: sanitizeChildren(field("children")),
     preview,
   };
 }
@@ -540,11 +736,11 @@ const MESSAGE_HEADING_RE = /^## (User|Assistant) — (.+)$/gm;
 
 /**
  * @param {string} markdown
- * @returns {{ role: 'user'|'assistant', content: string, at: string, widgets?: object[] }[]}
+ * @returns {{ role: 'user'|'assistant', content: string, at: string, widgets?: object[], mailFrom?: string }[]}
  */
 export function parseChatHistoryMessages(markdown) {
   const text = String(markdown || "");
-  /** @type {{ role: 'user'|'assistant', content: string, at: string, widgets?: object[] }[]} */
+  /** @type {{ role: 'user'|'assistant', content: string, at: string, widgets?: object[], mailFrom?: string }[]} */
   const messages = [];
   const matches = [...text.matchAll(MESSAGE_HEADING_RE)];
   for (let i = 0; i < matches.length; i++) {
@@ -553,8 +749,10 @@ export function parseChatHistoryMessages(markdown) {
     const at = isoOrNow(m[2]);
     const start = (m.index || 0) + m[0].length;
     const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
-    const body = text.slice(start, end).replace(/^\r?\n/, "").trim();
+    const rawBody = text.slice(start, end).replace(/^\r?\n/, "");
     const role = who === "Assistant" ? "assistant" : "user";
+    const mailed = role === "user" ? takeMailFrom(rawBody) : { mailFrom: "", body: rawBody };
+    const body = mailed.body.trim();
     if (role === "assistant") {
       const parsed = parseAgentReply(body);
       /** @type {{ role: 'user'|'assistant', content: string, at: string, widgets?: object[] }} */
@@ -569,12 +767,13 @@ export function parseChatHistoryMessages(markdown) {
       messages.push(row);
     } else {
       const shown = splitChatMessageFiles(body);
-      /** @type {{ role: 'user'|'assistant', content: string, at: string, files?: { name: string, mimeType: string }[] }} */
+      /** @type {{ role: 'user'|'assistant', content: string, at: string, files?: { name: string, mimeType: string }[], mailFrom?: string }} */
       const row = {
         role,
         content: shown.content || (shown.files.length ? "" : "(empty)"),
         at,
       };
+      if (mailed.mailFrom) row.mailFrom = mailed.mailFrom;
       if (shown.files.length) row.files = shown.files;
       messages.push(row);
     }
@@ -916,6 +1115,17 @@ export async function persistChatHistory(opts) {
   let scheduledStatus = String(opts?.scheduledStatus || "").trim();
   let keepEphemeralAt = "";
   const stampEphemeralClock = opts?.stampEphemeralClock === true;
+  const provided = (key) =>
+    Boolean(opts && Object.prototype.hasOwnProperty.call(opts, key));
+  let role = provided("role") ? sanitizeChatRole(opts.role) : null;
+  let cursorAgent = provided("cursorAgent") ? sanitizeHeaderToken(opts.cursorAgent) : null;
+  let parentSession = provided("parentSession") ? sanitizeSessionId(opts.parentSession) : null;
+  let mailScope = provided("mailScope") ? sanitizeMailScope(opts.mailScope) : null;
+  let modelLock = provided("modelLock") ? sanitizeModelLock(opts.modelLock) : null;
+  let orchestratorKey = provided("orchestratorKey")
+    ? sanitizeOrchestratorKey(opts.orchestratorKey)
+    : null;
+  let children = provided("children") ? sanitizeChildren(opts.children) : null;
   try {
     const existing = await readFile(abs, "utf8");
     const meta = parseChatHistoryMeta(existing);
@@ -929,9 +1139,23 @@ export async function persistChatHistory(opts) {
     if (scheduled == null) scheduled = meta.scheduled;
     if (!scheduledRunAt) scheduledRunAt = meta.scheduledRunAt;
     if (!scheduledStatus) scheduledStatus = meta.scheduledStatus;
+    if (role == null) role = meta.role;
+    if (cursorAgent == null) cursorAgent = meta.cursorAgent;
+    if (parentSession == null) parentSession = meta.parentSession;
+    if (mailScope == null) mailScope = meta.mailScope;
+    if (modelLock == null) modelLock = meta.modelLock;
+    if (orchestratorKey == null) orchestratorKey = meta.orchestratorKey;
+    if (children == null) children = meta.children;
   } catch {
     isNew = true;
   }
+  if (role == null) role = "";
+  if (cursorAgent == null) cursorAgent = "";
+  if (parentSession == null) parentSession = "";
+  if (mailScope == null) mailScope = "";
+  if (modelLock == null) modelLock = "";
+  if (orchestratorKey == null) orchestratorKey = "";
+  if (children == null) children = [];
   const firstUser =
     messages.find((m) => m.role === "user")?.content || "";
   starter = resolveChatStarter({
@@ -999,6 +1223,13 @@ export async function persistChatHistory(opts) {
     scheduled: Boolean(scheduled),
     scheduledRunAt,
     scheduledStatus,
+    role,
+    cursorAgent,
+    parentSession,
+    mailScope,
+    modelLock,
+    orchestratorKey,
+    children,
   });
   await writeFile(abs, markdown, "utf8");
   return rel;
@@ -1280,7 +1511,14 @@ export async function patchChatHistoryScheduled(opts) {
  *   started: string,
  *   updated: string,
  *   preview: string,
- *   messages: { role: 'user'|'assistant', content: string, at: string, widgets?: object[] }[],
+ *   messages: { role: 'user'|'assistant', content: string, at: string, widgets?: object[], mailFrom?: string }[],
+ *   role: ''|'orchestrator'|'subagent',
+ *   cursorAgent: string,
+ *   parentSession: string,
+ *   mailScope: ''|'family'|'open',
+ *   modelLock: ''|'composer'|'grok',
+ *   orchestratorKey: string,
+ *   children: string[],
  * }|null>}
  */
 export async function loadChatHistory(opts) {
@@ -1312,6 +1550,13 @@ export async function loadChatHistory(opts) {
     scheduled: meta.scheduled,
     scheduledRunAt: meta.scheduledRunAt,
     scheduledStatus: meta.scheduledStatus,
+    role: meta.role,
+    cursorAgent: meta.cursorAgent,
+    parentSession: meta.parentSession,
+    mailScope: meta.mailScope,
+    modelLock: meta.modelLock,
+    orchestratorKey: meta.orchestratorKey,
+    children: meta.children,
     messages: parseChatHistoryMessages(text),
   };
 }
@@ -1394,6 +1639,8 @@ async function loadChatListIndex(dir) {
       if (!entry || typeof entry !== "object") continue;
       const row = /** @type {{ row?: object, mtimeMs?: number, size?: number }} */ (entry);
       if (!row.row || typeof row.row !== "object") continue;
+      if (!Object.prototype.hasOwnProperty.call(row.row, "role")) continue;
+      if (!Object.prototype.hasOwnProperty.call(row.row, "parentSession")) continue;
       map.set(sessionId, {
         mtimeMs: Number(row.mtimeMs) || 0,
         size: Number(row.size) || 0,
@@ -1512,6 +1759,8 @@ async function readChatHistoryRows(opts) {
         started: meta.started,
         starter: meta.starter,
         workspace: meta.workspace || normalizeJypeWorkspace(opts?.workspace),
+        role: meta.role || "",
+        parentSession: meta.parentSession || "",
         mtimeMs: file.mtimeMs,
       };
       rows.push(row);

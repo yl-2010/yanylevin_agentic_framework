@@ -14,6 +14,7 @@ import {
   formatChatHistoryMarkdown,
   groupChatHistory,
   listChatHistory,
+  listChatHistoryFiles,
   listRecentChatHistory,
   loadChatHistory,
   loadChatHistoryHint,
@@ -33,6 +34,9 @@ import {
   relativeChatAge,
   sanitizeChatTitle,
   sanitizeChatVisibility,
+  ORCHESTRATOR_TITLE_PREFIX,
+  SUBAGENT_TITLE_PREFIX,
+  withRoleTitlePrefix,
   sanitizeChatEphemeral,
   chatHistoryIsEphemeralHidden,
   EPHEMERAL_HIDE_MS,
@@ -1114,6 +1118,58 @@ describe("titles", () => {
     );
   });
 
+  it("keeps Orchestrator: and Subagent: outside the 40 character cap", () => {
+    assert.equal(sanitizeChatTitle("Orchestrator: Cafe hunt"), "Orchestrator: Cafe hunt");
+    assert.equal(sanitizeChatTitle("Subagent: Spanish link"), "Subagent: Spanish link");
+    assert.equal(sanitizeChatTitle("Orchestrator:"), "");
+    assert.equal(sanitizeChatTitle("Subagent:"), "");
+    assert.equal(ORCHESTRATOR_TITLE_PREFIX, "Orchestrator: ");
+    assert.equal(SUBAGENT_TITLE_PREFIX, "Subagent: ");
+    const long = "spanish mastery assessment link for the group chat";
+    const titled = sanitizeChatTitle(
+      `Orchestrator: ${long} extra words that should fall off the end`
+    );
+    assert.ok(titled.startsWith(ORCHESTRATOR_TITLE_PREFIX));
+    assert.ok(titled.length > 40);
+    assert.ok(titled.slice(ORCHESTRATOR_TITLE_PREFIX.length).length <= 40);
+    const sub = sanitizeChatTitle(
+      `Subagent: ${long} extra words that should fall off the end`
+    );
+    assert.ok(sub.startsWith(SUBAGENT_TITLE_PREFIX));
+    assert.ok(sub.slice(SUBAGENT_TITLE_PREFIX.length).length <= 40);
+    assert.equal(
+      applyChatTitleStarter("Orchestrator: Cafe hunt", {
+        email: EMAIL,
+        workspace: "jype",
+        starter: "Yan",
+      }),
+      "Orchestrator: Cafe hunt"
+    );
+    assert.equal(
+      applyChatTitleStarter("Subagent: Spanish link", {
+        email: EMAIL,
+        workspace: "jype",
+        starter: "Alex",
+      }),
+      "Subagent: Spanish link"
+    );
+  });
+
+  it("prefixes a role title without stacking Scheduled or the other role", () => {
+    assert.equal(withRoleTitlePrefix("subagent", "Cafe hunt"), "Subagent: Cafe hunt");
+    assert.equal(withRoleTitlePrefix("orchestrator", "Cafe hunt"), "Orchestrator: Cafe hunt");
+    assert.equal(
+      withRoleTitlePrefix("orchestrator", "Subagent: Cafe hunt"),
+      "Orchestrator: Cafe hunt"
+    );
+    assert.equal(
+      withRoleTitlePrefix("subagent", "Scheduled: Orchestrator: Cafe hunt"),
+      "Subagent: Cafe hunt"
+    );
+    assert.equal(withRoleTitlePrefix("orchestrator", "Scheduled:"), "Orchestrator: Chat");
+    assert.equal(withRoleTitlePrefix("other", ""), "Orchestrator: Chat");
+  });
+
   it("treats only explicit true as ephemeral", () => {
     assert.equal(sanitizeChatEphemeral(""), false);
     assert.equal(sanitizeChatEphemeral("true"), true);
@@ -1243,6 +1299,161 @@ describe("chat titles for usage threads", () => {
         [personalId]: "Cafe hunt near Juanita",
         [jypeId]: "Rugby flight",
       });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("orchestrator mail metadata", () => {
+  const parent = "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff";
+  const childA = "cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa";
+  const childB = "dddddddd-eeee-4fff-8aaa-bbbbbbbbbbbb";
+  const agent = "bc-df5b1fe4-6d79-5f3d-b589-520b4f60283c";
+  const key = "team:family:yan:home";
+  const bubble = 'From "Cafe hunt": send the link';
+
+  it("round-trips role, agent, parent, scope, lock, key, and children", () => {
+    const md = formatChatHistoryMarkdown({
+      email: EMAIL,
+      sessionId: SID,
+      title: "Orchestrator: Cafe hunt",
+      role: "orchestrator",
+      cursorAgent: agent,
+      parentSession: parent,
+      mailScope: "family",
+      modelLock: "composer",
+      orchestratorKey: key,
+      children: [childA, childB],
+      messages: [{ role: "user", content: "start" }],
+    });
+    const meta = parseChatHistoryMeta(md);
+    assert.equal(meta.role, "orchestrator");
+    assert.equal(meta.cursorAgent, agent);
+    assert.equal(meta.parentSession, parent);
+    assert.equal(meta.mailScope, "family");
+    assert.equal(meta.modelLock, "composer");
+    assert.equal(meta.orchestratorKey, key);
+    assert.deepEqual(meta.children, [childA, childB]);
+    assert.match(md, /^role: orchestrator$/m);
+    assert.match(md, new RegExp(`^orchestratorKey: ${key}$`, "m"));
+    assert.match(md, new RegExp(`^children: ${childA},${childB}$`, "m"));
+    assert.doesNotMatch(md, /^mailScope: $/m);
+
+    const omitted = formatChatHistoryMarkdown({
+      email: EMAIL,
+      sessionId: SID,
+      role: "",
+      mailScope: "nope",
+      modelLock: "",
+      messages: [{ role: "user", content: "start" }],
+    });
+    assert.doesNotMatch(omitted, /^role:/m);
+    assert.doesNotMatch(omitted, /^mailScope:/m);
+    assert.doesNotMatch(omitted, /^modelLock:/m);
+  });
+
+  it("keeps mail-from off the bubble text", () => {
+    const md = formatChatHistoryMarkdown({
+      email: EMAIL,
+      sessionId: SID,
+      messages: [
+        {
+          role: "user",
+          content: bubble,
+          mailFrom: parent,
+          at: "2026-08-15T18:00:00.000Z",
+        },
+      ],
+    });
+    assert.match(md, new RegExp(`^mail-from: ${parent}$`, "m"));
+    assert.match(md, new RegExp(`mail-from: ${parent}\\n\\nFrom "Cafe hunt"`));
+    const messages = parseChatHistoryMessages(md);
+    assert.equal(messages[0].mailFrom, parent);
+    assert.equal(messages[0].content, bubble);
+    assert.doesNotMatch(messages[0].content, /mail-from/);
+    assert.equal(parseChatHistoryMeta(md).preview, bubble);
+
+    const unsafe = formatChatHistoryMarkdown({
+      email: EMAIL,
+      sessionId: SID,
+      messages: [{ role: "user", content: bubble, mailFrom: "nope" }],
+    });
+    assert.doesNotMatch(unsafe, /mail-from/);
+    assert.equal(parseChatHistoryMessages(unsafe)[0].content, bubble);
+    assert.equal(parseChatHistoryMessages(unsafe)[0].mailFrom, undefined);
+  });
+
+  it("keeps header fields on later persists and lists role with parent", async () => {
+    const root = await mkdtemp(join(tmpdir(), "home-chat-mail-"));
+    try {
+      await persistChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        title: "Orchestrator: Cafe hunt",
+        role: "orchestrator",
+        cursorAgent: agent,
+        parentSession: parent,
+        mailScope: "family",
+        modelLock: "composer",
+        orchestratorKey: key,
+        children: [childA, childB],
+        messages: [{ role: "user", content: bubble, mailFrom: parent }],
+      });
+      const first = await loadChatHistory({ root, email: EMAIL, sessionId: SID });
+      assert.equal(first?.role, "orchestrator");
+      assert.equal(first?.cursorAgent, agent);
+      assert.equal(first?.parentSession, parent);
+      assert.equal(first?.mailScope, "family");
+      assert.equal(first?.modelLock, "composer");
+      assert.equal(first?.orchestratorKey, key);
+      assert.deepEqual(first?.children, [childA, childB]);
+      assert.equal(first?.messages[0].mailFrom, parent);
+      assert.equal(first?.messages[0].content, bubble);
+
+      await persistChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        messages: [
+          { role: "user", content: bubble, mailFrom: parent },
+          { role: "assistant", content: "sent" },
+        ],
+      });
+      const kept = await loadChatHistory({ root, email: EMAIL, sessionId: SID });
+      assert.equal(kept?.role, "orchestrator");
+      assert.equal(kept?.cursorAgent, agent);
+      assert.equal(kept?.parentSession, parent);
+      assert.equal(kept?.mailScope, "family");
+      assert.equal(kept?.modelLock, "composer");
+      assert.equal(kept?.orchestratorKey, key);
+      assert.deepEqual(kept?.children, [childA, childB]);
+      assert.equal(kept?.title, "Orchestrator: Cafe hunt");
+
+      await persistChatHistory({
+        root,
+        email: EMAIL,
+        sessionId: SID,
+        role: "subagent",
+        modelLock: "grok",
+        mailScope: "open",
+        messages: [
+          { role: "user", content: bubble, mailFrom: parent },
+          { role: "assistant", content: "sent" },
+        ],
+      });
+      const next = await loadChatHistory({ root, email: EMAIL, sessionId: SID });
+      assert.equal(next?.role, "subagent");
+      assert.equal(next?.modelLock, "grok");
+      assert.equal(next?.mailScope, "open");
+      assert.equal(next?.cursorAgent, agent);
+      assert.equal(next?.orchestratorKey, key);
+
+      const files = await listChatHistoryFiles({ root, email: EMAIL });
+      const row = files.find((item) => item.sessionId === SID);
+      assert.equal(row?.role, "subagent");
+      assert.equal(row?.parentSession, parent);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

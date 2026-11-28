@@ -15,6 +15,7 @@ export const SERVICE_LOG_FILES = {
   cursorUsage: "personal-agent-cursor-usage.log",
   homeSync: "personal-agent-home-sync.log",
   lmstudioGptOss: "personal-agent-lmstudio-gpt-oss.log",
+  voiceSpeech: "yanylevin-voice-speech.log",
   cloudflared: "cloudflared-personal-agent.log",
   computerUse: "personal-agent-computer-use.log",
   sarGame: "personal-agent-sar-game.log",
@@ -30,6 +31,7 @@ export const AGENT_WORKER_LOG_PATH = SERVICE_LOGS.agentWorker;
 export const CURSOR_USAGE_LOG_PATH = SERVICE_LOGS.cursorUsage;
 export const HOME_SYNC_LOG_PATH = SERVICE_LOGS.homeSync;
 export const LMSTUDIO_GPT_OSS_LOG_PATH = SERVICE_LOGS.lmstudioGptOss;
+export const VOICE_SPEECH_LOG_PATH = SERVICE_LOGS.voiceSpeech;
 export const CLOUDFLARED_LOG_PATH = SERVICE_LOGS.cloudflared;
 export const COMPUTER_USE_LOG_PATH = SERVICE_LOGS.computerUse;
 export const SAR_GAME_LOG_PATH = SERVICE_LOGS.sarGame;

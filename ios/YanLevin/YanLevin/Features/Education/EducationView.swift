@@ -52,11 +52,19 @@ struct EducationView: View {
                     .adaptiveReadableWidth(AdaptiveLayout.pageMaxWidth, enabled: isWide)
             }
             .educationTabReselectScroll(isActive: educationFocus.isShowingDashboard)
+            .background {
+                HomeAccountTitleGesture(armed: accountGestureArmed) {
+                    educationFocus.homeAccountPresented = true
+                }
+            }
             .ylPageBackground()
             .navigationTitle(educationNavTitle)
             .navigationBarTitleDisplayMode(.large)
             .refreshable { await reloadAndRestartLiveSession() }
             .onChange(of: educationFocus.path) { _, path in
+                if !path.isEmpty {
+                    educationFocus.homeAccountPresented = false
+                }
                 if case .projectDetail(let project) = path.last {
                     if project.isJypePortal {
                         educationFocus.enterJype()
@@ -112,6 +120,11 @@ struct EducationView: View {
                 }
             }
         }
+        .overlay {
+            if educationFocus.homeAccountPresented {
+                AccountView()
+            }
+        }
         .environment(\.ylPalette, educationPalette)
         .task(id: liveTaskID) {
             store.focus = educationFocus
@@ -128,11 +141,22 @@ struct EducationView: View {
             applyEducationTodoHandoff()
             applyEducationClassHandoff()
         }
-        .onChange(of: nav.educationTodoHandoff) { _, _ in
+        .onChange(of: nav.educationTodoHandoff) { _, handoff in
+            if handoff != nil {
+                educationFocus.homeAccountPresented = false
+            }
             applyEducationTodoHandoff()
         }
-        .onChange(of: nav.educationClassHandoff) { _, _ in
+        .onChange(of: nav.educationClassHandoff) { _, handoff in
+            if handoff != nil {
+                educationFocus.homeAccountPresented = false
+            }
             applyEducationClassHandoff()
+        }
+        .onChange(of: nav.selectedTab) { previous, tab in
+            // Arriving on Home from another tab. A re-tap is handleTabReselect.
+            guard tab == .education, previous != .education else { return }
+            educationFocus.homeAccountPresented = false
         }
         .onChange(of: store.agentNavigate) { _, _ in
             applyAgentEducationNavigate()
@@ -154,6 +178,15 @@ struct EducationView: View {
         if educationFocus.isJype { return "JYPE" }
         if educationFocus.isDebate { return "Debate" }
         return "Home"
+    }
+
+    /// Large Home title, dashboard, and the same top check the Home reselect uses.
+    /// JYPE, Debate, and a scrolled page do not arm it.
+    private var accountGestureArmed: Bool {
+        educationNavTitle == "Home"
+            && educationFocus.isShowingDashboard
+            && educationFocus.visiblePageIsAtTop
+            && !educationFocus.homeAccountPresented
     }
 
     private var educationPalette: YLPalette {

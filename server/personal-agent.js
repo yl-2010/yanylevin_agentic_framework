@@ -33,7 +33,9 @@ import { formatCalendarLiveLines } from "./calendar-cli.js";
 import { formatCanvasLiveLine } from "./canvas-sync.js";
 import {
   applyChatWorkingStatus,
+  fallbackChatTitle,
   listChatHistory,
+  listChatHistoryFiles,
   loadChatHistory,
   markChatHistoryRead,
   patchChatHistoryDeferHide,
@@ -44,9 +46,21 @@ import {
   normalizeChatFiles,
   splitChatMessageFiles,
   safeChatFileName,
+  withRoleTitlePrefix,
   EPHEMERAL_HIDE_MS,
 } from "./home-chat-history.js";
 import { enqueueChatTitle, isStubChatTitle } from "./chat-title.js";
+import { execFile } from "node:child_process";
+import {
+  VOICE_TURN_NOTE,
+  attachVoiceUserMessage,
+  bindVoiceUtterance,
+  onVoiceGrokFinished,
+  onVoiceUtteranceDropped,
+  registerVoiceSessions,
+  replaceVoiceUserText,
+  takeVoiceTextBeforeSend,
+} from "./voice-agent.js";
 import {
   armFutureAgentTimer,
   armStoredFutureAgents,
@@ -92,16 +106,33 @@ import {
   GUEST_COMPOSER_SPEC,
   GUEST_GROK_SPEC,
   guestRunModels,
-  jypeMentionModelSpec,
   platformLabel,
   withoutFast,
 } from "./guest-agent.js";
+import {
+  AGENT_MAIL_RULE,
+  ORCHESTRATOR_STEER_NOTE,
+  agentMailInterrupts,
+  canMailThread,
+  filterMailThreads,
+  formatAgentMailBubble,
+  incomingMailEffects,
+  mailTurnNote,
+  rolePrompt,
+  unpinOrchestratorForMention,
+} from "./agent-mail.js";
+import {
+  orchestratorKey,
+  readOrchestrator,
+  writeOrchestrator,
+} from "./agent-orchestrators.js";
 import {
   AUTO_MODEL_SELECTION,
   INTERACTIVE_FALLBACK_DELAYS_MS,
   INTERACTIVE_MODEL_DELAYS_MS,
   WORKING_LABEL_DEFAULT,
   createLocalCursorAgent,
+  resumeLocalCursorAgent,
   disposeCursorAgent,
   evictLocalCursorExecutor,
   recreateLocalCursorAgent,
@@ -116,7 +147,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PA_ERROR_REPLY =
   "The personal agent hit an error. Try again or use Cursor Desktop with the personal-agent skill.";
 
-/** @typedef {{ role: 'user'|'assistant', content: string, queued?: boolean, queueId?: string, widgets?: object[], files?: { name: string, mimeType: string }[], at?: string, endOfTurn?: boolean }} ChatMessage */
+/** @typedef {{ role: 'user'|'assistant', content: string, queued?: boolean, queueId?: string, widgets?: object[], files?: { name: string, mimeType: string }[], at?: string, endOfTurn?: boolean, scratch?: boolean, mailFrom?: string }} ChatMessage */
 
 /**
  * Prepared agent turn (active or waiting in turnQueue).
@@ -135,9 +166,12 @@ const PA_ERROR_REPLY =
  *   files?: { name: string, mimeType: string }[],
  *   queueId?: string,
  *   interrupted?: boolean,
+ *   scratch?: boolean,
+ *   voiceUtteranceId?: string,
  *   imessageDeliverFinal?: boolean,
  *   teamsDeliverFinal?: boolean,
  *   whatsappDeliverFinal?: boolean,
+ *   mailFrom?: string,
  * }} TurnOpts
  */
 
@@ -172,6 +206,16 @@ const PA_ERROR_REPLY =
  *   ephemeralPinned?: boolean,
  *   agentDeferHide?: boolean,
  *   channelReplyOwed?: ''|'imessage'|'teams'|'whatsapp',
+ *   role?: ''|'orchestrator'|'subagent',
+ *   cursorAgentId?: string,
+ *   parentSessionId?: string,
+ *   mailScope?: ''|'family'|'open',
+ *   modelLock?: ''|'composer'|'grok',
+ *   orchestratorKey?: string,
+ *   childSessionIds?: string[],
+ *   lastMailFromSessionId?: string,
+ *   listTitle?: string,
+ *   forceListTitle?: boolean,
  * }} Session
  */
 
@@ -202,6 +246,7 @@ const ephemeralHideTimers = new Map();
 
 /** @type {Map<string, Session>} */
 const sessions = new Map();
+registerVoiceSessions(sessions);
 
 /** Focused session id per user (the chat the UI last opened). Others may still run. */
 /** @type {Map<string, string>} */
@@ -445,19 +490,27 @@ function wireMessage(m, extra) {
   if (extra?.queued || m?.queued) row.queued = true;
   const queueId = extra?.queueId || m?.queueId;
   if (row.queued && queueId) row.queueId = String(queueId);
+  if (isUser && m?.mailFrom) {
+    const mailFrom = sanitizeSessionId(m.mailFrom);
+    if (mailFrom) row.mailFrom = mailFrom;
+  }
   return row;
 }
 
 export function snapshotMessages(session) {
   /** @type {ChatMessage[]} */
-  const out = (session.messages || []).map((m) => wireMessage(m));
+  const out = (session.messages || [])
+    .filter((m) => !m?.scratch)
+    .map((m) => wireMessage(m));
   for (const turn of session.turnQueue || []) {
+    if (turn?.scratch) continue;
     out.push(
       wireMessage(
         {
           role: "user",
           content: turn.bubble || (normalizeChatFiles(turn.files).length ? "" : "(attachment)"),
           files: turn.files,
+          mailFrom: turn.mailFrom,
         },
         { queued: true, queueId: turn.queueId }
       )
@@ -622,10 +675,13 @@ export function formatVisibleTranscript(session, currentBubble) {
     const fileNote = names.length ? `Attached files: ${names.join(", ")}` : "";
     const fences =
       m?.role === "assistant" ? formatWidgetsAsFences(m.widgets) : "";
-    if (!text && !fences && !fileNote) continue;
+    const mailFrom =
+      m?.role !== "assistant" && m?.mailFrom ? String(m.mailFrom).trim() : "";
+    if (!text && !fences && !fileNote && !mailFrom) continue;
     const who = m.role === "assistant" ? "Assistant" : "User";
     lines.push(`${who}:`);
     if (text) lines.push(text);
+    if (mailFrom) lines.push(`Mail from session ${mailFrom}.`);
     if (fileNote) lines.push(fileNote);
     if (fences) lines.push(fences);
     lines.push("");
@@ -702,7 +758,7 @@ export function shouldAppendEndOfTurn(messages, content, widgets) {
  * @param {'user'|'assistant'} role
  * @param {string} content
  * @param {object[]} [widgets]
- * @param {{ endOfTurn?: boolean, files?: { name: string, mimeType: string }[] }} [extra]
+ * @param {{ endOfTurn?: boolean, files?: { name: string, mimeType: string }[], scratch?: boolean, mailFrom?: string }} [extra]
  */
 export function stampMessage(role, content, widgets, extra) {
   const text =
@@ -713,7 +769,17 @@ export function stampMessage(role, content, widgets, extra) {
   const files = normalizeChatFiles(extra?.files);
   if (files.length) row.files = files;
   if (extra?.endOfTurn) row.endOfTurn = true;
+  if (extra?.scratch) row.scratch = true;
+  if (role === "user" && extra?.mailFrom) {
+    const mailFrom = String(extra.mailFrom).trim();
+    if (mailFrom) row.mailFrom = mailFrom;
+  }
   return row;
+}
+
+/** Voice calls stay off the website's focused chat. */
+export function claimsChatFocus(session) {
+  return !session?.voiceMode;
 }
 
 /**
@@ -1390,12 +1456,270 @@ function gradeWatchTools(sid, session) {
 }
 
 /**
+ * @param {Session} session
+ * @param {string} sessionId
+ */
+function mailView(session, sessionId) {
+  return {
+    ...session,
+    sessionId,
+    workspace: sessionWorkspace(session),
+  };
+}
+
+/**
+ * History files plus live sessions in this workspace.
+ * Each row has sessionId, title, workspace, parentSession, and role.
+ * @param {Session} session
+ */
+async function collectMailRows(session) {
+  const email = session.email;
+  const workspace = sessionWorkspace(session);
+  /** @type {Map<string, { sessionId: string, title: string, workspace: string, parentSession: string, role: string }>} */
+  const byId = new Map();
+  const files = await listChatHistoryFiles({ email, workspace });
+  for (const row of files) {
+    const id = String(row?.sessionId || "");
+    if (!id) continue;
+    byId.set(id, {
+      sessionId: id,
+      title: row.title || "",
+      workspace: row.workspace || workspace,
+      parentSession: row.parentSession || "",
+      role: row.role || "",
+    });
+  }
+  for (const [id, live] of sessions) {
+    if (sessionWorkspace(live) !== workspace) continue;
+    if (!canAccessSession(live, email)) continue;
+    const prev = byId.get(id);
+    byId.set(id, {
+      sessionId: id,
+      title: (prev && prev.title) || live.listTitle || "",
+      workspace,
+      parentSession: live.parentSessionId || (prev && prev.parentSession) || "",
+      role: live.role || (prev && prev.role) || "",
+    });
+  }
+  return [...byId.values()];
+}
+
+/**
+ * @param {Session} session
+ * @param {string} sid
+ */
+async function mailSenderTitle(session, sid) {
+  try {
+    const loaded = await loadChatHistory({
+      email: session.email,
+      sessionId: sid,
+      workspace: sessionWorkspace(session),
+    });
+    if (loaded?.title) return loaded.title;
+  } catch (err) {
+    console.error(
+      "[personal-agent] mail title",
+      err instanceof Error ? err.message : err
+    );
+  }
+  if (session.listTitle) return session.listTitle;
+  if (session.role) return withRoleTitlePrefix(session.role, "");
+  return "Chat";
+}
+
+/**
+ * Mail one thread. Does not take UI focus. Errors are { ok:false, error }.
+ * @param {string} fromSid
+ * @param {string} targetSid
+ * @param {string} text
+ */
+export async function deliverAgentMail(fromSid, targetSid, text) {
+  try {
+    const sender = sessions.get(fromSid);
+    if (!sender) return { ok: false, error: "sender session not found" };
+    const body = String(text || "").trim();
+    if (!body) return { ok: false, error: "text required" };
+    const targetId = sanitizeSessionId(targetSid);
+    if (!targetId) return { ok: false, error: "invalid session id" };
+    const workspace = sessionWorkspace(sender);
+    const target = await hydrateAgentSession(targetId, sender.email, { workspace });
+    if (!target) return { ok: false, error: "target session not found" };
+    if (sessionWorkspace(target) !== workspace) {
+      return { ok: false, error: "different workspace" };
+    }
+    if (!canAccessSession(target, sender.email)) {
+      return { ok: false, error: "forbidden" };
+    }
+    const rows = await collectMailRows(sender);
+    const senderView = mailView(sender, fromSid);
+    const targetView = mailView(target, targetId);
+    if (!canMailThread(senderView, targetView, rows)) {
+      return { ok: false, error: "cannot mail that thread" };
+    }
+    const title = await mailSenderTitle(sender, fromSid);
+    const bubble = formatAgentMailBubble(title, body);
+    const interrupt = agentMailInterrupts(senderView, targetView);
+    target.lastMailFromSessionId = fromSid;
+    return await messageAgent(
+      targetId,
+      sender.email,
+      bubble,
+      [],
+      { client: "agent", workspace },
+      interrupt,
+      { mail: { fromSessionId: fromSid } }
+    );
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * New subagent session. Does not take focus.
+ * @param {string} parentSid
+ * @param {Session} parent
+ * @param {string} text
+ */
+async function createSubagentSession(parentSid, parent, text) {
+  const workspace = sessionWorkspace(parent);
+  const email = parent.email;
+  const agent = await createPersonalCursorAgent(modelLockCreateOpts(parent.modelLock));
+  const id =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `pa-${Date.now().toString(36)}`;
+  const starter = resolveChatStarter({
+    workspace,
+    email,
+    starter: parent.starter,
+    guest: parent.guestCaller,
+  });
+  sessions.set(id, {
+    agent,
+    email,
+    workspace,
+    starter,
+    createdAt: Date.now(),
+    lastUsedAt: Date.now(),
+    uploads: [],
+    uploadDirRel: chatUploadDir(email, workspace, id),
+    messages: [],
+    status: "idle",
+    workingLabel: null,
+    runPromise: null,
+    turnQueue: [],
+    imessageOrigin: null,
+    imessageDeliverFinal: false,
+    teamsOrigin: null,
+    teamsDeliverFinal: false,
+    whatsappOrigin: null,
+    whatsappDeliverFinal: false,
+    guestCaller: parent.guestCaller || null,
+    ephemeralPinned: false,
+    role: "subagent",
+    parentSessionId: parentSid,
+    mailScope: parent.mailScope || "open",
+    modelLock: parent.modelLock || "",
+    cursorAgentId: agent?.agentId || "",
+    childSessionIds: [],
+    listTitle: withRoleTitlePrefix("subagent", fallbackChatTitle(text)),
+    forceListTitle: true,
+  });
+  if (!Array.isArray(parent.childSessionIds)) parent.childSessionIds = [];
+  parent.childSessionIds.push(id);
+  await persistSessionHistory(parentSid, parent);
+  return id;
+}
+
+/**
+ * @param {string} sid
+ * @param {Session} session
+ */
+function agentMailTools(sid, session) {
+  return {
+    message_agent: {
+      description:
+        "Mail another thread in this workspace. Pass sessionId and text. The other thread sees a user bubble.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          sessionId: { type: "string" },
+          text: { type: "string" },
+        },
+        required: ["sessionId", "text"],
+      },
+      async execute({ sessionId, text }) {
+        try {
+          const result = await deliverAgentMail(sid, sessionId, text);
+          if (!result || result.ok === false) {
+            return String(result?.error || "mail failed");
+          }
+          return "mailed";
+        } catch (err) {
+          return err instanceof Error ? err.message : String(err);
+        }
+      },
+    },
+    list_agent_threads: {
+      description:
+        "List threads you can mail in this workspace. Includes threads hidden from the chat list.",
+      inputSchema: { type: "object", properties: {} },
+      async execute() {
+        try {
+          const rows = await collectMailRows(session);
+          const threads = filterMailThreads(rows, mailView(session, sid)).map((row) => ({
+            sessionId: row.sessionId,
+            title: row.title || "Chat",
+          }));
+          return JSON.stringify({ threads });
+        } catch (err) {
+          return err instanceof Error ? err.message : String(err);
+        }
+      },
+    },
+    start_subagent: {
+      description:
+        "Orchestrator only. Open a subagent thread and mail it the task text.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          text: { type: "string" },
+        },
+        required: ["text"],
+      },
+      async execute({ text }) {
+        if (session.role !== "orchestrator") {
+          return "only an orchestrator can start a subagent";
+        }
+        const task = String(text || "").trim();
+        if (!task) return "text required";
+        try {
+          const childId = await createSubagentSession(sid, session, task);
+          const mailed = await deliverAgentMail(sid, childId, task);
+          if (!mailed || mailed.ok === false) {
+            return String(mailed?.error || "mail failed");
+          }
+          return childId;
+        } catch (err) {
+          return err instanceof Error ? err.message : String(err);
+        }
+      },
+    },
+  };
+}
+
+/**
  * @param {string} sid
  * @param {Session} session
  */
 function sessionCustomTools(sid, session) {
+  const mail = agentMailTools(sid, session);
+  if (session.role === "subagent") {
+    delete mail.start_subagent;
+  }
   return {
-    ...sendChatMessageTool(sid, session),
+    ...(session.role === "subagent" ? {} : sendChatMessageTool(sid, session)),
+    ...mail,
     ...futureAgentTools(sid, session),
     ...gradeWatchTools(sid, session),
     ...openHomePageTool(sid, session),
@@ -1435,7 +1759,9 @@ function sendChatMessageTool(sid, session) {
         if (!content && !parsed.widgets.length) return "ignored empty";
         if (!Array.isArray(session.messages)) session.messages = [];
         session.messages.push(
-          stampMessage("assistant", content, parsed.widgets)
+          stampMessage("assistant", content, parsed.widgets, {
+            scratch: session.voiceMode === true,
+          })
         );
         persistSessionHistory(sid, session);
         notifyHomeClients(session.email, "change", {
@@ -1469,6 +1795,7 @@ async function cancelActiveRun(session) {
 }
 
 function persistSessionHistory(sid, session) {
+  if (session?.voiceMode) return Promise.resolve();
   const snap = snapshotMessages(session);
   const userTurns = snap.filter((m) => m.role === "user").length;
   const hasAssistant = snap.some((m) => m.role === "assistant");
@@ -1494,6 +1821,17 @@ function persistSessionHistory(sid, session) {
     opts.scheduled = true;
     opts.scheduledRunAt = session.scheduledRunAt || "";
     opts.scheduledStatus = session.scheduledStatus || "pending";
+  }
+  opts.role = session.role || "";
+  opts.cursorAgent = session.cursorAgentId || "";
+  opts.parentSession = session.parentSessionId || "";
+  opts.mailScope = session.mailScope || "";
+  opts.modelLock = session.modelLock || "";
+  opts.orchestratorKey = session.orchestratorKey || "";
+  opts.children = Array.isArray(session.childSessionIds) ? session.childSessionIds : [];
+  if (session.forceListTitle) {
+    opts.title = session.listTitle || "";
+    session.forceListTitle = false;
   }
   return persistChatHistory(opts)
     .then(() => {
@@ -1957,6 +2295,9 @@ export function isUiChatClient(uiContext) {
  */
 export function shouldPersistChatEphemeral(session) {
   if (!session) return null;
+  if (session.role === "orchestrator" || session.role === "subagent") {
+    return session.ephemeralPinned ? false : true;
+  }
   if (sessionWorkspace(session) === "jype") return false;
   if (session.agentDeferHide) return true;
   if (session.ephemeralPinned) return false;
@@ -2002,7 +2343,15 @@ function appendPromotedUserMessage(session, turn) {
   if (!Array.isArray(session.messages)) session.messages = [];
   const files = normalizeChatFiles(turn?.files);
   const content = String(turn?.bubble || "").trim() || (files.length ? "" : "(attachment)");
-  session.messages.push(stampMessage("user", content, null, { files }));
+  /** @type {{ files: { name: string, mimeType: string }[], scratch?: boolean, mailFrom?: string }} */
+  const extra = {
+    files,
+    scratch: session.voiceMode === true || turn?.scratch === true,
+  };
+  if (turn?.mailFrom) extra.mailFrom = turn.mailFrom;
+  const row = stampMessage("user", content, null, extra);
+  session.messages.push(row);
+  if (turn?.voiceUtteranceId) attachVoiceUserMessage(turn.voiceUtteranceId, row);
 }
 
 /**
@@ -2048,10 +2397,44 @@ async function replaceSessionAgent(session, model) {
     previous,
     attach: (agent) => {
       session.agent = agent;
+      if (agent?.agentId) session.cursorAgentId = agent.agentId;
       session.replayUiTranscript = true;
       session.lastSentContext = null;
     },
   });
+}
+
+/**
+ * Reuse the live handle, resume the saved Cursor agent, or create a new one.
+ * A failed resume clears the saved id and creates. Replay stays off after a
+ * resume because that agent still has its own cache.
+ * @param {Session} session
+ * @param {ModelSelection} model
+ */
+async function ensureCursorAgent(session, model) {
+  if (session.agent) return session.agent;
+  if (session.cursorAgentId) {
+    try {
+      const resumed = await resumeLocalCursorAgent({
+        agentId: session.cursorAgentId,
+        model,
+        cwd: REPO_ROOT,
+      });
+      session.agent = resumed;
+      session.replayUiTranscript = false;
+      return resumed;
+    } catch (err) {
+      console.warn(
+        `[personal-agent] resume failed for ${session.cursorAgentId}: ${err instanceof Error ? err.message : err}`
+      );
+      session.cursorAgentId = "";
+    }
+  }
+  const created = await createLocalCursorAgent({ model, cwd: REPO_ROOT });
+  session.agent = created;
+  session.cursorAgentId = created?.agentId || "";
+  session.replayUiTranscript = true;
+  return created;
 }
 
 /** Only a full executor evict (scheduled-job retry in this process) lands here. */
@@ -2155,6 +2538,7 @@ function messageFromHistory(m) {
   if (Array.isArray(m.widgets) && m.widgets.length) row.widgets = m.widgets;
   const files = normalizeChatFiles(m.files);
   if (files.length) row.files = files;
+  if (row.role === "user" && m.mailFrom) row.mailFrom = String(m.mailFrom);
   return row;
 }
 
@@ -2334,6 +2718,7 @@ export function systemPrompt(email, opts = {}) {
       `- Grade watch (poll a Canvas assignment until the grade posts): ${PERSONAL_SKILL_PATHS.gradeWatch}`,
       `- Celebration site: ${PERSONAL_SKILL_PATHS.celebration}`,
       "File uploads can be stored in the matching JYPE class or project folder.",
+      AGENT_MAIL_RULE,
       "Math on the website and in the iOS app is a display block, with a blank line before and after. Put $$ on its own line, then LaTeX, then $$ on its own line. Stack equations one per line in that block. Use \\(x\\) or $x^2$ only for a symbol inside a sentence. Never backticks for math. iMessage and Teams cannot render KaTeX, so those replies stay plain words.",
     ].join("\n");
   }
@@ -2399,6 +2784,7 @@ export function systemPrompt(email, opts = {}) {
     "Live context below is authoritative for clock, class-now, and the open screen. Trust it. Named-people lookup still opens brain/people/. Other home/<email>/ files only when the question needs that data.",
     "",
     "Reply: short. School mutations 1-3 lines. Markdown OK in the text bubble; never HTML tags or markdown images. Never em dashes. No thinking aloud. Do not tell the user to refresh. Read the widgets skill before emitting any widget fence. Never put Sent by Yan's Personal Agent in app or website bubbles; that footer is only for iMessage, email, and Teams.",
+    AGENT_MAIL_RULE,
     "Math on the website and in the iOS app is a display block, with a blank line before and after. Put $$ on its own line, then LaTeX, then $$ on its own line. Stack equations one per line in that block. Use \\(x\\) or $x^2$ only for a symbol inside a sentence. Never backticks for math. iMessage and Teams cannot render KaTeX, so those replies stay plain words.",
     "Send to a person with no channel named: iMessage, then Teams, then email. Named channel wins. In a Teams chat, tell Name stays in that chat unless they say iMessage. iMessage cannot attach a file. Messages accepts the send and the file never arrives. A file for iMessage or Teams goes out as a yanylevin.com link. Put it in the repo, use a non-guessable folder when it should not be easy to find, commit, push, npm run deploy:web, confirm the URL is 200, then send the link. Email the file with Mail.app only when they asked for email. A request to send the file is the link. Attach it in Messages or Teams with computer use only when they specifically ask for the file to go through that app. A message with images has no pixels. Open that chat in the Teams app and look. School Outlook still cannot send.",
     "Long work: send_chat_message first with a short status. Send more mid-run when new info, a change, or a useful update appears. Then a final Done. Quick answers: one reply only (that is the end of turn). On an iMessage or Teams @agent or @agentg first turn, that first status is also posted to the chat before you start the work.",
@@ -2448,6 +2834,7 @@ export function normalizeUiContext(raw) {
   str("brainPage", 40);
   str("brainPageTitle", 80);
   str("brainParam", 200);
+  str("voiceUtteranceId", 80);
   str("cardId", 200);
   str("cardLabel", 200);
   str("cardType", 40);
@@ -2985,43 +3372,36 @@ async function stageAttachments(session, sessionId, attachments) {
   return files;
 }
 
-function guestAgentCreateOpts(guest) {
-  const run = guestRunModels(guest);
-  if (!run.preferred) return {};
+/** @agent is Composer. @agentg is Grok. The guest ladder is not used. */
+function mentionAgentCreateOpts(_guest, _workspace, _platform, forceGrok) {
+  if (forceGrok) {
+    return {
+      model: copyModelSpec(GUEST_GROK_SPEC),
+      fallbackModel: copyModelSpec(GUEST_COMPOSER_SPEC),
+    };
+  }
   return {
-    model: run.preferred,
-    fallbackModel: run.fallback || AUTO_MODEL_SELECTION,
+    model: copyModelSpec(GUEST_COMPOSER_SPEC),
+    fallbackModel: AUTO_MODEL_SELECTION,
   };
 }
 
-/** @agent iMessage first turn stays on the existing model. Every Teams turn is Composer 2.5. @agentg is Grok. */
-function mentionAgentCreateOpts(guest, workspace, platform, forceGrok) {
-  if (forceGrok) {
-    return guestAgentCreateOpts({
-      ...(guest && typeof guest === "object" ? guest : {}),
+function modelLockCreateOpts(modelLock) {
+  if (modelLock === "grok") {
+    return {
       model: copyModelSpec(GUEST_GROK_SPEC),
-    });
+      fallbackModel: copyModelSpec(GUEST_COMPOSER_SPEC),
+    };
   }
-  if (platform === "teams") {
-    return guestAgentCreateOpts({
-      ...(guest && typeof guest === "object" ? guest : {}),
-      model: copyModelSpec(GUEST_COMPOSER_SPEC),
-    });
-  }
-  if (workspace === "jype") {
-    return guestAgentCreateOpts({
-      ...(guest && typeof guest === "object" ? guest : {}),
-      model: jypeMentionModelSpec(platform),
-    });
-  }
-  if (guest) return guestAgentCreateOpts(guest);
   return {
-    model: withoutFast(DEFAULT_MODEL_SPEC),
+    model: copyModelSpec(GUEST_COMPOSER_SPEC),
     fallbackModel: AUTO_MODEL_SELECTION,
   };
 }
 
 export function guestTurnModelSpec(session, hasSessionFiles) {
+  if (session.modelLock === "grok") return copyModelSpec(GUEST_GROK_SPEC);
+  if (session.modelLock === "composer") return copyModelSpec(GUEST_COMPOSER_SPEC);
   if (session.forceGrok) return copyModelSpec(GUEST_GROK_SPEC);
   if (session.teamsOrigin || session.teamsDeliverFinal) {
     return copyModelSpec(GUEST_COMPOSER_SPEC);
@@ -3098,7 +3478,7 @@ export async function startAgent(email, opts = {}) {
     workspace === "jype"
       ? { ...opts, model: opts.model || copyModelSpec(DEFAULT_MODEL_SPEC) }
       : opts;
-  const agent = await createPersonalCursorAgent(createOpts);
+  const agent = opts.agent || (await createPersonalCursorAgent(createOpts));
 
   const id =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -3107,9 +3487,12 @@ export async function startAgent(email, opts = {}) {
 
   const key = focusKey(normalized, workspace);
   // Switch focus. Running / queued threads keep working in the background.
-  const priorId = activeByEmail.get(key);
-  if (priorId && priorId !== id) {
-    await releaseFocusFrom(priorId);
+  // A voice call passes skipFocus so the website's open chat stays put.
+  if (!opts.skipFocus) {
+    const priorId = activeByEmail.get(key);
+    if (priorId && priorId !== id) {
+      await releaseFocusFrom(priorId);
+    }
   }
 
   const starter = resolveChatStarter({
@@ -3142,60 +3525,154 @@ export async function startAgent(email, opts = {}) {
     whatsappDeliverFinal: false,
     guestCaller: null,
     ephemeralPinned: workspace === "jype",
+    voiceMode: opts.voice === true,
   });
-  activeByEmail.set(key, id);
+  if (!opts.skipFocus) activeByEmail.set(key, id);
 
   return { sessionId: id, email: normalized, status: "idle", messages: [], workspace };
+}
+
+/**
+ * Chat target saved with the orchestrator so a later mail can still post
+ * after the worker restarts. The old message body is not stored.
+ * @param {object|null|undefined} origin
+ */
+function storedChannelOrigin(origin) {
+  if (!origin || typeof origin !== "object") return null;
+  /** @type {Record<string, string>} */
+  const out = {};
+  for (const key of ["to", "chat", "chatId", "handle", "key", "chatGuid", "messageGuid"]) {
+    const text = String(origin[key] || "").trim().slice(0, 200);
+    if (text) out[key] = text;
+  }
+  if (!out.to && !out.chatId) return null;
+  return out;
+}
+
+/**
+ * @param {Session} session
+ * @param {string} platform
+ * @param {Record<string, string>|null|undefined} origin
+ */
+function applyStoredChannelOrigin(session, platform, origin) {
+  if (!session || !origin) return;
+  if (platform === "teams") session.teamsOrigin = origin;
+  else session.imessageOrigin = origin;
+}
+
+/**
+ * One orchestrator per chat and kind. A later mention resumes that thread.
+ * @param {'imessage'|'teams'} platform
+ * @param {object} message
+ */
+async function routeChannelMention(platform, message) {
+  const teams = platform === "teams";
+  const origin = teams ? normalizeTeamsOrigin(message) : normalizeIMessageOrigin(message);
+  const raw = String(origin?.text || message?.text || "").trim();
+  const guest = message?.guestCaller || null;
+  const text = guest
+    ? formatGuestUserBubble({
+        name: guest.displayName,
+        platform: platformLabel(teams ? "teams" : "imessage"),
+        text: raw,
+      })
+    : raw;
+  if (!origin || !text) {
+    const err = new Error(
+      teams ? "teams @agent text required" : "imessage @agent text required"
+    );
+    err.status = 400;
+    throw err;
+  }
+  if (teams) await attachTeamsThreadPreview(origin);
+  const workspace = originIsJypeThread(origin) ? "jype" : "";
+  const forceGrok = messageForcesGrok(raw);
+  const startEmail =
+    workspace === "jype" ? jypeEmailForSlug(guest?.slug) || YAN_EMAIL : YAN_EMAIL;
+  const chatId = origin.chatId || origin.to;
+  const kind = forceGrok ? "agentg" : "agent";
+  const key = orchestratorKey(platform, chatId, kind);
+
+  let session = null;
+  let sid = "";
+  if (key) {
+    const row = await readOrchestrator(key);
+    if (row?.sessionId) {
+      session = await hydrateAgentSession(row.sessionId, startEmail, { workspace });
+      if (session) sid = row.sessionId;
+    }
+  }
+  if (!session) {
+    const createOpts = mentionAgentCreateOpts(guest, workspace, platform, forceGrok);
+    const started = await startAgent(startEmail, {
+      ...createOpts,
+      workspace,
+      guest,
+    });
+    sid = started.sessionId;
+    session = sessions.get(sid);
+    if (!session) {
+      const err = new Error("session not found");
+      err.status = 500;
+      throw err;
+    }
+    session.role = "orchestrator";
+    session.modelLock = forceGrok ? "grok" : "composer";
+    session.mailScope = guest ? "family" : "open";
+    session.orchestratorKey = key;
+    session.ephemeralPinned = false;
+    session.childSessionIds = [];
+    session.cursorAgentId = session.agent?.agentId || "";
+    session.listTitle = withRoleTitlePrefix("orchestrator", fallbackChatTitle(raw));
+    session.forceListTitle = true;
+  } else {
+    unpinOrchestratorForMention(session);
+    if (session.role !== "orchestrator") session.role = "orchestrator";
+    session.modelLock = forceGrok ? "grok" : "composer";
+    session.mailScope = guest ? "family" : "open";
+    if (key) session.orchestratorKey = key;
+    await ensureCursorAgent(session, guestTurnModelSpec(session, false));
+  }
+
+  if (teams) {
+    session.teamsOrigin = origin;
+    session.teamsDeliverFinal = true;
+  } else {
+    session.imessageOrigin = origin;
+    session.imessageDeliverFinal = true;
+  }
+  if (key) {
+    await writeOrchestrator(key, {
+      sessionId: sid,
+      cursorAgentId: session.cursorAgentId || "",
+      workspace: sessionWorkspace(session) || workspace,
+      email: session.email || startEmail,
+      platform,
+      origin: storedChannelOrigin(origin),
+    });
+  }
+  session.guestCaller = guest;
+  session.forceGrok = forceGrok;
+  const interrupt = session.status === "running";
+  return messageAgent(
+    sid,
+    session.email || startEmail,
+    text,
+    [],
+    { client: teams ? "teams" : "imessage", workspace: sessionWorkspace(session) || workspace },
+    interrupt
+  );
 }
 
 /**
  * New Personal Agent thread whose first user message is an iMessage that
  * mentioned @agent. Listed in the app/website for 10 minutes after the
  * reply finishes, then dropped unless Yan continues from web or iOS.
+ * Later mentions in the same chat resume the orchestrator.
  * @param {object} message
  */
 export async function startAgentFromIMessageMention(message) {
-  const origin = normalizeIMessageOrigin(message);
-  const raw = String(origin?.text || message?.text || "").trim();
-  const guest = message?.guestCaller || null;
-  const text = guest
-    ? formatGuestUserBubble({
-        name: guest.displayName,
-        platform: platformLabel("imessage"),
-        text: raw,
-      })
-    : raw;
-  if (!origin || !text) {
-    const err = new Error("imessage @agent text required");
-    err.status = 400;
-    throw err;
-  }
-  const workspace = originIsJypeThread(origin) ? "jype" : "";
-  const forceGrok = messageForcesGrok(raw);
-  const startEmail =
-    workspace === "jype"
-      ? jypeEmailForSlug(guest?.slug) || YAN_EMAIL
-      : YAN_EMAIL;
-  const createOpts = mentionAgentCreateOpts(guest, workspace, "imessage", forceGrok);
-  const started = await startAgent(startEmail, {
-    ...createOpts,
-    workspace,
-    guest,
-  });
-  const session = sessions.get(started.sessionId);
-  if (!session) {
-    const err = new Error("session not found");
-    err.status = 500;
-    throw err;
-  }
-  session.imessageOrigin = origin;
-  session.imessageDeliverFinal = true;
-  session.guestCaller = guest;
-  session.forceGrok = forceGrok;
-  return messageAgent(started.sessionId, startEmail, text, [], {
-    client: "imessage",
-    workspace,
-  });
+  return routeChannelMention("imessage", message);
 }
 
 /**
@@ -3235,51 +3712,11 @@ async function attachTeamsThreadPreview(origin) {
  * New Personal Agent thread whose first user message is a Teams chat that
  * mentioned @agent. Same 10-minute UI hide as iMessage @agent unless Yan
  * continues from web or iOS.
+ * Later mentions in the same chat resume the orchestrator.
  * @param {object} message
  */
 export async function startAgentFromTeamsMention(message) {
-  const origin = normalizeTeamsOrigin(message);
-  const raw = String(origin?.text || message?.text || "").trim();
-  const guest = message?.guestCaller || null;
-  const text = guest
-    ? formatGuestUserBubble({
-        name: guest.displayName,
-        platform: platformLabel("teams"),
-        text: raw,
-      })
-    : raw;
-  if (!origin || !text) {
-    const err = new Error("teams @agent text required");
-    err.status = 400;
-    throw err;
-  }
-  await attachTeamsThreadPreview(origin);
-  const workspace = originIsJypeThread(origin) ? "jype" : "";
-  const forceGrok = messageForcesGrok(raw);
-  const startEmail =
-    workspace === "jype"
-      ? jypeEmailForSlug(guest?.slug) || YAN_EMAIL
-      : YAN_EMAIL;
-  const createOpts = mentionAgentCreateOpts(guest, workspace, "teams", forceGrok);
-  const started = await startAgent(startEmail, {
-    ...createOpts,
-    workspace,
-    guest,
-  });
-  const session = sessions.get(started.sessionId);
-  if (!session) {
-    const err = new Error("session not found");
-    err.status = 500;
-    throw err;
-  }
-  session.teamsOrigin = origin;
-  session.teamsDeliverFinal = true;
-  session.guestCaller = guest;
-  session.forceGrok = forceGrok;
-  return messageAgent(started.sessionId, startEmail, text, [], {
-    client: "teams",
-    workspace,
-  });
+  return routeChannelMention("teams", message);
 }
 
 /**
@@ -3606,6 +4043,11 @@ async function executeAgentTurn(sid, session, opts) {
   const turnId = mintNavigateId();
   session.activeTurnId = turnId;
   session.channelProgress = channelProgressKind(opts);
+  if (!session.channelProgress && session.role === "orchestrator") {
+    if (session.imessageOrigin) session.channelProgress = "imessage";
+    else if (session.teamsOrigin) session.channelProgress = "teams";
+    else if (session.whatsappOrigin) session.channelProgress = "whatsapp";
+  }
   session.lastChannelProgressText = "";
 
   /** @type {ReturnType<typeof composeTurnPrompt>["sent"]|null} */
@@ -3642,20 +4084,12 @@ async function executeAgentTurn(sid, session, opts) {
           await evictLocalCursorExecutor({ skipIfScheduledAtLeast: 1 });
           await replaceSessionAgent(session, nextModel);
         } else if (!session.agent) {
-          session.agent = await createLocalCursorAgent({
-            model: nextModel,
-            cwd: REPO_ROOT,
-          });
-          session.replayUiTranscript = true;
+          await ensureCursorAgent(session, nextModel);
         }
       },
       run: async (nextModel) => {
         if (!session.agent) {
-          session.agent = await createLocalCursorAgent({
-            model: nextModel,
-            cwd: REPO_ROOT,
-          });
-          session.replayUiTranscript = true;
+          await ensureCursorAgent(session, nextModel);
         }
         const sendOpts = {
           model: nextModel,
@@ -3666,6 +4100,13 @@ async function executeAgentTurn(sid, session, opts) {
           : "";
         let turnPrompt = prompt;
         pendingSent = null;
+        if (opts.voiceUtteranceId && opts.promptPlan) {
+          const live = takeVoiceTextBeforeSend(opts.voiceUtteranceId);
+          if (live && live !== opts.bubble) {
+            opts.bubble = live;
+            opts.promptPlan.turn = replaceVoiceUserText(opts.promptPlan.turn, live);
+          }
+        }
         if (opts.promptPlan) {
           const composed = composeTurnPrompt(
             opts.promptPlan,
@@ -3713,6 +4154,7 @@ async function executeAgentTurn(sid, session, opts) {
     if (outcome.aborted || session.interrupting) {
       session.pendingNavigate = null;
       if (session.interrupting) releaseTurnRun(session);
+      if (opts.voiceUtteranceId) onVoiceUtteranceDropped(sid, opts.voiceUtteranceId);
       return;
     }
     if (!sessions.has(sid) || sessions.get(sid) !== session) return;
@@ -3776,7 +4218,10 @@ async function executeAgentTurn(sid, session, opts) {
     if (!content && !parsed.widgets.length) content = EMPTY_TURN_REPLY;
     if (shouldAppendEndOfTurn(session.messages, content, parsed.widgets)) {
       session.messages.push(
-        stampMessage("assistant", content, parsed.widgets, { endOfTurn: true })
+        stampMessage("assistant", content, parsed.widgets, {
+          endOfTurn: true,
+          scratch: session.voiceMode === true,
+        })
       );
     } else {
       const last = session.messages[session.messages.length - 1];
@@ -3804,7 +4249,15 @@ async function executeAgentTurn(sid, session, opts) {
     }
     if (session.interrupting) {
       releaseTurnRun(session);
+      if (opts.voiceUtteranceId) onVoiceUtteranceDropped(sid, opts.voiceUtteranceId);
       return;
+    }
+    if (opts.voiceUtteranceId) {
+      onVoiceGrokFinished({
+        sessionId: sid,
+        utteranceId: opts.voiceUtteranceId,
+        content,
+      });
     }
     releaseTurnRun(session);
     session.lastResult = {
@@ -3858,6 +4311,7 @@ async function executeAgentTurn(sid, session, opts) {
     ) {
       session.pendingNavigate = null;
       releaseTurnRun(session);
+      if (opts.voiceUtteranceId) onVoiceUtteranceDropped(sid, opts.voiceUtteranceId);
       return;
     }
     console.error("[personal-agent] run", err);
@@ -3878,11 +4332,21 @@ async function executeAgentTurn(sid, session, opts) {
     }
     const fallback = PA_ERROR_REPLY;
     session.messages.push(
-      stampMessage("assistant", fallback, undefined, { endOfTurn: true })
+      stampMessage("assistant", fallback, undefined, {
+        endOfTurn: true,
+        scratch: session.voiceMode === true,
+      })
     );
     await persistSessionHistory(sid, session);
     session.lastUsedAt = Date.now();
     releaseTurnRun(session);
+    if (opts.voiceUtteranceId) {
+      onVoiceGrokFinished({
+        sessionId: sid,
+        utteranceId: opts.voiceUtteranceId,
+        content: fallback,
+      });
+    }
     session.lastResult = {
       content: fallback,
       status: "error",
@@ -3928,7 +4392,7 @@ async function executeAgentTurn(sid, session, opts) {
  * @param {unknown} [attachmentsRaw]
  * @param {unknown} [uiContextRaw]
  * @param {unknown} [interruptRaw]
- * @param {{ files?: AttachmentSource[] }} [opts] files: pre-uploaded draft files on disk
+ * @param {{ files?: AttachmentSource[], mail?: { fromSessionId?: string } }} [opts] files: pre-uploaded draft files on disk. mail skips focus, pin, and channel delivery.
  */
 export async function messageAgent(
   sessionId,
@@ -3968,7 +4432,10 @@ export async function messageAgent(
     throw err;
   }
 
-  pinEphemeralChatIfUiClient(session, uiContext, sid);
+  const mail = opts?.mail && typeof opts.mail === "object" ? opts.mail : null;
+  const mailEffects = incomingMailEffects(mail);
+  const mailFrom = mail?.fromSessionId ? String(mail.fromSessionId) : "";
+  if (mailEffects.pin) pinEphemeralChatIfUiClient(session, uiContext, sid);
 
   if (!Array.isArray(session.turnQueue)) session.turnQueue = [];
   if (!Array.isArray(session.uploads)) session.uploads = [];
@@ -4002,7 +4469,7 @@ export async function messageAgent(
     } finally {
       session.interrupting = false;
     }
-    restoreOwedChannelDelivery(session);
+    if (mailEffects.channel) restoreOwedChannelDelivery(session);
   }
 
   session.lastUsedAt = Date.now();
@@ -4042,6 +4509,8 @@ export async function messageAgent(
   let promptSystem = systemPrompt(normalized, {
     workspace: sessionWorkspace(session),
   });
+  const roleText = rolePrompt(session);
+  if (roleText) promptSystem = `${promptSystem}\n\n${roleText}`;
   if (session.teamsOrigin) promptSystem = teamsVoicePrompt(promptSystem);
   const live = liveContextSections(
     nowContext,
@@ -4083,7 +4552,14 @@ export async function messageAgent(
     );
   }
   if (interrupting) {
-    promptParts.push(interruptClarificationNote(session.channelReplyOwed), "");
+    promptParts.push(
+      mail ? ORCHESTRATOR_STEER_NOTE : interruptClarificationNote(session.channelReplyOwed),
+      ""
+    );
+  }
+  if (mail) promptParts.push(mailTurnNote(mail.fromSessionId), "");
+  if (session.voiceMode) {
+    promptParts.push(VOICE_TURN_NOTE, "");
   }
   promptParts.push("User:", text || "(no text — see attachments)");
 
@@ -4152,10 +4628,17 @@ export async function messageAgent(
     bubble,
     files,
     interrupted: interrupting,
+    scratch: session.voiceMode === true,
+    voiceUtteranceId: uiContext?.voiceUtteranceId
+      ? String(uiContext.voiceUtteranceId)
+      : "",
+    ...(mailFrom ? { mailFrom } : {}),
   };
-  claimChannelDelivery(session, turnOpts);
+  if (mailEffects.channel) claimChannelDelivery(session, turnOpts);
 
-  activeByEmail.set(focusKey(normalized, sessionWorkspace(session)), sid);
+  if (mailEffects.focus && claimsChatFocus(session)) {
+    activeByEmail.set(focusKey(normalized, sessionWorkspace(session)), sid);
+  }
 
   if (interrupting) session.status = "running";
 
@@ -4164,6 +4647,9 @@ export async function messageAgent(
     // starts, so assistant replies stay interleaved (u1,a1,u2,a2,…).
     turnOpts.queueId = randomUUID();
     session.turnQueue.push(turnOpts);
+    if (turnOpts.voiceUtteranceId) {
+      bindVoiceUtterance(turnOpts.voiceUtteranceId, { turnOpts, userMessage: null });
+    }
     persistSessionHistory(sid, session);
     notifyHomeClients(normalized, "change", {
       source: "agent",
@@ -4173,9 +4659,19 @@ export async function messageAgent(
       queueLength: queuedTurnCount(session),
     });
   } else {
-    session.messages.push(
-      stampMessage("user", bubble || (files.length ? "" : "(attachment)"), null, { files })
+    /** @type {{ files: { name: string, mimeType: string }[], scratch?: boolean, mailFrom?: string }} */
+    const stamped = { files, scratch: session.voiceMode === true };
+    if (mailFrom) stamped.mailFrom = mailFrom;
+    const userRow = stampMessage(
+      "user",
+      bubble || (files.length ? "" : "(attachment)"),
+      null,
+      stamped
     );
+    session.messages.push(userRow);
+    if (turnOpts.voiceUtteranceId) {
+      bindVoiceUtterance(turnOpts.voiceUtteranceId, { turnOpts, userMessage: userRow });
+    }
     // Awaited so a brand-new chat's .md exists before the 202 and the SSE
     // change; a /chats refresh right after send must already list it.
     await persistSessionHistory(sid, session);
@@ -4336,6 +4832,14 @@ async function hydrateAgentSession(sid, email, opts = {}) {
   if (again) return again;
   const workspace = normalizeJypeWorkspace(loaded.workspace || hinted);
   const messages = (loaded.messages || []).map((m) => messageFromHistory(m));
+  const role = loaded.role || "";
+  let lastMailFromSessionId = "";
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.role === "user" && messages[i].mailFrom) {
+      lastMailFromSessionId = String(messages[i].mailFrom);
+      break;
+    }
+  }
   const session = {
     agent: null,
     email: normalized,
@@ -4363,13 +4867,35 @@ async function hydrateAgentSession(sid, email, opts = {}) {
     whatsappOrigin: null,
     whatsappDeliverFinal: false,
     guestCaller: null,
-    ephemeralPinned: workspace === "jype" ? true : !loaded.ephemeral,
+    ephemeralPinned:
+      role === "orchestrator" || role === "subagent"
+        ? !loaded.ephemeral
+        : workspace === "jype"
+          ? true
+          : !loaded.ephemeral,
+    role,
+    cursorAgentId: loaded.cursorAgent || "",
+    parentSessionId: loaded.parentSession || "",
+    mailScope: loaded.mailScope || "open",
+    modelLock: loaded.modelLock || "",
+    orchestratorKey: loaded.orchestratorKey || "",
+    childSessionIds: Array.isArray(loaded.children) ? [...loaded.children] : [],
+    lastMailFromSessionId,
   };
   if (loaded.scheduled) {
     session.scheduled = true;
     session.scheduledRunAt = loaded.scheduledRunAt || "";
     session.scheduledStatus = loaded.scheduledStatus || "pending";
     session.forceGrok = true;
+  }
+  if (
+    session.role === "orchestrator" &&
+    session.orchestratorKey &&
+    !session.imessageOrigin &&
+    !session.teamsOrigin
+  ) {
+    const row = await readOrchestrator(session.orchestratorKey);
+    if (row?.origin) applyStoredChannelOrigin(session, row.platform || "", row.origin);
   }
   sessions.set(sid, session);
   return session;
@@ -4787,3 +5313,210 @@ export function startFutureAgentScheduler() {
       console.error("[future-agents] scheduler", err);
     });
 }
+
+function gitCapture(args) {
+  return new Promise((resolve) => {
+    execFile("git", args, { cwd: REPO_ROOT }, (err, stdout) => {
+      if (err) resolve(null);
+      else resolve(String(stdout || ""));
+    });
+  });
+}
+
+async function gitDirtySet() {
+  const out = await gitCapture(["status", "--porcelain"]);
+  if (out == null) return null;
+  const set = new Set();
+  for (const line of out.split("\n")) {
+    if (!line.trim()) continue;
+    set.add(line.slice(3).trim());
+  }
+  return set;
+}
+
+async function restoreGitDirty(before) {
+  if (!before) return;
+  const after = await gitDirtySet();
+  if (!after) return;
+  const added = [...after].filter((path) => path && !before.has(path));
+  if (!added.length) return;
+  await new Promise((resolve) => {
+    execFile("git", ["checkout", "--", ...added], { cwd: REPO_ROOT }, () => resolve());
+  });
+}
+
+async function hiddenAgentText(session, prompt) {
+  if (!session.agent || typeof session.agent.send !== "function") {
+    session.agent = await createPersonalCursorAgent({
+      model: copyModelSpec(DEFAULT_MODEL_SPEC),
+    });
+  }
+  const model = copyModelSpec(DEFAULT_MODEL_SPEC);
+  const chunks = [];
+  // Same send shape as a normal turn, without the extra chat tools.
+  // This checkout has no SDK types that show a tools-off flag, so none is passed.
+  // Tracked file edits from this turn are checked out. Tool bubbles are dropped.
+  const run = await session.agent.send(prompt, { model });
+  session.activeRun = run;
+  if (typeof run.stream === "function") {
+    for await (const event of run.stream()) {
+      if (event?.type === "assistant" && event.message?.content) {
+        for (const block of event.message.content) {
+          if (block?.type === "text" && typeof block.text === "string") {
+            chunks.push(block.text);
+          }
+        }
+      }
+    }
+  }
+  const result = await run.wait();
+  session.activeRun = null;
+  let content = result && typeof result.result === "string" ? result.result.trim() : "";
+  if (!content) {
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      const piece = String(chunks[i] || "").trim();
+      if (piece) {
+        content = piece;
+        break;
+      }
+    }
+  }
+  return content;
+}
+
+/**
+ * Hidden Grok turn for the voice summary. Does not take website focus.
+ * @param {string} sid
+ * @param {string} email
+ * @param {string} prompt
+ */
+export async function sendVoiceSummaryTurn(sid, email, prompt) {
+  const normalized = canonicalizeEmail(email);
+  let session = sessions.get(sid);
+  if (!session) {
+    session = {
+      agent: null,
+      email: normalized,
+      workspace: "",
+      messages: [],
+      status: "idle",
+      turnQueue: [],
+      voiceMode: true,
+      createdAt: Date.now(),
+      lastUsedAt: Date.now(),
+      uploads: [],
+      uploadDirRel: null,
+    };
+    sessions.set(sid, session);
+  }
+  if (!canAccessSession(session, normalized)) {
+    const err = new Error("forbidden");
+    err.status = 403;
+    throw err;
+  }
+  const beforeLen = session.messages.length;
+  const beforeGit = await gitDirtySet();
+  let text = "";
+  try {
+    text = await hiddenAgentText(session, String(prompt || ""));
+  } catch (err) {
+    console.error("[voice] summary turn", err);
+    text = "";
+  } finally {
+    if (session.messages.length > beforeLen) session.messages.length = beforeLen;
+    session.activeRun = null;
+    await restoreGitDirty(beforeGit);
+  }
+  return { text };
+}
+
+/**
+ * Replace scratch rows with the summary bubbles and write the chat file.
+ * @param {string} sid
+ * @param {string} email
+ * @param {{ role: "user"|"assistant", text: string }[]} bubbles
+ */
+export async function commitVoiceSummary(sid, email, bubbles) {
+  const normalized = canonicalizeEmail(email);
+  const rows = (bubbles || []).map((b) => stampMessage(b.role, b.text));
+  const session = sessions.get(sid);
+  if (!session) {
+    await persistChatHistory({
+      email: normalized,
+      sessionId: sid,
+      messages: rows,
+    });
+    return { ok: true, rebuilt: true };
+  }
+  if (!canAccessSession(session, normalized)) {
+    const err = new Error("forbidden");
+    err.status = 403;
+    throw err;
+  }
+  session.messages = rows;
+  session.voiceMode = false;
+  session.replayUiTranscript = true;
+  session.turnQueue = [];
+  session.status = "idle";
+  await persistSessionHistory(sid, session);
+  return { ok: true, rebuilt: false };
+}
+
+/**
+ * Stop a live voice turn without starting another Grok send.
+ * @param {string} sid
+ * @param {string} email
+ */
+export async function cancelVoiceAgentTurn(sid, email) {
+  const normalized = canonicalizeEmail(email);
+  const session = sessions.get(String(sid || ""));
+  if (!session) return { cancelled: false };
+  if (!canAccessSession(session, normalized)) {
+    const err = new Error("forbidden");
+    err.status = 403;
+    throw err;
+  }
+  const running = session.status === "running" || (session.turnQueue || []).length > 0;
+  if (!running) return { cancelled: false };
+  session.interrupting = true;
+  try {
+    await cancelActiveRun(session);
+    session.turnQueue = [];
+    session.status = "idle";
+    releaseTurnRun(session);
+  } finally {
+    session.interrupting = false;
+  }
+  return { cancelled: true };
+}
+
+/** @param {string} id @param {Session} session */
+export function installAgentSessionForTests(id, session) {
+  sessions.set(id, session);
+}
+
+/** @param {string} id */
+export function discardAgentSessionForTests(id) {
+  const session = sessions.get(id);
+  sessions.delete(id);
+  if (session?.email && activeByEmail.get(focusKey(session.email, session.workspace)) === id) {
+    activeByEmail.delete(focusKey(session.email, session.workspace));
+  }
+}
+
+/** @param {string} sid */
+export function persistSessionHistoryForTests(sid) {
+  const session = sessions.get(sid);
+  if (!session) throw new Error("session missing");
+  return persistSessionHistory(sid, session);
+}
+
+export {
+  startVoiceSession,
+  voiceUtterance,
+  voiceState,
+  voiceAudio,
+  voiceDormant,
+  voiceResume,
+  voiceHeartbeat,
+} from "./voice-agent.js";

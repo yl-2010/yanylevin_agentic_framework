@@ -936,6 +936,30 @@ export async function createLocalCursorAgent({ model, cwd }) {
 }
 
 /**
+ * Resume a local Cursor agent by id. Same key, model, and cwd as create.
+ * @param {{
+ *   agentId: string,
+ *   model: { id: string, params?: { id: string, value: string }[] },
+ *   cwd: string,
+ * }} opts
+ */
+export async function resumeLocalCursorAgent({ agentId, model, cwd }) {
+  if (typeof agentId !== "string" || !agentId.trim()) {
+    throw new Error("agentId is required");
+  }
+  await reloadCursorApiKeyFromEnv();
+  const apiKey = requireCursorApiKey();
+  const { Agent } = await import("@cursor/sdk");
+  const agent = await Agent.resume(agentId, {
+    apiKey,
+    model,
+    local: { cwd },
+  });
+  liveLocalAgents.add(agent);
+  return agent;
+}
+
+/**
  * Dispose only the caller's failing Agent, then create a fresh one.
  * Other chats keep their agents; owner evict listeners do not fire.
  * `attach` runs in the same lock as create so the owner pointer is never a

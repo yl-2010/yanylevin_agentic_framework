@@ -9,6 +9,7 @@
     "dev": "node --env-file=.env --watch index.js",
     "agent-worker": "node --env-file=.env agent-worker.js",
     "agent-worker:restart-when-idle": "curl -sS -f -X POST http://127.0.0.1:3005/restart-when-idle",
+    "voice-speech": "python3 voice-speech.py",
     "daily-briefing": "node --env-file=.env daily-briefing-agent.js",
     "daily-briefing-grokbot": "node --env-file=.env daily-briefing-grokbot.js",
     "grokbot-usage": "node grokbot-usage.js",

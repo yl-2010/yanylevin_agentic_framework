@@ -88,6 +88,13 @@ export const markAgentChatRead = proxy("markAgentChatRead");
 export const resolveChatUploadFile = proxy("resolveChatUploadFile");
 export const scheduleFutureAgentLive = proxy("scheduleFutureAgentLive");
 export const cancelFutureAgentLive = proxy("cancelFutureAgentLive");
+export const startVoiceSession = proxy("startVoiceSession");
+export const voiceUtterance = proxy("voiceUtterance");
+export const voiceState = proxy("voiceState");
+export const voiceAudio = proxy("voiceAudio");
+export const voiceDormant = proxy("voiceDormant");
+export const voiceResume = proxy("voiceResume");
+export const voiceHeartbeat = proxy("voiceHeartbeat");
 
 /**
  * Parse SSE text; returns leftover partial block.

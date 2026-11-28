@@ -1902,6 +1902,10 @@ void main() {
   function initMagneticCorners() {
     if (cheapGlassOn()) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // data-lg-clamp: same hover as the big static rectangle cards (axis-aligned lift, no rotate-squash).
+    document.querySelectorAll("[data-lg-clamp]").forEach((el) => {
+      bindMagnetic(el, 0.28 * STATIC_BOX_MAG_SCALE, { clamp: true });
+    });
     document
       .querySelectorAll(".corner:not(.yan-chat-pill)")
       .forEach((el) => bindMagnetic(el, 0.28));
