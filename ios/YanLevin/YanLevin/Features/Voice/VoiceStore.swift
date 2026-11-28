@@ -3,8 +3,9 @@ import Foundation
 import UIKit
 
 /// Live voice call on the Mac. Uses `APIClient` and the same bearer as
-/// `POST api/home/agent/message`. The phone still says Okay or Checking
-/// before this returns. Parakeet, Kokoro, and Grok run on the server.
+/// `POST api/home/agent/message`. The phone starts talking before this
+/// returns, and keeps going until the answer audio starts. Parakeet, Kokoro,
+/// and Grok run on the server. Grok does not gate the first line.
 @MainActor
 final class VoiceStore {
     static let shared = VoiceStore()
@@ -27,6 +28,9 @@ final class VoiceStore {
     private var didSaveHaptic = false
     private var answerStarted = false
     private var agentRunning = false
+    /// True once a poll showed this turn actually running or compressing.
+    /// An idle poll before that must not cut off the holding lines.
+    private var sawServerBusy = false
     private var serverPhase: VoiceOrbPhase = .breathing
     private var foreground = true
     /// True only after a foreground poll still showed an unsummarized call.
@@ -121,6 +125,7 @@ final class VoiceStore {
         holding = false
         holdingIntent = false
         agentRunning = false
+        sawServerBusy = false
         serverPhase = .breathing
         chaseUntil = nil
         stopHeartbeat()
@@ -249,6 +254,7 @@ final class VoiceStore {
         didSaveHaptic = false
         answerStarted = false
         agentRunning = false
+        sawServerBusy = false
         serverPhase = .breathing
         chaseUntil = nil
         sawUnsummarizedWhileForeground = false
@@ -289,9 +295,12 @@ final class VoiceStore {
             let interrupt = item.interruptsLiveTurn || agentRunning
             if !VoicePhrase.isSocial(item.text) {
                 agentRunning = true
+                sawServerBusy = false
                 serverPhase = .searching
                 VoiceCapture.shared.liveTurnRunning = true
                 surface?.voiceServerPhase(.searching)
+            } else {
+                VoiceCapture.shared.endCompany(stopSpeech: false)
             }
             let job = Outbound(
                 id: item.id,
@@ -346,10 +355,25 @@ final class VoiceStore {
                 }
                 return
             }
-            guard Self.isRetryable(error) else { return }
+            guard Self.isRetryable(error) else {
+                failUtterance()
+                return
+            }
             try? await Task.sleep(nanoseconds: 400_000_000)
-            _ = try? await postUtterance(body, token: token)
+            do {
+                _ = try await postUtterance(body, token: token)
+            } catch {
+                failUtterance()
+            }
         }
+    }
+
+    /// The Mac did not take the turn. Stop the holding lines instead of talking over a dead send.
+    private func failUtterance() {
+        agentRunning = false
+        sawServerBusy = false
+        VoiceCapture.shared.liveTurnRunning = false
+        VoiceCapture.shared.endCompany(stopSpeech: true)
     }
 
     private func recoverUtterance(_ body: VoiceUtteranceBody, token: String, error: Error) async {
@@ -499,6 +523,13 @@ final class VoiceStore {
             VoiceCapture.shared.noteServerCaption(label)
         }
         playSpeak(state.speak ?? [])
+        let serverBusy = agentRunning || serverPhase == .working || serverPhase == .searching
+        if serverBusy {
+            sawServerBusy = true
+        } else if sawServerBusy && !answerStarted {
+            sawServerBusy = false
+            VoiceCapture.shared.endCompany(stopSpeech: true)
+        }
         if state.summarized == true {
             sessionId = nil
             holding = false
@@ -523,7 +554,7 @@ final class VoiceStore {
     private func considerCaption(_ raw: String?) {
         let text = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        if text == "Okay." || text == "Checking." { return }
+        if text == "Okay." || VoicePhrase.isCompanyLine(text) { return }
         if answerStarted { return }
         let capture = VoiceCapture.shared
         if capture.isHearing || capture.isSpeaking { return }
@@ -548,7 +579,17 @@ final class VoiceStore {
                 }
                 if let lineID = track.lineID, let audioId = chunk.audioId, !audioId.isEmpty, !track.audioDone {
                     fetchAudio(chunkID: chunk.id, audioId: audioId, lineID: lineID, role: .firstSound, line: text)
-                } else if track.lineID == nil || chunk.audioId == nil {
+                } else if track.lineID == nil || Date().timeIntervalSince(track.seen) > 2.5 {
+                    track.audioDone = true
+                }
+            } else if kind == "hold" {
+                if !track.spoke && !text.isEmpty {
+                    track.spoke = true
+                    VoiceCapture.shared.speakServerCompany(id: chunk.id, text: text)
+                }
+                if let audioId = chunk.audioId, !audioId.isEmpty, !track.audioDone {
+                    fetchAudio(chunkID: chunk.id, audioId: audioId, lineID: chunk.id, role: .company, line: text)
+                } else if chunk.audioId == nil && Date().timeIntervalSince(track.seen) > Self.audioWait {
                     track.audioDone = true
                 }
             } else if !text.isEmpty {
@@ -721,12 +762,15 @@ final class VoiceStore {
         }
     }
 
+    /// `listening` is an open mic. `breathing` means the call went dormant.
     private static func orbPhase(_ raw: String?) -> VoiceOrbPhase {
         switch raw {
         case "working": return .working
         case "searching": return .searching
         case "composing": return .composing
         case "connecting": return .connecting
+        case "listening": return .listening
+        case "breathing": return .breathing
         default: return .breathing
         }
     }

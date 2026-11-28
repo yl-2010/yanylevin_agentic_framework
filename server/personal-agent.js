@@ -376,6 +376,64 @@ export const DEFAULT_MODEL_SPEC = personalModelSpec(
   "grok-4.7"
 );
 
+/**
+ * Live voice turns. Same selection as fitness-agent.js.
+ * Composer 2.5, Fast on. Not a "-fast" id.
+ */
+export const VOICE_LIVE_MODEL_SPEC = {
+  id: "composer-2.5",
+  params: [{ id: "fast", value: "true" }],
+};
+
+/**
+ * Hard spoken work. Same params as the text default, Fast on.
+ * Not a "grok-4.7-high-fast" id.
+ */
+export const VOICE_HARD_MODEL_SPEC = {
+  id: "grok-4.7",
+  params: [
+    { id: "context", value: "256k" },
+    { id: "reasoning_effort", value: "high" },
+    { id: "fast", value: "true" },
+  ],
+};
+
+/**
+ * SDK subagent Composer may start on a really hard spoken turn.
+ * The key is the name in the Agent tool. Fast stays on.
+ */
+export function voiceHardAgents() {
+  return {
+    hard: {
+      description:
+        "Really hard spoken work only. Grok 4.7 high with Fast on. Do not take a normal question.",
+      prompt: [
+        "You are the Personal Agent on a spoken turn that was really hard for Composer 2.5 Fast.",
+        "Do the work. Same permissions as the parent turn.",
+        `Read ${PERSONAL_SKILL_PATHS.soul} and the skill this task needs.`,
+        "The final text is a normal chat answer. Do not role-play a phone call.",
+      ].join(" "),
+      model: copyModelSpec(VOICE_HARD_MODEL_SPEC),
+    },
+  };
+}
+
+/** Create options for a live voice session. Summary does not use these. */
+export function voiceCursorCreateOpts() {
+  return {
+    model: copyModelSpec(VOICE_LIVE_MODEL_SPEC),
+    agents: voiceHardAgents(),
+  };
+}
+
+/**
+ * @param {{ voiceMode?: boolean }} session
+ */
+function cursorVoiceExtras(session) {
+  if (!session?.voiceMode) return {};
+  return { agents: voiceHardAgents() };
+}
+
 /** Attachment / image Personal Agent. grok-4.7 high, Fast off, independent of text-only. */
 export const ATTACHMENT_MODEL_SPEC = personalModelSpec(
   process.env.CURSOR_PERSONAL_ATTACHMENT_MODEL ||
@@ -2412,6 +2470,7 @@ async function replaceSessionAgent(session, model) {
     model,
     cwd: REPO_ROOT,
     previous,
+    ...cursorVoiceExtras(session),
     attach: (agent) => {
       session.agent = agent;
       if (agent?.agentId) session.cursorAgentId = agent.agentId;
@@ -2430,12 +2489,14 @@ async function replaceSessionAgent(session, model) {
  */
 async function ensureCursorAgent(session, model) {
   if (session.agent) return session.agent;
+  const extras = cursorVoiceExtras(session);
   if (session.cursorAgentId) {
     try {
       const resumed = await resumeLocalCursorAgent({
         agentId: session.cursorAgentId,
         model,
         cwd: REPO_ROOT,
+        ...extras,
       });
       session.agent = resumed;
       session.replayUiTranscript = false;
@@ -2447,7 +2508,11 @@ async function ensureCursorAgent(session, model) {
       session.cursorAgentId = "";
     }
   }
-  const created = await createLocalCursorAgent({ model, cwd: REPO_ROOT });
+  const created = await createLocalCursorAgent({
+    model,
+    cwd: REPO_ROOT,
+    ...extras,
+  });
   session.agent = created;
   session.cursorAgentId = created?.agentId || "";
   session.replayUiTranscript = true;
@@ -3417,6 +3482,7 @@ function modelLockCreateOpts(modelLock) {
 }
 
 export function guestTurnModelSpec(session, hasSessionFiles) {
+  if (session.voiceMode) return copyModelSpec(VOICE_LIVE_MODEL_SPEC);
   if (session.modelLock === "grok") return copyModelSpec(GUEST_GROK_SPEC);
   if (session.modelLock === "composer") return copyModelSpec(GUEST_COMPOSER_SPEC);
   if (session.forceGrok) return copyModelSpec(GUEST_GROK_SPEC);
@@ -3462,6 +3528,7 @@ async function createPersonalCursorAgent(opts = {}) {
       agent = await createLocalCursorAgent({
         model: currentModel,
         cwd: REPO_ROOT,
+        agents: opts.agents,
       });
       return { status: "finished", result: "ok" };
     },
@@ -3491,10 +3558,12 @@ export async function startAgent(email, opts = {}) {
     throw err;
   }
 
-  const createOpts =
-    workspace === "jype"
-      ? { ...opts, model: opts.model || copyModelSpec(DEFAULT_MODEL_SPEC) }
-      : opts;
+  const createOpts = { ...opts };
+  if (opts.voice) {
+    Object.assign(createOpts, voiceCursorCreateOpts());
+  } else if (workspace === "jype") {
+    createOpts.model = opts.model || copyModelSpec(DEFAULT_MODEL_SPEC);
+  }
   const agent = opts.agent || (await createPersonalCursorAgent(createOpts));
 
   const id =
@@ -5441,6 +5510,7 @@ async function hiddenAgentText(session, prompt) {
       model: copyModelSpec(DEFAULT_MODEL_SPEC),
     });
   }
+  // Voice summary stays on the slow default. Do not pass the live voice spec.
   const model = copyModelSpec(DEFAULT_MODEL_SPEC);
   const chunks = [];
   // Same send shape as a normal turn, without the extra chat tools.

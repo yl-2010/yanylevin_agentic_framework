@@ -2,7 +2,7 @@
  * Voice session on the agent worker.
  * One Personal Agent session per call. Scratch until the summary is written.
  * One device listens. Dormant is not the summary. The summary waits until the
- * session is dormant and every Grok turn and spoken line is finished, then
+ * session is dormant and every agent turn and spoken line is finished, then
  * one more minute.
  *
  * Speech goes through voice-speech-client.js, which talks to
@@ -27,10 +27,16 @@ export const VOICE_ANSWER_HARD_MS = 8000;
 export const VOICE_SPEAK_WORDS = 12;
 export const VOICE_SUMMARY_MAX_TOKENS = 80;
 export const VOICE_ACK_SOCIAL = "Okay.";
-export const VOICE_ACK_WORK = "Checking.";
+/**
+ * First spoken line for a real request. The phone says this itself, before the
+ * upload returns. Kokoro may replace it only if that word has not started.
+ * Later lines keep going while Grok is still working. They are not this one word.
+ */
+export const VOICE_ACK_WORK = "Yeah, one second.";
+export const VOICE_COMPANY_MAX = 3;
 
 export const VOICE_TURN_NOTE =
-  "This request was spoken. The work is the same as a typed turn. The final text is a normal chat answer.";
+  "This request was spoken. The work is the same as a typed turn. The final text is a normal chat answer. If the task is really hard, start the hard subagent. A normal question stays on this turn.";
 
 const SPOKEN_STOP = new Set(
   `a an the and or but if then so to of in on for at by with from as is are was were be been being it this that these those i you he she we they me him her us them my your his its our their not no nor do does did doing done have has had having will would can could should may might must about into over after before up down out off than too very just also only own same than`.split(
@@ -38,7 +44,7 @@ const SPOKEN_STOP = new Set(
   )
 );
 
-// Same phrases as VoicePhrase.socialPhrases. Exact match after normalizeSocialText.
+// Same phrases as VoicePhrase.socialPhrases. Keep the two lists identical.
 const SOCIAL_PHRASES = [
   "hey",
   "hi",
@@ -53,6 +59,22 @@ const SOCIAL_PHRASES = [
 ];
 
 const SOCIAL_EXACT = new Set(SOCIAL_PHRASES);
+
+// Same words as VoicePhrase.fillers. A breath in front of hello is still hello.
+const SOCIAL_FILLERS = new Set(
+  "uh um uhm hmm hm ah er eh huh mm mmm mhm mmhmm uhh ahh".split(" ")
+);
+
+// Talk that can sit in a holding line. A word outside this set, and outside
+// what he just said, is a fact the line is not allowed to invent.
+const COMPANY_BRIDGE = new Set(
+  `yeah looking still here second right sure hang give little longer minute moment waiting check checking seeing reading pulling opening about`.split(
+    /\s+/
+  )
+);
+
+const RESULT_CLAIM =
+  /\b(i|i've|i’ve)\s+(moved|filed|finished|done|sent|added|deleted|removed|changed|updated|put|set|handled|fixed|booked|scheduled|emailed|texted)\b/i;
 
 /** @type {Map<string, { text: string, sent: boolean, bag: any }>} */
 const utteranceSlots = new Map();
@@ -82,13 +104,29 @@ export function normalizeSocialText(raw) {
 }
 
 /**
- * Fixed allowlist. Exact phrase only, same list as the phone.
+ * Same rule as VoicePhrase.isSocial. Fillers drop out, then the phrase has to
+ * be one allowlist line. "hello hello" still counts. Extra words do not.
  * @param {unknown} raw
  */
 export function isSocialUtterance(raw) {
-  const norm = normalizeSocialText(raw);
-  if (!norm) return false;
-  return SOCIAL_EXACT.has(norm);
+  const words = normalizeSocialText(raw)
+    .split(" ")
+    .filter((word) => word && !SOCIAL_FILLERS.has(word));
+  if (!words.length) return false;
+  if (SOCIAL_EXACT.has(words.join(" "))) return true;
+  for (const candidate of SOCIAL_PHRASES) {
+    const parts = candidate.split(" ");
+    if (!parts.length || words.length <= parts.length || words.length % parts.length !== 0) continue;
+    let matches = true;
+    for (let i = 0; i < words.length; i++) {
+      if (words[i] !== parts[i % parts.length]) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) return true;
+  }
+  return false;
 }
 
 /**
@@ -154,6 +192,26 @@ export function spokenLineAddsNoun(reply, spoken) {
     if (!known.has(word)) return true;
   }
   return false;
+}
+
+/**
+ * A holding line while Grok is still working. It can echo his words and
+ * ordinary stalling. It cannot claim the work already happened, and it
+ * cannot name something he did not say.
+ * @param {string} userText
+ * @param {string} line
+ */
+export function acceptCompanyLine(userText, line) {
+  const text = String(line || "").replace(/\s+/g, " ").trim();
+  if (!text || text.length > 140) return false;
+  if (RESULT_CLAIM.test(text)) return false;
+  if (/^(done|finished|all set)\b/i.test(text)) return false;
+  const known = new Set(contentWords(userText));
+  for (const word of contentWords(text)) {
+    if (known.has(word) || COMPANY_BRIDGE.has(word)) continue;
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -672,6 +730,7 @@ export function createVoiceBook(deps) {
         activeDevice: call.activeDevice,
       };
       call.seen.set(id, record);
+      stopCompany(call);
       if (social) {
         if (interrupt && typeof deps.cancelTurn === "function") {
           await deps.cancelTurn(call.sessionId, call.email);
@@ -692,17 +751,22 @@ export function createVoiceBook(deps) {
       if (typeof deps.messageAgent !== "function") {
         throw httpError(500, "voice agent is not wired");
       }
+      // The phone already started the opener. Kokoro for that line, and the
+      // next spoken lines, start here. messageAgent is the slow part and does
+      // not sit in front of them.
+      void synthAck(deps, call, VOICE_ACK_WORK);
+      void runCompanyTalk(call, id, said, deps, (text, kind) => pushSpeak(call, text, kind));
       const hearing = transcribeSwap(call, id, audioBase64, deps.transcribe);
       try {
         await deps.messageAgent(call.sessionId, call.email, said, id, Boolean(interrupt));
       } catch (err) {
+        stopCompany(call);
         call.pendingSpeak.delete(id);
         call.turns = call.turns.filter((row) => row.utteranceId !== id);
         call.seen.delete(id);
         throw err;
       }
       void hearing;
-      void synthAck(deps, call, VOICE_ACK_WORK);
       await save(call);
       return record;
     },
@@ -710,6 +774,8 @@ export function createVoiceBook(deps) {
     async grokFinished({ sessionId, utteranceId, content, dropped }) {
       const call = bySession.get(sessionId);
       if (!call || call.summarized) return;
+      // Free LM Studio before the answer compression, and stop new holding lines.
+      stopCompany(call);
       const turn = call.turns.find((row) => row.utteranceId && row.utteranceId === utteranceId);
       if (dropped) {
         if (turn) {
@@ -893,6 +959,91 @@ export function createVoiceBook(deps) {
   };
 }
 
+function stopCompany(call) {
+  if (!call) return;
+  if (call.companyAbort) {
+    call.companyAbort.abort();
+    call.companyAbort = null;
+  }
+  call.companyFor = "";
+}
+
+/**
+ * Short lines from gpt-oss while the agent turn is still going.
+ * Started before messageAgent is awaited. Aborted when the answer is ready.
+ * A slow or missing model changes nothing on the phone, which is already talking.
+ * @param {any} call
+ * @param {string} id
+ * @param {string} userText
+ * @param {object} deps
+ * @param {(text: string, kind: string) => void} push
+ */
+async function runCompanyTalk(call, id, userText, deps, push) {
+  if (typeof deps.streamCompany !== "function") return;
+  const ac = new AbortController();
+  call.companyAbort = ac;
+  call.companyFor = id;
+  let seen = 0;
+  let kept = 0;
+  try {
+    for await (const piece of deps.streamCompany(userText, ac.signal)) {
+      if (ac.signal.aborted || call.companyFor !== id) return;
+      seen += 1;
+      if (seen > 8 || kept >= VOICE_COMPANY_MAX) return;
+      const line = String(piece || "").trim();
+      if (!line || line === VOICE_ACK_WORK || line === VOICE_ACK_SOCIAL) continue;
+      if (!acceptCompanyLine(userText, line)) continue;
+      push(line, "hold");
+      kept += 1;
+    }
+  } catch {
+    /* phone is already saying the local lines */
+  }
+}
+
+/**
+ * One or two short stalling sentences. No tools, no result.
+ * @param {string} userText
+ * @param {AbortSignal} [signal]
+ */
+export async function* streamCompanyLines(userText, signal) {
+  const messages = [
+    {
+      role: "system",
+      content: [
+        "You are on a phone call. Someone else is doing the work.",
+        "Keep them company with short spoken sentences while that work is still going.",
+        "Use only words from what they just said, plus ordinary stalling.",
+        "Do not say the work is finished. Do not invent a result, a name, or a place.",
+        "No tools. Two or three short sentences.",
+      ].join(" "),
+    },
+    { role: "user", content: String(userText || "") },
+  ];
+  let buffer = "";
+  let emitted = 0;
+  const gen = streamChatCompletions({
+    messages,
+    maxTokens: VOICE_SUMMARY_MAX_TOKENS,
+    temperature: 0.4,
+    signal,
+  });
+  for await (const delta of gen) {
+    if (signal?.aborted) return;
+    buffer += delta;
+    while (emitted < 6) {
+      const split = splitSpeakable(buffer, false);
+      if (!split) break;
+      buffer = split.rest;
+      emitted += 1;
+      yield split.piece;
+    }
+    if (emitted >= 6) return;
+  }
+  const tail = splitSpeakable(buffer, true);
+  if (tail?.piece && emitted < 6 && !signal?.aborted) yield tail.piece;
+}
+
 /**
  * Kokoro for the fixed line the phone already started. Publish only when
  * audio exists, so a missing clip does not make the phone say it twice.
@@ -1045,6 +1196,9 @@ function productionDeps() {
     },
     synthesize: synthesizeClip,
     streamSpoken: streamSpokenAnswer,
+    streamCompany(userText, signal) {
+      return streamCompanyLines(userText, signal);
+    },
   };
 }
 

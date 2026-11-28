@@ -919,9 +919,22 @@ const COMPUTER_USE_AGENT = {
 };
 
 /**
- * @param {{ model: { id: string, params?: { id: string, value: string }[] }, cwd: string }} opts
+ * Computer use stays on every local agent. Extra defs are voice-only.
+ * @param {Record<string, object>|undefined} extra
  */
-export async function createLocalCursorAgent({ model, cwd }) {
+function localAgents(extra) {
+  if (!extra) return COMPUTER_USE_AGENT;
+  return { ...COMPUTER_USE_AGENT, ...extra };
+}
+
+/**
+ * @param {{
+ *   model: { id: string, params?: { id: string, value: string }[] },
+ *   cwd: string,
+ *   agents?: Record<string, object>,
+ * }} opts
+ */
+export async function createLocalCursorAgent({ model, cwd, agents }) {
   await reloadCursorApiKeyFromEnv();
   const apiKey = requireCursorApiKey();
   const { Agent } = await import("@cursor/sdk");
@@ -929,7 +942,7 @@ export async function createLocalCursorAgent({ model, cwd }) {
     apiKey,
     model,
     local: { cwd },
-    agents: COMPUTER_USE_AGENT,
+    agents: localAgents(agents),
   });
   liveLocalAgents.add(agent);
   return agent;
@@ -941,20 +954,24 @@ export async function createLocalCursorAgent({ model, cwd }) {
  *   agentId: string,
  *   model: { id: string, params?: { id: string, value: string }[] },
  *   cwd: string,
+ *   agents?: Record<string, object>,
  * }} opts
  */
-export async function resumeLocalCursorAgent({ agentId, model, cwd }) {
+export async function resumeLocalCursorAgent({ agentId, model, cwd, agents }) {
   if (typeof agentId !== "string" || !agentId.trim()) {
     throw new Error("agentId is required");
   }
   await reloadCursorApiKeyFromEnv();
   const apiKey = requireCursorApiKey();
   const { Agent } = await import("@cursor/sdk");
-  const agent = await Agent.resume(agentId, {
+  /** @type {Record<string, unknown>} */
+  const resumeOpts = {
     apiKey,
     model,
     local: { cwd },
-  });
+  };
+  if (agents) resumeOpts.agents = localAgents(agents);
+  const agent = await Agent.resume(agentId, resumeOpts);
   liveLocalAgents.add(agent);
   return agent;
 }
@@ -969,15 +986,16 @@ export async function resumeLocalCursorAgent({ agentId, model, cwd }) {
  *   cwd: string,
  *   attach?: (agent: any) => void,
  *   previous?: unknown,
+ *   agents?: Record<string, object>,
  * }} opts
  */
-export async function recreateLocalCursorAgent({ model, cwd, attach, previous }) {
+export async function recreateLocalCursorAgent({ model, cwd, attach, previous, agents }) {
   const run = evictChain.then(async () => {
     if (previous) {
       liveLocalAgents.delete(previous);
       await disposeAgentHandle(previous);
     }
-    const agent = await createLocalCursorAgent({ model, cwd });
+    const agent = await createLocalCursorAgent({ model, cwd, agents });
     if (typeof attach === "function") attach(agent);
     return agent;
   });

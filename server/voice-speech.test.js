@@ -383,6 +383,18 @@ try:
     raise SystemExit("bad rate should fail")
 except mod.SpeechError as exc:
     assert exc.code == "bad-wav"
+pcm = b"\\x00\\x01" * 5000
+parts = list(mod.iter_pcm_frames(pcm, mod.FRAME_SAMPLES))
+assert b"".join(parts) == pcm
+assert len(parts) > 1
+assert len(parts[0]) == mod.FRAME_SAMPLES * 2
+assert all(len(part) % 2 == 0 for part in parts)
+assert list(mod.iter_pcm_frames(b"", 4)) == []
+try:
+    list(mod.iter_pcm_frames(b"\\x00", 4))
+    raise SystemExit("odd pcm should fail")
+except mod.SpeechError as exc:
+    assert exc.code == "odd-pcm"
 print("ok")
 `,
       ],

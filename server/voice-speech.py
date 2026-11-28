@@ -36,6 +36,8 @@ DEFAULT_PORT = 3016
 BIND_HOST = "127.0.0.1"
 SAMPLE_RATE = 16000
 SPEAK_RATE = 24000
+# 100 ms at SPEAK_RATE. Each chunk is whole little-endian 16-bit frames.
+FRAME_SAMPLES = 2400
 VOICE = "af_heart"
 PARAKEET_REPO = "nvidia/parakeet-tdt-0.6b-v3"
 KOKORO_REPO = "hexgrad/Kokoro-82M"
@@ -99,6 +101,30 @@ def hypothesis_text(output) -> str:
     if isinstance(text, str):
         return text.strip()
     return ""
+
+
+def iter_pcm_frames(pcm: bytes, frame_samples: int = FRAME_SAMPLES):
+    """Yield s16le slices. The last slice can be short. Odd lengths are refused."""
+    if frame_samples < 1:
+        raise SpeechError("bad-frame")
+    if len(pcm) % 2 != 0:
+        raise SpeechError("odd-pcm")
+    frame_bytes = frame_samples * 2
+    start = 0
+    limit = len(pcm)
+    while start < limit:
+        yield pcm[start : start + frame_bytes]
+        start += frame_bytes
+
+
+def samples_to_s16le(samples) -> bytes:
+    import numpy as np
+
+    audio = np.asarray(samples, dtype=np.float32).reshape(-1)
+    audio = np.nan_to_num(audio, nan=0.0, posinf=0.0, neginf=0.0)
+    audio = np.clip(audio, -1.0, 1.0)
+    pcm = np.rint(audio * 32767.0).astype("<i2")
+    return np.ascontiguousarray(pcm).tobytes()
 
 
 def wav_to_pcm(data: bytes) -> bytes:
@@ -260,9 +286,10 @@ class LocalEngine:
     def speak_pcm(self, text: str, gen: int):
         if not self.kokoro_ready or self.pipeline is None:
             raise SpeechError("kokoro-not-loaded")
-        import numpy as np
         import torch
 
+        frame_bytes = FRAME_SAMPLES * 2
+        pending = bytearray()
         self._kokoro_lock.acquire()
         try:
             with torch.inference_mode():
@@ -273,11 +300,18 @@ class LocalEngine:
                         return
                     if hasattr(audio, "detach"):
                         audio = audio.detach().float().cpu().numpy()
-                    samples = np.asarray(audio, dtype=np.float32).reshape(-1)
-                    clipped = np.clip(samples, -1.0, 1.0)
-                    pcm = (clipped * 32767.0).astype("<i2").tobytes()
-                    if pcm:
-                        yield pcm
+                    pcm = samples_to_s16le(audio)
+                    if not pcm:
+                        continue
+                    pending.extend(pcm)
+                    while len(pending) >= frame_bytes:
+                        if self.gate.cancelled(gen):
+                            produced.close()
+                            return
+                        yield bytes(pending[:frame_bytes])
+                        del pending[:frame_bytes]
+                if pending and not self.gate.cancelled(gen):
+                    yield bytes(pending)
         finally:
             self._kokoro_lock.release()
 

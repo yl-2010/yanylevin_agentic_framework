@@ -1,9 +1,10 @@
 import SwiftUI
 
 /// Signed-out Voice is the Account sign-in cards. Signed-in Voice is one
-/// glass stage: the tinted orb, a caption capsule, and no person button.
-/// The orb is the mic. A tap starts listening. A tap while the session is
-/// up goes dormant and stops listening. The screen does not open Chat.
+/// glass stage: the tinted orb, and no person button. No caption, title,
+/// status line, or device name. The orb is the mic. A tap starts listening.
+/// A tap while the session is up goes dormant and stops listening. The
+/// screen does not open Chat.
 struct VoiceView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var nav: AppNavigationStore
@@ -53,9 +54,8 @@ struct VoiceView: View {
     }
 }
 
-/// Glass circle, caption capsule, and the orb control. Personal palette.
-/// iPhone landscape stays one column. iPad uses a larger circle and
-/// `AdaptiveLayout.formMaxWidth` for the caption.
+/// Glass circle and the orb control. Personal palette. iPhone landscape
+/// stays one column. iPad uses a larger circle. Nothing else is drawn.
 struct VoiceStage: View {
     @ObservedObject var session: VoiceSession
     /// Preview-only. Nil follows the real device.
@@ -64,7 +64,6 @@ struct VoiceStage: View {
     var onOrbTap: (() -> Void)? = nil
 
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     private var isPad: Bool {
         prefersPadLayout ?? AdaptiveLayout.isPad
@@ -82,23 +81,13 @@ struct VoiceStage: View {
     }
 
     var body: some View {
-        VStack(spacing: stackSpacing) {
-            orbControl
-            captionCapsule
-                .adaptiveReadableWidth(AdaptiveLayout.formMaxWidth, enabled: isPad)
-        }
-        .padding(.horizontal, isPad ? 32 : 24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background {
-            YLTheme.pageFill(colorScheme, palette: .standard)
-                .ignoresSafeArea()
-        }
-        .environment(\.ylPalette, .standard)
-    }
-
-    private var stackSpacing: CGFloat {
-        if verticalSizeClass == .compact && !isPad { return 16 }
-        return 28
+        orbControl
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background {
+                YLTheme.pageFill(colorScheme, palette: .standard)
+                    .ignoresSafeArea()
+            }
+            .environment(\.ylPalette, .standard)
     }
 
     private var orbControl: some View {
@@ -113,8 +102,16 @@ struct VoiceStage: View {
                 }
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(onOrbTap == nil ? session.orbAccessibilityLabel : session.phase.rawValue)
+            .accessibilityLabel(orbAccessibility)
             .accessibilityAddTraits(session.orbIsControl || onOrbTap != nil ? .isButton : [])
+    }
+
+    /// VoiceOver names the control. It does not read a caption, a status
+    /// line, or which device holds the mic.
+    private var orbAccessibility: String {
+        if onOrbTap != nil { return session.phase.rawValue }
+        if session.otherDeviceHoldsMic { return "Voice" }
+        return session.orbAccessibilityLabel
     }
 
     private var orbGlass: some View {
@@ -125,23 +122,6 @@ struct VoiceStage: View {
                 interactive: session.orbIsControl || onOrbTap != nil,
                 clear: true
             )
-    }
-
-    private var captionCapsule: some View {
-        let line = session.displayedCaption
-        return (Text(line.settled).foregroundStyle(YLTheme.fg(colorScheme))
-            + Text(line.volatileSuffix).foregroundStyle(YLTheme.muted(colorScheme)))
-            .font(.body)
-            .lineLimit(1)
-            .minimumScaleFactor(0.75)
-            .frame(maxWidth: .infinity, minHeight: 22)
-            .padding(.horizontal, 18)
-            .padding(.vertical, 12)
-            .ylGlassCapsule(interactive: false)
-            .opacity(line.isEmpty ? 0 : 1)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(line.spoken)
-            .accessibilityHidden(line.isEmpty)
     }
 }
 
@@ -210,20 +190,6 @@ private struct VoiceStateBrowser: View {
 
     private func show(_ next: Int) {
         index = next
-        let phase = phases[next]
-        session.preview(phase, caption: Self.sample(phase))
-    }
-
-    private static func sample(_ phase: VoiceOrbPhase) -> VoiceCaption {
-        switch phase {
-        case .connecting, .breathing:
-            return VoiceCaption()
-        case .listening:
-            return VoiceCaption(settled: "Move the calc set", volatileSuffix: " to Friday")
-        case .working, .searching:
-            return VoiceCaption(settled: "Checking.")
-        case .composing:
-            return VoiceCaption(settled: "Moved it to Friday.")
-        }
+        session.preview(phases[next])
     }
 }

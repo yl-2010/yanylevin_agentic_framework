@@ -18,6 +18,10 @@ import {
   FOUR11_SKILL_PATH,
   ATTACHMENT_MODEL_SPEC,
   DEFAULT_MODEL_SPEC,
+  VOICE_HARD_MODEL_SPEC,
+  VOICE_LIVE_MODEL_SPEC,
+  voiceCursorCreateOpts,
+  voiceHardAgents,
   EMPTY_TURN_REPLY,
   guestTurnModelSpec,
   normalizeAttachments,
@@ -222,6 +226,31 @@ describe("Personal Agent models", () => {
       false
     );
     assert.equal(grok.id, "grok-4.7");
+  });
+
+  it("uses Composer 2.5 Fast for a live voice turn and Grok 4.7 high Fast for the hard subagent", () => {
+    const live = guestTurnModelSpec({ voiceMode: true }, false);
+    assert.equal(live.id, VOICE_LIVE_MODEL_SPEC.id);
+    assert.deepEqual(live.params, [{ id: "fast", value: "true" }]);
+    const withFiles = guestTurnModelSpec({ voiceMode: true }, true);
+    assert.equal(withFiles.id, "composer-2.5");
+    assert.equal(withFiles.params.find((p) => p.id === "fast")?.value, "true");
+    assert.equal(VOICE_HARD_MODEL_SPEC.id, "grok-4.7");
+    assert.deepEqual(VOICE_HARD_MODEL_SPEC.params, [
+      { id: "context", value: "256k" },
+      { id: "reasoning_effort", value: "high" },
+      { id: "fast", value: "true" },
+    ]);
+    const created = voiceCursorCreateOpts();
+    assert.deepEqual(created.model, live);
+    const hard = voiceHardAgents().hard;
+    assert.equal(hard.model.params.find((p) => p.id === "fast")?.value, "true");
+    assert.equal(
+      hard.model.params.find((p) => p.id === "reasoning_effort")?.value,
+      "high"
+    );
+    assert.match(hard.description, /Really hard/);
+    assert.equal(DEFAULT_MODEL_SPEC.params.find((p) => p.id === "fast")?.value, "false");
   });
 });
 
