@@ -637,6 +637,9 @@ describe("Personal Agent skill files", () => {
       "utf8"
     );
     assert.match(browser, /Which profile/);
+    assert.match(browser, /tabs stay sorted/);
+    assert.match(browser, /shared across every profile/);
+    assert.doesNotMatch(browser, /logged-out page/);
     assert.match(browser, /tabs open/);
     assert.match(browser, /--profile/);
     assert.match(browser, /Personal/);
@@ -850,6 +853,7 @@ describe("Personal Agent skill files", () => {
     assert.match(agent, /personal-onenote/);
     assert.match(agent, /personal-browser/);
     assert.match(agent, /profile whose name matches the task/);
+    assert.match(agent, /Logins are shared across profiles/);
     assert.match(agent, /context-synthesis/);
     assert.match(agent, /location-enrichment/);
     assert.match(agent, /location-brain/);

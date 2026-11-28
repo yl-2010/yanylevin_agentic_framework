@@ -86,7 +86,7 @@ Unknown shorthand: `node server/brain-glossary.js "<term>"`. A slang or abbrevia
 
 ## Always: browsers
 
-Yan's own turns use Ardia. Read `.cursor/skills/personal-browser/SKILL.md` before opening a site that curl cannot do. Pick the Ardia profile whose name matches the task before the first `ardia browse`. Instagram and his other personal accounts are Personal, even when ExampleCo is the window on screen. `ardia browse open` follows the focused window, so open with `ardia tabs open <url> --profile <id>` and then `ardia browse tab <id>`. The personal-browser skill has the profile list and the steps. A password Ardia already autofills, or one it has saved, is fine to use for that login. Do not print it.
+Yan's own turns use Ardia. Read `.cursor/skills/personal-browser/SKILL.md` before opening a site that curl cannot do. Pick the Ardia profile whose name matches the task before the first `ardia browse`. Logins are shared across profiles. The profile is where the tab lives, so Instagram goes in Personal even when ExampleCo is the window on screen. `ardia browse open` follows the focused window, so open with `ardia tabs open <url> --profile <id>` and then `ardia browse tab <id>`. The personal-browser skill has the profile list and the steps. A password Ardia already autofills, or one it has saved, is fine to use for that login. Do not print it.
 
 A login Ardia has not saved uses `.cursor/skills/passwords/SKILL.md`. List the account, fill it with a reason, and do not put the password in any message. Do not ask first. Anyone who is not Yan does not use that vault.
 

@@ -18,7 +18,9 @@ Yan's own turns start in Ardia. Read `~/.cursor/skills/ardia/SKILL.md` and drive
 
 ## Which profile
 
-Each Ardia profile has its own cookies and saved logins. The window on screen is the last profile he had up. Match the task to a profile name before the first `ardia browse`. Instagram opened in ExampleCo because that profile was showing. It belongs in Personal.
+Profiles are how his tabs stay sorted. Logins, cookies, and saved passwords are shared across every profile. Put the new tab in the profile the site belongs to.
+
+The window on screen is the last profile he had up. Match the task to a profile name before the first `ardia browse`. Instagram opened in ExampleCo because that profile was showing. It belongs in Personal.
 
 List the live names. Do not paste the tab tree into the reply.
 
@@ -28,7 +30,7 @@ ardia tabs --json
 
 Read `profiles` (`id`, `name`). The live list wins if he renames one. Names as of 2026-11-27:
 
-- **Personal** (`default`). His own accounts. Instagram and other personal social, banks, Fidelity, personal Google, games, and anything that is not school, college counseling, debate, ExampleCo, or estore.
+- **Personal** (`default`). His own sites. Instagram and other personal social, banks, Fidelity, personal Google, games, and anything that is not school, college counseling, debate, ExampleCo, or estore.
 - **Education.** Example School. Canvas, school Outlook, epschedule, four11, school sites.
 - **College Prep.** Common App, PathIvy, counseling docs, college applications.
 - **Debate.** Tabroom, debate research, rounds.
@@ -37,7 +39,7 @@ Read `profiles` (`id`, `name`). The live list wins if he renames one. Names as o
 
 If two names could fit, use the profile that already has that site open.
 
-`ardia browse` has no `--profile` flag. `ardia browse open` with no tab follows the focused window. The generic Ardia line that says use the tab he is looking at does not apply when the task is a different account. Open in the matching profile first, then attach.
+`ardia browse` has no `--profile` flag. `ardia browse open` with no tab follows the focused window. The generic Ardia line that says use the tab he is looking at does not apply when this tab belongs in a different profile. Open there first, then attach.
 
 If that profile already has the site:
 
@@ -53,13 +55,11 @@ ardia tabs open <url> --profile <id> --json
 ardia browse tab <new-id>
 ```
 
-The open reply includes the new tab id. Then snapshot and act. Cookies and saved logins are that profile's.
+The open reply includes the new tab id. Then snapshot and act. The new tab sits in that profile. Signing in works the same in every profile, because the logins are shared.
 
-If he means the page already on screen, stay on that tab.
+If he means the page already on screen, stay on that tab. Leave his existing tabs where they are.
 
 `nextProfile` and `previousProfile` only cycle the visible space. Do not hunt with them.
-
-A logged-out page on a site he uses means the profile is wrong. Switch before typing a password or making an account.
 
 Signing in is allowed when the task needs the site and Ardia already has the password. That means the page autofilled it, or `ardia browse auth list` has an entry for the site and `ardia browse auth login <name>` types it. Do not stop to ask. Do not read the password out of the field. Do not run `auth show`. Do not put the password in the chat. "Signed in" is enough.
 
