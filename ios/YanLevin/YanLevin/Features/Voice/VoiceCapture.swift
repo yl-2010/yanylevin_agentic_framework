@@ -283,8 +283,8 @@ final class VoiceCapture: ObservableObject {
         return utterances.remove(at: index)
     }
 
-    /// The voice model's first sentence. System voice starts now. Kokoro replaces it only if the word has not started.
-    func speakModelLine(id: String, text: String, opening: Bool) {
+    /// The voice model's sentence. The caption can show now. Audio waits for the Mac clip.
+    func speakModelLine(id _: String, text: String, opening: Bool) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !answerOwnsSpeaker, !trimmed.isEmpty else { return }
         if !isHearing {
@@ -293,14 +293,13 @@ final class VoiceCapture: ObservableObject {
             spokenLine = trimmed
         }
         if opening {
-            speaker.speakFirstSound(id: id, text: trimmed)
-        } else {
-            speaker.speakLine(id: id, text: trimmed, role: .company)
+            speaker.allowHoldingLine()
         }
     }
 
-    /// Answer sentence from the Personal Agent. Starts as soon as the text exists.
-    func speakAnswer(id: String, text: String) {
+    /// Answer sentence from the Personal Agent. Stops whatever is still playing.
+    /// The Mac clip is the only thing that speaks it.
+    func speakAnswer(id _: String, text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         answerOwnsSpeaker = true
@@ -310,7 +309,6 @@ final class VoiceCapture: ObservableObject {
             captionVolatile = ""
             spokenLine = trimmed
         }
-        speaker.speakLine(id: id, text: trimmed, role: .answer)
     }
 
     func playReturnedAudio(
@@ -320,13 +318,13 @@ final class VoiceCapture: ObservableObject {
         sampleRate: Double,
         role: VoicePlaybackRole,
         line: String
-    ) {
+    ) async {
         if (role == .answer || role == .company) && !line.isEmpty && !isHearing && (role == .answer || !answerOwnsSpeaker) {
             captionFinal = line
             captionVolatile = ""
             spokenLine = line
         }
-        speaker.playReturnedAudio(
+        await speaker.playReturnedAudio(
             chunkID: chunkID,
             lineID: lineID,
             pcmLE16: pcmLE16,
@@ -364,7 +362,6 @@ final class VoiceCapture: ObservableObject {
 
     private func prepareBody() async {
         if readiness == .ready { return }
-        speaker.warmVoice()
         var analyzer = false
         if #available(iOS 26.0, *) {
             analyzer = await prepareAnalyzerAssets()
@@ -404,8 +401,22 @@ final class VoiceCapture: ObservableObject {
             return
         }
 
+        var opened: AVAudioFormat?
+        var attempts = 0
+        while opened == nil {
+            attempts += 1
+            do {
+                opened = try await speaker.activateMic()
+            } catch VoiceAudioError.superseded {
+                if !wantsMic || Task.isCancelled || attempts >= 4 { return }
+            } catch {
+                closeMic()
+                readiness = .unavailable("On-device speech isn't available on this \(Self.deviceWord), so the mic stays off.")
+                return
+            }
+        }
+        guard let input = opened else { return }
         do {
-            let input = try speaker.activateMic()
             var analyzerFormat: AVAudioFormat?
             var analyzerYield: (@Sendable (AVAudioPCMBuffer) -> Void)?
             if analyzerReady {

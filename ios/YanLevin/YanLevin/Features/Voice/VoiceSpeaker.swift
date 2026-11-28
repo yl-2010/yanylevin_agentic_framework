@@ -11,8 +11,8 @@ enum VoicePlaybackRole: Equatable {
     case answer
 }
 
-/// Plays Kokoro chunks on an `AVAudioEngine`, and the system voice when those
-/// chunks are late or missing. Each buffer is resampled to the session rate and
+/// Plays Mac audio on an `AVAudioEngine`. A live call never starts
+/// `AVSpeechSynthesizer`. Each buffer is resampled to the session rate and
 /// queued before the one ahead of it finishes, so a sentence stays one piece.
 @MainActor
 final class VoiceSpeaker: ObservableObject {
@@ -25,7 +25,7 @@ final class VoiceSpeaker: ObservableObject {
 
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
-    private let synth = AVSpeechSynthesizer()
+    private let sessionWork = AudioSessionWork()
     private var playFormat: AVAudioFormat
     private let tapBox = TapBox()
 
@@ -35,33 +35,20 @@ final class VoiceSpeaker: ObservableObject {
     private var micUp = false
     private var playingBuffer = false
     private var playGeneration = 0
-    private var issuedSynthToken = 0
     private var nextToken = 0
     private var queued: [Queued] = []
     private var inflight: [Queued] = []
     private var startedTokens = Set<Int>()
     private var openLines: [OpenLine] = []
     private var playedChunks = Set<String>()
-    /// Set once the holding line's first word has started, so a late Kokoro chunk cannot talk over it.
-    private var firstSoundLocked: Source?
-    private var synthConverter: AVAudioConverter?
-    private var synthFormatKey: String?
-    private var premiumVoice: AVSpeechSynthesisVoice?
-    private var didWarmVoice = false
+    /// Stop cut the holding line. A late Mac clip for that line does not come back.
+    private var holdingCut = false
 
     private struct OpenLine {
         var id: String
         var role: VoicePlaybackRole
         var line: String
-        var source: Source
         var started = false
-        var synthToken = 0
-    }
-
-    private enum Source {
-        case pending
-        case synth
-        case kokoro
     }
 
     private struct Queued {
@@ -77,60 +64,19 @@ final class VoiceSpeaker: ObservableObject {
         playFormat = Self.floatFormat(48_000)
     }
 
-    /// True when audio is playing, queued, or the system voice is about to produce a buffer.
+    /// True when Mac audio is playing or queued. Waiting on a clip is silence.
     var isAudible: Bool {
-        isSpeaking || playingBuffer || !queued.isEmpty || openLines.contains { $0.source == .pending }
+        isSpeaking || playingBuffer || !queued.isEmpty
     }
 
-    /// Premium en-US if this phone has it. Otherwise the utterance keeps the default system voice.
-    func warmVoice() {
-        guard !didWarmVoice else { return }
-        didWarmVoice = true
-        premiumVoice = AVSpeechSynthesisVoice.speechVoices().first {
-            $0.language == "en-US" && $0.quality == .premium
-        }
+    /// A new holding line may play. `stopPlayback` had closed the previous one.
+    func allowHoldingLine() {
+        holdingCut = false
     }
 
-    /// Holding line. Returns as soon as synthesis is scheduled. Kokoro can still
-    /// take the line if a chunk arrives before the first word is audible.
-    func speakFirstSound(id: String, text: String) {
-        firstSoundLocked = nil
-        speakLine(id: id, text: text, role: .firstSound)
-    }
-
-    /// One answer sentence. Starts the system voice now. A Kokoro chunk with the
-    /// same line id replaces it only if the word has not started.
-    func speakLine(id: String, text: String, role: VoicePlaybackRole) {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        if openLines.contains(where: { $0.id == id && $0.role == role }) { return }
-        warmVoice()
-        issuedSynthToken += 1
-        let gen = issuedSynthToken
-        openLines.append(OpenLine(id: id, role: role, line: trimmed, source: .pending, synthToken: gen))
-        let utterance = AVSpeechUtterance(string: trimmed)
-        if let premiumVoice {
-            utterance.voice = premiumVoice
-        }
-        synth.write(utterance) { [weak self] buffer in
-            guard let pcm = buffer as? AVAudioPCMBuffer else { return }
-            if pcm.frameLength == 0 {
-                Task { @MainActor in
-                    self?.synthEnded(id: id, role: role, gen: gen)
-                }
-                return
-            }
-            guard let copy = VoicePCM.copy(pcm) else { return }
-            Task { @MainActor in
-                self?.takeSynth(copy, id: id, role: role, text: trimmed, gen: gen)
-            }
-        }
-    }
-
-    /// Little-endian Int16 mono. Kokoro is 24 kHz, then resampled to the session
-    /// rate. `chunkID` is dropped if it already played. `lineID` ties the chunk
-    /// to a spoken sentence so a late prettier take cannot talk over a word
-    /// that already started. Later chunks of that sentence append.
+    /// Little-endian Int16 mono from the Mac. Kokoro is 24 kHz, then resampled
+    /// to the session rate. `chunkID` is dropped if it already played. Later
+    /// chunks of the same sentence append. The system voice is not a fallback.
     func playReturnedAudio(
         chunkID: String,
         lineID: String,
@@ -138,11 +84,16 @@ final class VoiceSpeaker: ObservableObject {
         sampleRate: Double,
         role: VoicePlaybackRole,
         line: String
-    ) {
+    ) async {
         guard !pcmLE16.isEmpty else { return }
         guard playedChunks.insert(chunkID).inserted else { return }
-        if role == .firstSound, firstSoundLocked == .synth {
-            return
+        if role == .firstSound, holdingCut { return }
+        if !micUp {
+            do {
+                try await sessionWork.activate(mic: false)
+            } catch {
+                return
+            }
         }
         do {
             try ensureEngine()
@@ -151,51 +102,14 @@ final class VoiceSpeaker: ObservableObject {
         }
         guard let buffer = floatBuffer(pcmLE16, sampleRate: sampleRate > 0 ? sampleRate : 24_000) else { return }
 
-        if let index = lineIndex(role: role, lineID: lineID) {
-            if openLines[index].source == .synth && openLines[index].started {
-                return
-            }
-            var restored: [Queued] = []
-            if openLines[index].source != .kokoro && !openLines[index].started {
-                let oldID = openLines[index].id
-                let ownsHead = inflight.first?.lineID == oldID && inflight.first?.role == role
-                if inflight.contains(where: { $0.lineID == oldID && $0.role == role }) && !ownsHead {
-                    return
-                }
-                queued.removeAll { $0.lineID == oldID && $0.role == role }
-                if ownsHead {
-                    restored = inflight.filter { !($0.lineID == oldID && $0.role == role) }
-                    playGeneration += 1
-                    player.stop()
-                    inflight.removeAll()
-                    playingBuffer = false
-                    startedTokens.removeAll()
-                }
-                openLines[index].synthToken = 0
-                if !openLines.contains(where: { $0.synthToken != 0 }) {
-                    synth.stopSpeaking(at: .immediate)
-                }
-                dropSynthConverter()
-            }
-            openLines[index].source = .kokoro
-            openLines[index].id = lineID
-            if !line.isEmpty { openLines[index].line = line }
+        let text = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let index = openLines.firstIndex(where: { $0.role == role && $0.id == lineID }) {
+            if !text.isEmpty { openLines[index].line = text }
             let fires = !openLines[index].started && VoicePCM.isAudible(buffer) && !lineHasStart(lineID, role: role)
             enqueue(buffer, role: role, lineID: lineID, line: openLines[index].line, firesStart: fires)
-            for item in restored {
-                enqueue(
-                    item.buffer,
-                    role: item.role,
-                    lineID: item.lineID,
-                    line: item.line,
-                    firesStart: item.firesStart && !lineHasStart(item.lineID, role: item.role)
-                )
-            }
             return
         }
-
-        let text = line.trimmingCharacters(in: .whitespacesAndNewlines)
-        openLines.append(OpenLine(id: lineID, role: role, line: text, source: .kokoro))
+        openLines.append(OpenLine(id: lineID, role: role, line: text))
         enqueue(buffer, role: role, lineID: lineID, line: text, firesStart: VoicePCM.isAudible(buffer))
     }
 
@@ -205,11 +119,9 @@ final class VoiceSpeaker: ObservableObject {
         inflight.removeAll()
         startedTokens.removeAll()
         openLines.removeAll()
-        firstSoundLocked = .synth
+        holdingCut = true
         playingBuffer = false
-        dropSynthConverter()
         player.stop()
-        synth.stopSpeaking(at: .immediate)
         setSpeaking(false)
     }
 
@@ -221,8 +133,8 @@ final class VoiceSpeaker: ObservableObject {
 
     /// Session is play-and-record, speaker unless a headset is already the route.
     /// Returns the input format. The tap is not installed yet.
-    func activateMic() throws -> AVAudioFormat {
-        try configureSession(mic: true)
+    func activateMic() async throws -> AVAudioFormat {
+        try await sessionWork.activate(mic: true)
         if engine.isRunning { engine.stop() }
         enableVoiceProcessing()
         adoptHardwareFormat()
@@ -263,57 +175,12 @@ final class VoiceSpeaker: ObservableObject {
         removeTap()
         if engine.isRunning { engine.stop() }
         micUp = false
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        sessionWork.deactivate()
     }
 
     // MARK: Playback queue
 
     private var currentPlayingID: String?
-
-    private func lineIndex(role: VoicePlaybackRole, lineID: String) -> Int? {
-        if let exact = openLines.firstIndex(where: { $0.role == role && $0.id == lineID }) {
-            return exact
-        }
-        // One holding line. Its Kokoro chunk can use a different id and still win
-        // if the system voice has not started the word. Answer lines match ids only,
-        // so the next sentence does not glue onto the previous one.
-        guard role == .firstSound else { return nil }
-        return openLines.firstIndex(where: { $0.role == role && !$0.started })
-    }
-
-    private func takeSynth(_ buffer: AVAudioPCMBuffer, id: String, role: VoicePlaybackRole, text: String, gen: Int) {
-        guard let index = openLines.firstIndex(where: { $0.id == id && $0.role == role }) else { return }
-        guard openLines[index].synthToken == gen else { return }
-        guard openLines[index].source != .kokoro else { return }
-        do {
-            try ensureEngine()
-        } catch {
-            return
-        }
-        guard let played = renderSynth(buffer) else { return }
-        openLines[index].source = .synth
-        let audible = VoicePCM.isAudible(played)
-        let fires = audible && !openLines[index].started && !lineHasStart(id, role: role)
-        enqueue(played, role: role, lineID: id, line: text, firesStart: fires)
-    }
-
-    private func synthEnded(id: String, role: VoicePlaybackRole, gen: Int) {
-        guard let index = openLines.firstIndex(where: { $0.id == id && $0.role == role }) else { return }
-        guard openLines[index].synthToken == gen else { return }
-        guard openLines[index].source != .kokoro else {
-            dropSynthConverter()
-            return
-        }
-        if openLines[index].source == .pending {
-            openLines[index].source = .synth
-        }
-        if let tail = flushSynth(), tail.frameLength > 0 {
-            let fires = VoicePCM.isAudible(tail) && !openLines[index].started && !lineHasStart(id, role: role)
-            enqueue(tail, role: role, lineID: id, line: openLines[index].line, firesStart: fires)
-        } else {
-            pump()
-        }
-    }
 
     private func lineHasStart(_ lineID: String, role: VoicePlaybackRole) -> Bool {
         queued.contains { $0.lineID == lineID && $0.role == role && $0.firesStart }
@@ -345,9 +212,7 @@ final class VoiceSpeaker: ObservableObject {
             if inflight.isEmpty {
                 playingBuffer = false
                 retireFinishedLines()
-                if !openLines.contains(where: { $0.source == .pending }) {
-                    setSpeaking(false)
-                }
+                setSpeaking(false)
             }
             return
         }
@@ -395,9 +260,6 @@ final class VoiceSpeaker: ObservableObject {
         guard item.firesStart else { return }
         if let index = openLines.firstIndex(where: { $0.id == item.lineID && $0.role == item.role }) {
             openLines[index].started = true
-            if item.role == .firstSound && firstSoundLocked == nil {
-                firstSoundLocked = openLines[index].source
-            }
         }
         setSpeaking(true)
         if !item.line.isEmpty {
@@ -435,29 +297,12 @@ final class VoiceSpeaker: ObservableObject {
             adoptHardwareFormat()
             return
         }
-        try configureSession(mic: false)
         if !engine.isRunning {
             adoptHardwareFormat()
             engine.prepare()
             try engine.start()
         }
         adoptHardwareFormat()
-    }
-
-    private func configureSession(mic: Bool) throws {
-        let session = AVAudioSession.sharedInstance()
-        try? session.setPreferredSampleRate(48_000)
-        try? session.setPreferredIOBufferDuration(0.02)
-        if mic {
-            try session.setCategory(
-                .playAndRecord,
-                mode: .voiceChat,
-                options: [.defaultToSpeaker, .duckOthers, .allowBluetoothHFP]
-            )
-        } else {
-            try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
-        }
-        try session.setActive(true)
     }
 
     private func adoptHardwareFormat() {
@@ -470,7 +315,6 @@ final class VoiceSpeaker: ObservableObject {
         let restart = engine.isRunning && !micUp && !tapInstalled
         if restart { engine.stop() }
         playFormat = Self.floatFormat(rate)
-        dropSynthConverter()
         if !playerConnected {
             engine.attach(player)
             playerConnected = true
@@ -541,36 +385,6 @@ final class VoiceSpeaker: ObservableObject {
         return convert(buffer, using: converter, flush: true)
     }
 
-    private func renderSynth(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
-        if samePlayFormat(buffer.format) { return buffer }
-        let key = formatKey(buffer.format)
-        let converter: AVAudioConverter
-        if let synthConverter, synthFormatKey == key {
-            converter = synthConverter
-        } else if let made = AVAudioConverter(from: buffer.format, to: playFormat) {
-            synthConverter = made
-            synthFormatKey = key
-            converter = made
-        } else {
-            return nil
-        }
-        return convert(buffer, using: converter, flush: false)
-    }
-
-    private func flushSynth() -> AVAudioPCMBuffer? {
-        guard let converter = synthConverter else { return nil }
-        dropSynthConverter()
-        guard let output = AVAudioPCMBuffer(pcmFormat: playFormat, frameCapacity: 4096) else { return nil }
-        output.frameLength = output.frameCapacity
-        var error: NSError?
-        converter.convert(to: output, error: &error) { _, status in
-            status.pointee = .endOfStream
-            return nil
-        }
-        if error != nil || output.frameLength == 0 { return nil }
-        return output
-    }
-
     private func convert(
         _ input: AVAudioPCMBuffer,
         using converter: AVAudioConverter,
@@ -604,18 +418,81 @@ final class VoiceSpeaker: ObservableObject {
             && format.isInterleaved == playFormat.isInterleaved
     }
 
-    private func formatKey(_ format: AVAudioFormat) -> String {
-        "\(format.sampleRate)-\(format.commonFormat.rawValue)-\(format.channelCount)-\(format.isInterleaved)"
-    }
-
-    private func dropSynthConverter() {
-        synthConverter = nil
-        synthFormatKey = nil
-    }
 }
 
-private enum VoiceAudioError: Error {
+enum VoiceAudioError: Error {
     case noInput
+    /// A newer session change replaced this one before it ran.
+    case superseded
+}
+
+/// Category and `setActive` run off the main thread. The newest request wins,
+/// so a hang-up cannot deactivate a call that already replaced it.
+private final class AudioSessionWork: @unchecked Sendable {
+    private let queue = DispatchQueue(label: "yl.voice.audio-session")
+    private let lock = NSLock()
+    private var ticket = 0
+
+    func activate(mic: Bool) async throws {
+        let mine = bump()
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            queue.async {
+                guard self.isCurrent(mine) else {
+                    cont.resume(throwing: VoiceAudioError.superseded)
+                    return
+                }
+                do {
+                    try self.apply(mic: mic, active: true)
+                    cont.resume()
+                } catch {
+                    cont.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func deactivate() {
+        let mine = bump()
+        queue.async {
+            guard self.isCurrent(mine) else { return }
+            try? self.apply(mic: false, active: false)
+        }
+    }
+
+    private func bump() -> Int {
+        lock.lock()
+        ticket += 1
+        let mine = ticket
+        lock.unlock()
+        return mine
+    }
+
+    private func isCurrent(_ mine: Int) -> Bool {
+        lock.lock()
+        let current = ticket == mine
+        lock.unlock()
+        return current
+    }
+
+    private func apply(mic: Bool, active: Bool) throws {
+        let session = AVAudioSession.sharedInstance()
+        if !active {
+            try session.setActive(false, options: .notifyOthersOnDeactivation)
+            return
+        }
+        try? session.setPreferredSampleRate(48_000)
+        try? session.setPreferredIOBufferDuration(0.02)
+        if mic {
+            try session.setCategory(
+                .playAndRecord,
+                mode: .voiceChat,
+                options: [.defaultToSpeaker, .duckOthers, .allowBluetoothHFP]
+            )
+        } else {
+            try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+        }
+        try session.setActive(true)
+    }
 }
 
 enum VoicePCM {

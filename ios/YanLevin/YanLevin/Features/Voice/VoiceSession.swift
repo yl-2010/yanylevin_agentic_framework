@@ -75,9 +75,9 @@ struct VoiceCaption: Equatable {
     }
 }
 
-/// Voice session for the glass screen. The mic, the caption, and the first
-/// spoken lines stay on the phone. `VoiceStore` posts the clip with the same
-/// signed-in client as Chat. A partial caption never buzzes.
+/// Voice session for the glass screen. The mic and the caption stay on the
+/// phone. Spoken audio is the Mac clip only. `VoiceStore` posts the clip with
+/// the same signed-in client as Chat. A partial caption never buzzes.
 @MainActor
 final class VoiceSession: ObservableObject {
     /// This device. The server later reports who `activeDevice` is.
@@ -386,7 +386,8 @@ final class VoiceSession: ObservableObject {
     }
 
     /// Caption and orb follow the mic. Grok's phase shows only while he is quiet.
-    /// A long silence leaves the mic up. It does not hang up.
+    /// A long silence leaves the mic up. It does not hang up, and it does not
+    /// draw the dormant ring. An open mic stays on the listening wave.
     /// Listening, thinking, and speaking stay up through a pause. A one-frame
     /// mic blip does not cut in the connecting web.
     private func applyCapture() {
@@ -464,6 +465,8 @@ final class VoiceSession: ObservableObject {
             next = latchedWork
         } else if opening || installing {
             next = .connecting
+        } else if armed {
+            next = .listening
         } else {
             next = .breathing
         }

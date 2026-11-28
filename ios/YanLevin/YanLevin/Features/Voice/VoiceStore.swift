@@ -4,9 +4,9 @@ import UIKit
 
 /// Live voice call on the Mac. Uses `APIClient` and the same bearer as
 /// `POST api/home/agent/message`. The phone does not classify the phrase.
-/// The first sound is the voice model's first sentence, played as soon as
-/// that text arrives. Parakeet and Kokoro run on the server. Composer does
-/// not gate the first line.
+/// The first sound is the Mac clip for the voice model's first sentence.
+/// The phone does not speak it with the system voice. Parakeet and Kokoro
+/// run on the server. Composer does not gate the first line.
 @MainActor
 final class VoiceStore {
     static let shared = VoiceStore()
@@ -695,7 +695,7 @@ final class VoiceStore {
                     self.finishAudio(chunkID, done: true)
                     return
                 }
-                VoiceCapture.shared.playReturnedAudio(
+                await VoiceCapture.shared.playReturnedAudio(
                     chunkID: chunkID,
                     lineID: lineID,
                     pcmLE16: data,
