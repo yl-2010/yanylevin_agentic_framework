@@ -46,6 +46,7 @@ import {
   normalizeChatFiles,
   splitChatMessageFiles,
   safeChatFileName,
+  orchestratorListTitle,
   withRoleTitlePrefix,
   EPHEMERAL_HIDE_MS,
 } from "./home-chat-history.js";
@@ -3709,8 +3710,6 @@ async function routeChannelMention(platform, message) {
     session.ephemeralPinned = false;
     session.childSessionIds = [];
     session.cursorAgentId = session.agent?.agentId || "";
-    session.listTitle = withRoleTitlePrefix("orchestrator", fallbackChatTitle(raw));
-    session.forceListTitle = true;
   } else {
     unpinOrchestratorForMention(session);
     if (session.role !== "orchestrator") session.role = "orchestrator";
@@ -3719,6 +3718,8 @@ async function routeChannelMention(platform, message) {
     if (key) session.orchestratorKey = key;
     await ensureCursorAgent(session, guestTurnModelSpec(session, false));
   }
+  session.listTitle = orchestratorListTitle(platform, origin);
+  session.forceListTitle = true;
 
   if (teams) {
     session.teamsOrigin = origin;

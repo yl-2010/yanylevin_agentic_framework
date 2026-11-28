@@ -188,6 +188,7 @@ async function pumpTitleQueue() {
 export async function generateAndStoreChatTitle(opts) {
   const loaded = await loadChatHistory(opts);
   if (!loaded) return null;
+  if (String(loaded.role || "") === "orchestrator") return loaded.title || null;
   const firstUser =
     loaded.messages.find((m) => m.role === "user")?.content ||
     loaded.preview ||

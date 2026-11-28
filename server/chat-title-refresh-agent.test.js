@@ -127,6 +127,12 @@ describe("selectChatTitleRefreshTargets", () => {
       updated: "2026-08-01T18:00:00.000Z",
       path: "old.md",
     },
+    {
+      sessionId: "orch4444-bbbb-4ccc-8ddd-eeeeffff0004",
+      updated: "2026-08-18T18:00:00.000Z",
+      path: "orchestrator.md",
+      role: "orchestrator",
+    },
   ];
 
   it("nightly keeps the last 24 hours", () => {
@@ -134,6 +140,14 @@ describe("selectChatTitleRefreshTargets", () => {
     assert.deepEqual(
       picked.map((r) => r.path),
       ["today.md", "yesterday.md"]
+    );
+  });
+
+  it("leaves orchestrator titles alone", () => {
+    const picked = selectChatTitleRefreshTargets(rows, { sinceMs });
+    assert.equal(
+      picked.some((row) => row.role === "orchestrator"),
+      false
     );
   });
 

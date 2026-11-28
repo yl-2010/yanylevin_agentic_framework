@@ -189,7 +189,9 @@ export function chunkArray(items, size = CHAT_TITLE_REFRESH_BATCH_SIZE) {
  * @param {{ backfill?: boolean, sinceMs?: number, beforeMs?: number }} opts
  */
 export function selectChatTitleRefreshTargets(rows, opts = {}) {
-  const list = Array.isArray(rows) ? rows : [];
+  const list = (Array.isArray(rows) ? rows : []).filter(
+    (row) => String(row?.role || "") !== "orchestrator"
+  );
   if (opts.backfill) {
     const beforeMs = Number(opts.beforeMs);
     if (!Number.isFinite(beforeMs)) return [];

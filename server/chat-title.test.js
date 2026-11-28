@@ -1,6 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
+  generateAndStoreChatTitle,
   isStubChatTitle,
   TITLE_MODEL,
   TITLE_MAX_TOKENS,
@@ -8,7 +12,7 @@ import {
   titleSeedFromUserMessage,
   TITLE_PROMPT,
 } from "./chat-title.js";
-import { fallbackChatTitle } from "./home-chat-history.js";
+import { fallbackChatTitle, persistChatHistory } from "./home-chat-history.js";
 
 describe("titleFromAgentReply", () => {
   it("keeps a short title", () => {
@@ -120,5 +124,33 @@ describe("isStubChatTitle", () => {
       isStubChatTitle("Batu: (Teams): what's southasianesh", teams),
       true
     );
+  });
+});
+
+describe("generateAndStoreChatTitle", () => {
+  it("leaves an orchestrator title as the chat name", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orch-title-"));
+    const sessionId = "c7618dea-4ed9-47f0-af9d-f69a5044569f";
+    try {
+      await persistChatHistory({
+        root,
+        email: "you@example.com",
+        sessionId,
+        role: "orchestrator",
+        title: "Orchestrator: JYPE (iMessage)",
+        messages: [
+          { role: "user", content: "@agent slime Alex out for scrolling" },
+          { role: "assistant", content: "Building it" },
+        ],
+      });
+      const title = await generateAndStoreChatTitle({
+        email: "you@example.com",
+        sessionId,
+        root,
+      });
+      assert.equal(title, "Orchestrator: JYPE (iMessage)");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });

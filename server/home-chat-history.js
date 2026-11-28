@@ -286,6 +286,69 @@ export function withRoleTitlePrefix(role, title) {
   return `${prefix}${bare}`;
 }
 
+const ORCHESTRATOR_PLATFORM_LABEL = {
+  teams: "Teams",
+  imessage: "iMessage",
+  whatsapp: "WhatsApp",
+};
+
+/**
+ * True for a group, false for a DM, null when the id does not say.
+ * @param {unknown} platform
+ * @param {{ chatId?: string, to?: string, chatGuid?: string }|null|undefined} origin
+ * @returns {boolean|null}
+ */
+export function channelOriginIsGroup(platform, origin) {
+  const plat = String(platform || "").trim().toLowerCase();
+  const chatId = String(origin?.chatId || origin?.to || "");
+  const guid = String(origin?.chatGuid || "");
+  if (plat === "teams") {
+    if (/@thread\.v2\b/i.test(chatId)) return true;
+    if (/@unq\.gbl\.spaces\b/i.test(chatId)) return false;
+    return null;
+  }
+  if (guid.includes(";+;")) return true;
+  if (guid.includes(";-;")) return false;
+  if (/^chat\d/i.test(chatId)) return true;
+  return null;
+}
+
+/**
+ * DM titles use the person's first name. Group titles use the chat name.
+ * @param {unknown} chatName
+ * @param {boolean|null} group
+ */
+export function orchestratorChatName(chatName, group) {
+  const name = String(chatName || "").replace(/\s+/g, " ").trim();
+  if (!name) return "Chat";
+  if (group !== false) return name;
+  if (/^\+?\d[\d\s().-]{6,}$/.test(name)) return name;
+  const parts = name.split(" ");
+  if (parts.length >= 2 && !/\b(and|&|of|family|group|class|chat|team)\b/i.test(name)) {
+    return parts[0];
+  }
+  return name;
+}
+
+/**
+ * List title for a mention orchestrator. The platform stays on the end
+ * even when the chat name is long.
+ * @param {unknown} platform
+ * @param {{ chat?: string, chatId?: string, to?: string, chatGuid?: string }|null|undefined} origin
+ */
+export function orchestratorListTitle(platform, origin) {
+  const plat = String(platform || "").trim().toLowerCase();
+  const label = ORCHESTRATOR_PLATFORM_LABEL[plat] || "iMessage";
+  const suffix = ` (${label})`;
+  const group = channelOriginIsGroup(plat, origin);
+  const named = normalizeChatTitle(
+    orchestratorChatName(origin?.chat || origin?.to || "", group)
+  );
+  const room = Math.max(1, TITLE_MAX - suffix.length);
+  const bare = clampChatTitle(named, room) || "Chat";
+  return `${ORCHESTRATOR_TITLE_PREFIX}${bare}${suffix}`;
+}
+
 /**
  * First user bubble written when a future agent is scheduled.
  * Returns the task under the date line, or "".

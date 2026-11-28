@@ -36,6 +36,7 @@ import {
   sanitizeChatVisibility,
   ORCHESTRATOR_TITLE_PREFIX,
   SUBAGENT_TITLE_PREFIX,
+  orchestratorListTitle,
   withRoleTitlePrefix,
   sanitizeChatEphemeral,
   chatHistoryIsEphemeralHidden,
@@ -1168,6 +1169,53 @@ describe("titles", () => {
     );
     assert.equal(withRoleTitlePrefix("orchestrator", "Scheduled:"), "Orchestrator: Chat");
     assert.equal(withRoleTitlePrefix("other", ""), "Orchestrator: Chat");
+  });
+
+  it("names an orchestrator from the chat and the platform", () => {
+    assert.equal(
+      orchestratorListTitle("teams", {
+        chat: "Alex Rivera",
+        chatId:
+          "19:1a7f4ac6-5273-47eb-8101-1a26d6d3a236_4e03777e-4fc0-4313-bbd4-158aff3fbcee@unq.gbl.spaces",
+      }),
+      "Orchestrator: Alex (Teams)"
+    );
+    assert.equal(
+      orchestratorListTitle("imessage", {
+        chat: "JYPE",
+        chatId: "chat959093724978724799",
+        chatGuid: "any;+;chat959093724978724799",
+      }),
+      "Orchestrator: JYPE (iMessage)"
+    );
+    assert.equal(
+      orchestratorListTitle("imessage", {
+        chat: "Nikita",
+        chatGuid: "any;-;+12065550100",
+      }),
+      "Orchestrator: Nikita (iMessage)"
+    );
+    assert.equal(
+      orchestratorListTitle("teams", {
+        chat: "LYPS",
+        chatId: "19:abc@thread.v2",
+      }),
+      "Orchestrator: LYPS (Teams)"
+    );
+    assert.equal(
+      orchestratorListTitle("teams", {
+        chat: "Class of 2028",
+        chatId: "19:class@thread.v2",
+      }),
+      "Orchestrator: Class of 2028 (Teams)"
+    );
+    const long = orchestratorListTitle("imessage", {
+      chat: "The International Society of Very Long Group Names Indeed",
+      chatGuid: "any;+;chat1",
+    });
+    assert.ok(long.startsWith("Orchestrator: "));
+    assert.ok(long.endsWith(" (iMessage)"));
+    assert.ok(long.slice("Orchestrator: ".length).length <= 40);
   });
 
   it("treats only explicit true as ephemeral", () => {
