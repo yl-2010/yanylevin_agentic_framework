@@ -2,7 +2,8 @@ import AVFoundation
 import Foundation
 
 /// Which spoken line a buffer belongs to.
-/// The holding line is the first sound. The answer is the later Grok sentence.
+/// The first sound is the voice model's first sentence. Later sentences from
+/// that model use company. The answer is the Personal Agent's spoken line.
 enum VoicePlaybackRole: Equatable {
     case firstSound
     /// More lines while Grok is still working. Not the answer.

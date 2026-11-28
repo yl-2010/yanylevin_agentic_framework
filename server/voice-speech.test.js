@@ -177,7 +177,7 @@ describe("speak client", () => {
     });
     process.env.VOICE_SPEECH_URL = down.url;
     await assert.rejects(async () => {
-      for await (const _chunk of speak("Checking.")) {
+      for await (const _chunk of speak("Hello.")) {
         /* unused */
       }
     }, (err) => err.code === "kokoro-not-loaded");
@@ -199,7 +199,7 @@ describe("speak client", () => {
     });
     process.env.VOICE_SPEECH_URL = up.url;
     const chunks = [];
-    for await (const chunk of speak("Checking.")) chunks.push(chunk);
+    for await (const chunk of speak("Hello.")) chunks.push(chunk);
     assert.equal(chunks.length, 1);
     assert.equal(chunks[0].sampleRate, 24000);
     assert.equal(chunks[0].voice, "af_heart");

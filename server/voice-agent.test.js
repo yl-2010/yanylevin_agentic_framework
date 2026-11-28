@@ -5,18 +5,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseChatHistoryMessages, persistChatHistory } from "./home-chat-history.js";
 import {
-  VOICE_ACK_SOCIAL,
-  VOICE_ACK_WORK,
   VOICE_TURN_NOTE,
   VOICE_COOLDOWN_MS,
   VOICE_HEARTBEAT_MS,
   VOICE_HEARTBEAT_MISSES,
-  acceptCompanyLine,
   compressAgentReply,
   createVoiceBook,
   firstSentences,
-  isSocialUtterance,
+  modelSpeech,
   parseSummaryBubbles,
+  readVoiceRoute,
   spokenLineAddsNoun,
 } from "./voice-agent.js";
 
@@ -88,119 +86,97 @@ function bookWith(overrides = {}) {
 }
 
 describe("voice turn note", () => {
-  it("keeps the spoken lines and tells Composer it may start the hard subagent", () => {
-    assert.equal(VOICE_ACK_SOCIAL, "Okay.");
-    assert.equal(VOICE_ACK_WORK, "Yeah, one second.");
+  it("tells Composer it may start the hard subagent", () => {
     assert.match(VOICE_TURN_NOTE, /start the hard subagent/);
     assert.match(VOICE_TURN_NOTE, /normal chat answer/);
   });
 });
 
-describe("voice social line", () => {
-  it("treats only the phone's social phrases as social", () => {
-    for (const phrase of [
-      "hey",
-      "hi",
-      "hello",
-      "thanks",
-      "thank you",
-      "stop",
-      "never mind",
-      "nevermind",
-      "okay",
-      "ok",
-    ]) {
-      assert.equal(isSocialUtterance(phrase), true, phrase);
-    }
-    assert.equal(isSocialUtterance("Okay."), true);
-    assert.equal(isSocialUtterance("OK"), true);
-    assert.equal(isSocialUtterance("Thanks!"), true);
-    assert.equal(isSocialUtterance("never-mind"), true);
-    assert.equal(isSocialUtterance("uh hello"), true);
-    assert.equal(isSocialUtterance("Hello um"), true);
-    assert.equal(isSocialUtterance("Uh, hello."), true);
-    assert.equal(isSocialUtterance("hello hello"), true);
-    assert.equal(isSocialUtterance("thank you thank you"), true);
-    assert.equal(isSocialUtterance("um"), false);
-    assert.equal(isSocialUtterance("hello there"), false);
-    assert.equal(isSocialUtterance("bye"), false);
-    assert.equal(isSocialUtterance("yes"), false);
-    assert.equal(isSocialUtterance("thanks so much"), false);
-    assert.equal(isSocialUtterance("move my calc homework to Friday"), false);
+describe("voice model judgment", () => {
+  it("reads the route word and leaves it out of the speech", () => {
+    assert.deepEqual(readVoiceRoute("sta"), { route: null, speech: "", pending: true });
+    assert.deepEqual(readVoiceRoute("stay"), { route: null, speech: "", pending: true });
+    assert.deepEqual(readVoiceRoute("stay\nHey."), {
+      route: "stay",
+      speech: "Hey.",
+      pending: false,
+    });
+    assert.deepEqual(readVoiceRoute("agent Looking at Friday."), {
+      route: "agent",
+      speech: "Looking at Friday.",
+      pending: false,
+    });
+    assert.deepEqual(readVoiceRoute("Hello there."), {
+      route: "stay",
+      speech: "Hello there.",
+      pending: false,
+    });
+    assert.equal(readVoiceRoute("agent", true).route, "agent");
+    const harmony =
+      "<|channel|>analysis<|message|>needs tools<|end|><|channel|>final<|message|>stay\nHey.";
+    assert.equal(modelSpeech(harmony).includes("needs tools"), false);
+    assert.equal(readVoiceRoute(modelSpeech(harmony)).route, "stay");
+    assert.match(readVoiceRoute(modelSpeech(harmony)).speech, /Hey/);
   });
 
-  it("does not start Grok for a social line", async () => {
-    const harness = bookWith();
+  it("stays on the voice model unless that model says agent", async () => {
+    /** @type {string[][]} */
+    const prompts = [];
+    const harness = bookWith({
+      deps: {
+        async *streamVoice(messages) {
+          prompts.push(messages.map((row) => row.content));
+          const heard = messages.at(-1).content;
+          if (heard === "thanks") yield "agent\nI'll take a look.\n";
+          else yield "stay\nHey.\n";
+        },
+      },
+    });
     await harness.book.start({ email: YAN, device: "phone" });
-    const result = await harness.book.utterance({
-      email: YAN,
-      sessionId: "voice-sess1",
-      device: "phone",
-      text: "never mind",
-      clientUtteranceId: "u-social",
-    });
-    assert.equal(result.social, true);
-    assert.equal(harness.overrides.sends || 0, 0);
-    const call = harness.book.bySession.get("voice-sess1");
-    assert.equal(call.turns[1].spoken, VOICE_ACK_SOCIAL);
-    const okay = await harness.book.utterance({
-      email: YAN,
-      sessionId: "voice-sess1",
-      device: "phone",
-      text: "Okay.",
-      clientUtteranceId: "u-okay",
-    });
-    assert.equal(okay.social, true);
-    assert.equal(harness.overrides.sends || 0, 0);
     const hello = await harness.book.utterance({
       email: YAN,
       sessionId: "voice-sess1",
       device: "phone",
-      text: "Uh, hello.",
-      clientUtteranceId: "u-hello",
+      text: "move my calc homework to Friday",
+      clientUtteranceId: "u-stay",
     });
-    assert.equal(hello.social, true);
-    assert.equal(hello.text, "Uh, hello.");
+    await harness.flush();
+    assert.equal(hello.route, "stay");
+    assert.equal(hello.speak[0].kind, "voice");
+    assert.equal(hello.speak[0].text, "Hey.");
     assert.equal(harness.overrides.sends || 0, 0);
-    assert.equal(call.turns.at(-1).spoken, VOICE_ACK_SOCIAL);
+    const call = harness.book.bySession.get("voice-sess1");
+    assert.equal(call.turns.at(-1).spoken, "Hey.");
+    const thanks = await harness.book.utterance({
+      email: YAN,
+      sessionId: "voice-sess1",
+      device: "phone",
+      text: "thanks",
+      clientUtteranceId: "u-agent",
+    });
+    assert.equal(thanks.route, "agent");
+    assert.equal(thanks.speak[0].text, "I'll take a look.");
+    assert.equal(harness.overrides.sends, 1);
+    assert.match(prompts[1].join("\n"), /Hey/);
+    assert.equal(prompts[1].some((line) => line === "Checking."), false);
   });
-});
 
-describe("company talk while Grok works", () => {
-  it("rejects a holding line that claims a result or a new noun", () => {
-    assert.equal(acceptCompanyLine("what's due tomorrow", "Looking at that."), true);
-    assert.equal(acceptCompanyLine("what's due tomorrow", VOICE_ACK_WORK), true);
-    assert.equal(acceptCompanyLine("file the college mail", "I filed the college mail."), false);
-    assert.equal(
-      acceptCompanyLine("what's due tomorrow", "I handle the school dashboard on this Mac."),
-      false
-    );
-    assert.equal(acceptCompanyLine("what's due tomorrow", "Done."), false);
-  });
-
-  it("speaks a holding line before Grok's send returns", async () => {
+  it("speaks the model's sentence before the agent send returns", async () => {
     let releaseSend;
     const sendGate = new Promise((resolve) => {
       releaseSend = resolve;
     });
-    let continued = false;
-    let releaseMore;
-    const moreGate = new Promise((resolve) => {
-      releaseMore = resolve;
-    });
+    let started = false;
     const harness = bookWith({
       streamSpoken: async () => "Calc is due tomorrow.",
       deps: {
         async messageAgent() {
+          started = true;
           await sendGate;
           return { ok: true };
         },
-        async *streamCompany() {
-          yield "Looking at that.";
-          yield "I filed the college mail.";
-          await moreGate;
-          continued = true;
-          yield "Still waiting.";
+        async *streamVoice() {
+          yield "agent\nLooking at Friday.\nI filed the college mail.\n";
         },
       },
     });
@@ -212,46 +188,34 @@ describe("company talk while Grok works", () => {
       text: "what's due tomorrow",
       clientUtteranceId: "u-hold",
     });
-    await harness.flush();
-    const call = harness.book.bySession.get("voice-sess1");
-    const holds = call.speak.filter((chunk) => chunk.kind === "hold");
-    assert.equal(holds.length, 1);
-    assert.equal(holds[0].text, "Looking at that.");
+    const result = await pending;
+    assert.equal(started, true);
+    assert.equal(result.speak.length, 1);
+    assert.equal(result.speak[0].text, "Looking at Friday.");
+    assert.equal(result.speak[0].kind, "voice");
     await harness.book.grokFinished({
       sessionId: "voice-sess1",
       utteranceId: "u-hold",
       content: "Calc is due tomorrow.",
     });
-    releaseMore();
-    await harness.flush();
-    assert.equal(continued, true);
-    const after = call.speak.filter((chunk) => chunk.kind === "hold");
-    assert.equal(after.length, 1);
+    const call = harness.book.bySession.get("voice-sess1");
+    assert.equal(call.speak.filter((chunk) => chunk.kind === "voice").length, 1);
     assert.ok(call.speak.some((chunk) => chunk.kind === "answer"));
     releaseSend();
-    await pending;
   });
 
-  it("does not start company talk for a social line", async () => {
-    let calls = 0;
-    const harness = bookWith({
-      deps: {
-        async *streamCompany() {
-          calls += 1;
-          yield "Looking at that.";
-        },
-      },
-    });
+  it("does not start Composer when the local model is missing", async () => {
+    const harness = bookWith();
     await harness.book.start({ email: YAN, device: "phone" });
-    await harness.book.utterance({
+    const result = await harness.book.utterance({
       email: YAN,
       sessionId: "voice-sess1",
       device: "phone",
-      text: "thanks",
-      clientUtteranceId: "u-social-hold",
+      text: "what's due tomorrow",
+      clientUtteranceId: "u-down",
     });
-    await harness.flush();
-    assert.equal(calls, 0);
+    assert.equal(result.route, "stay");
+    assert.equal(result.speak.length, 0);
     assert.equal(harness.overrides.sends || 0, 0);
   });
 });
@@ -397,6 +361,9 @@ describe("one device and the summary wait", () => {
     const harness = bookWith({
       summaryText: JSON.stringify({ bubbles }),
       deps: {
+        async *streamVoice() {
+          yield "stay\nSounds good.\n";
+        },
         async commitSummary(call, rows) {
           await persistChatHistory({
             root,
@@ -420,6 +387,7 @@ describe("one device and the summary wait", () => {
         text: "thanks",
         clientUtteranceId: "u-sum",
       });
+      await harness.flush();
       await harness.book.dormant({ email: YAN, sessionId: "voice-sess1", device: "phone" });
       await harness.flush();
       harness.setClock(harness.book.bySession.get("voice-sess1").cooldownDeadline);
@@ -432,7 +400,7 @@ describe("one device and the summary wait", () => {
       assert.equal(messages.length, 2);
       assert.equal(messages[0].content, bubbles[0].text);
       assert.equal(messages[1].content, bubbles[1].text);
-      assert.equal(messages[1].content.includes(VOICE_ACK_SOCIAL), false);
+      assert.equal(messages[1].content.includes("Okay."), false);
       assert.equal(parseSummaryBubbles("nope", [{ role: "user" }]), null);
     } finally {
       await rm(root, { recursive: true, force: true });

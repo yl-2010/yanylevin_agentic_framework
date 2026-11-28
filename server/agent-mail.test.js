@@ -270,7 +270,8 @@ describe("channelAnswerNote", () => {
       "teams",
       ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine"].join("\n")
     );
-    assert.match(note, /posted in Teams/);
+    assert.match(note, /The orchestrator will post this in Teams/);
+    assert.match(note, /You do not send it/);
     assert.match(note, /A few sentences/);
     assert.equal(note.split("\n").includes("one"), false);
     assert.equal(note.split("\n").includes("two"), true);
@@ -337,6 +338,10 @@ describe("role prompts", () => {
     assert.match(ORCHESTRATOR_RULE, /Do not say subagent, orchestrator, worker, or mail unless they used that word first/);
     assert.match(SUBAGENT_RULE, /Do not say subagent, orchestrator, worker, or mail unless they used that word first/);
     assert.match(SUBAGENT_RULE, /Do not wait until the end for the only mail/);
+    assert.match(SUBAGENT_RULE, /You do not send any message out/);
+    assert.match(SUBAGENT_RULE, /You reply only with message_agent/);
+    assert.match(ORCHESTRATOR_RULE, /Do not write the answer and send it yourself/);
+    assert.match(ORCHESTRATOR_RULE, /do not send it again/);
     assert.equal(SUBAGENT_RULE.includes("forwarded as-is"), false);
     assert.equal(ORCHESTRATOR_RULE.includes("\u2014"), false);
   });

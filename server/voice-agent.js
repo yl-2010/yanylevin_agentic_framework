@@ -14,6 +14,7 @@ import { randomUUID } from "node:crypto";
 import { hearForGrok, speak } from "./voice-speech-client.js";
 import { readdir, readFile, mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { extractHarmonyChannels } from "./chat-theme.js";
 import { chatHistoryAbsDir, PRASHAM_EMAIL, YAN_EMAIL } from "./onedrive-projects.js";
 import { streamChatCompletions } from "./lmstudio.js";
 
@@ -21,60 +22,32 @@ export const VOICE_COOLDOWN_MS = 60_000;
 export const VOICE_HEARTBEAT_MS = 5_000;
 export const VOICE_HEARTBEAT_MISSES = 2;
 export const VOICE_PARAKEET_BUDGET_MS = 1500;
-/** Cutoff so a slow gpt-oss line does not open a silent gap. Not a measured time. */
+/** How long the utterance post waits for the first spoken sentence. Not a measured model time. */
 export const VOICE_ANSWER_CUTOFF_MS = 1500;
 export const VOICE_ANSWER_HARD_MS = 8000;
 export const VOICE_SPEAK_WORDS = 12;
 export const VOICE_SUMMARY_MAX_TOKENS = 80;
-export const VOICE_ACK_SOCIAL = "Okay.";
-/**
- * First spoken line for a real request. The phone says this itself, before the
- * upload returns. Kokoro may replace it only if that word has not started.
- * Later lines keep going while Grok is still working. They are not this one word.
- */
-export const VOICE_ACK_WORK = "Yeah, one second.";
-export const VOICE_COMPANY_MAX = 3;
+export const VOICE_TALK_MAX_TOKENS = 120;
 
 export const VOICE_TURN_NOTE =
   "This request was spoken. The work is the same as a typed turn. The final text is a normal chat answer. If the task is really hard, start the hard subagent. A normal question stays on this turn.";
+
+/**
+ * The local model stays in the call. The first word is its judgment.
+ * That word is not spoken. There is no phrase list in this file.
+ */
+export const VOICE_CONVERSATION_PROMPT = [
+  "You are the voice on this phone call. You stay in the conversation. Talk in short spoken sentences.",
+  "The first word of each reply is stay or agent. That word is not spoken.",
+  "agent means this turn needs tools or the Personal Agent. That includes mail, files, the calendar, todos, the brain, and anything you have to look up or change. After that word, say one short sentence in your own words, then stop. Do not answer the request.",
+  "stay means you can answer from this conversation. After that word, speak the reply. Do not start the Personal Agent.",
+].join(" ");
 
 const SPOKEN_STOP = new Set(
   `a an the and or but if then so to of in on for at by with from as is are was were be been being it this that these those i you he she we they me him her us them my your his its our their not no nor do does did doing done have has had having will would can could should may might must about into over after before up down out off than too very just also only own same than`.split(
     /\s+/
   )
 );
-
-// Same phrases as VoicePhrase.socialPhrases. Keep the two lists identical.
-const SOCIAL_PHRASES = [
-  "hey",
-  "hi",
-  "hello",
-  "thanks",
-  "thank you",
-  "stop",
-  "never mind",
-  "nevermind",
-  "okay",
-  "ok",
-];
-
-const SOCIAL_EXACT = new Set(SOCIAL_PHRASES);
-
-// Same words as VoicePhrase.fillers. A breath in front of hello is still hello.
-const SOCIAL_FILLERS = new Set(
-  "uh um uhm hmm hm ah er eh huh mm mmm mhm mmhmm uhh ahh".split(" ")
-);
-
-// Talk that can sit in a holding line. A word outside this set, and outside
-// what he just said, is a fact the line is not allowed to invent.
-const COMPANY_BRIDGE = new Set(
-  `yeah looking still here second right sure hang give little longer minute moment waiting check checking seeing reading pulling opening about`.split(
-    /\s+/
-  )
-);
-
-const RESULT_CLAIM =
-  /\b(i|i've|i’ve)\s+(moved|filed|finished|done|sent|added|deleted|removed|changed|updated|put|set|handled|fixed|booked|scheduled|emailed|texted)\b/i;
 
 /** @type {Map<string, { text: string, sent: boolean, bag: any }>} */
 const utteranceSlots = new Map();
@@ -92,41 +65,48 @@ export function normalizeVoiceDevice(raw) {
 }
 
 /**
- * Same shape as VoicePhrase.normalize. Lowercase, and non-letters become spaces.
+ * Text the voice model has actually said so far.
+ * gpt-oss sometimes streams a Harmony analysis channel first. That channel is not speech.
  * @param {unknown} raw
  */
-export function normalizeSocialText(raw) {
-  return String(raw || "")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim()
-    .replace(/ +/g, " ");
+export function modelSpeech(raw) {
+  const text = String(raw || "");
+  if (text.includes("<|")) {
+    const channels = extractHarmonyChannels(text);
+    const finals = channels.filter((row) => row.channel === "final");
+    if (!finals.length) return "";
+    return finals[finals.length - 1].body
+      .replace(/<\|[^|>]*$/g, "")
+      .replace(/<\|[^|>]{0,120}\|>/g, "");
+  }
+  return text.replace(/<\|[^|>]*$/g, "");
 }
 
 /**
- * Same rule as VoicePhrase.isSocial. Fillers drop out, then the phrase has to
- * be one allowlist line. "hello hello" still counts. Extra words do not.
- * @param {unknown} raw
+ * The model's first word is the route. It is not spoken.
+ * `agent` starts Composer. Anything else, including a reply with no marker, stays on this model.
+ * A prefix of the marker stays pending until the word is finished.
+ * @param {unknown} speech
+ * @param {boolean} [flush]
+ * @returns {{ route: "agent"|"stay"|null, speech: string, pending: boolean }}
  */
-export function isSocialUtterance(raw) {
-  const words = normalizeSocialText(raw)
-    .split(" ")
-    .filter((word) => word && !SOCIAL_FILLERS.has(word));
-  if (!words.length) return false;
-  if (SOCIAL_EXACT.has(words.join(" "))) return true;
-  for (const candidate of SOCIAL_PHRASES) {
-    const parts = candidate.split(" ");
-    if (!parts.length || words.length <= parts.length || words.length % parts.length !== 0) continue;
-    let matches = true;
-    for (let i = 0; i < words.length; i++) {
-      if (words[i] !== parts[i % parts.length]) {
-        matches = false;
-        break;
-      }
-    }
-    if (matches) return true;
+export function readVoiceRoute(speech, flush = false) {
+  const body = String(speech || "").replace(/^\s+/, "");
+  if (!body) return { route: null, speech: "", pending: !flush };
+  const match = body.match(/^([A-Za-z]+)([\s\S]*)$/);
+  if (!match) return { route: "stay", speech: body, pending: false };
+  const word = match[1].toLowerCase();
+  const after = match[2];
+  const isRoute = word === "agent" || word === "stay";
+  const isPrefix = !isRoute && ("agent".startsWith(word) || "stay".startsWith(word));
+  if ((isPrefix || isRoute) && after === "" && !flush) {
+    return { route: null, speech: "", pending: true };
   }
-  return false;
+  if (isRoute && (after === "" || /^[\s.!?]/.test(after))) {
+    const spoken = after.replace(/^[.!?]+\s*/, "").replace(/^\s+/, "");
+    return { route: word, speech: spoken, pending: false };
+  }
+  return { route: "stay", speech: body, pending: false };
 }
 
 /**
@@ -192,26 +172,6 @@ export function spokenLineAddsNoun(reply, spoken) {
     if (!known.has(word)) return true;
   }
   return false;
-}
-
-/**
- * A holding line while Grok is still working. It can echo his words and
- * ordinary stalling. It cannot claim the work already happened, and it
- * cannot name something he did not say.
- * @param {string} userText
- * @param {string} line
- */
-export function acceptCompanyLine(userText, line) {
-  const text = String(line || "").replace(/\s+/g, " ").trim();
-  if (!text || text.length > 140) return false;
-  if (RESULT_CLAIM.test(text)) return false;
-  if (/^(done|finished|all set)\b/i.test(text)) return false;
-  const known = new Set(contentWords(userText));
-  for (const word of contentWords(text)) {
-    if (known.has(word) || COMPANY_BRIDGE.has(word)) continue;
-    return false;
-  }
-  return true;
 }
 
 /**
@@ -472,7 +432,7 @@ export function createVoiceBook(deps) {
   }
 
   async function idle(call) {
-    if (call.pendingSpeak?.size > 0 || call.compressing) return false;
+    if (call.pendingSpeak?.size > 0 || call.compressing || call.voicing) return false;
     const session = deps.session ? deps.session(call.sessionId) : null;
     if (session) {
       if (session.status === "running") return false;
@@ -594,7 +554,7 @@ export function createVoiceBook(deps) {
       ? "working"
       : call.speaking
         ? "composing"
-        : call.compressing
+        : call.voicing || call.compressing
           ? "working"
           : session?.status === "running"
             ? "searching"
@@ -617,11 +577,12 @@ export function createVoiceBook(deps) {
     };
   }
 
-  function pushSpeak(call, text, kind) {
+  function pushSpeak(call, text, kind, utteranceId) {
     const id = randomUUID();
-    const chunk = { id, text, kind, audioId: null };
+    const chunk = { id, text, kind, audioId: null, utteranceId: utteranceId || "" };
     call.speak.push(chunk);
     if (call.speak.length > 40) call.speak.splice(0, call.speak.length - 40);
+    if (kind === "voice") notifyVoiceLine(call);
     if (typeof deps.synthesize === "function" && text) {
       deps
         .synthesize(text)
@@ -688,6 +649,12 @@ export function createVoiceBook(deps) {
         sawLive: false,
         pendingSpeak: new Set(),
         compressing: false,
+        voicing: false,
+        voiceFor: "",
+        voiceAbort: null,
+        voiceLineDone: null,
+        voiceRoute: "",
+        voiceMemory: [],
         speaking: false,
         speakingText: "",
         caption: "",
@@ -717,56 +684,46 @@ export function createVoiceBook(deps) {
       if (!id || !said) throw httpError(400, "clientUtteranceId and text required");
       if (call.seen.has(id)) return { ...call.seen.get(id), duplicate: true };
       call.lastHeartbeatAt = now();
-      const social = isSocialUtterance(said);
       const at = new Date(now()).toISOString();
       openUtteranceSlot(id, said);
       call.caption = said;
+      call.turns.push({ role: "user", text: said, at, utteranceId: id });
+      call.pendingSpeak.add(id);
+      call.voicing = true;
+      call.voiceRoute = "";
       const record = {
         ok: true,
         sessionId: call.sessionId,
-        social,
         clientUtteranceId: id,
         text: said,
         activeDevice: call.activeDevice,
+        route: "",
+        speak: [],
       };
       call.seen.set(id, record);
-      stopCompany(call);
-      if (social) {
-        if (interrupt && typeof deps.cancelTurn === "function") {
-          await deps.cancelTurn(call.sessionId, call.email);
-        }
-        call.turns.push({ role: "user", text: said, at });
-        call.turns.push({
-          role: "assistant",
-          text: VOICE_ACK_SOCIAL,
-          spoken: VOICE_ACK_SOCIAL,
-          at,
-        });
-        void synthAck(deps, call, VOICE_ACK_SOCIAL);
-        await save(call);
-        return record;
-      }
-      call.turns.push({ role: "user", text: said, at, utteranceId: id });
-      call.pendingSpeak.add(id);
-      if (typeof deps.messageAgent !== "function") {
-        throw httpError(500, "voice agent is not wired");
-      }
-      // The phone already started the opener. Kokoro for that line, and the
-      // next spoken lines, start here. messageAgent is the slow part and does
-      // not sit in front of them.
-      void synthAck(deps, call, VOICE_ACK_WORK);
-      void runCompanyTalk(call, id, said, deps, (text, kind) => pushSpeak(call, text, kind));
+      stopVoice(call);
       const hearing = transcribeSwap(call, id, audioBase64, deps.transcribe);
-      try {
-        await deps.messageAgent(call.sessionId, call.email, said, id, Boolean(interrupt));
-      } catch (err) {
-        stopCompany(call);
-        call.pendingSpeak.delete(id);
-        call.turns = call.turns.filter((row) => row.utteranceId !== id);
-        call.seen.delete(id);
-        throw err;
+      const wait = armVoiceWait(call);
+      const task = runVoiceTurn(
+        call,
+        id,
+        said,
+        Boolean(interrupt),
+        deps,
+        now,
+        (text, kind) => pushSpeak(call, text, kind, id)
+      );
+      const settled = task.then(() => save(call));
+      if (typeof deps.streamVoice === "function") {
+        const gate = sleep(VOICE_ANSWER_CUTOFF_MS);
+        await Promise.race([wait, settled, gate.promise]);
+        gate.cancel();
+      } else {
+        await settled;
       }
       void hearing;
+      record.route = call.voiceRoute || "";
+      record.speak = call.speak.filter((chunk) => chunk.utteranceId === id);
       await save(call);
       return record;
     },
@@ -774,8 +731,8 @@ export function createVoiceBook(deps) {
     async grokFinished({ sessionId, utteranceId, content, dropped }) {
       const call = bySession.get(sessionId);
       if (!call || call.summarized) return;
-      // Free LM Studio before the answer compression, and stop new holding lines.
-      stopCompany(call);
+      // The voice model is done talking. The spoken answer is the agent's text.
+      stopVoice(call);
       const turn = call.turns.find((row) => row.utteranceId && row.utteranceId === utteranceId);
       if (dropped) {
         if (turn) {
@@ -805,6 +762,7 @@ export function createVoiceBook(deps) {
         at: new Date(now()).toISOString(),
         utteranceId,
       });
+      if (spoken) rememberVoice(call, "assistant", spoken);
       if (user && user.fullHeard && user.fullHeard !== user.text) {
         user.text = user.fullHeard;
         call.caption = user.fullHeard;
@@ -938,6 +896,14 @@ export function createVoiceBook(deps) {
         sawLive: false,
         pendingSpeak: new Set(),
         compressing: false,
+        voicing: false,
+        voiceFor: "",
+        voiceAbort: null,
+        voiceLineDone: null,
+        voiceRoute: "",
+        voiceMemory: Array.isArray(raw.voiceMemory)
+          ? raw.voiceMemory
+          : memoryFromTurns(raw.turns),
         speaking: false,
         speakingText: "",
         caption: raw.caption || "",
@@ -959,109 +925,224 @@ export function createVoiceBook(deps) {
   };
 }
 
-function stopCompany(call) {
+function stopVoice(call) {
   if (!call) return;
-  if (call.companyAbort) {
-    call.companyAbort.abort();
-    call.companyAbort = null;
+  if (call.voiceAbort) {
+    call.voiceAbort.abort();
+    call.voiceAbort = null;
   }
-  call.companyFor = "";
+  call.voiceFor = "";
+  notifyVoiceLine(call);
+}
+
+function armVoiceWait(call) {
+  let done = () => {};
+  const promise = new Promise((resolve) => {
+    done = resolve;
+  });
+  call.voiceLineDone = () => {
+    call.voiceLineDone = null;
+    done();
+  };
+  return promise;
+}
+
+function notifyVoiceLine(call) {
+  if (typeof call?.voiceLineDone === "function") call.voiceLineDone();
 }
 
 /**
- * Short lines from gpt-oss while the agent turn is still going.
- * Started before messageAgent is awaited. Aborted when the answer is ready.
- * A slow or missing model changes nothing on the phone, which is already talking.
+ * @param {number} ms
+ */
+function sleep(ms) {
+  let timer;
+  const promise = new Promise((resolve) => {
+    timer = setTimeout(resolve, ms);
+    timer.unref?.();
+  });
+  return { promise, cancel: () => clearTimeout(timer) };
+}
+
+/**
+ * @param {any} call
+ * @param {string} role
+ * @param {string} content
+ */
+function rememberVoice(call, role, content) {
+  const text = String(content || "").trim();
+  if (!text) return;
+  if (!Array.isArray(call.voiceMemory)) call.voiceMemory = [];
+  call.voiceMemory.push({ role, content: text });
+  if (call.voiceMemory.length > 24) {
+    call.voiceMemory.splice(0, call.voiceMemory.length - 24);
+  }
+}
+
+/**
+ * @param {{ role?: string, text?: string, spoken?: string }[]} turns
+ */
+function memoryFromTurns(turns) {
+  if (!Array.isArray(turns)) return [];
+  return turns
+    .map((turn) => ({
+      role: turn?.role === "assistant" ? "assistant" : "user",
+      content: String(turn?.spoken || turn?.text || "").trim(),
+    }))
+    .filter((turn) => turn.content);
+}
+
+/**
+ * One local model for the whole call. It speaks as soon as a sentence exists.
+ * Composer starts only when that model says the turn needs tools.
  * @param {any} call
  * @param {string} id
- * @param {string} userText
+ * @param {string} said
+ * @param {boolean} interrupt
  * @param {object} deps
+ * @param {() => number} now
  * @param {(text: string, kind: string) => void} push
  */
-async function runCompanyTalk(call, id, userText, deps, push) {
-  if (typeof deps.streamCompany !== "function") return;
+async function runVoiceTurn(call, id, said, interrupt, deps, now, push) {
   const ac = new AbortController();
-  call.companyAbort = ac;
-  call.companyFor = id;
-  let seen = 0;
-  let kept = 0;
-  try {
-    for await (const piece of deps.streamCompany(userText, ac.signal)) {
-      if (ac.signal.aborted || call.companyFor !== id) return;
-      seen += 1;
-      if (seen > 8 || kept >= VOICE_COMPANY_MAX) return;
-      const line = String(piece || "").trim();
-      if (!line || line === VOICE_ACK_WORK || line === VOICE_ACK_SOCIAL) continue;
-      if (!acceptCompanyLine(userText, line)) continue;
-      push(line, "hold");
-      kept += 1;
+  call.voiceAbort = ac;
+  call.voiceFor = id;
+  call.voicing = true;
+  rememberVoice(call, "user", said);
+  if (typeof deps.streamVoice !== "function") {
+    call.pendingSpeak.delete(id);
+    call.voicing = false;
+    call.voiceRoute = "stay";
+    if (interrupt && typeof deps.cancelTurn === "function") {
+      void Promise.resolve(deps.cancelTurn(call.sessionId, call.email)).catch(() => {});
     }
-  } catch {
-    /* phone is already saying the local lines */
+    notifyVoiceLine(call);
+    return;
   }
+  const messages = [
+    { role: "system", content: VOICE_CONVERSATION_PROMPT },
+    ...call.voiceMemory.slice(0, -1).slice(-24),
+    { role: "user", content: said },
+  ];
+  let raw = "";
+  let route = "";
+  let routed = false;
+  let sentSpeech = "";
+  let pendingBuf = "";
+  let spokenCount = 0;
+  let spokenText = "";
+  let agentStarted = false;
+
+  function startAgent() {
+    if (agentStarted || call.voiceFor !== id) return;
+    agentStarted = true;
+    if (typeof deps.messageAgent !== "function") return;
+    void Promise.resolve(
+      deps.messageAgent(call.sessionId, call.email, said, id, interrupt)
+    ).catch((err) => {
+      console.error("[voice] agent", err);
+      call.pendingSpeak.delete(id);
+    });
+  }
+
+  function emit(piece) {
+    const line = String(piece || "").trim();
+    if (!line || call.voiceFor !== id) return;
+    spokenCount += 1;
+    spokenText = spokenText ? `${spokenText} ${line}` : line;
+    push(line, "voice");
+  }
+
+  function drain(flush) {
+    const limit = route === "agent" ? 1 : 4;
+    while (spokenCount < limit) {
+      const split = splitSpeakable(pendingBuf, false);
+      if (!split) break;
+      pendingBuf = split.rest;
+      emit(split.piece);
+    }
+    if (flush && spokenCount < limit) {
+      const tail = splitSpeakable(pendingBuf, true);
+      if (tail?.piece) {
+        pendingBuf = tail.rest;
+        emit(tail.piece);
+      }
+    }
+    if (route === "agent" && spokenCount >= 1) ac.abort();
+  }
+
+  function pump(flush) {
+    if (call.voiceFor !== id) return;
+    const judged = readVoiceRoute(modelSpeech(raw), flush);
+    if (judged.pending) return;
+    if (!routed) {
+      routed = true;
+      route = judged.route || "stay";
+      call.voiceRoute = route;
+      if (route === "agent") startAgent();
+      else if (interrupt && typeof deps.cancelTurn === "function") {
+        void Promise.resolve(deps.cancelTurn(call.sessionId, call.email)).catch(() => {});
+      }
+    }
+    const full = judged.speech || "";
+    const extra = full.startsWith(sentSpeech) ? full.slice(sentSpeech.length) : full;
+    if (full.startsWith(sentSpeech)) sentSpeech = full;
+    else sentSpeech += extra;
+    if (extra) pendingBuf += extra;
+    drain(flush);
+  }
+
+  try {
+    const gen = deps.streamVoice(messages, ac.signal);
+    for await (const delta of gen) {
+      if (ac.signal.aborted || call.voiceFor !== id) break;
+      raw += delta;
+      pump(false);
+      if (route === "agent" && spokenCount >= 1) break;
+    }
+    if (call.voiceFor === id && !ac.signal.aborted) pump(true);
+  } catch {
+    /* aborted, or the local model is down. No canned line, and no Composer without a judgment. */
+  }
+  if (call.voiceFor !== id) return;
+  if (!routed) {
+    route = "stay";
+    call.voiceRoute = "stay";
+    if (interrupt && typeof deps.cancelTurn === "function") {
+      void Promise.resolve(deps.cancelTurn(call.sessionId, call.email)).catch(() => {});
+    }
+  }
+  if (route === "agent") {
+    if (spokenText) rememberVoice(call, "assistant", spokenText);
+  } else {
+    call.pendingSpeak.delete(id);
+    if (spokenText) {
+      call.turns.push({
+        role: "assistant",
+        text: spokenText,
+        spoken: spokenText,
+        at: new Date(now()).toISOString(),
+        utteranceId: id,
+      });
+      rememberVoice(call, "assistant", spokenText);
+    }
+  }
+  call.voicing = false;
+  if (call.voiceAbort === ac) call.voiceAbort = null;
+  notifyVoiceLine(call);
 }
 
 /**
- * One or two short stalling sentences. No tools, no result.
- * @param {string} userText
+ * gpt-oss on LM Studio. Same model the short lines already used.
+ * @param {Array<{role: string, content: string}>} messages
  * @param {AbortSignal} [signal]
  */
-export async function* streamCompanyLines(userText, signal) {
-  const messages = [
-    {
-      role: "system",
-      content: [
-        "You are on a phone call. Someone else is doing the work.",
-        "Keep them company with short spoken sentences while that work is still going.",
-        "Use only words from what they just said, plus ordinary stalling.",
-        "Do not say the work is finished. Do not invent a result, a name, or a place.",
-        "No tools. Two or three short sentences.",
-      ].join(" "),
-    },
-    { role: "user", content: String(userText || "") },
-  ];
-  let buffer = "";
-  let emitted = 0;
-  const gen = streamChatCompletions({
+async function* streamVoiceModel(messages, signal) {
+  yield* streamChatCompletions({
     messages,
-    maxTokens: VOICE_SUMMARY_MAX_TOKENS,
+    maxTokens: VOICE_TALK_MAX_TOKENS,
     temperature: 0.4,
     signal,
   });
-  for await (const delta of gen) {
-    if (signal?.aborted) return;
-    buffer += delta;
-    while (emitted < 6) {
-      const split = splitSpeakable(buffer, false);
-      if (!split) break;
-      buffer = split.rest;
-      emitted += 1;
-      yield split.piece;
-    }
-    if (emitted >= 6) return;
-  }
-  const tail = splitSpeakable(buffer, true);
-  if (tail?.piece && emitted < 6 && !signal?.aborted) yield tail.piece;
-}
-
-/**
- * Kokoro for the fixed line the phone already started. Publish only when
- * audio exists, so a missing clip does not make the phone say it twice.
- * @param {object} deps
- * @param {any} call
- * @param {string} text
- */
-async function synthAck(deps, call, text) {
-  if (typeof deps.synthesize !== "function") return;
-  try {
-    const audio = await deps.synthesize(text);
-    if (!audio?.bytes?.length) return;
-    const audioId = randomUUID();
-    call.audio.set(audioId, audio);
-    call.speak.push({ id: randomUUID(), text, kind: "ack", audioId });
-  } catch {
-    /* phone already has the system voice */
-  }
 }
 
 /**
@@ -1137,6 +1218,7 @@ function ledgerSnapshot(call) {
     summarized: call.summarized,
     caption: call.caption,
     turns: call.turns,
+    voiceMemory: call.voiceMemory || [],
   };
 }
 
@@ -1196,8 +1278,8 @@ function productionDeps() {
     },
     synthesize: synthesizeClip,
     streamSpoken: streamSpokenAnswer,
-    streamCompany(userText, signal) {
-      return streamCompanyLines(userText, signal);
+    streamVoice(messages, signal) {
+      return streamVoiceModel(messages, signal);
     },
   };
 }

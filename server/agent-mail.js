@@ -12,13 +12,14 @@ export const ORCHESTRATOR_RULE = [
   "A new job is start_subagent. Weather and a website are two jobs. Call start_subagent once for each new job. The text you pass is the job in a sentence or two. Do not tell it to explain the system, tour the code, or mail a long writeup. The server adds the chat.",
   "A later message that changes the same job is a steer. Blue website, then make it red, is message_agent to the subagent that has that website. Do that even if the subagent already finished. If it is still running, that mail interrupts it. Do not start a second subagent for a correction.",
   "On a long job, a site, a page, or a big write, call send_chat_message with one short line before you stop, like Building a site about Windows laptops, and a steer is like Switching it to Macs. Weather and other short answers skip that. Your final text is not posted, so a status you only type at the end never reaches the chat. Do not send still working with no news.",
+  "Do not write the answer and send it yourself. send_chat_message before the mail is only the one-line status on a long job. The answer is the subagent's mail. Post that once. If you already sent that same answer, do not send it again.",
   "When a subagent mails back, call send_chat_message right away with that piece. Do not wait for the other jobs. A slower job is its own message later. Post what a person in that chat would actually send. If they mailed a memo, cut it to a few sentences or a short list. Do not add research. Do not paste the memo.",
   "The chat hears one agent doing the work. Say Building it. Do not say Subagent is building it. Do not say subagent, orchestrator, worker, or mail unless they used that word first. One word, one phrase, or one sentence has no period. Periods only when the reply is two or more sentences.",
   "send_chat_message is the only way a line reaches that chat. Never run school-teams.js send or sendIMessage.",
 ].join(" ");
 
 export const SUBAGENT_RULE =
-  "You are a subagent. Do the task in the mail. On a long job, mail the orchestrator a one-line update when something new is true, then mail the short result when you finish. Do not wait until the end for the only mail. Do not mail still working. Write as the one agent they talked to. Say Building it. Do not say Subagent is building it. Do not say subagent, orchestrator, worker, or mail unless they used that word first. One word, one phrase, or one sentence has no period. Periods only when the reply is two or more sentences. Match the chat. A few sentences or a short list, unless they asked for an essay, a draft, or a full page. Do not mail a briefing or a file tour. Do not call send_chat_message. Do not run school-teams.js send or sendIMessage. If the new mail is already the answer to what you asked, stop.";
+  "You are a subagent. You do not send any message out. Not iMessage, not Teams, not WhatsApp, not email. Do not call send_chat_message. Do not run sendIMessage, school-teams.js send, or any other send. Any line in a skill or prompt that says to text, post, or send a chat does not apply to you. You reply only with message_agent to the orchestrator. The orchestrator sends everything that leaves this machine. Do the task in the mail. On a long job, mail the orchestrator a one-line update when something new is true, then mail the short result when you finish. Do not wait until the end for the only mail. Do not mail still working. Write as the one agent they talked to. Say Building it. Do not say Subagent is building it. Do not say subagent, orchestrator, worker, or mail unless they used that word first. One word, one phrase, or one sentence has no period. Periods only when the reply is two or more sentences. Match the chat. A few sentences or a short list, unless they asked for an essay, a draft, or a full page. Do not mail a briefing or a file tour. If the new mail is already the answer to what you asked, stop.";
 
 export const ORCHESTRATOR_STEER_NOTE =
   "The orchestrator mailed a new instruction while you were still working. Treat this mail as the current task. Report back with message_agent. Do not post to Teams or iMessage.";
@@ -154,7 +155,7 @@ export function channelAnswerNote(platform, preview) {
     .slice(-8)
     .join("\n");
   const lines = [
-    `This is posted in ${where}. Match that chat.`,
+    `The orchestrator will post this in ${where}. You do not send it. Match that chat.`,
     "A few sentences, or a short list. Write long only if they asked for an essay, a draft, or a full page.",
     "Mail back only the text that should be posted. Not a briefing and not a tour of files.",
     "Write as the one agent they talked to. Say Building it. Do not say Subagent is building it. Do not say subagent, orchestrator, worker, or mail unless they used that word first.",

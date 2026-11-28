@@ -4,8 +4,7 @@ import Speech
 import SwiftUI
 import UIKit
 
-/// Fixed social lines. The phone says "Okay." for these and keeps talking for everything else.
-/// The server allowlist has to use the same phrases and the same fillers, or it will start Grok on a line the phone already treated as social.
+/// Phrase end and noise. The phone does not decide whether a line starts the Personal Agent.
 enum VoicePhrase {
     static let silence: TimeInterval = 0.7
     /// A volatile result that never finalizes cannot sit in front of the first sound.
@@ -14,21 +13,7 @@ enum VoicePhrase {
     static let revisionSettle: TimeInterval = 0.2
     static let sampleRate: Double = 16_000
 
-    /// Hey, thanks, stop, never mind, and the same kind of short reply.
-    /// `server/voice-agent.js` `SOCIAL_PHRASES` is this set. Keep them identical.
-    static let socialPhrases: Set<String> = [
-        "hey",
-        "hi",
-        "hello",
-        "thanks",
-        "thank you",
-        "stop",
-        "never mind",
-        "nevermind",
-        "okay",
-        "ok",
-    ]
-
+    /// A lone breath is not an utterance. It is not a route.
     static let fillers: Set<String> = [
         "uh", "um", "uhm", "hmm", "hm", "ah", "er", "eh", "huh",
         "mm", "mmm", "mhm", "mmhmm", "uhh", "ahh",
@@ -41,49 +26,7 @@ enum VoicePhrase {
         return String(raw).split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 
-    /// Exact phrase after fillers are dropped. "Uh, hello" and "hello hello" are still hello.
-    /// A second phrase, or leftover words, is not social.
-    static func isSocial(_ text: String) -> Bool {
-        let words = normalize(text)
-            .split(separator: " ")
-            .map(String.init)
-            .filter { !fillers.contains($0) }
-        guard !words.isEmpty else { return false }
-        if socialPhrases.contains(words.joined(separator: " ")) { return true }
-        for candidate in socialPhrases {
-            let parts = candidate.split(separator: " ").map(String.init)
-            guard !parts.isEmpty, words.count > parts.count, words.count % parts.count == 0 else { continue }
-            var matches = true
-            for index in words.indices {
-                if words[index] != parts[index % parts.count] {
-                    matches = false
-                    break
-                }
-            }
-            if matches { return true }
-        }
-        return false
-    }
-
-    /// Same opener as `VOICE_ACK_WORK` on the server. Said on the phone before the upload.
-    /// The rest play if Grok is still going, so the call does not go quiet after one line.
-    static let companyLines = [
-        "Yeah, one second.",
-        "I'm looking at that.",
-        "Still here.",
-        "Not done yet.",
-        "Give me a little longer.",
-    ]
-
-    static func firstSound(for text: String) -> String {
-        isSocial(text) ? "Okay." : companyLines[0]
-    }
-
-    static func isCompanyLine(_ text: String) -> Bool {
-        companyLines.contains(text.trimmingCharacters(in: .whitespacesAndNewlines))
-    }
-
-    /// Empty audio is dropped. A one-word noise blip is dropped. "Hey" and "stop" are not blips.
+    /// Empty audio is dropped. A one-word noise blip is dropped. A real word is not a blip.
     static func shouldDrop(text: String, speechSeconds: Double) -> Bool {
         if speechSeconds <= 0 { return true }
         let norm = normalize(text)
@@ -99,8 +42,7 @@ struct VoiceUtterance: Identifiable, Equatable {
     var text: String
     /// 16 kHz mono little-endian Int16. About 32 KB a second. Kept so the Mac can run Parakeet.
     let pcm16kMono: Data
-    let social: Bool
-    /// Speech started over the speaker, or over a Grok turn the store marked live.
+    /// Speech started over the speaker, or over a turn the store marked live.
     let interruptsLiveTurn: Bool
 }
 
@@ -198,11 +140,8 @@ final class VoiceCapture: ObservableObject {
     private var lastCommitted = ""
     private var bargeFired = false
     private var currentInterrupts = false
-    /// Follow-up lines after the opener, while the agent is still working.
-    private var companyArmed = false
+    /// True once the Personal Agent's answer has taken the speaker.
     private var answerOwnsSpeaker = false
-    private var companyNext = 1
-    private var companyTask: Task<Void, Never>?
     @Published private(set) var wantsMic = false
     private var analyzerReady = false
     private var openTask: Task<Void, Never>?
@@ -224,9 +163,6 @@ final class VoiceCapture: ObservableObject {
         }
         speaker.onSpeakingChange = { [weak self] speaking in
             self?.isSpeaking = speaking
-            if !speaking {
-                self?.scheduleCompany()
-            }
         }
         backgroundObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification,
@@ -289,7 +225,6 @@ final class VoiceCapture: ObservableObject {
     /// Stops the mic. A long silence must not call this.
     func goDormant() {
         let was = isListening || wantsMic
-        endCompany(stopSpeech: false)
         openTask?.cancel()
         closeMic()
         speaker.stopPlayback()
@@ -302,7 +237,6 @@ final class VoiceCapture: ObservableObject {
     func setOtherDeviceLive(_ live: Bool) {
         otherDeviceIsLive = live
         if live {
-            endCompany(stopSpeech: false)
             openTask?.cancel()
             closeMic()
             speaker.stopPlayback()
@@ -349,12 +283,27 @@ final class VoiceCapture: ObservableObject {
         return utterances.remove(at: index)
     }
 
-    /// Answer sentence. The holding lines stop, then this starts. Kokoro replaces it only if the word has not started.
+    /// The voice model's first sentence. System voice starts now. Kokoro replaces it only if the word has not started.
+    func speakModelLine(id: String, text: String, opening: Bool) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !answerOwnsSpeaker, !trimmed.isEmpty else { return }
+        if !isHearing {
+            captionFinal = trimmed
+            captionVolatile = ""
+            spokenLine = trimmed
+        }
+        if opening {
+            speaker.speakFirstSound(id: id, text: trimmed)
+        } else {
+            speaker.speakLine(id: id, text: trimmed, role: .company)
+        }
+    }
+
+    /// Answer sentence from the Personal Agent. Starts as soon as the text exists.
     func speakAnswer(id: String, text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         answerOwnsSpeaker = true
-        endCompany(stopSpeech: false)
         speaker.stopPlayback()
         if !isHearing {
             captionFinal = trimmed
@@ -362,31 +311,6 @@ final class VoiceCapture: ObservableObject {
             spokenLine = trimmed
         }
         speaker.speakLine(id: id, text: trimmed, role: .answer)
-    }
-
-    /// A later line from the Mac. Plays after whatever is already in the queue.
-    /// Ignored once the answer has taken the speaker.
-    func speakServerCompany(id: String, text: String) {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard companyArmed, !answerOwnsSpeaker, !trimmed.isEmpty else { return }
-        companyTask?.cancel()
-        if !isHearing {
-            captionFinal = trimmed
-            captionVolatile = ""
-            spokenLine = trimmed
-        }
-        speaker.speakLine(id: id, text: trimmed, role: .company)
-    }
-
-    /// The agent finished or the send failed, and there is no answer to play.
-    func endCompany(stopSpeech: Bool) {
-        let wasArmed = companyArmed
-        companyArmed = false
-        companyTask?.cancel()
-        companyTask = nil
-        if stopSpeech && wasArmed && !answerOwnsSpeaker {
-            speaker.stopPlayback()
-        }
     }
 
     func playReturnedAudio(
@@ -639,7 +563,6 @@ final class VoiceCapture: ObservableObject {
         guard speaker.isAudible || liveTurnRunning else { return }
         bargeFired = true
         currentInterrupts = true
-        endCompany(stopSpeech: false)
         speaker.stopPlayback()
         YLHaptics.interrupt()
     }
@@ -700,69 +623,20 @@ final class VoiceCapture: ObservableObject {
             return
         }
         let id = UUID().uuidString
-        let social = VoicePhrase.isSocial(text)
-        let line = VoicePhrase.firstSound(for: text)
-        endCompany(stopSpeech: false)
+        answerOwnsSpeaker = false
         if speaker.isAudible {
             speaker.stopPlayback()
-        }
-        if !social {
-            beginCompany()
         }
         utterances.append(
             VoiceUtterance(
                 id: id,
                 text: text,
                 pcm16kMono: pcm,
-                social: social,
                 interruptsLiveTurn: interrupts
             )
         )
-        captionFinal = line
-        captionVolatile = ""
-        spokenLine = line
-        // On the phone, before the upload. VoiceStore posts this clip after.
-        speaker.speakFirstSound(id: id, text: line)
-    }
-
-    private func beginCompany() {
-        companyArmed = true
-        answerOwnsSpeaker = false
-        companyNext = 1
-        scheduleCompany()
-    }
-
-    /// Next local line, after a short breath, if the answer has not started and he is not mid-phrase.
-    /// If a line is still playing, this waits and tries again. One quiet gap does not end the call.
-    private func scheduleCompany() {
-        guard companyArmed, !answerOwnsSpeaker else { return }
-        companyTask?.cancel()
-        companyTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 200_000_000)
-            guard let self, !Task.isCancelled else { return }
-            guard self.companyArmed, !self.answerOwnsSpeaker else { return }
-            if self.isHearing || self.gate.collecting || self.speaker.isAudible {
-                self.scheduleCompany()
-                return
-            }
-            self.speakNextCompanyLine()
-        }
-    }
-
-    private func speakNextCompanyLine() {
-        let lines = VoicePhrase.companyLines
-        guard lines.count > 1 else { return }
-        if companyNext <= 0 || companyNext >= lines.count {
-            companyNext = 1
-        }
-        let line = lines[companyNext]
-        companyNext += 1
-        if !isHearing {
-            captionFinal = line
-            captionVolatile = ""
-            spokenLine = line
-        }
-        speaker.speakLine(id: UUID().uuidString, text: line, role: .company)
+        // His words stay on screen until the voice model has a sentence.
+        // The phone does not pick a line, and it does not start audio here.
     }
 
     private func lineDidStart(_ line: String) {

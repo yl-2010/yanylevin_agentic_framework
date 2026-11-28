@@ -3,9 +3,10 @@ import Foundation
 import UIKit
 
 /// Live voice call on the Mac. Uses `APIClient` and the same bearer as
-/// `POST api/home/agent/message`. The phone starts talking before this
-/// returns, and keeps going until the answer audio starts. Parakeet, Kokoro,
-/// and Grok run on the server. Grok does not gate the first line.
+/// `POST api/home/agent/message`. The phone does not classify the phrase.
+/// The first sound is the voice model's first sentence, played as soon as
+/// that text arrives. Parakeet and Kokoro run on the server. Composer does
+/// not gate the first line.
 @MainActor
 final class VoiceStore {
     static let shared = VoiceStore()
@@ -28,9 +29,8 @@ final class VoiceStore {
     private var didSaveHaptic = false
     private var answerStarted = false
     private var agentRunning = false
-    /// True once a poll showed this turn actually running or compressing.
-    /// An idle poll before that must not cut off the holding lines.
-    private var sawServerBusy = false
+    /// The first model sentence of this utterance has started the speaker.
+    private var openedModelLine = false
     private var serverPhase: VoiceOrbPhase = .breathing
     private var foreground = true
     /// True only after a foreground poll still showed an unsummarized call.
@@ -50,8 +50,6 @@ final class VoiceStore {
     private struct PostedLine {
         var id: String
         var apple: String
-        var firstSound: String
-        var ackPlayed: Bool
     }
 
     private struct SpeakTrack {
@@ -59,6 +57,7 @@ final class VoiceStore {
         var audioDone = false
         var seen = Date()
         var lineID: String?
+        var opening = false
     }
 
     private struct Outbound {
@@ -125,7 +124,7 @@ final class VoiceStore {
         holding = false
         holdingIntent = false
         agentRunning = false
-        sawServerBusy = false
+        openedModelLine = false
         serverPhase = .breathing
         chaseUntil = nil
         stopHeartbeat()
@@ -254,7 +253,7 @@ final class VoiceStore {
         didSaveHaptic = false
         answerStarted = false
         agentRunning = false
-        sawServerBusy = false
+        openedModelLine = false
         serverPhase = .breathing
         chaseUntil = nil
         sawUnsummarizedWhileForeground = false
@@ -281,27 +280,12 @@ final class VoiceStore {
             if item.interruptsLiveTurn {
                 retireQueuedSpeech()
             }
-            posted.append(
-                PostedLine(
-                    id: item.id,
-                    apple: item.text,
-                    firstSound: VoicePhrase.firstSound(for: item.text),
-                    ackPlayed: false
-                )
-            )
+            posted.append(PostedLine(id: item.id, apple: item.text))
             hadUtterance = true
             answerStarted = false
+            openedModelLine = false
             chaseUntil = Date().addingTimeInterval(Self.chaseWindow)
             let interrupt = item.interruptsLiveTurn || agentRunning
-            if !VoicePhrase.isSocial(item.text) {
-                agentRunning = true
-                sawServerBusy = false
-                serverPhase = .searching
-                VoiceCapture.shared.liveTurnRunning = true
-                surface?.voiceServerPhase(.searching)
-            } else {
-                VoiceCapture.shared.endCompany(stopSpeech: false)
-            }
             let job = Outbound(
                 id: item.id,
                 text: item.text,
@@ -347,7 +331,7 @@ final class VoiceStore {
             audioBase64: job.pcm.base64EncodedString()
         )
         do {
-            _ = try await postUtterance(body, token: token)
+            playReturnedSpeak(try await postUtterance(body, token: token))
         } catch {
             if Self.statusCode(error) == 409 {
                 if holding {
@@ -361,19 +345,24 @@ final class VoiceStore {
             }
             try? await Task.sleep(nanoseconds: 400_000_000)
             do {
-                _ = try await postUtterance(body, token: token)
+                playReturnedSpeak(try await postUtterance(body, token: token))
             } catch {
                 failUtterance()
             }
         }
     }
 
-    /// The Mac did not take the turn. Stop the holding lines instead of talking over a dead send.
+    /// The Mac did not take the turn. Stop whatever has started instead of talking over a dead send.
     private func failUtterance() {
         agentRunning = false
-        sawServerBusy = false
         VoiceCapture.shared.liveTurnRunning = false
-        VoiceCapture.shared.endCompany(stopSpeech: true)
+        if !answerStarted {
+            VoiceCapture.shared.speaker.stopPlayback()
+        }
+    }
+
+    private func playReturnedSpeak(_ response: VoiceCallResponse) {
+        playSpeak(response.speak ?? [])
     }
 
     private func recoverUtterance(_ body: VoiceUtteranceBody, token: String, error: Error) async {
@@ -400,7 +389,7 @@ final class VoiceStore {
                 }
                 return
             }
-            _ = try await postUtterance(body, token: token)
+            playReturnedSpeak(try await postUtterance(body, token: token))
         } catch {
             return
         }
@@ -523,13 +512,6 @@ final class VoiceStore {
             VoiceCapture.shared.noteServerCaption(label)
         }
         playSpeak(state.speak ?? [])
-        let serverBusy = agentRunning || serverPhase == .working || serverPhase == .searching
-        if serverBusy {
-            sawServerBusy = true
-        } else if sawServerBusy && !answerStarted {
-            sawServerBusy = false
-            VoiceCapture.shared.endCompany(stopSpeech: true)
-        }
         if state.summarized == true {
             sessionId = nil
             holding = false
@@ -554,7 +536,6 @@ final class VoiceStore {
     private func considerCaption(_ raw: String?) {
         let text = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        if text == "Okay." || VoicePhrase.isCompanyLine(text) { return }
         if answerStarted { return }
         let capture = VoiceCapture.shared
         if capture.isHearing || capture.isSpeaking { return }
@@ -573,22 +554,19 @@ final class VoiceStore {
             var track = speakTrack[chunk.id] ?? SpeakTrack()
             let text = (chunk.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let kind = chunk.kind ?? "answer"
-            if kind == "ack" {
+            if kind == "voice" {
                 if track.lineID == nil {
-                    track.lineID = takeAckLine(matching: text)
+                    track.opening = !openedModelLine
+                    openedModelLine = true
+                    track.lineID = chunk.id
                 }
-                if let lineID = track.lineID, let audioId = chunk.audioId, !audioId.isEmpty, !track.audioDone {
-                    fetchAudio(chunkID: chunk.id, audioId: audioId, lineID: lineID, role: .firstSound, line: text)
-                } else if track.lineID == nil || Date().timeIntervalSince(track.seen) > 2.5 {
-                    track.audioDone = true
-                }
-            } else if kind == "hold" {
                 if !track.spoke && !text.isEmpty {
                     track.spoke = true
-                    VoiceCapture.shared.speakServerCompany(id: chunk.id, text: text)
+                    VoiceCapture.shared.speakModelLine(id: chunk.id, text: text, opening: track.opening)
                 }
+                let role: VoicePlaybackRole = track.opening ? .firstSound : .company
                 if let audioId = chunk.audioId, !audioId.isEmpty, !track.audioDone {
-                    fetchAudio(chunkID: chunk.id, audioId: audioId, lineID: chunk.id, role: .company, line: text)
+                    fetchAudio(chunkID: chunk.id, audioId: audioId, lineID: chunk.id, role: role, line: text)
                 } else if chunk.audioId == nil && Date().timeIntervalSince(track.seen) > Self.audioWait {
                     track.audioDone = true
                 }
@@ -608,14 +586,6 @@ final class VoiceStore {
             }
             speakTrack[chunk.id] = track
         }
-    }
-
-    private func takeAckLine(matching text: String) -> String? {
-        guard let index = posted.firstIndex(where: { !$0.ackPlayed && $0.firstSound == text }) else {
-            return nil
-        }
-        posted[index].ackPlayed = true
-        return posted[index].id
     }
 
     private func fetchAudio(
@@ -854,6 +824,7 @@ private struct VoiceCallResponse: Decodable {
     var summarizing: Bool?
     var onOtherDevice: Bool?
     var duplicate: Bool?
+    var speak: [VoiceSpeakChunk]?
 }
 
 private struct VoiceSpeakChunk: Decodable {
