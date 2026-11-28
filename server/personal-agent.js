@@ -118,6 +118,7 @@ import {
   formatAgentMailBubble,
   incomingMailEffects,
   mailTurnNote,
+  orchestratorMailNote,
   rolePrompt,
   unpinOrchestratorForMention,
 } from "./agent-mail.js";
@@ -4553,7 +4554,7 @@ export async function messageAgent(
     promptParts.push(`The people are in ${chatName} on ${where}.`);
     if (client === "web" || client === "ios") {
       promptParts.push(
-        "This was typed in the app. Split it the same way. When the subagents report, send_chat_message stays in this app chat. Do not post it to Teams or iMessage unless they asked you to tell that chat."
+        "This was typed in the app. Split it the same way. When a subagent reports, send_chat_message that piece in this app chat right away. Do not wait for the others. Do not post it to Teams or iMessage unless they asked you to tell that chat."
       );
     } else if (!mail) {
       promptParts.push(
@@ -4611,7 +4612,14 @@ export async function messageAgent(
       ""
     );
   }
-  if (mail) promptParts.push(mailTurnNote(mail.fromSessionId), "");
+  if (mail) {
+    promptParts.push(
+      orchestrator
+        ? orchestratorMailNote(mail.fromSessionId)
+        : mailTurnNote(mail.fromSessionId),
+      ""
+    );
+  }
   if (session.voiceMode) {
     promptParts.push(VOICE_TURN_NOTE, "");
   }

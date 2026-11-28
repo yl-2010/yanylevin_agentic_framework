@@ -11,7 +11,7 @@ export const ORCHESTRATOR_RULE = [
   "Split the message into independent jobs and call start_subagent once for each job before you stop. One question is one job. Weather and an explanation of the code are two jobs. Call both in this turn.",
   "The text you pass is the whole task. The subagent cannot see this chat. Tell it what to find and to mail the full answer back.",
   "Then stop. Do not draft the answer. Your final text is not posted to Teams or iMessage.",
-  "When a subagent mails back, wait if another job is still out. When every job has reported, call send_chat_message once with the combined answer those people should see. Use what they sent. Do not add research of your own.",
+  "When a subagent mails back, call send_chat_message right away with that piece. Do not wait for the other jobs. A slower job is its own message later. Use what they sent. Do not add research of your own.",
   "message_agent steers a subagent that is still running and interrupts it.",
   "send_chat_message is the only way a line reaches that chat. Never run school-teams.js send or sendIMessage.",
 ].join(" ");
@@ -130,6 +130,11 @@ export function rolePrompt(session) {
 export function mailTurnNote(fromSessionId) {
   const id = fromSessionId == null ? "" : String(fromSessionId);
   return `This message was mailed from session ${id}. The session id is not part of the bubble. Answer with message_agent to that sessionId. ${STOP_SENTENCE}`;
+}
+
+export function orchestratorMailNote(fromSessionId) {
+  const id = fromSessionId == null ? "" : String(fromSessionId);
+  return `This message was mailed from session ${id}. If it is a finished piece of the job, call send_chat_message now with that piece. Do not wait for other subagents. A slower job is a separate message later. Do not mail them back unless you have a new ask. Your final text is not posted.`;
 }
 
 export function incomingMailEffects(mail) {

@@ -12,6 +12,7 @@ import {
   incomingMailEffects,
   mailFamilyIds,
   mailTurnNote,
+  orchestratorMailNote,
   rolePrompt,
   unpinOrchestratorForMention,
 } from "./agent-mail.js";
@@ -252,6 +253,14 @@ describe("mailTurnNote", () => {
     assert.match(note, /message_agent/);
     assert.match(note, /If this is already the answer to what you asked, stop\./);
   });
+
+  it("tells the orchestrator to post that piece now", () => {
+    const note = orchestratorMailNote("sess-9");
+    assert.match(note, /sess-9/);
+    assert.match(note, /send_chat_message now/);
+    assert.match(note, /Do not wait for other subagents/);
+    assert.equal(note.includes("message_agent to that sessionId"), false);
+  });
 });
 
 describe("unpinOrchestratorForMention", () => {
@@ -295,6 +304,8 @@ describe("role prompts", () => {
     assert.match(ORCHESTRATOR_RULE, /Weather and an explanation of the code are two jobs/);
     assert.equal(ORCHESTRATOR_RULE.includes("final reply on a mention turn is posted"), false);
     assert.match(ORCHESTRATOR_RULE, /Your final text is not posted/);
+    assert.match(ORCHESTRATOR_RULE, /Do not wait for the other jobs/);
+    assert.equal(ORCHESTRATOR_RULE.includes("wait if another job is still out"), false);
     assert.match(SUBAGENT_RULE, /forwarded as-is/);
     assert.equal(ORCHESTRATOR_RULE.includes("\u2014"), false);
   });
