@@ -115,6 +115,7 @@ import {
   agentMailInterrupts,
   canMailThread,
   filterMailThreads,
+  channelAnswerNote,
   formatAgentMailBubble,
   incomingMailEffects,
   mailTurnNote,
@@ -1685,7 +1686,7 @@ function agentMailTools(sid, session) {
     },
     start_subagent: {
       description:
-        "Orchestrator only. Open a subagent thread and mail it the task text.",
+        "Orchestrator only. Mail a subagent the question in a sentence or two, plus what to find. Do not ask for a full writeup.",
       inputSchema: {
         type: "object",
         properties: {
@@ -1701,7 +1702,15 @@ function agentMailTools(sid, session) {
         if (!task) return "text required";
         try {
           const childId = await createSubagentSession(sid, session, task);
-          const mailed = await deliverAgentMail(sid, childId, task);
+          const note = channelAnswerNote(
+            session.teamsOrigin ? "teams" : session.imessageOrigin ? "imessage" : "",
+            session.teamsOrigin?.threadPreview || session.imessageOrigin?.threadPreview || ""
+          );
+          const mailed = await deliverAgentMail(
+            sid,
+            childId,
+            note ? `${task}\n\n${note}` : task
+          );
           if (!mailed || mailed.ok === false) {
             return String(mailed?.error || "mail failed");
           }
@@ -4561,6 +4570,23 @@ export async function messageAgent(
         "This is a mention. Split it into independent jobs and call start_subagent for each one now. Do not answer."
       );
     }
+    const recent = String(
+      session.teamsOrigin?.threadPreview || session.imessageOrigin?.threadPreview || ""
+    )
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(-8)
+      .join("\n");
+    if (recent) {
+      promptParts.push(
+        "Recent messages, oldest first. Use them only to judge length and tone. Do not answer from them.",
+        recent
+      );
+    }
+    promptParts.push(
+      "When you post, match that chat. A few sentences or a short list, unless they asked for an essay, a draft, or a full page. If a subagent mails a memo, cut it. Do not paste it."
+    );
     promptParts.push("");
   }
   const imessageBlock = orchestrator

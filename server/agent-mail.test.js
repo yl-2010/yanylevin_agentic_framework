@@ -11,6 +11,7 @@ import {
   formatAgentMailBubble,
   incomingMailEffects,
   mailFamilyIds,
+  channelAnswerNote,
   mailTurnNote,
   orchestratorMailNote,
   rolePrompt,
@@ -263,6 +264,22 @@ describe("mailTurnNote", () => {
   });
 });
 
+describe("channelAnswerNote", () => {
+  it("keeps the latest chat lines and the short-reply rule", () => {
+    const note = channelAnswerNote(
+      "teams",
+      ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine"].join("\n")
+    );
+    assert.match(note, /posted in Teams/);
+    assert.match(note, /A few sentences/);
+    assert.equal(note.split("\n").includes("one"), false);
+    assert.equal(note.split("\n").includes("two"), true);
+    assert.equal(note.split("\n").includes("nine"), true);
+    assert.equal(channelAnswerNote("", "hi"), "");
+    assert.equal(channelAnswerNote("imessage", "").includes("Recent messages"), false);
+  });
+});
+
 describe("unpinOrchestratorForMention", () => {
   it("clears pin flags only on an orchestrator", () => {
     const orchestrator = {
@@ -306,7 +323,10 @@ describe("role prompts", () => {
     assert.match(ORCHESTRATOR_RULE, /Your final text is not posted/);
     assert.match(ORCHESTRATOR_RULE, /Do not wait for the other jobs/);
     assert.equal(ORCHESTRATOR_RULE.includes("wait if another job is still out"), false);
-    assert.match(SUBAGENT_RULE, /forwarded as-is/);
+    assert.match(SUBAGENT_RULE, /only the text that should be posted/);
+    assert.match(SUBAGENT_RULE, /Do not mail a briefing/);
+    assert.match(ORCHESTRATOR_RULE, /Do not paste the memo/);
+    assert.equal(SUBAGENT_RULE.includes("forwarded as-is"), false);
     assert.equal(ORCHESTRATOR_RULE.includes("\u2014"), false);
   });
 });
