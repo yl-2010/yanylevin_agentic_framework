@@ -46,6 +46,18 @@ enum VoiceOrbPhase: String, CaseIterable, Equatable, Identifiable {
     /// Idle breath. Tap from here starts listening. Any other phase is a live
     /// session, and a tap goes dormant.
     var isDormant: Bool { self == .breathing }
+
+    /// Temporary test readout. The words, then the animation on screen.
+    var debugLine: String {
+        switch self {
+        case .connecting: return "Connecting, web"
+        case .breathing: return "Dormant, breathing, ring"
+        case .listening: return "Listening, wave"
+        case .working: return "Thinking, working, orbits"
+        case .searching: return "Searching, globe"
+        case .composing: return "Speaking, composing, ribbon"
+        }
+    }
 }
 
 /// One caption line. Settled words use the normal foreground. The volatile
@@ -156,6 +168,14 @@ final class VoiceSession: ObservableObject {
         return caption
     }
 
+    /// One line for the temporary test box. Names the state and the animation.
+    var debugStateLine: String {
+        if otherDeviceHoldsMic, let activeDevice {
+            return "Dormant, \(activeDevice.label) has it, ring"
+        }
+        return phase.debugLine
+    }
+
     var orbAccessibilityLabel: String {
         if otherDeviceHoldsMic {
             return displayedCaption.settled
@@ -207,6 +227,22 @@ final class VoiceSession: ObservableObject {
         phase = .connecting
         VoiceCapture.shared.setOtherDeviceLive(false)
         VoiceCapture.shared.startListening()
+    }
+
+    /// Testing control. Posts a real dormant for this call, then claims a new one.
+    func resetCall() {
+        guard micEnabled else { return }
+        previewing = false
+        callConnecting = true
+        serverPhase = .breathing
+        clearWork()
+        clearSpeechClocks()
+        listening = false
+        VoiceCapture.shared.setOtherDeviceLive(false)
+        activeDevice = thisDevice
+        phase = .connecting
+        caption = VoiceCaption()
+        VoiceStore.shared.resetSession(surface: self, device: thisDevice)
     }
 
     /// Stop listening. Same path for the orb tap, leaving the Voice tab, and

@@ -272,6 +272,52 @@ describe("one device and the summary wait", () => {
     assert.equal(resumed.activeDevice, "pad");
   });
 
+  it("reset dormants the open call and starts a new session", async () => {
+    let n = 0;
+    let cancelled = "";
+    const harness = bookWith({
+      deps: {
+        async startAgent() {
+          n += 1;
+          return { sessionId: `sess-${n}` };
+        },
+        async cancelTurn(sessionId) {
+          cancelled = sessionId;
+        },
+      },
+    });
+    const first = await harness.book.start({ email: YAN, device: "phone" });
+    assert.equal(first.sessionId, "sess-1");
+    const second = await harness.book.reset({
+      email: YAN,
+      sessionId: first.sessionId,
+      device: "phone",
+    });
+    assert.equal(second.claimed, true);
+    assert.equal(second.sessionId, "sess-2");
+    const old = harness.book.bySession.get("sess-1");
+    assert.equal(old.dormant, true);
+    assert.equal(old.activeDevice, null);
+    assert.equal(cancelled, "sess-1");
+    const again = await harness.book.start({ email: YAN, device: "phone" });
+    assert.equal(again.sessionId, "sess-2");
+  });
+
+  it("reset with no call still starts one", async () => {
+    let n = 0;
+    const harness = bookWith({
+      deps: {
+        async startAgent() {
+          n += 1;
+          return { sessionId: `fresh-${n}` };
+        },
+      },
+    });
+    const started = await harness.book.reset({ email: YAN, device: "phone" });
+    assert.equal(started.claimed, true);
+    assert.equal(started.sessionId, "fresh-1");
+  });
+
   it("marks the session dormant after two missed heartbeats", async () => {
     const harness = bookWith();
     await harness.book.start({ email: YAN, device: "phone" });

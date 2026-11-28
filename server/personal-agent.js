@@ -5677,6 +5677,7 @@ export {
   voiceState,
   voiceAudio,
   voiceDormant,
+  voiceReset,
   voiceResume,
   voiceHeartbeat,
 } from "./voice-agent.js";

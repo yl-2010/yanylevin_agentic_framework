@@ -2,9 +2,10 @@ import SwiftUI
 
 /// Signed-out Voice is the Account sign-in cards. Signed-in Voice is one
 /// glass stage: the tinted orb, and no person button. No caption, title,
-/// status line, or device name. The orb is the mic. A tap starts listening.
-/// A tap while the session is up goes dormant and stops listening. The
-/// screen does not open Chat.
+/// or device name. The orb is the mic. A tap starts listening. A tap while
+/// the session is up goes dormant and stops listening. A temporary line
+/// under the orb names the state, and Reset ends the call and starts
+/// another. The screen does not open Chat.
 struct VoiceView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var nav: AppNavigationStore
@@ -55,7 +56,8 @@ struct VoiceView: View {
 }
 
 /// Glass circle and the orb control. Personal palette. iPhone landscape
-/// stays one column. iPad uses a larger circle. Nothing else is drawn.
+/// stays one column. iPad uses a larger circle. A temporary state line and
+/// Reset sit under the orb.
 struct VoiceStage: View {
     @ObservedObject var session: VoiceSession
     /// Preview-only. Nil follows the real device.
@@ -83,11 +85,42 @@ struct VoiceStage: View {
     var body: some View {
         orbControl
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .safeAreaInset(edge: .bottom, spacing: 16) {
+                testingControls
+                    .frame(maxWidth: .infinity)
+            }
             .background {
                 YLTheme.pageFill(colorScheme, palette: .standard)
                     .ignoresSafeArea()
             }
             .environment(\.ylPalette, .standard)
+    }
+
+    /// Temporary. One line for the phase the orb was told to draw, and a
+    /// button that ends the Mac call and starts another.
+    private var testingControls: some View {
+        VStack(spacing: 12) {
+            Text(session.debugStateLine)
+                .font(.subheadline)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .foregroundStyle(YLTheme.fg(colorScheme))
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(
+                    .ultraThinMaterial,
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+            Button("Reset") {
+                session.resetCall()
+            }
+            .buttonStyle(.bordered)
+            .disabled(onOrbTap != nil || !session.micEnabled)
+        }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 8)
+        .frame(maxWidth: 420)
     }
 
     private var orbControl: some View {

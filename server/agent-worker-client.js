@@ -93,6 +93,7 @@ export const voiceUtterance = proxy("voiceUtterance");
 export const voiceState = proxy("voiceState");
 export const voiceAudio = proxy("voiceAudio");
 export const voiceDormant = proxy("voiceDormant");
+export const voiceReset = proxy("voiceReset");
 export const voiceResume = proxy("voiceResume");
 export const voiceHeartbeat = proxy("voiceHeartbeat");
 

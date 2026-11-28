@@ -26,6 +26,7 @@ export const AGENT_WORKER_METHODS = Object.freeze([
   "voiceState",
   "voiceAudio",
   "voiceDormant",
+  "voiceReset",
   "voiceResume",
   "voiceHeartbeat",
 ]);

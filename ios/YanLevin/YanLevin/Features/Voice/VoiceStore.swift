@@ -142,6 +142,44 @@ final class VoiceStore {
         }
     }
 
+    /// Testing control. Marks the live call dormant, then `voice/reset` starts a new one.
+    /// A second call cancels the first. An in-flight phrase stays on the old call.
+    func resetSession(surface: VoiceSession, device: VoiceDeviceKind) {
+        self.surface = surface
+        self.device = device
+        claimGeneration += 1
+        let generation = claimGeneration
+        let previousId = sessionId
+        holding = false
+        holdingIntent = false
+        agentRunning = false
+        openedModelLine = false
+        serverPhase = .breathing
+        chaseUntil = nil
+        hadUtterance = false
+        posted.removeAll()
+        stopHeartbeat()
+        retireQueuedSpeech()
+        VoiceCapture.shared.liveTurnRunning = false
+        dropLocalUtterances()
+        VoiceCapture.shared.goDormant()
+        dropLocalUtterances()
+        let token = self.token
+        let pendingSend = sendTail
+        sessionId = nil
+        enqueueLink { [weak self] in
+            await pendingSend?.value
+            guard let self, generation == self.claimGeneration else { return }
+            self.holdingIntent = true
+            await self.performReset(
+                generation,
+                previousId: previousId,
+                token: token,
+                device: device
+            )
+        }
+    }
+
     // MARK: Claim
 
     private func performClaim(_ generation: Int) async {
@@ -263,6 +301,57 @@ final class VoiceStore {
         surface?.voiceLinkClaimed()
         startHeartbeat()
         kickPoll()
+    }
+
+    private func performReset(
+        _ generation: Int,
+        previousId: String?,
+        token: String?,
+        device: VoiceDeviceKind
+    ) async {
+        guard generation == claimGeneration, holdingIntent else { return }
+        guard let token, !token.isEmpty else {
+            holdingIntent = false
+            surface?.voiceLinkFailed("Sign in again.")
+            return
+        }
+        do {
+            let start: VoiceCallResponse = try await APIClient.shared.request(
+                "api/home/agent/voice/reset",
+                method: "POST",
+                body: VoiceSessionBody(device: device.rawValue, sessionId: previousId),
+                bearer: token
+            )
+            guard generation == claimGeneration, holdingIntent else {
+                if start.claimed == true, let sid = start.sessionId, !sid.isEmpty {
+                    await postDormant(token: token, sessionId: sid, device: device)
+                }
+                return
+            }
+            guard let sid = start.sessionId, !sid.isEmpty, start.claimed == true else {
+                holdingIntent = false
+                if let holder = otherDevice(in: start.activeDevice) {
+                    surface?.voiceLinkBusyElsewhere(holder)
+                } else {
+                    surface?.voiceLinkFailed("Can't reach the Mac.")
+                }
+                return
+            }
+            sessionId = sid
+            adopt(sid)
+        } catch {
+            guard generation == claimGeneration, holdingIntent else { return }
+            holdingIntent = false
+            holding = false
+            surface?.voiceLinkFailed(Self.failureLine(error))
+        }
+    }
+
+    private func dropLocalUtterances() {
+        for item in VoiceCapture.shared.utterances {
+            seenUtteranceIDs.insert(item.id)
+            _ = VoiceCapture.shared.consumeUtterance(id: item.id)
+        }
     }
 
     private func otherDevice(in raw: String?) -> VoiceDeviceKind? {

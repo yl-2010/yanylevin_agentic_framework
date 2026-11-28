@@ -922,6 +922,47 @@ export function createVoiceBook(deps) {
       const call = bySession.get(sessionId);
       if (call) await arm(call);
     },
+
+    /**
+     * End the live call the same way dormant does, then open a new agent session.
+     * A normal start keeps the unsummarized call. This one does not.
+     */
+    async reset({ email, sessionId, device }) {
+      const who = String(email || "").trim();
+      const dev = normalizeVoiceDevice(device);
+      if (!who) throw httpError(400, "email required");
+      if (!dev) throw httpError(400, "device required");
+      const sid = String(sessionId || "").trim();
+      /** @type {any[]} */
+      const targets = [];
+      if (sid) {
+        const named = bySession.get(sid);
+        if (named && named.email === who) targets.push(named);
+      }
+      const linked = findEmailCall(who);
+      if (linked && !targets.includes(linked)) targets.push(linked);
+      for (const call of targets) {
+        if (call.summarized) continue;
+        stopVoice(call);
+        if (typeof deps.cancelTurn === "function") {
+          try {
+            await deps.cancelTurn(call.sessionId, who);
+          } catch {
+            /* the turn may already be gone */
+          }
+        }
+        call.pendingSpeak?.clear();
+        call.voicing = false;
+        call.compressing = false;
+        call.speaking = false;
+        call.speakingText = "";
+        const wasDormant = call.dormant === true;
+        markDormant(call);
+        if (wasDormant) void arm(call);
+      }
+      byEmail.delete(who);
+      return this.start({ email: who, device: dev });
+    },
   };
 }
 
@@ -1394,6 +1435,15 @@ export async function voiceAudio(email, opts = {}) {
 export async function voiceDormant(email, opts = {}) {
   const book = await ready();
   return book.dormant({
+    email,
+    sessionId: opts?.sessionId,
+    device: opts?.device,
+  });
+}
+
+export async function voiceReset(email, opts = {}) {
+  const book = await ready();
+  return book.reset({
     email,
     sessionId: opts?.sessionId,
     device: opts?.device,

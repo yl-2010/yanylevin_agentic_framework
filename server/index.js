@@ -84,6 +84,7 @@ import {
   voiceState,
   voiceAudio,
   voiceDormant,
+  voiceReset,
   voiceResume,
   voiceHeartbeat,
   ensureAgentWorker,
@@ -1170,6 +1171,20 @@ app.post("/api/home/agent/voice/dormant", requireHomeUser, async (req, res) => {
     res.status(err.status || 500).json({
       ok: false,
       error: err.message || "voice dormant failed",
+    });
+  }
+});
+
+app.post("/api/home/agent/voice/reset", requireHomeUser, async (req, res) => {
+  try {
+    const result = await voiceReset(req.user.email, req.body || {});
+    res.setHeader("Cache-Control", "no-store");
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/home/agent/voice/reset]", err);
+    res.status(err.status || 500).json({
+      ok: false,
+      error: err.message || "voice reset failed",
     });
   }
 });
