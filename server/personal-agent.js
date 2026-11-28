@@ -1646,7 +1646,7 @@ function agentMailTools(sid, session) {
   return {
     message_agent: {
       description:
-        "Mail another thread in this workspace. Pass sessionId and text. The other thread sees a user bubble.",
+        "Mail another thread. Pass sessionId and text. Use this to steer a subagent when the person changes the same job. That interrupts it if it is still running.",
       inputSchema: {
         type: "object",
         properties: {
@@ -1686,7 +1686,7 @@ function agentMailTools(sid, session) {
     },
     start_subagent: {
       description:
-        "Orchestrator only. Mail a subagent the question in a sentence or two, plus what to find. Do not ask for a full writeup.",
+        "Orchestrator only. Open a subagent for a new job. A correction of a job you already started is message_agent, not this.",
       inputSchema: {
         type: "object",
         properties: {
@@ -4567,7 +4567,7 @@ export async function messageAgent(
       );
     } else if (!mail) {
       promptParts.push(
-        "This is a mention. Split it into independent jobs and call start_subagent for each one now. Do not answer."
+        "This is a mention. If it changes a job a subagent already has, message_agent that subagent. Do not start another. A new job is start_subagent, and the task is the thing they asked for, not an explanation of how you would do it. Do not answer."
       );
     }
     const recent = String(
@@ -4629,7 +4629,7 @@ export async function messageAgent(
   }
   if (interrupting && orchestrator && !mail) {
     promptParts.push(
-      "This mention replaces the one you were handling. Split this message instead. Do not answer it.",
+      "This mention changes the current job. If a subagent already has that job, message_agent that subagent. Do not start a second one. A brand new job is start_subagent. Do not answer it, and do not explain how you would do it.",
       ""
     );
   } else if (interrupting) {
