@@ -330,6 +330,10 @@ describe("role prompts", () => {
     assert.match(ORCHESTRATOR_RULE, /like I can say/);
     assert.match(ORCHESTRATOR_RULE, /Building a site about Windows laptops/);
     assert.match(ORCHESTRATOR_RULE, /never reaches the chat/);
+    assert.match(ORCHESTRATOR_RULE, /Say Building it/);
+    assert.match(ORCHESTRATOR_RULE, /Do not say Subagent is building it/);
+    assert.match(ORCHESTRATOR_RULE, /Do not say subagent, orchestrator, worker, or mail unless they used that word first/);
+    assert.match(SUBAGENT_RULE, /Do not say subagent, orchestrator, worker, or mail unless they used that word first/);
     assert.match(SUBAGENT_RULE, /Do not wait until the end for the only mail/);
     assert.equal(SUBAGENT_RULE.includes("forwarded as-is"), false);
     assert.equal(ORCHESTRATOR_RULE.includes("\u2014"), false);
