@@ -495,7 +495,7 @@ final class VoiceStore {
         VoiceCapture.shared.liveTurnRunning = agentRunning
         surface?.voiceServerPhase(serverPhase)
         considerCaption(state.caption)
-        if agentRunning, captureCaptionEmpty, let label = cleaned(state.workingLabel) {
+        if agentRunning, captureCaptionEmpty, let label = Self.cleaned(state.workingLabel) {
             VoiceCapture.shared.noteServerCaption(label)
         }
         playSpeak(state.speak ?? [])
