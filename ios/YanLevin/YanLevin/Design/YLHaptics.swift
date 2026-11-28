@@ -72,28 +72,26 @@ enum YLHaptics {
         playImpact(.medium)
     }
 
-    /// Mushy soft thump when a machine-title swipe crosses halfway (titles split).
-    static func machineSwipeHalfway() {
-        playImpact(.soft, intensity: 0.92)
-    }
-
-    /// First sound of a voice turn. One soft impact, the same generator as
-    /// `machineSwipeHalfway`. Play when audio actually starts, not when the
-    /// request is sent. Not `startBusyPulse`.
+    /// Voice turn, the moment audio actually starts. Same soft hit as a machine-title swipe.
+    /// Not when the line is requested, and not on a partial caption word.
     static func voiceFirstSound() {
         playImpact(.soft, intensity: 0.92)
     }
 
-    /// Spoken answer starts. One medium impact. Same generator as `medium`,
-    /// played as the answer audio begins.
+    /// Spoken Grok answer, the moment that audio starts. Medium, same as leaving Voice,
+    /// but it plays because the answer started, not because he left.
     static func voiceAnswer() {
-        medium()
+        playImpact(.medium)
     }
 
-    /// Voice summary landed while this device is in the foreground. One soft
-    /// impact. Skip the call if the app is backgrounded or the device is off.
+    /// Summary file landed and this device is in the foreground. Soft, one hit.
     static func voiceSaved() {
-        playImpact(.soft)
+        playImpact(.soft, intensity: 0.92)
+    }
+
+    /// Mushy soft thump when a machine-title swipe crosses halfway (titles split).
+    static func machineSwipeHalfway() {
+        playImpact(.soft, intensity: 0.92)
     }
 
     /// Warm the soft generator as a machine-title drag begins.

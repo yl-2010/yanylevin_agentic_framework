@@ -291,5 +291,11 @@ describe("role prompts", () => {
     assert.match(AGENT_MAIL_RULE, /message_agent/);
     assert.match(AGENT_MAIL_RULE, /list_agent_threads/);
     assert.match(SUBAGENT_RULE, /sendIMessage/);
+    assert.match(ORCHESTRATOR_RULE, /independent jobs/);
+    assert.match(ORCHESTRATOR_RULE, /Weather and an explanation of the code are two jobs/);
+    assert.equal(ORCHESTRATOR_RULE.includes("final reply on a mention turn is posted"), false);
+    assert.match(ORCHESTRATOR_RULE, /Your final text is not posted/);
+    assert.match(SUBAGENT_RULE, /forwarded as-is/);
+    assert.equal(ORCHESTRATOR_RULE.includes("\u2014"), false);
   });
 });

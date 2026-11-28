@@ -87,6 +87,10 @@
 	<string>Yan Levin uses your iPhone location in the background so the Personal Agent can see where you are when you chat from the web or a computer. On iPhone it also sends a location update about every 5 minutes, plus when you move a significant distance.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription~ipad</key>
 	<string>Yan Levin uses location on chat maps. The iPad app does not send location to the Personal Agent and does not run a 5-minute heartbeat. That is iPhone only.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Yan Levin uses the microphone so you can talk to the Personal Agent. Audio goes to your Mac and is not sent to a speech service.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Yan Levin uses on-device speech recognition for the live caption while you talk. Recognition stays on this iPhone or iPad.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>

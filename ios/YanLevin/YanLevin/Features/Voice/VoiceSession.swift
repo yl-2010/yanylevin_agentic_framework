@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import ThinkingOrbsKit
 
@@ -71,10 +72,21 @@ final class VoiceSession: ObservableObject {
 
     /// Signed in and `canUseAgent` would allow the Personal Agent. Full access
     /// on this app is that gate. Guests never reach the stage.
-    var micEnabled: Bool
+    var micEnabled: Bool {
+        didSet {
+            guard micEnabled != oldValue else { return }
+            if micEnabled {
+                VoiceCapture.shared.prepare()
+            } else {
+                VoiceCapture.shared.goDormant()
+            }
+        }
+    }
 
     /// App is not backgrounded. `voiceSaved` plays only while this is true.
     var isForeground = true
+
+    private var capturePull: AnyCancellable?
 
     @Published private(set) var phase: VoiceOrbPhase = .breathing
     @Published private(set) var caption = VoiceCaption()
@@ -85,6 +97,14 @@ final class VoiceSession: ObservableObject {
     init(micEnabled: Bool = false, thisDevice: VoiceDeviceKind = .current) {
         self.micEnabled = micEnabled
         self.thisDevice = thisDevice
+        capturePull = VoiceCapture.shared.objectWillChange.sink { [weak self] _ in
+            Task { @MainActor in
+                self?.applyCapture()
+            }
+        }
+        if micEnabled {
+            VoiceCapture.shared.prepare()
+        }
     }
 
     var otherDeviceHoldsMic: Bool {
@@ -128,21 +148,21 @@ final class VoiceSession: ObservableObject {
         guard orbIsControl, !listening else { return }
         activeDevice = thisDevice
         listening = true
-        phase = .listening
-        YLHaptics.tap()
+        phase = VoiceCapture.shared.readiness == .installing ? .connecting : .breathing
+        VoiceCapture.shared.setOtherDeviceLive(false)
+        VoiceCapture.shared.startListening()
     }
 
     /// Stop listening. Same path for the orb tap, leaving the Voice tab, and
-    /// leaving the app. A second call does not buzz again.
+    /// leaving the app. The capture plays medium once, and only if the mic
+    /// was actually up. A second call does not buzz again.
     func goDormant() {
-        let wasAwake = listening || !phase.isDormant
+        VoiceCapture.shared.goDormant()
         listening = false
         phase = .breathing
         if activeDevice == thisDevice {
             activeDevice = nil
         }
-        guard wasAwake else { return }
-        YLHaptics.medium()
     }
 
     /// He started talking over playback. Stops the spoken turn on screen and
@@ -170,7 +190,7 @@ final class VoiceSession: ObservableObject {
     /// Summary bubbles were written. Soft hit only if this app is still up.
     func noteSummarySaved() {
         guard isForeground else { return }
-        YLHaptics.voiceSaved()
+        VoiceCapture.shared.noteSummarySaved()
     }
 
     /// Live transcript or the sentence being spoken. No haptic.
@@ -182,15 +202,51 @@ final class VoiceSession: ObservableObject {
     /// the mic and shows the breathing orb. Does not steal a live claim.
     func noteRemoteActiveDevice(_ device: VoiceDeviceKind?) {
         if device == thisDevice {
+            VoiceCapture.shared.setOtherDeviceLive(false)
             activeDevice = thisDevice
             return
         }
         let wasAwake = listening || !phase.isDormant
+        VoiceCapture.shared.setOtherDeviceLive(device != nil)
         listening = false
         phase = .breathing
         activeDevice = device
         if wasAwake {
             YLHaptics.medium()
+        }
+    }
+
+    /// Caption and orb follow the mic. Searching and working stay put while
+    /// the call is open and he is quiet, so a later store can set those.
+    private func applyCapture() {
+        let capture = VoiceCapture.shared
+        if otherDeviceHoldsMic { return }
+        if case .unavailable(let message) = capture.readiness, !capture.isListening {
+            listening = false
+            phase = .breathing
+            caption = VoiceCaption(settled: message)
+            return
+        }
+        let armed = capture.isListening || capture.wantsMic
+        listening = armed
+        if capture.isHearing {
+            phase = .listening
+        } else if capture.isSpeaking {
+            phase = .composing
+        } else if capture.readiness == .installing && !armed {
+            phase = .connecting
+        } else if armed {
+            if phase != .searching && phase != .working {
+                phase = capture.readiness == .installing ? .connecting : .breathing
+            }
+        } else if phase == .listening || phase == .composing || phase == .connecting {
+            phase = .breathing
+        }
+        if capture.isSpeaking {
+            let line = capture.spokenLine.isEmpty ? capture.captionFinal : capture.spokenLine
+            caption = VoiceCaption(settled: line)
+        } else {
+            caption = VoiceCaption(settled: capture.captionFinal, volatileSuffix: capture.captionVolatile)
         }
     }
 

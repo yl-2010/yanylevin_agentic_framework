@@ -1622,6 +1622,11 @@ async function createSubagentSession(parentSid, parent, text) {
     modelLock: parent.modelLock || "",
     cursorAgentId: agent?.agentId || "",
     childSessionIds: [],
+    relayPlatform: parent.teamsOrigin
+      ? "teams"
+      : parent.imessageOrigin
+        ? "imessage"
+        : parent.relayPlatform || "",
     listTitle: withRoleTitlePrefix("subagent", fallbackChatTitle(text)),
     forceListTitle: true,
   });
@@ -2205,7 +2210,7 @@ async function continueAgentSend(session, sid, text, model) {
  */
 async function settleOutboundSend(session, sid, content, opts, model) {
   const channel = channelProgressKind(opts);
-  if (!channel) return content;
+  if (!channel || session?.role === "orchestrator") return content;
   let guidDropped = false;
   let resumes = 0;
   for (let guard = 0; guard < 8; guard++) {
@@ -4043,7 +4048,11 @@ async function executeAgentTurn(sid, session, opts) {
   const turnId = mintNavigateId();
   session.activeTurnId = turnId;
   session.channelProgress = channelProgressKind(opts);
-  if (!session.channelProgress && session.role === "orchestrator") {
+  if (
+    !session.channelProgress &&
+    session.role === "orchestrator" &&
+    opts.mailFrom
+  ) {
     if (session.imessageOrigin) session.channelProgress = "imessage";
     else if (session.teamsOrigin) session.channelProgress = "teams";
     else if (session.whatsappOrigin) session.channelProgress = "whatsapp";
@@ -4506,12 +4515,20 @@ export async function messageAgent(
     throw err;
   }
 
-  let promptSystem = systemPrompt(normalized, {
-    workspace: sessionWorkspace(session),
-  });
-  const roleText = rolePrompt(session);
-  if (roleText) promptSystem = `${promptSystem}\n\n${roleText}`;
-  if (session.teamsOrigin) promptSystem = teamsVoicePrompt(promptSystem);
+  const orchestrator = session.role === "orchestrator";
+  let promptSystem = orchestrator
+    ? rolePrompt(session)
+    : systemPrompt(normalized, {
+        workspace: sessionWorkspace(session),
+      });
+  if (!orchestrator) {
+    const roleText = rolePrompt(session);
+    if (roleText) promptSystem = `${promptSystem}\n\n${roleText}`;
+    if (session.teamsOrigin) promptSystem = teamsVoicePrompt(promptSystem);
+    if (session.role === "subagent" && session.relayPlatform === "teams") {
+      promptSystem = `${promptSystem}\n\n${TEAMS_FOUR11_HIDE}`;
+    }
+  }
   const live = liveContextSections(
     nowContext,
     uiContext,
@@ -4521,37 +4538,74 @@ export async function messageAgent(
   const channelParts = [];
   /** @type {string[]} */
   const promptParts = [];
-  const imessageBlock = formatIMessageOriginBlock(session.imessageOrigin, {
+  if (orchestrator) {
+    const chatName =
+      session.teamsOrigin?.chat ||
+      session.imessageOrigin?.chat ||
+      session.whatsappOrigin?.chat ||
+      "this chat";
+    const where = session.teamsOrigin
+      ? "Teams"
+      : session.imessageOrigin
+        ? "iMessage"
+        : "chat";
+    const client = String(uiContext?.client || "");
+    promptParts.push(`The people are in ${chatName} on ${where}.`);
+    if (client === "web" || client === "ios") {
+      promptParts.push(
+        "This was typed in the app. Split it the same way. When the subagents report, send_chat_message stays in this app chat. Do not post it to Teams or iMessage unless they asked you to tell that chat."
+      );
+    } else if (!mail) {
+      promptParts.push(
+        "This is a mention. Split it into independent jobs and call start_subagent for each one now. Do not answer."
+      );
+    }
+    promptParts.push("");
+  }
+  const imessageBlock = orchestrator
+    ? ""
+    : formatIMessageOriginBlock(session.imessageOrigin, {
     deliverFinal: Boolean(session.imessageDeliverFinal),
     guestCaller: session.guestCaller,
   });
   if (imessageBlock) {
     channelParts.push(imessageBlock);
   }
-  const teamsBlock = formatTeamsOriginBlock(session.teamsOrigin, {
-    deliverFinal: Boolean(session.teamsDeliverFinal),
-    guestCaller: session.guestCaller,
-  });
+  const teamsBlock = orchestrator
+    ? ""
+    : formatTeamsOriginBlock(session.teamsOrigin, {
+        deliverFinal: Boolean(session.teamsDeliverFinal),
+        guestCaller: session.guestCaller,
+      });
   if (teamsBlock) {
     channelParts.push(teamsBlock);
   }
-  const whatsappBlock = formatWhatsAppOriginBlock(session.whatsappOrigin, {
-    deliverFinal: Boolean(session.whatsappDeliverFinal),
-    guestCaller: session.guestCaller,
-  });
+  const whatsappBlock = orchestrator
+    ? ""
+    : formatWhatsAppOriginBlock(session.whatsappOrigin, {
+        deliverFinal: Boolean(session.whatsappDeliverFinal),
+        guestCaller: session.guestCaller,
+      });
   if (whatsappBlock) {
     channelParts.push(whatsappBlock);
   }
-  const composerSchedule = jypeComposerScheduleLine(model, session.teamsOrigin);
+  const composerSchedule = orchestrator
+    ? ""
+    : jypeComposerScheduleLine(model, session.teamsOrigin);
   if (composerSchedule) {
     channelParts.push(composerSchedule);
   }
-  if (session.futureAgentRecord) {
+  if (!orchestrator && session.futureAgentRecord) {
     channelParts.push(
       formatScheduledSystemBlock(session.futureAgentRecord, { kickoff: false })
     );
   }
-  if (interrupting) {
+  if (interrupting && orchestrator && !mail) {
+    promptParts.push(
+      "This mention replaces the one you were handling. Split this message instead. Do not answer it.",
+      ""
+    );
+  } else if (interrupting) {
     promptParts.push(
       mail ? ORCHESTRATOR_STEER_NOTE : interruptClarificationNote(session.channelReplyOwed),
       ""

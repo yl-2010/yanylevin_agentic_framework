@@ -85,11 +85,28 @@ function bookWith(overrides = {}) {
 }
 
 describe("voice social line", () => {
-  it("treats hey, thanks, stop, and never mind as social", () => {
-    assert.equal(isSocialUtterance("hey"), true);
+  it("treats only the phone's social phrases as social", () => {
+    for (const phrase of [
+      "hey",
+      "hi",
+      "hello",
+      "thanks",
+      "thank you",
+      "stop",
+      "never mind",
+      "nevermind",
+      "okay",
+      "ok",
+    ]) {
+      assert.equal(isSocialUtterance(phrase), true, phrase);
+    }
+    assert.equal(isSocialUtterance("Okay."), true);
+    assert.equal(isSocialUtterance("OK"), true);
     assert.equal(isSocialUtterance("Thanks!"), true);
-    assert.equal(isSocialUtterance("stop"), true);
-    assert.equal(isSocialUtterance("never mind"), true);
+    assert.equal(isSocialUtterance("never-mind"), true);
+    assert.equal(isSocialUtterance("bye"), false);
+    assert.equal(isSocialUtterance("yes"), false);
+    assert.equal(isSocialUtterance("thanks so much"), false);
     assert.equal(isSocialUtterance("move my calc homework to Friday"), false);
   });
 
@@ -107,6 +124,15 @@ describe("voice social line", () => {
     assert.equal(harness.overrides.sends || 0, 0);
     const call = harness.book.bySession.get("voice-sess1");
     assert.equal(call.turns[1].spoken, VOICE_ACK_SOCIAL);
+    const okay = await harness.book.utterance({
+      email: YAN,
+      sessionId: "voice-sess1",
+      device: "phone",
+      text: "Okay.",
+      clientUtteranceId: "u-okay",
+    });
+    assert.equal(okay.social, true);
+    assert.equal(harness.overrides.sends || 0, 0);
   });
 });
 

@@ -38,54 +38,21 @@ const SPOKEN_STOP = new Set(
   )
 );
 
+// Same phrases as VoicePhrase.socialPhrases. Exact match after normalizeSocialText.
 const SOCIAL_PHRASES = [
   "hey",
   "hi",
   "hello",
-  "hiya",
-  "yo",
-  "sup",
   "thanks",
   "thank you",
-  "thank you so much",
-  "thanks so much",
-  "thank u",
-  "ty",
   "stop",
   "never mind",
   "nevermind",
-  "ok",
   "okay",
-  "k",
-  "bye",
-  "goodbye",
-  "good night",
-  "goodnight",
-  "good morning",
-  "good afternoon",
-  "cool",
-  "got it",
-  "sounds good",
-  "all good",
-  "no worries",
-  "sorry",
-  "wait",
-  "yes",
-  "yeah",
-  "yep",
-  "no",
-  "nope",
-  "nah",
-  "please",
-  "alright",
-  "all right",
-  "what's up",
-  "whats up",
-  "np",
+  "ok",
 ];
 
 const SOCIAL_EXACT = new Set(SOCIAL_PHRASES);
-const SOCIAL_WORDS = new Set(SOCIAL_PHRASES.flatMap((p) => p.split(" ")));
 
 /** @type {Map<string, { text: string, sent: boolean, bag: any }>} */
 const utteranceSlots = new Map();
@@ -103,27 +70,25 @@ export function normalizeVoiceDevice(raw) {
 }
 
 /**
+ * Same shape as VoicePhrase.normalize. Lowercase, and non-letters become spaces.
  * @param {unknown} raw
  */
 export function normalizeSocialText(raw) {
   return String(raw || "")
     .toLowerCase()
-    .replace(/[!?.,'’"]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/ +/g, " ");
 }
 
 /**
- * Fixed allowlist. Not a model guess.
+ * Fixed allowlist. Exact phrase only, same list as the phone.
  * @param {unknown} raw
  */
 export function isSocialUtterance(raw) {
   const norm = normalizeSocialText(raw);
   if (!norm) return false;
-  if (SOCIAL_EXACT.has(norm)) return true;
-  const words = norm.split(" ");
-  if (words.length > 4) return false;
-  return words.every((w) => SOCIAL_WORDS.has(w));
+  return SOCIAL_EXACT.has(norm);
 }
 
 /**
