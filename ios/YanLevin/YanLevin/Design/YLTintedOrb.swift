@@ -40,8 +40,7 @@ struct YLTintedOrb: View {
             } else {
                 TimelineView(.animation) { timeline in
                     let now = timeline.date.timeIntervalSinceReferenceDate
-                    mix.advance(toward: state, now: now)
-                    canvas(layers: mix.layers(at: now), now: now, tint: tint, dark: dark)
+                    canvas(layers: mix.layers(toward: state, at: now), now: now, tint: tint, dark: dark)
                 }
             }
         }
@@ -134,6 +133,12 @@ private final class OrbMix {
         previous = state
         rendered = state
         candidate = state
+    }
+
+    /// Steps the mix, then returns the drawings. The timeline cannot call `advance` itself. That call is Void, and ViewBuilder tries to treat it as a view.
+    func layers(toward target: OrbState, at now: TimeInterval) -> [(OrbState, Double)] {
+        advance(toward: target, now: now)
+        return layers(at: now)
     }
 
     func advance(toward target: OrbState, now: TimeInterval) {
