@@ -1751,7 +1751,9 @@ function sendChatMessageTool(sid, session) {
   return {
     send_chat_message: {
       description:
-        "Send a user-visible chat bubble immediately without ending the turn. On an iMessage or Teams @agent or @agentg first turn, this also posts that text to the same chat right away. Before a long job (a new page, a study guide, a big write), send one short line of what you are about to do, then start the work. Send another only when that chat should hear something new. Do not send still working with no news. The server still sends your final reply when the work is done, so do not put that same final text here. On a normal app chat this stays in the app and website only. Do not call this for a short answer.",
+        session.role === "orchestrator"
+          ? "Post one line to the Teams or iMessage chat now. Your final text is not posted, so this call is the only way they hear a status. On a long job, call it with one short line when you start or steer the work. Building a site about Windows laptops. Send another only when there is news. Do not send still working. Do not put the final blurb here and also leave it for later. A short answer like the weather skips this until the subagent mails the result."
+          : "Send a user-visible chat bubble immediately without ending the turn. On an iMessage or Teams @agent or @agentg first turn, this also posts that text to the same chat right away. Before a long job (a new page, a study guide, a big write), send one short line of what you are about to do, then start the work. Send another only when that chat should hear something new. Do not send still working with no news. The server still sends your final reply when the work is done, so do not put that same final text here. On a normal app chat this stays in the app and website only. Do not call this for a short answer.",
       inputSchema: {
         type: "object",
         properties: {

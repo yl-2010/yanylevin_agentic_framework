@@ -322,12 +322,15 @@ describe("role prompts", () => {
     assert.match(ORCHESTRATOR_RULE, /Your final text is not posted/);
     assert.match(ORCHESTRATOR_RULE, /Do not wait for the other jobs/);
     assert.equal(ORCHESTRATOR_RULE.includes("wait if another job is still out"), false);
-    assert.match(SUBAGENT_RULE, /only the text that should be posted/);
+    assert.match(SUBAGENT_RULE, /mail the short result when you finish/);
     assert.match(SUBAGENT_RULE, /Do not mail a briefing/);
     assert.match(ORCHESTRATOR_RULE, /Do not paste the memo/);
     assert.match(ORCHESTRATOR_RULE, /Blue website, then make it red/);
     assert.match(ORCHESTRATOR_RULE, /Do not start a second subagent/);
     assert.match(ORCHESTRATOR_RULE, /like I can say/);
+    assert.match(ORCHESTRATOR_RULE, /Building a site about Windows laptops/);
+    assert.match(ORCHESTRATOR_RULE, /never reaches the chat/);
+    assert.match(SUBAGENT_RULE, /Do not wait until the end for the only mail/);
     assert.equal(SUBAGENT_RULE.includes("forwarded as-is"), false);
     assert.equal(ORCHESTRATOR_RULE.includes("\u2014"), false);
   });
