@@ -267,6 +267,25 @@ final class VoiceCapture: ObservableObject {
         }
     }
 
+    /// Status line while the mic is down. Empty clears it.
+    func showIdleLine(_ text: String) {
+        guard !isListening, !isHearing else { return }
+        captionFinal = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        captionVolatile = ""
+        if captionFinal.isEmpty {
+            spokenLine = ""
+        }
+    }
+
+    /// Parakeet's line, once the holding sentence is done. Does not cover a live partial.
+    func noteServerCaption(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !isHearing, !isSpeaking else { return }
+        guard captionFinal != trimmed else { return }
+        captionFinal = trimmed
+        captionVolatile = ""
+    }
+
     /// Parakeet's line, when it differs. Does not cover the sentence being spoken.
     func replaceUtteranceText(id: String, with text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -620,7 +639,7 @@ final class VoiceCapture: ObservableObject {
         captionFinal = line
         captionVolatile = ""
         spokenLine = line
-        // On the phone, before any upload, Parakeet, or Grok.
+        // On the phone, before the upload. VoiceStore posts this clip after.
         speaker.speakFirstSound(id: id, text: line)
     }
 

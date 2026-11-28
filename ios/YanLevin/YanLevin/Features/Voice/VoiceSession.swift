@@ -63,8 +63,9 @@ struct VoiceCaption: Equatable {
     }
 }
 
-/// Local voice session for the glass screen. No network. Listening, dormant,
-/// and the later audio cues all go through here so a partial caption cannot buzz.
+/// Voice session for the glass screen. The mic, the caption, and Okay / Checking
+/// stay on the phone. `VoiceStore` posts the clip with the same signed-in client
+/// as Chat. A partial caption never buzzes.
 @MainActor
 final class VoiceSession: ObservableObject {
     /// This device. The server later reports who `activeDevice` is.
@@ -78,13 +79,23 @@ final class VoiceSession: ObservableObject {
             if micEnabled {
                 VoiceCapture.shared.prepare()
             } else {
-                VoiceCapture.shared.goDormant()
+                goDormant()
             }
         }
     }
 
     /// App is not backgrounded. `voiceSaved` plays only while this is true.
-    var isForeground = true
+    var isForeground = true {
+        didSet {
+            guard isForeground != oldValue else { return }
+            VoiceStore.shared.setForeground(isForeground)
+        }
+    }
+
+    /// Mac call is still being claimed, or the speech asset is still installing.
+    private var callConnecting = false
+    /// Last phase from `voice/state`. Hearing and speaking on the phone win over this.
+    private var serverPhase: VoiceOrbPhase = .breathing
 
     private var capturePull: AnyCancellable?
 
@@ -131,24 +142,43 @@ final class VoiceSession: ObservableObject {
         if !micEnabled {
             return "Voice"
         }
-        return listening ? "Stop listening" : "Start listening"
+        return (listening || callConnecting) ? "Stop listening" : "Start listening"
+    }
+
+    /// Signed-in token, the same one `POST api/home/agent/message` sends.
+    func bind(token: String?) {
+        VoiceStore.shared.attach(surface: self, token: token, device: thisDevice)
+        VoiceStore.shared.setForeground(isForeground)
     }
 
     /// Tap on the orb. Starts listening, or goes dormant and stops the mic.
+    /// With a token, the Mac is claimed before the mic opens. Okay and Checking
+    /// still come from the phone the moment a phrase ends.
     func tapOrb() {
         guard orbIsControl else { return }
-        if listening || !phase.isDormant {
+        if listening || callConnecting || !phase.isDormant {
             goDormant()
+        } else if VoiceStore.shared.hasToken {
+            beginCall()
         } else {
             startListening()
         }
     }
 
+    private func beginCall() {
+        guard orbIsControl, !listening, !callConnecting else { return }
+        callConnecting = true
+        serverPhase = .breathing
+        phase = .connecting
+        VoiceCapture.shared.showIdleLine("")
+        VoiceStore.shared.claim(surface: self, device: thisDevice)
+    }
+
     func startListening() {
         guard orbIsControl, !listening else { return }
+        callConnecting = true
         activeDevice = thisDevice
-        listening = true
-        phase = VoiceCapture.shared.readiness == .installing ? .connecting : .breathing
+        phase = .connecting
         VoiceCapture.shared.setOtherDeviceLive(false)
         VoiceCapture.shared.startListening()
     }
@@ -157,12 +187,64 @@ final class VoiceSession: ObservableObject {
     /// leaving the app. The capture plays medium once, and only if the mic
     /// was actually up. A second call does not buzz again.
     func goDormant() {
+        let micUp = VoiceCapture.shared.isListening || VoiceCapture.shared.wantsMic
+        let cancelConnect = callConnecting && !micUp
+        callConnecting = false
+        serverPhase = .breathing
+        VoiceStore.shared.release()
         VoiceCapture.shared.goDormant()
         listening = false
         phase = .breathing
         if activeDevice == thisDevice {
             activeDevice = nil
         }
+        if cancelConnect {
+            YLHaptics.medium()
+        }
+    }
+
+    /// `voice/start` or `voice/resume` claimed this device. Open the mic.
+    func voiceLinkClaimed() {
+        startListening()
+    }
+
+    func voiceLinkFailed(_ line: String) {
+        callConnecting = false
+        serverPhase = .breathing
+        VoiceCapture.shared.liveTurnRunning = false
+        VoiceCapture.shared.showIdleLine(line)
+        listening = false
+        phase = .breathing
+        applyCapture()
+    }
+
+    func voiceLinkBusyElsewhere(_ device: VoiceDeviceKind) {
+        if activeDevice == device && !listening && phase.isDormant && !callConnecting {
+            return
+        }
+        callConnecting = false
+        serverPhase = .breathing
+        phase = .breathing
+        noteRemoteActiveDevice(device)
+    }
+
+    /// The other device let go. A tap here can claim the call.
+    func voiceOtherDeviceReleased() {
+        guard otherDeviceHoldsMic else { return }
+        VoiceCapture.shared.setOtherDeviceLive(false)
+        activeDevice = nil
+        listening = false
+        phase = .breathing
+    }
+
+    /// Server marked the call dormant, usually after missed heartbeats.
+    func voiceDroppedByServer() {
+        goDormant()
+    }
+
+    func voiceServerPhase(_ phase: VoiceOrbPhase) {
+        serverPhase = phase
+        applyCapture()
     }
 
     /// He started talking over playback. Stops the spoken turn on screen and
@@ -216,12 +298,13 @@ final class VoiceSession: ObservableObject {
         }
     }
 
-    /// Caption and orb follow the mic. Searching and working stay put while
-    /// the call is open and he is quiet, so a later store can set those.
+    /// Caption and orb follow the mic. Grok's phase shows only while he is quiet.
+    /// A long silence leaves the mic up. It does not hang up.
     private func applyCapture() {
         let capture = VoiceCapture.shared
         if otherDeviceHoldsMic { return }
         if case .unavailable(let message) = capture.readiness, !capture.isListening {
+            callConnecting = false
             listening = false
             phase = .breathing
             caption = VoiceCaption(settled: message)
@@ -229,17 +312,18 @@ final class VoiceSession: ObservableObject {
         }
         let armed = capture.isListening || capture.wantsMic
         listening = armed
+        if capture.isListening {
+            callConnecting = false
+        }
         if capture.isHearing {
             phase = .listening
         } else if capture.isSpeaking {
             phase = .composing
-        } else if capture.readiness == .installing && !armed {
+        } else if callConnecting || (armed && !capture.isListening) || capture.readiness == .installing {
             phase = .connecting
-        } else if armed {
-            if phase != .searching && phase != .working {
-                phase = capture.readiness == .installing ? .connecting : .breathing
-            }
-        } else if phase == .listening || phase == .composing || phase == .connecting {
+        } else if armed && (serverPhase == .searching || serverPhase == .working || serverPhase == .composing) {
+            phase = serverPhase
+        } else {
             phase = .breathing
         }
         if capture.isSpeaking {

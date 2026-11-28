@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		016EA89B8F227C0DDEED8851 /* ChatSendFlight.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA73E841EE806831FD0F0861 /* ChatSendFlight.swift */; };
 		1F6B3D90A4C85E27B7D14A38 /* VoiceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D4A6C28E1F74B30A8C5D9E2 /* VoiceSession.swift */; };
+		B7D2F0C85E1A4B93C6F8D429 /* VoiceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8C3E1B74D9F4A62B0E5C718 /* VoiceStore.swift */; };
 		4B8E2F17C9A046D3B5E8A172 /* VoiceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7C31A94B0D64F58A2E19C6D /* VoiceView.swift */; };
 		0176F9C055AC87C95524E633 /* ChatWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0293C4406F9D69D94DEF0AF /* ChatWidgets.swift */; };
 		02E4B0AB334E7E786B92BAFF /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D468F5B66C3D9BB130D39AAA /* AuthStore.swift */; };
@@ -151,6 +152,7 @@
 /* Begin PBXFileReference section */
 		03B019B6E0B0488314D38BD9 /* ChatControlWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatControlWidget.swift; sourceTree = "<group>"; };
 		9D4A6C28E1F74B30A8C5D9E2 /* VoiceSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceSession.swift; sourceTree = "<group>"; };
+		A8C3E1B74D9F4A62B0E5C718 /* VoiceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceStore.swift; sourceTree = "<group>"; };
 		E7C31A94B0D64F58A2E19C6D /* VoiceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceView.swift; sourceTree = "<group>"; };
 		04CDAACEDCB8632DFA206E04 /* KaTeX_Main-BoldItalic.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Main-BoldItalic.woff2"; sourceTree = "<group>"; };
 		057315720E940707A886B356 /* YanLevinWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = YanLevinWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -275,6 +277,7 @@
 				C4A7E0C0A11E5B4C0D9E8F01 /* VoiceCapture.swift */,
 				9D4A6C28E1F74B30A8C5D9E2 /* VoiceSession.swift */,
 				C4A7E0C0A11E5B4C0D9E8F03 /* VoiceSpeaker.swift */,
+				A8C3E1B74D9F4A62B0E5C718 /* VoiceStore.swift */,
 				E7C31A94B0D64F58A2E19C6D /* VoiceView.swift */,
 			);
 			path = Voice;
@@ -711,6 +714,7 @@
 				C4A7E0C0A11E5B4C0D9E8F02 /* VoiceCapture.swift in Sources */,
 				1F6B3D90A4C85E27B7D14A38 /* VoiceSession.swift in Sources */,
 				C4A7E0C0A11E5B4C0D9E8F04 /* VoiceSpeaker.swift in Sources */,
+				B7D2F0C85E1A4B93C6F8D429 /* VoiceStore.swift in Sources */,
 				4B8E2F17C9A046D3B5E8A172 /* VoiceView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

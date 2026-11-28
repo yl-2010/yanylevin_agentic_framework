@@ -1752,7 +1752,7 @@ function sendChatMessageTool(sid, session) {
     send_chat_message: {
       description:
         session.role === "orchestrator"
-          ? "Post one line to the Teams or iMessage chat now. Say Building it. Do not say Subagent is building it. Do not say subagent, orchestrator, worker, or mail unless they used that word first. Your final text is not posted, so this call is the only way they hear a status. On a long job, call it with one short line when you start or steer the work. Building a site about Windows laptops. Send another only when there is news. Do not send still working. Do not put the final blurb here and also leave it for later. A short answer like the weather skips this until the result is ready."
+          ? "Post one line to the Teams or iMessage chat now. Say Building it. Do not say Subagent is building it. Do not say subagent, orchestrator, worker, or mail unless they used that word first. Your final text is not posted, so this call is the only way they hear a status. On a long job, call it with one short line when you start or steer the work, like Building a site about Windows laptops, with no period. Send another only when there is news. One sentence has no period. Periods only when the reply is two or more sentences. Do not send still working. Do not put the final blurb here and also leave it for later. A short answer like the weather skips this until the result is ready."
           : "Send a user-visible chat bubble immediately without ending the turn. On an iMessage or Teams @agent or @agentg first turn, this also posts that text to the same chat right away. Before a long job (a new page, a study guide, a big write), send one short line of what you are about to do, then start the work. Send another only when that chat should hear something new. Do not send still working with no news. The server still sends your final reply when the work is done, so do not put that same final text here. On a normal app chat this stays in the app and website only. Do not call this for a short answer.",
       inputSchema: {
         type: "object",
@@ -4587,7 +4587,7 @@ export async function messageAgent(
       );
     }
     promptParts.push(
-      "When you post, match that chat. A few sentences or a short list, unless they asked for an essay, a draft, or a full page. If a subagent mails a memo, cut it. Do not paste it. Say Building it. Do not say Subagent is building it. Do not say subagent, orchestrator, worker, or mail unless they used that word first."
+      "When you post, match that chat. A few sentences or a short list, unless they asked for an essay, a draft, or a full page. If a subagent mails a memo, cut it. Do not paste it. Say Building it. Do not say Subagent is building it. Do not say subagent, orchestrator, worker, or mail unless they used that word first. One sentence has no period. Periods only when the reply is two or more sentences."
     );
     promptParts.push("");
   }

@@ -22,6 +22,10 @@ struct VoiceView: View {
         .onAppear {
             session.isForeground = scenePhase != .background
             session.micEnabled = auth.hasFullAccess
+            session.bind(token: auth.session?.token)
+        }
+        .onChange(of: auth.session?.token) { _, token in
+            session.bind(token: token)
         }
         .onChange(of: auth.hasFullAccess) { _, allowed in
             session.micEnabled = allowed

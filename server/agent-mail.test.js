@@ -331,6 +331,8 @@ describe("role prompts", () => {
     assert.match(ORCHESTRATOR_RULE, /Building a site about Windows laptops/);
     assert.match(ORCHESTRATOR_RULE, /never reaches the chat/);
     assert.match(ORCHESTRATOR_RULE, /Say Building it/);
+    assert.match(ORCHESTRATOR_RULE, /One word, one phrase, or one sentence has no period/);
+    assert.match(SUBAGENT_RULE, /one sentence has no period/);
     assert.match(ORCHESTRATOR_RULE, /Do not say Subagent is building it/);
     assert.match(ORCHESTRATOR_RULE, /Do not say subagent, orchestrator, worker, or mail unless they used that word first/);
     assert.match(SUBAGENT_RULE, /Do not say subagent, orchestrator, worker, or mail unless they used that word first/);
